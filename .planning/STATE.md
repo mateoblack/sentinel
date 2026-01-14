@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-14)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.0 shipped — planning next milestone
+**Current focus:** v1.1 Sentinel Fingerprint — making Sentinel enforceable and provable via SourceIdentity stamping
 
 ## Current Position
 
-Phase: 8 of 8 (Profile Compatibility)
-Plan: 2 of 2 in current phase
-Status: v1.0 Milestone complete
-Last activity: 2026-01-14 — Shipped v1.0 MVP
+Phase: 9 of 17 (Source Identity Schema)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-14 — Milestone v1.1 Sentinel Fingerprint created
 
-Progress: ████████████████████ 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone Summary
 
@@ -61,20 +61,16 @@ Key decisions from v1.0 logged in PROJECT.md Key Decisions table.
 
 None — clean implementation.
 
-### Blockers/Concerns
+### Blockers/Concerns Carried Forward
 
-None — v1.0 shipped successfully.
+None — clean start for v1.1.
 
 ## Session Continuity
 
 Last session: 2026-01-14
-Stopped at: v1.0 milestone complete
+Stopped at: Milestone v1.1 initialization
 Resume file: None
 
-## Next Steps
+## Roadmap Evolution
 
-Options for v1.1:
-- Approval workflows (DynamoDB + notification integration)
-- Break-glass mode for emergency access
-- Additional policy conditions (IP ranges, MFA requirements)
-- S3-based policy storage alternative
+- Milestone v1.1 created: Sentinel Fingerprint (SourceIdentity stamping), 9 phases (Phase 9-17)
