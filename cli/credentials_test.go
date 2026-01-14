@@ -1,11 +1,16 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/byteness/aws-vault/v7/iso8601"
+	"github.com/byteness/aws-vault/v7/logging"
 )
 
 func TestCredentialProcessOutputJSONMarshaling(t *testing.T) {
@@ -190,4 +195,192 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestCredentialsCommandInput_LoggingFields(t *testing.T) {
+	// Test that CredentialsCommandInput has all expected logging fields
+	input := CredentialsCommandInput{
+		ProfileName:     "test-profile",
+		PolicyParameter: "/sentinel/policies/test",
+		LogFile:         "/tmp/decisions.log",
+		LogStderr:       true,
+	}
+
+	// Verify LogFile field exists and is set correctly
+	if input.LogFile != "/tmp/decisions.log" {
+		t.Errorf("expected LogFile '/tmp/decisions.log', got %q", input.LogFile)
+	}
+
+	// Verify LogStderr field exists and is set correctly
+	if !input.LogStderr {
+		t.Error("expected LogStderr to be true")
+	}
+
+	// Test default values
+	defaultInput := CredentialsCommandInput{}
+	if defaultInput.LogFile != "" {
+		t.Errorf("expected empty LogFile by default, got %q", defaultInput.LogFile)
+	}
+	if defaultInput.LogStderr {
+		t.Error("expected LogStderr to be false by default")
+	}
+	if defaultInput.Logger != nil {
+		t.Error("expected Logger to be nil by default")
+	}
+}
+
+func TestCredentialsCommand_LoggerCreation(t *testing.T) {
+	t.Run("creates logger when log-file is set", func(t *testing.T) {
+		// Create temp directory for test
+		tmpDir := t.TempDir()
+		logFile := filepath.Join(tmpDir, "decisions.log")
+
+		// Test that file logger can be created
+		f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			t.Fatalf("Failed to open log file: %v", err)
+		}
+		defer f.Close()
+
+		// Create logger and write entry
+		logger := logging.NewJSONLogger(f)
+		entry := logging.DecisionLogEntry{
+			Timestamp:  "2026-01-14T10:00:00Z",
+			User:       "alice",
+			Profile:    "production",
+			Effect:     "allow",
+			Rule:       "allow-production",
+			RuleIndex:  0,
+			PolicyPath: "/sentinel/policies/default",
+		}
+		logger.LogDecision(entry)
+
+		// Verify file was written
+		f.Close()
+		content, err := os.ReadFile(logFile)
+		if err != nil {
+			t.Fatalf("Failed to read log file: %v", err)
+		}
+
+		if len(content) == 0 {
+			t.Error("expected log file to have content")
+		}
+
+		// Verify it's valid JSON
+		var parsed logging.DecisionLogEntry
+		if err := json.Unmarshal(bytes.TrimSpace(content), &parsed); err != nil {
+			t.Errorf("log file should contain valid JSON, got error: %v", err)
+		}
+	})
+
+	t.Run("creates logger when log-stderr is set", func(t *testing.T) {
+		// Test that stderr logger can be created
+		var buf bytes.Buffer
+		logger := logging.NewJSONLogger(&buf)
+
+		entry := logging.DecisionLogEntry{
+			Timestamp: "2026-01-14T10:00:00Z",
+			User:      "bob",
+			Profile:   "staging",
+			Effect:    "deny",
+			RuleIndex: -1,
+		}
+		logger.LogDecision(entry)
+
+		if buf.Len() == 0 {
+			t.Error("expected buffer to have content")
+		}
+	})
+
+	t.Run("creates MultiWriter for both destinations", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		logFile := filepath.Join(tmpDir, "decisions.log")
+
+		// Create file and buffer
+		f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			t.Fatalf("Failed to open log file: %v", err)
+		}
+		defer f.Close()
+
+		var stderrBuf bytes.Buffer
+
+		// Create MultiWriter just like credentials.go does
+		writers := []io.Writer{&stderrBuf, f}
+		logger := logging.NewJSONLogger(io.MultiWriter(writers...))
+
+		entry := logging.DecisionLogEntry{
+			Timestamp:  "2026-01-14T10:00:00Z",
+			User:       "charlie",
+			Profile:    "development",
+			Effect:     "allow",
+			Rule:       "allow-dev",
+			RuleIndex:  0,
+			PolicyPath: "/sentinel/policies/default",
+		}
+		logger.LogDecision(entry)
+
+		// Verify both destinations received the log
+		if stderrBuf.Len() == 0 {
+			t.Error("expected stderr buffer to have content")
+		}
+
+		f.Close()
+		fileContent, err := os.ReadFile(logFile)
+		if err != nil {
+			t.Fatalf("Failed to read log file: %v", err)
+		}
+
+		if len(fileContent) == 0 {
+			t.Error("expected log file to have content")
+		}
+
+		// Verify both have the same content
+		if stderrBuf.String() != string(fileContent) {
+			t.Errorf("expected identical content in both destinations:\nstderr: %q\nfile: %q",
+				stderrBuf.String(), string(fileContent))
+		}
+	})
+
+	t.Run("file logging appends to existing file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		logFile := filepath.Join(tmpDir, "decisions.log")
+
+		// Write first entry
+		f1, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			t.Fatalf("Failed to open log file: %v", err)
+		}
+		logger1 := logging.NewJSONLogger(f1)
+		logger1.LogDecision(logging.DecisionLogEntry{
+			Timestamp: "2026-01-14T10:00:00Z",
+			User:      "alice",
+			Effect:    "allow",
+		})
+		f1.Close()
+
+		// Write second entry (new file handle, simulating new command execution)
+		f2, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			t.Fatalf("Failed to open log file: %v", err)
+		}
+		logger2 := logging.NewJSONLogger(f2)
+		logger2.LogDecision(logging.DecisionLogEntry{
+			Timestamp: "2026-01-14T10:01:00Z",
+			User:      "bob",
+			Effect:    "deny",
+		})
+		f2.Close()
+
+		// Verify file has both entries (JSON Lines format)
+		content, err := os.ReadFile(logFile)
+		if err != nil {
+			t.Fatalf("Failed to read log file: %v", err)
+		}
+
+		lines := bytes.Split(bytes.TrimSpace(content), []byte("\n"))
+		if len(lines) != 2 {
+			t.Errorf("expected 2 log lines (appended), got %d", len(lines))
+		}
+	})
 }
