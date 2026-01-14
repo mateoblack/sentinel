@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -59,4 +61,88 @@ func Example_sentinelExecCommand() {
 	// 2. Evaluate if the current user can access the "myprofile" profile at the current time
 	// 3. If allowed, retrieve credentials and inject them into the subprocess environment
 	// 4. Execute "aws s3 ls" with the injected credentials
+}
+
+func TestSentinelExecCommand_InvalidProfile(t *testing.T) {
+	// Create a temp config file with known profiles
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config")
+
+	configContent := `[profile production]
+region = us-east-1
+
+[profile staging]
+region = us-west-2
+`
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// Set AWS_CONFIG_FILE to use our test config
+	t.Setenv("AWS_CONFIG_FILE", configFile)
+
+	input := SentinelExecCommandInput{
+		ProfileName:     "nonexistent",
+		PolicyParameter: "/sentinel/policies/default",
+	}
+
+	s := &Sentinel{}
+	exitCode, err := SentinelExecCommand(context.Background(), input, s)
+
+	// Verify exit code is 1 (non-zero)
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1, got %d", exitCode)
+	}
+
+	// Verify error is returned
+	if err == nil {
+		t.Fatal("expected error for invalid profile, got nil")
+	}
+
+	errStr := err.Error()
+
+	// Verify error message contains "not found"
+	if !strings.Contains(errStr, "not found") {
+		t.Errorf("error should mention 'not found', got: %s", errStr)
+	}
+
+	// Verify error mentions the profile name
+	if !strings.Contains(errStr, "nonexistent") {
+		t.Errorf("error should mention the profile name, got: %s", errStr)
+	}
+
+	// Verify error lists available profiles
+	if !strings.Contains(errStr, "production") || !strings.Contains(errStr, "staging") {
+		t.Errorf("error should list available profiles, got: %s", errStr)
+	}
+}
+
+func TestSentinelExecCommand_ValidProfile_ReachesPolicy(t *testing.T) {
+	// This test verifies that when profile is valid, exec proceeds past profile validation
+	// It will fail at policy loading (no SSM access), but that's expected
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config")
+
+	configContent := `[profile valid-profile]
+region = us-east-1
+`
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	t.Setenv("AWS_CONFIG_FILE", configFile)
+
+	input := SentinelExecCommandInput{
+		ProfileName:     "valid-profile",
+		PolicyParameter: "/sentinel/policies/default",
+	}
+
+	s := &Sentinel{}
+	_, err := SentinelExecCommand(context.Background(), input, s)
+
+	// We expect an error (will fail at AWS config or policy loading),
+	// but it should NOT be a profile validation error
+	if err != nil && strings.Contains(err.Error(), "not found in AWS config") {
+		t.Errorf("should not fail on profile validation for valid profile, got: %v", err)
+	}
 }
