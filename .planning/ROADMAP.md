@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Policy Evaluation** - Core decision engine (allow/deny logic)
 - [x] **Phase 5: Credential Process** - credential_process output format and integration
 - [x] **Phase 6: Decision Logging** - Structured logging of access decisions
-- [ ] **Phase 7: Exec Command** - sentinel exec for direct invocation
+- [x] **Phase 7: Exec Command** - sentinel exec for direct invocation
 - [ ] **Phase 8: Profile Compatibility** - Seamless integration with existing aws-vault profiles
 
 ## Phase Details
@@ -97,7 +97,7 @@ Plans:
 
 Plans:
 - [x] 07-01: exec command with subprocess spawning
-- [ ] 07-02: Environment variable injection
+- [x] 07-02: Environment variable injection
 
 ### Phase 8: Profile Compatibility
 **Goal**: Work transparently with existing ~/.aws/config profiles without modification
@@ -122,5 +122,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Policy Evaluation | 2/2 | Complete | 2026-01-14 |
 | 5. Credential Process | 2/2 | Complete | 2026-01-14 |
 | 6. Decision Logging | 2/2 | Complete | 2026-01-14 |
-| 7. Exec Command | 1/2 | In progress | - |
+| 7. Exec Command | 2/2 | Complete | 2026-01-14 |
 | 8. Profile Compatibility | 0/2 | Not started | - |
