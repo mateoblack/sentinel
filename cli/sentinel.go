@@ -64,6 +64,23 @@ func (s *Sentinel) AwsConfigFile() (*vault.ConfigFile, error) {
 	return s.awsConfigFile, nil
 }
 
+// ValidateProfile checks if profile exists in AWS config file.
+// Returns nil if valid, error with available profiles if not found.
+func (s *Sentinel) ValidateProfile(profileName string) error {
+	configFile, err := s.AwsConfigFile()
+	if err != nil {
+		return fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	_, ok := configFile.ProfileSection(profileName)
+	if !ok {
+		availableProfiles := configFile.ProfileNames()
+		return fmt.Errorf("profile %q not found in AWS config; available profiles: %v", profileName, availableProfiles)
+	}
+
+	return nil
+}
+
 // ConfigureSentinelGlobals sets up global flags for the sentinel CLI.
 func ConfigureSentinelGlobals(app *kingpin.Application) *Sentinel {
 	s := &Sentinel{
