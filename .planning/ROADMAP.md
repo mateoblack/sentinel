@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: TBD
 
 Plans:
-- [ ] 01-01: CLI skeleton with cobra, main entry point
+- [x] 01-01: CLI skeleton with kingpin, main entry point
 - [ ] 01-02: aws-vault library integration, credential provider access
 
 ### Phase 2: Policy Schema
@@ -116,7 +116,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/2 | Not started | - |
+| 1. Foundation | 1/2 | In progress | - |
 | 2. Policy Schema | 0/2 | Not started | - |
 | 3. Policy Loading | 0/2 | Not started | - |
 | 4. Policy Evaluation | 0/2 | Not started | - |
