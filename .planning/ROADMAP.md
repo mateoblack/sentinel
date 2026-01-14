@@ -86,7 +86,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 06-01: Structured logger with decision fields
+- [x] 06-01: Structured logger with decision fields
 - [ ] 06-02: Log destination configuration
 
 ### Phase 7: Exec Command
@@ -121,6 +121,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Policy Loading | 2/2 | Complete | 2026-01-14 |
 | 4. Policy Evaluation | 2/2 | Complete | 2026-01-14 |
 | 5. Credential Process | 2/2 | Complete | 2026-01-14 |
-| 6. Decision Logging | 0/2 | Not started | - |
+| 6. Decision Logging | 1/2 | In progress | - |
 | 7. Exec Command | 0/2 | Not started | - |
 | 8. Profile Compatibility | 0/2 | Not started | - |
