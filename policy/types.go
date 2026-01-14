@@ -79,3 +79,32 @@ type HourRange struct {
 	Start string `yaml:"start" json:"start"` // Format: "HH:MM" (24-hour)
 	End   string `yaml:"end" json:"end"`     // Format: "HH:MM" (24-hour)
 }
+
+// IsValid returns true if the Effect is a known value.
+func (e Effect) IsValid() bool {
+	return e == EffectAllow || e == EffectDeny
+}
+
+// String returns the string representation of the Effect.
+func (e Effect) String() string {
+	return string(e)
+}
+
+// IsValid returns true if the Weekday is a known value.
+func (w Weekday) IsValid() bool {
+	switch w {
+	case Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday:
+		return true
+	}
+	return false
+}
+
+// String returns the string representation of the Weekday.
+func (w Weekday) String() string {
+	return string(w)
+}
+
+// AllWeekdays returns all valid weekday values.
+func AllWeekdays() []Weekday {
+	return []Weekday{Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday}
+}
