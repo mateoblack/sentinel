@@ -68,25 +68,23 @@ func matchesConditions(c *Condition, req *Request) bool {
 // matchesProfiles checks if the request profile matches the condition.
 // An empty profiles list matches any profile.
 func matchesProfiles(profiles []string, profile string) bool {
-	if len(profiles) == 0 {
-		return true
-	}
-	for _, p := range profiles {
-		if p == profile {
-			return true
-		}
-	}
-	return false
+	return containsOrEmpty(profiles, profile)
 }
 
 // matchesUsers checks if the request user matches the condition.
 // An empty users list matches any user.
 func matchesUsers(users []string, user string) bool {
-	if len(users) == 0 {
+	return containsOrEmpty(users, user)
+}
+
+// containsOrEmpty returns true if the list is empty or contains the value.
+// An empty list matches any value (acts as wildcard).
+func containsOrEmpty(list []string, value string) bool {
+	if len(list) == 0 {
 		return true
 	}
-	for _, u := range users {
-		if u == user {
+	for _, item := range list {
+		if item == value {
 			return true
 		}
 	}
