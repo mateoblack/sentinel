@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/iso8601"
+	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 )
 
@@ -21,6 +22,7 @@ type CredentialsCommandInput struct {
 	Region          string
 	NoSession       bool
 	SessionDuration time.Duration
+	Logger          logging.Logger // nil means no logging
 }
 
 // CredentialProcessOutput represents the JSON output format for AWS credential_process.
@@ -109,7 +111,13 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	// 6. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 7. Handle decision
+	// 7. Log decision (before handling, so both allow and deny are logged)
+	if input.Logger != nil {
+		entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
+		input.Logger.LogDecision(entry)
+	}
+
+	// 8. Handle decision
 	if decision.Effect == policy.EffectDeny {
 		fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
 		return fmt.Errorf("access denied")
