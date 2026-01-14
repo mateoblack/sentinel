@@ -65,7 +65,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 04-01: Rule matching engine
+- [x] 04-01: Rule matching engine
 - [ ] 04-02: Decision result with matched rule context
 
 ### Phase 5: Credential Process
@@ -119,7 +119,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Foundation | 2/2 | Complete | 2026-01-14 |
 | 2. Policy Schema | 2/2 | Complete | 2026-01-14 |
 | 3. Policy Loading | 2/2 | Complete | 2026-01-14 |
-| 4. Policy Evaluation | 0/2 | Not started | - |
+| 4. Policy Evaluation | 1/2 | In progress | - |
 | 5. Credential Process | 0/2 | Not started | - |
 | 6. Decision Logging | 0/2 | Not started | - |
 | 7. Exec Command | 0/2 | Not started | - |
