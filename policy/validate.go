@@ -3,7 +3,6 @@ package policy
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 	"time"
 )
 
@@ -99,26 +98,10 @@ func (h *HourRange) Validate() error {
 }
 
 // validateHourFormat checks if a time string is in valid HH:MM 24-hour format.
+// The regex already validates hour (00-23) and minute (00-59) ranges.
 func validateHourFormat(timeStr string) error {
 	if !hourFormatRegex.MatchString(timeStr) {
 		return fmt.Errorf("invalid hour format '%s'", timeStr)
 	}
-
-	// Parse and validate ranges
-	matches := hourFormatRegex.FindStringSubmatch(timeStr)
-	if matches == nil {
-		return fmt.Errorf("invalid hour format '%s'", timeStr)
-	}
-
-	hour, _ := strconv.Atoi(matches[1])
-	minute, _ := strconv.Atoi(matches[2])
-
-	if hour < 0 || hour > 23 {
-		return fmt.Errorf("invalid hour format '%s'", timeStr)
-	}
-	if minute < 0 || minute > 59 {
-		return fmt.Errorf("invalid hour format '%s'", timeStr)
-	}
-
 	return nil
 }
