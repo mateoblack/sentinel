@@ -76,7 +76,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 05-01: credentials command with policy evaluation
+- [x] 05-01: credentials command with policy evaluation
 - [ ] 05-02: credential_process JSON output format
 
 ### Phase 6: Decision Logging
@@ -120,7 +120,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Policy Schema | 2/2 | Complete | 2026-01-14 |
 | 3. Policy Loading | 2/2 | Complete | 2026-01-14 |
 | 4. Policy Evaluation | 2/2 | Complete | 2026-01-14 |
-| 5. Credential Process | 0/2 | Not started | - |
+| 5. Credential Process | 1/2 | In progress | - |
 | 6. Decision Logging | 0/2 | Not started | - |
 | 7. Exec Command | 0/2 | Not started | - |
 | 8. Profile Compatibility | 0/2 | Not started | - |

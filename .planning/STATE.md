@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-13)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Phase 4 — Policy Evaluation
+**Current focus:** Phase 5 — Credential Process
 
 ## Current Position
 
-Phase: 4 of 8 (Policy Evaluation)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-14 — Completed 04-02-PLAN.md
+Phase: 5 of 8 (Credential Process)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-14 — Completed 05-01-PLAN.md
 
-Progress: ██████████ 50%
+Progress: ███████████░░░░░ 56%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 2.4 min
-- Total execution time: 19 min
+- Total plans completed: 9
+- Average duration: 2.3 min
+- Total execution time: 21 min
 
 **By Phase:**
 
@@ -31,9 +31,10 @@ Progress: ██████████ 50%
 | 2-policy-schema | 2/2 | 5 min | 2.5 min |
 | 3-policy-loading | 2/2 | 3 min | 1.5 min |
 | 4-policy-evaluation | 2/2 | 5 min | 2.5 min |
+| 5-credential-process | 1/2 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (1 min), 03-02 (2 min), 04-01 (3 min), 04-02 (2 min)
+- Last 5 plans: 03-02 (2 min), 04-01 (3 min), 04-02 (2 min), 05-01 (2 min)
 - Trend: Consistent
 
 ## Accumulated Context
@@ -63,6 +64,8 @@ Recent decisions affecting current work:
 | 04-01 | Hour range [start, end) semantics | Inclusive start, exclusive end for intuitive business hours |
 | 04-01 | Empty list = wildcard matching | Allow rules like "any user on staging" |
 | 04-01 | Default deny on no match/nil input | Security-first approach |
+| 05-01 | OS username for policy evaluation | Use os/user.Current().Username for identity |
+| 05-01 | 5-minute cache TTL for policy | Balance API calls vs freshness |
 
 ### Deferred Issues
 
@@ -75,5 +78,5 @@ None - Go is now available and builds succeed.
 ## Session Continuity
 
 Last session: 2026-01-14
-Stopped at: Completed 04-02-PLAN.md (Phase 4 complete)
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
