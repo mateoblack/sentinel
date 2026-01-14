@@ -805,6 +805,413 @@ func TestEvaluate_CombinedConditions(t *testing.T) {
 	})
 }
 
+func TestDecisionContext_MatchedRule(t *testing.T) {
+	t.Run("RuleIndex is set correctly for first rule", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "allow-staging",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"staging"},
+					},
+					Reason: "staging allowed",
+				},
+			},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.RuleIndex != 0 {
+			t.Errorf("expected RuleIndex 0, got %d", decision.RuleIndex)
+		}
+	})
+
+	t.Run("RuleIndex is set correctly for second rule", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "deny-prod",
+					Effect: EffectDeny,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+					},
+				},
+				{
+					Name:   "allow-staging",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"staging"},
+					},
+				},
+			},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.RuleIndex != 1 {
+			t.Errorf("expected RuleIndex 1, got %d", decision.RuleIndex)
+		}
+	})
+
+	t.Run("Conditions populated from matched rule", func(t *testing.T) {
+		expectedProfiles := []string{"staging", "development"}
+		expectedUsers := []string{"alice", "bob"}
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "allow-nonprod-team",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: expectedProfiles,
+						Users:    expectedUsers,
+					},
+				},
+			},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Conditions == nil {
+			t.Fatal("expected Conditions to be non-nil")
+		}
+		if len(decision.Conditions.Profiles) != len(expectedProfiles) {
+			t.Errorf("expected %d profiles, got %d", len(expectedProfiles), len(decision.Conditions.Profiles))
+		}
+		for i, p := range expectedProfiles {
+			if decision.Conditions.Profiles[i] != p {
+				t.Errorf("expected profile %q at index %d, got %q", p, i, decision.Conditions.Profiles[i])
+			}
+		}
+		if len(decision.Conditions.Users) != len(expectedUsers) {
+			t.Errorf("expected %d users, got %d", len(expectedUsers), len(decision.Conditions.Users))
+		}
+	})
+
+	t.Run("Conditions includes time window when present", func(t *testing.T) {
+		// 15:30 UTC = 10:30 EST, which is within 09:00-17:00 in America/New_York
+		fixedTime := time.Date(2025, time.January, 14, 15, 30, 0, 0, time.UTC)
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "business-hours",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Time: &TimeWindow{
+							Days: []Weekday{Monday, Tuesday, Wednesday, Thursday, Friday},
+							Hours: &HourRange{
+								Start: "09:00",
+								End:   "17:00",
+							},
+							Timezone: "America/New_York",
+						},
+					},
+				},
+			},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    fixedTime,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Conditions == nil {
+			t.Fatal("expected Conditions to be non-nil")
+		}
+		if decision.Conditions.Time == nil {
+			t.Fatal("expected Conditions.Time to be non-nil")
+		}
+		if len(decision.Conditions.Time.Days) != 5 {
+			t.Errorf("expected 5 days, got %d", len(decision.Conditions.Time.Days))
+		}
+		if decision.Conditions.Time.Hours == nil {
+			t.Fatal("expected Hours to be non-nil")
+		}
+		if decision.Conditions.Time.Hours.Start != "09:00" {
+			t.Errorf("expected Start '09:00', got %q", decision.Conditions.Time.Hours.Start)
+		}
+		if decision.Conditions.Time.Timezone != "America/New_York" {
+			t.Errorf("expected Timezone 'America/New_York', got %q", decision.Conditions.Time.Timezone)
+		}
+	})
+}
+
+func TestDecisionContext_DefaultDeny(t *testing.T) {
+	t.Run("RuleIndex is -1 for default deny", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "allow-prod",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+					},
+				},
+			},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "staging", // no matching rule
+			Time:    time.Now(),
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.RuleIndex != -1 {
+			t.Errorf("expected RuleIndex -1 for default deny, got %d", decision.RuleIndex)
+		}
+	})
+
+	t.Run("Conditions is nil for default deny", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules:   []Rule{},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Conditions != nil {
+			t.Errorf("expected Conditions to be nil for default deny, got %+v", decision.Conditions)
+		}
+	})
+
+	t.Run("RuleIndex is -1 for nil policy", func(t *testing.T) {
+		req := &Request{
+			User:    "alice",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := Evaluate(nil, req)
+
+		if decision.RuleIndex != -1 {
+			t.Errorf("expected RuleIndex -1 for nil policy, got %d", decision.RuleIndex)
+		}
+		if decision.Conditions != nil {
+			t.Errorf("expected Conditions to be nil for nil policy, got %+v", decision.Conditions)
+		}
+	})
+
+	t.Run("RuleIndex is -1 for nil request", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "allow-all",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{},
+					},
+				},
+			},
+		}
+
+		decision := Evaluate(policy, nil)
+
+		if decision.RuleIndex != -1 {
+			t.Errorf("expected RuleIndex -1 for nil request, got %d", decision.RuleIndex)
+		}
+	})
+}
+
+func TestDecisionContext_EvaluatedAt(t *testing.T) {
+	t.Run("EvaluatedAt is reasonable for matched rule", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "allow-staging",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"staging"},
+					},
+				},
+			},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		before := time.Now()
+		decision := Evaluate(policy, req)
+		after := time.Now()
+
+		if decision.EvaluatedAt.Before(before) {
+			t.Errorf("EvaluatedAt %v is before test start %v", decision.EvaluatedAt, before)
+		}
+		if decision.EvaluatedAt.After(after) {
+			t.Errorf("EvaluatedAt %v is after test end %v", decision.EvaluatedAt, after)
+		}
+	})
+
+	t.Run("EvaluatedAt is reasonable for default deny", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules:   []Rule{},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		before := time.Now()
+		decision := Evaluate(policy, req)
+		after := time.Now()
+
+		if decision.EvaluatedAt.Before(before) {
+			t.Errorf("EvaluatedAt %v is before test start %v", decision.EvaluatedAt, before)
+		}
+		if decision.EvaluatedAt.After(after) {
+			t.Errorf("EvaluatedAt %v is after test end %v", decision.EvaluatedAt, after)
+		}
+	})
+
+	t.Run("EvaluatedAt is set even for nil policy", func(t *testing.T) {
+		req := &Request{
+			User:    "alice",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		before := time.Now()
+		decision := Evaluate(nil, req)
+		after := time.Now()
+
+		if decision.EvaluatedAt.IsZero() {
+			t.Error("EvaluatedAt should not be zero for nil policy")
+		}
+		if decision.EvaluatedAt.Before(before) || decision.EvaluatedAt.After(after) {
+			t.Errorf("EvaluatedAt %v is outside test window [%v, %v]", decision.EvaluatedAt, before, after)
+		}
+	})
+}
+
+func TestDecision_String(t *testing.T) {
+	t.Run("ALLOW format with rule name and index", func(t *testing.T) {
+		decision := Decision{
+			Effect:      EffectAllow,
+			MatchedRule: "allow-staging",
+			RuleIndex:   0,
+		}
+
+		result := decision.String()
+
+		expected := "ALLOW by rule 'allow-staging' (index 0)"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("DENY format with rule name and index", func(t *testing.T) {
+		decision := Decision{
+			Effect:      EffectDeny,
+			MatchedRule: "deny-prod",
+			RuleIndex:   2,
+		}
+
+		result := decision.String()
+
+		expected := "DENY by rule 'deny-prod' (index 2)"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("default deny format", func(t *testing.T) {
+		decision := Decision{
+			Effect:      EffectDeny,
+			MatchedRule: "",
+			RuleIndex:   -1,
+		}
+
+		result := decision.String()
+
+		expected := "DENY (no matching rule)"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("String output from Evaluate for allow", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "allow-dev",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"development"},
+					},
+				},
+			},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "development",
+			Time:    time.Now(),
+		}
+
+		decision := Evaluate(policy, req)
+		result := decision.String()
+
+		expected := "ALLOW by rule 'allow-dev' (index 0)"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+
+	t.Run("String output from Evaluate for default deny", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules:   []Rule{},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := Evaluate(policy, req)
+		result := decision.String()
+
+		expected := "DENY (no matching rule)"
+		if result != expected {
+			t.Errorf("expected %q, got %q", expected, result)
+		}
+	})
+}
+
 func TestEvaluate_EdgeCases(t *testing.T) {
 	t.Run("empty policy returns default deny", func(t *testing.T) {
 		policy := &Policy{
