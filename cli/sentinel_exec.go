@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/user"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 )
@@ -78,6 +80,11 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 // It evaluates policy before spawning a subprocess with credentials.
 // Returns exit code and error.
 func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s *Sentinel) (int, error) {
+	// 0. Check if already in a sentinel subshell
+	if os.Getenv("AWS_SENTINEL") != "" {
+		return 0, fmt.Errorf("running in an existing sentinel subshell; 'exit' from the subshell or unset AWS_SENTINEL to force")
+	}
+
 	// 1. Create logger based on configuration
 	var logger logging.Logger
 	if input.LogFile != "" || input.LogStderr {
@@ -157,7 +164,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		SessionDuration: input.SessionDuration,
 	}
 
-	_, err = s.GetCredentials(ctx, credReq)
+	creds, err := s.GetCredentials(ctx, credReq)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to retrieve credentials: %v\n", err)
 		return 1, err
@@ -169,9 +176,32 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		command = getDefaultShell()
 	}
 
-	// 12. Prepare subprocess environment (env injection in plan 02)
-	_ = createEnv(input.ProfileName, input.Region, "")
+	// 12. Prepare subprocess environment
+	cmdEnv := createEnv(input.ProfileName, input.Region, "")
 
-	// 13. Return success (subprocess execution in plan 02)
-	return 0, nil
+	// 13. Set AWS_SENTINEL to indicate running in sentinel subshell
+	cmdEnv.Set("AWS_SENTINEL", input.ProfileName)
+
+	// 14. Inject credentials into environment
+	log.Println("Setting subprocess env: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
+	cmdEnv.Set("AWS_ACCESS_KEY_ID", creds.AccessKeyID)
+	cmdEnv.Set("AWS_SECRET_ACCESS_KEY", creds.SecretAccessKey)
+	if creds.SessionToken != "" {
+		log.Println("Setting subprocess env: AWS_SESSION_TOKEN")
+		cmdEnv.Set("AWS_SESSION_TOKEN", creds.SessionToken)
+	}
+	if creds.CanExpire {
+		log.Println("Setting subprocess env: AWS_CREDENTIAL_EXPIRATION")
+		cmdEnv.Set("AWS_CREDENTIAL_EXPIRATION", iso8601.Format(creds.Expiration))
+	}
+
+	// 15. Try exec syscall first (replaces process, more efficient)
+	err = doExecSyscall(command, input.Args, cmdEnv)
+	if err != nil {
+		log.Println("Error doing execve syscall:", err.Error())
+		log.Println("Falling back to running a subprocess")
+	}
+
+	// 16. Fall back to subprocess execution
+	return runSubProcess(command, input.Args, cmdEnv)
 }
