@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Project setup, CLI scaffolding, aws-vault integration
 - [x] **Phase 2: Policy Schema** - Define policy format and rule structure
-- [ ] **Phase 3: Policy Loading** - SSM Parameter Store integration for policy fetch (In progress)
+- [x] **Phase 3: Policy Loading** - SSM Parameter Store integration for policy fetch
 - [ ] **Phase 4: Policy Evaluation** - Core decision engine (allow/deny logic)
 - [ ] **Phase 5: Credential Process** - credential_process output format and integration
 - [ ] **Phase 6: Decision Logging** - Structured logging of access decisions
@@ -56,7 +56,7 @@ Plans:
 
 Plans:
 - [x] 03-01: SSM client setup and parameter fetch
-- [ ] 03-02: Policy caching with TTL
+- [x] 03-02: Policy caching with TTL
 
 ### Phase 4: Policy Evaluation
 **Goal**: Core decision engine that evaluates rules and returns allow/deny with matched rule
@@ -118,7 +118,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-01-14 |
 | 2. Policy Schema | 2/2 | Complete | 2026-01-14 |
-| 3. Policy Loading | 1/2 | In progress | - |
+| 3. Policy Loading | 2/2 | Complete | 2026-01-14 |
 | 4. Policy Evaluation | 0/2 | Not started | - |
 | 5. Credential Process | 0/2 | Not started | - |
 | 6. Decision Logging | 0/2 | Not started | - |
