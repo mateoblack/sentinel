@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-13)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Phase 6 — Decision Logging
+**Current focus:** Phase 7 — Exec Command
 
 ## Current Position
 
 Phase: 6 of 8 (Decision Logging)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-14 — Completed 06-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-01-14 — Completed 06-02-PLAN.md
 
-Progress: █████████████░░░ 68%
+Progress: ██████████████░░ 75%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 2.4 min
-- Total execution time: 26 min
+- Total plans completed: 12
+- Average duration: 2.5 min
+- Total execution time: 30 min
 
 **By Phase:**
 
@@ -32,10 +32,10 @@ Progress: █████████████░░░ 68%
 | 3-policy-loading | 2/2 | 3 min | 1.5 min |
 | 4-policy-evaluation | 2/2 | 5 min | 2.5 min |
 | 5-credential-process | 2/2 | 4 min | 2 min |
-| 6-decision-logging | 1/2 | 3 min | 3 min |
+| 6-decision-logging | 2/2 | 7 min | 3.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02 (2 min), 05-01 (2 min), 05-02 (2 min), 06-01 (3 min)
+- Last 5 plans: 05-01 (2 min), 05-02 (2 min), 06-01 (3 min), 06-02 (4 min)
 - Trend: Consistent
 
 ## Accumulated Context
@@ -70,6 +70,9 @@ Recent decisions affecting current work:
 | 06-01 | JSON Lines format for logs | Single-line JSON for log aggregation compatibility |
 | 06-01 | Logger interface abstraction | Pluggable backends (file, network, etc.) |
 | 06-01 | Logger nil by default | CLI flags added in plan 06-02 |
+| 06-02 | Logger created from CLI flags at start | Before policy evaluation, after flag parsing |
+| 06-02 | File logging uses O_APPEND mode | Accumulate entries across invocations |
+| 06-02 | io.MultiWriter for multiple destinations | Standard library pattern for simultaneous outputs |
 
 ### Deferred Issues
 
@@ -82,5 +85,5 @@ None - Go is now available and builds succeed.
 ## Session Continuity
 
 Last session: 2026-01-14
-Stopped at: Completed 06-01-PLAN.md
+Stopped at: Completed 06-02-PLAN.md (Phase 6 complete)
 Resume file: None

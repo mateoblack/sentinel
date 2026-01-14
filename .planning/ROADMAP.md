@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Policy Loading** - SSM Parameter Store integration for policy fetch
 - [x] **Phase 4: Policy Evaluation** - Core decision engine (allow/deny logic)
 - [x] **Phase 5: Credential Process** - credential_process output format and integration
-- [ ] **Phase 6: Decision Logging** - Structured logging of access decisions
+- [x] **Phase 6: Decision Logging** - Structured logging of access decisions
 - [ ] **Phase 7: Exec Command** - sentinel exec for direct invocation
 - [ ] **Phase 8: Profile Compatibility** - Seamless integration with existing aws-vault profiles
 
@@ -87,7 +87,7 @@ Plans:
 
 Plans:
 - [x] 06-01: Structured logger with decision fields
-- [ ] 06-02: Log destination configuration
+- [x] 06-02: Log destination configuration
 
 ### Phase 7: Exec Command
 **Goal**: `sentinel exec --profile X -- cmd` for direct command invocation with credentials
@@ -121,6 +121,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Policy Loading | 2/2 | Complete | 2026-01-14 |
 | 4. Policy Evaluation | 2/2 | Complete | 2026-01-14 |
 | 5. Credential Process | 2/2 | Complete | 2026-01-14 |
-| 6. Decision Logging | 1/2 | In progress | - |
+| 6. Decision Logging | 2/2 | Complete | 2026-01-14 |
 | 7. Exec Command | 0/2 | Not started | - |
 | 8. Profile Compatibility | 0/2 | Not started | - |
