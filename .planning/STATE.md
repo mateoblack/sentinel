@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-13)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Phase 2 — Policy Schema
+**Current focus:** Phase 3 — Policy Loading
 
 ## Current Position
 
-Phase: 2 of 8 (Policy Schema)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-14 — Completed 02-02-PLAN.md
+Phase: 3 of 8 (Policy Loading)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-14 — Completed 03-01-PLAN.md
 
-Progress: ███████░░░ 25%
+Progress: ████████░░ 31%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 2.8 min
-- Total execution time: 11 min
+- Total plans completed: 5
+- Average duration: 2.4 min
+- Total execution time: 12 min
 
 **By Phase:**
 
@@ -29,9 +29,10 @@ Progress: ███████░░░ 25%
 |-------|-------|-------|----------|
 | 1-foundation | 2/2 | 6 min | 3 min |
 | 2-policy-schema | 2/2 | 5 min | 2.5 min |
+| 3-policy-loading | 1/2 | 1 min | 1 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (3 min), 01-02 (3 min), 02-01 (2 min), 02-02 (3 min)
+- Last 5 plans: 01-02 (3 min), 02-01 (2 min), 02-02 (3 min), 03-01 (1 min)
 - Trend: Consistent
 
 ## Accumulated Context
@@ -52,6 +53,9 @@ Recent decisions affecting current work:
 | 02-02 | Regex for hour format validation | Single-step HH:MM validation |
 | 02-02 | time.LoadLocation for timezone | Leverage Go's timezone database |
 | 02-02 | Require at least one condition per rule | Prevent overly broad rules |
+| 03-01 | Caller provides aws.Config to Loader | Match vault.go pattern, no hidden config loading |
+| 03-01 | WithDecryption: true always | Support SecureString parameters (no-op for String) |
+| 03-01 | ErrPolicyNotFound wraps parameter name | Provide context in error messages |
 
 ### Deferred Issues
 
@@ -64,5 +68,5 @@ None - Go is now available and builds succeed.
 ## Session Continuity
 
 Last session: 2026-01-14
-Stopped at: Completed 02-02-PLAN.md (Phase 2 complete)
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
