@@ -44,7 +44,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 02-01: Policy schema design and Go structs
+- [x] 02-01: Policy schema design and Go structs
 - [ ] 02-02: Policy parsing and validation
 
 ### Phase 3: Policy Loading
@@ -117,7 +117,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-01-14 |
-| 2. Policy Schema | 0/2 | Not started | - |
+| 2. Policy Schema | 1/2 | In progress | - |
 | 3. Policy Loading | 0/2 | Not started | - |
 | 4. Policy Evaluation | 0/2 | Not started | - |
 | 5. Credential Process | 0/2 | Not started | - |
