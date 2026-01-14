@@ -46,15 +46,15 @@ None
 
 **Milestone Goal:** Make Sentinel enforceable and provable inside AWS by stamping all sessions with a Sentinel-controlled SourceIdentity.
 
-#### Phase 9: Source Identity Schema
+#### Phase 9: Source Identity Schema (Complete)
 
 **Goal**: Define SourceIdentity format (`sentinel:<user>:<request-id>`) and request-id generation
 **Depends on**: v1.0 complete
 **Research**: Unlikely (internal design)
-**Plans**: TBD
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 09-01: TBD (run /gsd:plan-phase 9 to break down)
+- [x] 09-01: Create SourceIdentity type and request-id generation
 
 #### Phase 10: AssumeRole Provider
 
@@ -142,7 +142,7 @@ Plans:
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
-| 9. Source Identity Schema | v1.1 | 0/? | Not started | - |
+| 9. Source Identity Schema | v1.1 | 1/1 | Complete | 2026-01-14 |
 | 10. AssumeRole Provider | v1.1 | 0/? | Not started | - |
 | 11. Two-Hop Orchestration | v1.1 | 0/? | Not started | - |
 | 12. Credential Process Update | v1.1 | 0/? | Not started | - |
