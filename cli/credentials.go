@@ -106,6 +106,12 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	}
 	username := currentUser.Username
 
+	// 1.5. Validate profile exists in AWS config
+	if err := s.ValidateProfile(input.ProfileName); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return err
+	}
+
 	// 2. Create AWS config for SSM
 	awsCfgOpts := []func(*config.LoadOptions) error{}
 	if input.Region != "" {

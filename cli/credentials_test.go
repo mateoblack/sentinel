@@ -6,11 +6,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/vault"
 )
 
 func TestCredentialProcessOutputJSONMarshaling(t *testing.T) {
@@ -383,4 +385,131 @@ func TestCredentialsCommand_LoggerCreation(t *testing.T) {
 			t.Errorf("expected 2 log lines (appended), got %d", len(lines))
 		}
 	})
+}
+
+func TestSentinel_ValidateProfile(t *testing.T) {
+	// Create a temp config file with known profiles
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config")
+
+	configContent := `[profile production]
+region = us-east-1
+
+[profile staging]
+region = us-west-2
+
+[default]
+region = us-east-1
+`
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// Set AWS_CONFIG_FILE to use our test config
+	originalEnv := os.Getenv("AWS_CONFIG_FILE")
+	os.Setenv("AWS_CONFIG_FILE", configFile)
+	defer os.Setenv("AWS_CONFIG_FILE", originalEnv)
+
+	t.Run("returns nil for existing profile", func(t *testing.T) {
+		s := &Sentinel{}
+
+		err := s.ValidateProfile("production")
+		if err != nil {
+			t.Errorf("expected nil error for existing profile, got: %v", err)
+		}
+	})
+
+	t.Run("returns nil for default profile", func(t *testing.T) {
+		// Need a fresh Sentinel to reload config
+		s := &Sentinel{}
+
+		err := s.ValidateProfile("default")
+		if err != nil {
+			t.Errorf("expected nil error for default profile, got: %v", err)
+		}
+	})
+
+	t.Run("returns error for missing profile with available profiles", func(t *testing.T) {
+		// Need a fresh Sentinel to reload config
+		s := &Sentinel{}
+
+		err := s.ValidateProfile("nonexistent")
+		if err == nil {
+			t.Fatal("expected error for nonexistent profile, got nil")
+		}
+
+		errStr := err.Error()
+
+		// Check that error mentions the profile name
+		if !strings.Contains(errStr, "nonexistent") {
+			t.Errorf("error should mention the profile name, got: %s", errStr)
+		}
+
+		// Check that error mentions "not found"
+		if !strings.Contains(errStr, "not found") {
+			t.Errorf("error should mention 'not found', got: %s", errStr)
+		}
+
+		// Check that error lists available profiles
+		if !strings.Contains(errStr, "production") || !strings.Contains(errStr, "staging") {
+			t.Errorf("error should list available profiles (production, staging), got: %s", errStr)
+		}
+	})
+
+	t.Run("caches config file across calls", func(t *testing.T) {
+		s := &Sentinel{}
+
+		// First call loads config
+		_ = s.ValidateProfile("production")
+
+		// Config should be cached
+		if s.awsConfigFile == nil {
+			t.Error("expected awsConfigFile to be cached after first call")
+		}
+
+		// Second call should use cached config
+		cachedConfig := s.awsConfigFile
+		_ = s.ValidateProfile("staging")
+
+		if s.awsConfigFile != cachedConfig {
+			t.Error("expected awsConfigFile to remain cached between calls")
+		}
+	})
+}
+
+func TestSentinel_ValidateProfile_WithLoadedConfig(t *testing.T) {
+	// Test using a pre-loaded config (simulates how credentials command works)
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config")
+
+	configContent := `[profile dev]
+region = eu-west-1
+`
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// Load config manually
+	loadedConfig, err := vault.LoadConfig(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	s := &Sentinel{
+		awsConfigFile: loadedConfig,
+	}
+
+	// Validate existing profile
+	if err := s.ValidateProfile("dev"); err != nil {
+		t.Errorf("expected nil for existing profile, got: %v", err)
+	}
+
+	// Validate missing profile
+	err = s.ValidateProfile("missing")
+	if err == nil {
+		t.Fatal("expected error for missing profile")
+	}
+	if !strings.Contains(err.Error(), "missing") {
+		t.Errorf("error should mention profile name, got: %s", err.Error())
+	}
 }
