@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/user"
 	"time"
@@ -23,6 +24,8 @@ type CredentialsCommandInput struct {
 	NoSession       bool
 	SessionDuration time.Duration
 	Logger          logging.Logger // nil means no logging
+	LogFile         string         // Path to log file (empty = no file logging)
+	LogStderr       bool           // Log to stderr (default: false)
 }
 
 // CredentialProcessOutput represents the JSON output format for AWS credential_process.
@@ -60,6 +63,12 @@ func ConfigureCredentialsCommand(app *kingpin.Application, s *Sentinel) {
 		Short('d').
 		DurationVar(&input.SessionDuration)
 
+	cmd.Flag("log-file", "Path to write decision logs (JSON Lines format)").
+		StringVar(&input.LogFile)
+
+	cmd.Flag("log-stderr", "Write decision logs to stderr").
+		BoolVar(&input.LogStderr)
+
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := CredentialsCommand(context.Background(), input, s)
 		app.FatalIfError(err, "credentials")
@@ -71,6 +80,24 @@ func ConfigureCredentialsCommand(app *kingpin.Application, s *Sentinel) {
 // It evaluates policy before retrieving credentials.
 // On success, outputs JSON to stdout. On failure, outputs error to stderr and returns non-zero.
 func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *Sentinel) error {
+	// 0. Create logger based on configuration
+	if input.LogFile != "" || input.LogStderr {
+		writers := []io.Writer{}
+		if input.LogStderr {
+			writers = append(writers, os.Stderr)
+		}
+		if input.LogFile != "" {
+			f, err := os.OpenFile(input.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to open log file: %v\n", err)
+				return err
+			}
+			defer f.Close()
+			writers = append(writers, f)
+		}
+		input.Logger = logging.NewJSONLogger(io.MultiWriter(writers...))
+	}
+
 	// 1. Get current user
 	currentUser, err := user.Current()
 	if err != nil {
