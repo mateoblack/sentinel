@@ -16,6 +16,7 @@ func main() {
 
 	s := cli.ConfigureSentinelGlobals(app)
 	cli.ConfigureCredentialsCommand(app, s)
+	cli.ConfigureSentinelExecCommand(app, s)
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
