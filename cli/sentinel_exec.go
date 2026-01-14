@@ -85,6 +85,12 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		return 0, fmt.Errorf("running in an existing sentinel subshell; 'exit' from the subshell or unset AWS_SENTINEL to force")
 	}
 
+	// 0.5. Validate profile exists in AWS config
+	if err := s.ValidateProfile(input.ProfileName); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return 1, err
+	}
+
 	// 1. Create logger based on configuration
 	var logger logging.Logger
 	if input.LogFile != "" || input.LogStderr {
