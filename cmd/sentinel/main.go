@@ -14,7 +14,8 @@ func main() {
 	app := kingpin.New("sentinel", "Intent-aware access control for AWS credentials")
 	app.Version(Version)
 
-	cli.ConfigureSentinelGlobals(app)
+	s := cli.ConfigureSentinelGlobals(app)
+	cli.ConfigureCredentialsCommand(app, s)
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
