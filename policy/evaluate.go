@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -18,35 +19,56 @@ type Decision struct {
 	Effect      Effect
 	MatchedRule string
 	Reason      string
+	RuleIndex   int        // Position of matched rule in policy (0-based, -1 if no match)
+	Conditions  *Condition // Copy of matched rule's conditions for logging (nil for default deny)
+	EvaluatedAt time.Time  // Timestamp when evaluation occurred
+}
+
+// String returns a human-readable representation of the decision.
+func (d Decision) String() string {
+	if d.MatchedRule == "" {
+		return "DENY (no matching rule)"
+	}
+	return fmt.Sprintf("%s by rule '%s' (index %d)", strings.ToUpper(string(d.Effect)), d.MatchedRule, d.RuleIndex)
 }
 
 // defaultDeny returns the default deny decision when no rules match.
-func defaultDeny() Decision {
+func defaultDeny(evaluatedAt time.Time) Decision {
 	return Decision{
 		Effect:      EffectDeny,
 		MatchedRule: "",
 		Reason:      "no matching rule",
+		RuleIndex:   -1,
+		Conditions:  nil,
+		EvaluatedAt: evaluatedAt,
 	}
 }
 
 // Evaluate evaluates a credential request against a policy.
 // It returns the decision for the first matching rule, or default deny if no rules match.
 func Evaluate(policy *Policy, req *Request) Decision {
+	evaluatedAt := time.Now()
+
 	if policy == nil || req == nil {
-		return defaultDeny()
+		return defaultDeny(evaluatedAt)
 	}
 
-	for _, rule := range policy.Rules {
+	for i, rule := range policy.Rules {
 		if matchesConditions(&rule.Conditions, req) {
+			// Copy conditions to avoid reference to original
+			conditionsCopy := rule.Conditions
 			return Decision{
 				Effect:      rule.Effect,
 				MatchedRule: rule.Name,
 				Reason:      rule.Reason,
+				RuleIndex:   i,
+				Conditions:  &conditionsCopy,
+				EvaluatedAt: evaluatedAt,
 			}
 		}
 	}
 
-	return defaultDeny()
+	return defaultDeny(evaluatedAt)
 }
 
 // matchesConditions checks if all conditions in a rule match the request.
