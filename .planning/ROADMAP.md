@@ -96,7 +96,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 07-01: exec command with subprocess spawning
+- [x] 07-01: exec command with subprocess spawning
 - [ ] 07-02: Environment variable injection
 
 ### Phase 8: Profile Compatibility
@@ -122,5 +122,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Policy Evaluation | 2/2 | Complete | 2026-01-14 |
 | 5. Credential Process | 2/2 | Complete | 2026-01-14 |
 | 6. Decision Logging | 2/2 | Complete | 2026-01-14 |
-| 7. Exec Command | 0/2 | Not started | - |
+| 7. Exec Command | 1/2 | In progress | - |
 | 8. Profile Compatibility | 0/2 | Not started | - |
