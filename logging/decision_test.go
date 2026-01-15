@@ -452,3 +452,190 @@ func containsSubstringHelper(s, substr string) bool {
 	}
 	return false
 }
+
+func TestDecisionLogEntry_JSONFieldNames(t *testing.T) {
+	// Verify exact JSON field names match the schema
+	t.Run("enhanced entry has correct field names", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect:      policy.EffectAllow,
+			MatchedRule: "allow-production",
+			RuleIndex:   0,
+			Reason:      "allowed",
+		}
+
+		creds := &CredentialIssuanceFields{
+			RequestID:       "a1b2c3d4",
+			SourceIdentity:  "sentinel:alice:a1b2c3d4",
+			RoleARN:         "arn:aws:iam::123456789012:role/TestRole",
+			SessionDuration: 1 * time.Hour,
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+		data, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatalf("failed to marshal: %v", err)
+		}
+
+		jsonStr := string(data)
+
+		// Verify exact field names (JSON tags)
+		expectedFields := []string{
+			`"timestamp":`,
+			`"user":`,
+			`"profile":`,
+			`"effect":`,
+			`"rule":`,
+			`"rule_index":`,
+			`"reason":`,
+			`"policy_path":`,
+			`"request_id":`,
+			`"source_identity":`,
+			`"role_arn":`,
+			`"session_duration_seconds":`,
+		}
+
+		for _, field := range expectedFields {
+			if !containsSubstring(jsonStr, field) {
+				t.Errorf("JSON should contain field %s, got: %s", field, jsonStr)
+			}
+		}
+	})
+
+	t.Run("session_duration_seconds is integer seconds", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect: policy.EffectAllow,
+		}
+
+		// 45 minutes = 2700 seconds
+		creds := &CredentialIssuanceFields{
+			RequestID:       "test1234",
+			SessionDuration: 45 * time.Minute,
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+		data, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatalf("failed to marshal: %v", err)
+		}
+
+		jsonStr := string(data)
+
+		// Should contain 2700, not a duration string
+		if !containsSubstring(jsonStr, `"session_duration_seconds":2700`) {
+			t.Errorf("session_duration_seconds should be 2700, got: %s", jsonStr)
+		}
+	})
+}
+
+func TestNewDecisionLogEntry_OmitsNewFields(t *testing.T) {
+	// Verify that using NewDecisionLogEntry (not Enhanced) results in JSON
+	// without the new credential fields
+	t.Run("basic NewDecisionLogEntry has no credential fields in JSON", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "bob",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect:      policy.EffectDeny,
+			MatchedRule: "",
+			RuleIndex:   -1,
+			Reason:      "no matching rule",
+		}
+
+		// Use basic NewDecisionLogEntry - not enhanced
+		entry := NewDecisionLogEntry(req, decision, "/sentinel/policies/default")
+
+		data, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatalf("failed to marshal: %v", err)
+		}
+
+		jsonStr := string(data)
+
+		// Verify new fields are NOT in JSON (omitempty on empty/zero values)
+		credentialFields := []string{
+			`"request_id"`,
+			`"source_identity"`,
+			`"role_arn"`,
+			`"session_duration_seconds"`,
+		}
+
+		for _, field := range credentialFields {
+			if containsSubstring(jsonStr, field) {
+				t.Errorf("JSON should NOT contain %s for basic entry, got: %s", field, jsonStr)
+			}
+		}
+
+		// Verify base fields ARE present
+		baseFields := []string{
+			`"timestamp":`,
+			`"user":"bob"`,
+			`"profile":"staging"`,
+			`"effect":"deny"`,
+		}
+
+		for _, field := range baseFields {
+			if !containsSubstring(jsonStr, field) {
+				t.Errorf("JSON should contain %s, got: %s", field, jsonStr)
+			}
+		}
+	})
+}
+
+func TestEnhancedDecisionLogEntry_RequestIDOnly(t *testing.T) {
+	// Test case where only RequestID is set (partial population)
+	req := &policy.Request{
+		User:    "alice",
+		Profile: "production",
+		Time:    time.Now(),
+	}
+
+	decision := policy.Decision{
+		Effect: policy.EffectAllow,
+	}
+
+	// Only RequestID populated
+	creds := &CredentialIssuanceFields{
+		RequestID: "only1234",
+		// SourceIdentity, RoleARN, SessionDuration all empty/zero
+	}
+
+	entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	jsonStr := string(data)
+
+	// Only request_id should be present
+	if !containsSubstring(jsonStr, `"request_id":"only1234"`) {
+		t.Errorf("JSON should contain request_id, got: %s", jsonStr)
+	}
+
+	// Other credential fields should be omitted
+	if containsSubstring(jsonStr, `"source_identity"`) {
+		t.Errorf("JSON should NOT contain source_identity when empty, got: %s", jsonStr)
+	}
+	if containsSubstring(jsonStr, `"role_arn"`) {
+		t.Errorf("JSON should NOT contain role_arn when empty, got: %s", jsonStr)
+	}
+	if containsSubstring(jsonStr, `"session_duration_seconds"`) {
+		t.Errorf("JSON should NOT contain session_duration_seconds when zero, got: %s", jsonStr)
+	}
+}
