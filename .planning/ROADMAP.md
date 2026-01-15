@@ -86,15 +86,15 @@ Plans:
 Plans:
 - [x] 12-01: Integrate GetCredentialsWithSourceIdentity into credentials command
 
-#### Phase 13: Exec Command Update
+#### Phase 13: Exec Command Update (Complete)
 
 **Goal**: Update exec command to use two-hop credential flow with SourceIdentity
 **Depends on**: Phase 12
 **Research**: Unlikely (parallel to credential_process changes)
-**Plans**: TBD
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 13-01: TBD
+- [x] 13-01: Update exec command to use GetCredentialsWithSourceIdentity
 
 #### Phase 14: Enhanced Decision Logging
 
@@ -144,7 +144,7 @@ Plans:
 | 10. AssumeRole Provider | v1.1 | 1/1 | Complete | 2026-01-14 |
 | 11. Two-Hop Orchestration | v1.1 | 1/1 | Complete | 2026-01-14 |
 | 12. Credential Process Update | v1.1 | 1/1 | Complete | 2026-01-15 |
-| 13. Exec Command Update | v1.1 | 0/? | Not started | - |
+| 13. Exec Command Update | v1.1 | 1/1 | Complete | 2026-01-15 |
 | 14. Enhanced Decision Logging | v1.1 | 0/? | Not started | - |
 | 15. CloudTrail Correlation | v1.1 | 0/? | Not started | - |
 | 16. Enforcement Patterns | v1.1 | 0/? | Not started | - |
