@@ -136,7 +136,7 @@ Plans:
 **Plans**: 4
 
 Plans:
-- [ ] 24-01: Notification types and Notifier interface
+- [x] 24-01: Notification types and Notifier interface — completed 2026-01-15
 - [ ] 24-02: SNS notifier implementation
 - [ ] 24-03: Webhook notifier implementation
 - [ ] 24-04: NotifyStore wrapper and CLI integration
@@ -257,7 +257,7 @@ Plans:
 | 21. List/Check Commands | v1.2 | 2/2 | Complete | 2026-01-15 |
 | 22. Approve/Deny Commands | v1.2 | 1/1 | Complete | 2026-01-14 |
 | 23. Request Integration | v1.2 | 2/2 | Complete | 2026-01-15 |
-| 24. Notification Hooks | v1.2 | 0/? | Not started | - |
+| 24. Notification Hooks | v1.2 | 1/4 | In progress | - |
 | 25. Approval Policies | v1.2 | 0/? | Not started | - |
 | 26. Approval Audit Trail | v1.2 | 0/? | Not started | - |
 | 27. Break-Glass Schema | v1.3 | 0/? | Not started | - |
