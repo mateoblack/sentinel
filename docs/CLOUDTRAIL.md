@@ -199,3 +199,108 @@ This produces a timeline of actions:
 {"time": "2024-01-15T10:38:42Z", "service": "iam.amazonaws.com", "action": "GetUser"}
 ```
 
+## AWS CLI Examples
+
+The AWS CLI provides `lookup-events` for searching CloudTrail's recent history. These examples demonstrate common patterns for correlating Sentinel sessions with AWS activity.
+
+> **Note:** `aws cloudtrail lookup-events` searches the last 90 days of management events. For older events or data events (S3 object-level, Lambda invocations), use Athena queries against CloudTrail logs in S3.
+
+### Lookup by SourceIdentity
+
+Find all CloudTrail events for a specific Sentinel session:
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+  --start-time "2024-01-15T00:00:00Z" \
+  --end-time "2024-01-15T23:59:59Z"
+```
+
+### Extract Key Fields with jq
+
+Parse the nested CloudTrail response to extract actionable information:
+
+```bash
+# Get event time, service, action, and source IP
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+  --start-time "2024-01-15T10:00:00Z" \
+  --end-time "2024-01-15T12:00:00Z" \
+  --output json | jq -r '
+    .Events[].CloudTrailEvent | fromjson |
+    [.eventTime, .eventSource, .eventName, .sourceIPAddress] | @tsv
+  '
+```
+
+Example output:
+
+```
+2024-01-15T10:35:00Z    ec2.amazonaws.com       DescribeInstances       198.51.100.42
+2024-01-15T10:36:15Z    s3.amazonaws.com        ListBuckets             198.51.100.42
+2024-01-15T10:38:42Z    iam.amazonaws.com       GetUser                 198.51.100.42
+```
+
+### Find All Sentinel Sessions in Time Window
+
+List all Sentinel-issued sessions in the last hour:
+
+```bash
+aws cloudtrail lookup-events \
+  --start-time "$(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ)" \
+  --end-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --output json | jq -r '
+    .Events[].CloudTrailEvent | fromjson |
+    select(.userIdentity.sourceIdentity != null) |
+    select(.userIdentity.sourceIdentity | startswith("sentinel:")) |
+    .userIdentity.sourceIdentity
+  ' | sort -u
+```
+
+### Filter by AWS Service
+
+Find all EC2 actions from a Sentinel session:
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+  --start-time "2024-01-15T10:00:00Z" \
+  --end-time "2024-01-15T12:00:00Z" \
+  --output json | jq '
+    .Events[].CloudTrailEvent | fromjson |
+    select(.eventSource == "ec2.amazonaws.com") |
+    {time: .eventTime, action: .eventName, resources: .resources}
+  '
+```
+
+### Cross-Reference Workflow
+
+Complete example starting from Sentinel log and ending with CloudTrail activity:
+
+```bash
+# Step 1: Find the Sentinel decision for a user
+REQUEST_ID=$(grep '"user":"alice"' /var/log/sentinel/decisions.log | tail -1 | jq -r '.request_id')
+echo "Request ID: $REQUEST_ID"
+
+# Step 2: Build the source identity
+SOURCE_IDENTITY="sentinel:alice:$REQUEST_ID"
+echo "Source Identity: $SOURCE_IDENTITY"
+
+# Step 3: Lookup CloudTrail events
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue="$SOURCE_IDENTITY" \
+  --start-time "2024-01-15T00:00:00Z" \
+  --end-time "2024-01-16T00:00:00Z" \
+  --output json | jq -r '
+    .Events[].CloudTrailEvent | fromjson |
+    "[\(.eventTime)] \(.eventSource): \(.eventName)"
+  '
+```
+
+Example output:
+
+```
+[2024-01-15T10:35:00Z] ec2.amazonaws.com: DescribeInstances
+[2024-01-15T10:36:15Z] s3.amazonaws.com: ListBuckets
+[2024-01-15T10:38:42Z] iam.amazonaws.com: GetUser
+```
+
