@@ -7,7 +7,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 ## Milestones
 
 - ✅ **v1.0 MVP** - [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md) (Phases 1-8, shipped 2026-01-14)
-- 🚧 **v1.1 Sentinel Fingerprint** - Phases 9-17 (in progress)
+- ✅ **v1.1 Sentinel Fingerprint** - Phases 9-17 (shipped 2026-01-15)
 
 ## Completed Milestones
 
@@ -42,7 +42,7 @@ None
 | 7. Exec Command | v1.0 | 2/2 | Complete | 2026-01-14 |
 | 8. Profile Compatibility | v1.0 | 2/2 | Complete | 2026-01-14 |
 
-### 🚧 v1.1 Sentinel Fingerprint (In Progress)
+### ✅ v1.1 Sentinel Fingerprint (Complete)
 
 **Milestone Goal:** Make Sentinel enforceable and provable inside AWS by stamping all sessions with a Sentinel-controlled SourceIdentity.
 
@@ -129,15 +129,15 @@ Plans:
 Plans:
 - [x] 16-01: Create enforcement patterns documentation
 
-#### Phase 17: Integration Testing
+#### Phase 17: Integration Testing (Complete)
 
 **Goal**: End-to-end testing of fingerprint flow with real AWS resources
 **Depends on**: Phase 16
 **Research**: Unlikely (testing existing implementation)
-**Plans**: TBD
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 17-01: TBD
+- [x] 17-01: Create integration tests for Sentinel Fingerprint flow
 
 ## Progress (v1.1)
 
@@ -151,4 +151,4 @@ Plans:
 | 14. Enhanced Decision Logging | v1.1 | 4/4 | Complete | 2026-01-15 |
 | 15. CloudTrail Correlation | v1.1 | 1/1 | Complete | 2026-01-15 |
 | 16. Enforcement Patterns | v1.1 | 1/1 | Complete | 2026-01-15 |
-| 17. Integration Testing | v1.1 | 0/? | Not started | - |
+| 17. Integration Testing | v1.1 | 1/1 | Complete | 2026-01-15 |
