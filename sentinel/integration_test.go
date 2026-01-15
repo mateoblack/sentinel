@@ -62,7 +62,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/identity"
 )
 
@@ -171,4 +173,95 @@ func TestIntegration_SentinelAssumeRole(t *testing.T) {
 
 	t.Logf("Successfully assumed role with SourceIdentity: %s", result.SourceIdentity)
 	t.Logf("AssumedRoleArn: %s", result.AssumedRoleArn)
+}
+
+// TestIntegration_CredentialsAreValid tests that credentials issued by Sentinel
+// actually work for AWS API calls by making a GetCallerIdentity request.
+//
+// This test proves the complete credential flow:
+// 1. Sentinel assumes role with SourceIdentity stamping
+// 2. The resulting credentials are valid AWS credentials
+// 3. The credentials identify as the assumed role (not the original caller)
+//
+// # Role Requirements
+//
+// The test role needs permission to call sts:GetCallerIdentity.
+// This is typically allowed by default, but if you have restrictive policies,
+// ensure the role has this permission.
+func TestIntegration_CredentialsAreValid(t *testing.T) {
+	skipIfNoIntegrationEnv(t)
+	cfg := getIntegrationConfig(t)
+	ctx := context.Background()
+
+	// Load AWS credentials using default credential chain
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region))
+	if err != nil {
+		t.Fatalf("failed to load AWS config: %v", err)
+	}
+
+	// Create SourceIdentity with test user and generated request-id
+	testUser := "credentialstest"
+	requestID := identity.NewRequestID()
+	sourceIdentity, err := identity.New(testUser, requestID)
+	if err != nil {
+		t.Fatalf("failed to create SourceIdentity: %v", err)
+	}
+
+	// Get credentials via SentinelAssumeRole
+	input := &SentinelAssumeRoleInput{
+		CredsProvider:  awsCfg.Credentials,
+		RoleARN:        cfg.RoleARN,
+		SourceIdentity: sourceIdentity,
+		Region:         cfg.Region,
+	}
+
+	result, err := SentinelAssumeRole(ctx, input)
+	if err != nil {
+		t.Fatalf("SentinelAssumeRole failed: %v", err)
+	}
+
+	// Create a new STS client using the assumed credentials
+	// This is the key test - we use the credentials Sentinel issued
+	assumedCreds := aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+		return result.Credentials, nil
+	})
+
+	assumedCfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(cfg.Region),
+		config.WithCredentialsProvider(assumedCreds),
+	)
+	if err != nil {
+		t.Fatalf("failed to create config with assumed credentials: %v", err)
+	}
+
+	stsClient := sts.NewFromConfig(assumedCfg)
+
+	// Call GetCallerIdentity with the assumed credentials
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		t.Fatalf("GetCallerIdentity failed: %v", err)
+	}
+
+	// Verify the response
+	if identity.Arn == nil || *identity.Arn == "" {
+		t.Error("GetCallerIdentity Arn is empty")
+	}
+	if identity.UserId == nil || *identity.UserId == "" {
+		t.Error("GetCallerIdentity UserId is empty")
+	}
+	if identity.Account == nil || *identity.Account == "" {
+		t.Error("GetCallerIdentity Account is empty")
+	}
+
+	// Verify the ARN confirms we're using the assumed role
+	// The ARN should look like: arn:aws:sts::123456789012:assumed-role/RoleName/session-name
+	if !strings.Contains(*identity.Arn, "assumed-role") {
+		t.Errorf("GetCallerIdentity Arn %q does not contain 'assumed-role' - credentials may not be from assumed role", *identity.Arn)
+	}
+
+	t.Logf("Credentials verified with GetCallerIdentity")
+	t.Logf("  Arn: %s", *identity.Arn)
+	t.Logf("  UserId: %s", *identity.UserId)
+	t.Logf("  Account: %s", *identity.Account)
+	t.Logf("  SourceIdentity used: %s", sourceIdentity.Format())
 }
