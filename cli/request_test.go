@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
@@ -71,6 +73,20 @@ func (m *mockStore) ListByProfile(ctx context.Context, profile string, limit int
 	return nil, nil
 }
 
+// mockLogger captures approval log entries for testing.
+type mockLogger struct {
+	approvalEntries []logging.ApprovalLogEntry
+	decisionEntries []logging.DecisionLogEntry
+}
+
+func (m *mockLogger) LogApproval(entry logging.ApprovalLogEntry) {
+	m.approvalEntries = append(m.approvalEntries, entry)
+}
+
+func (m *mockLogger) LogDecision(entry logging.DecisionLogEntry) {
+	m.decisionEntries = append(m.decisionEntries, entry)
+}
+
 // mockSentinel provides a Sentinel stub for testing that bypasses profile validation.
 type mockSentinel struct {
 	profileExists bool
@@ -91,6 +107,7 @@ func (m *mockSentinel) ValidateProfile(profileName string) error {
 type testableRequestCommandOutput struct {
 	Request      *request.Request
 	AutoApproved bool
+	Logger       *mockLogger
 }
 
 // testableRequestCommand is a testable version that accepts a profile validator.
@@ -155,9 +172,29 @@ func testableRequestCommand(ctx context.Context, input RequestCommandInput, vali
 		return nil, err
 	}
 
+	// 9. Log approval events if Logger is provided
+	var loggerUsed *mockLogger
+	if input.Logger != nil {
+		// Log request created event
+		createdEntry := logging.NewApprovalLogEntry(notification.EventRequestCreated, req, username)
+		input.Logger.LogApproval(createdEntry)
+
+		// If auto-approved, also log the approval event
+		if autoApproved {
+			approvedEntry := logging.NewApprovalLogEntry(notification.EventRequestApproved, req, username)
+			input.Logger.LogApproval(approvedEntry)
+		}
+
+		// If it's a mock logger, store reference for test verification
+		if ml, ok := input.Logger.(*mockLogger); ok {
+			loggerUsed = ml
+		}
+	}
+
 	return &testableRequestCommandOutput{
 		Request:      req,
 		AutoApproved: autoApproved,
+		Logger:       loggerUsed,
 	}, nil
 }
 
@@ -624,5 +661,143 @@ func TestRequestCommand_AutoApprove_ProfileNoRule(t *testing.T) {
 	}
 	if output.AutoApproved {
 		t.Error("expected AutoApproved to be false when no rule matches profile")
+	}
+}
+
+// Tests for approval logging
+
+func TestRequestCommand_Logger_LogsCreatedEvent(t *testing.T) {
+	store := &mockStore{
+		createFn: func(ctx context.Context, req *request.Request) error {
+			return nil
+		},
+	}
+
+	logger := &mockLogger{}
+
+	input := RequestCommandInput{
+		ProfileName:   "test-profile",
+		Duration:      1 * time.Hour,
+		Justification: "Testing request logging functionality",
+		Store:         store,
+		Logger:        logger,
+	}
+
+	output, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify logger received the created event
+	if len(logger.approvalEntries) != 1 {
+		t.Fatalf("expected 1 approval log entry, got %d", len(logger.approvalEntries))
+	}
+
+	entry := logger.approvalEntries[0]
+	if entry.Event != string(notification.EventRequestCreated) {
+		t.Errorf("expected event %q, got %q", notification.EventRequestCreated, entry.Event)
+	}
+	if entry.RequestID != output.Request.ID {
+		t.Errorf("expected request ID %q, got %q", output.Request.ID, entry.RequestID)
+	}
+	if entry.Profile != "test-profile" {
+		t.Errorf("expected profile %q, got %q", "test-profile", entry.Profile)
+	}
+	if entry.Status != string(request.StatusPending) {
+		t.Errorf("expected status %q, got %q", request.StatusPending, entry.Status)
+	}
+	if entry.AutoApproved {
+		t.Error("expected AutoApproved to be false for non-auto-approved request")
+	}
+}
+
+func TestRequestCommand_Logger_AutoApproved_LogsBothEvents(t *testing.T) {
+	currentUser, _ := user.Current()
+	store := &mockStore{
+		createFn: func(ctx context.Context, req *request.Request) error {
+			return nil
+		},
+	}
+
+	logger := &mockLogger{}
+
+	// Create policy with auto-approve for current user
+	approvalPolicy := &policy.ApprovalPolicy{
+		Version: "1",
+		Rules: []policy.ApprovalRule{
+			{
+				Name:      "production-auto-approve",
+				Profiles:  []string{"production"},
+				Approvers: []string{"admin"},
+				AutoApprove: &policy.AutoApproveCondition{
+					Users:       []string{currentUser.Username},
+					MaxDuration: 2 * time.Hour,
+				},
+			},
+		},
+	}
+
+	input := RequestCommandInput{
+		ProfileName:    "production",
+		Duration:       1 * time.Hour,
+		Justification:  "Testing auto-approve logging",
+		Store:          store,
+		Logger:         logger,
+		ApprovalPolicy: approvalPolicy,
+	}
+
+	output, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify request was auto-approved
+	if !output.AutoApproved {
+		t.Fatal("expected request to be auto-approved")
+	}
+
+	// Verify logger received both events
+	if len(logger.approvalEntries) != 2 {
+		t.Fatalf("expected 2 approval log entries, got %d", len(logger.approvalEntries))
+	}
+
+	// First entry should be created event
+	createdEntry := logger.approvalEntries[0]
+	if createdEntry.Event != string(notification.EventRequestCreated) {
+		t.Errorf("expected first event to be %q, got %q", notification.EventRequestCreated, createdEntry.Event)
+	}
+
+	// Second entry should be approved event
+	approvedEntry := logger.approvalEntries[1]
+	if approvedEntry.Event != string(notification.EventRequestApproved) {
+		t.Errorf("expected second event to be %q, got %q", notification.EventRequestApproved, approvedEntry.Event)
+	}
+	if !approvedEntry.AutoApproved {
+		t.Error("expected AutoApproved to be true for auto-approved request")
+	}
+	if approvedEntry.Status != string(request.StatusApproved) {
+		t.Errorf("expected status %q, got %q", request.StatusApproved, approvedEntry.Status)
+	}
+}
+
+func TestRequestCommand_NoLogger_NoPanic(t *testing.T) {
+	store := &mockStore{
+		createFn: func(ctx context.Context, req *request.Request) error {
+			return nil
+		},
+	}
+
+	input := RequestCommandInput{
+		ProfileName:   "test-profile",
+		Duration:      1 * time.Hour,
+		Justification: "Testing request without logger",
+		Store:         store,
+		// Logger is nil
+	}
+
+	// Should not panic when Logger is nil
+	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

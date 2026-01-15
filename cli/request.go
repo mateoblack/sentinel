@@ -10,6 +10,7 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
@@ -34,6 +35,10 @@ type RequestCommandInput struct {
 	// ApprovalPolicy is an optional approval policy for auto-approve checking.
 	// If nil, no auto-approve checking is performed.
 	ApprovalPolicy *policy.ApprovalPolicy
+
+	// Logger is an optional Logger for audit trail logging.
+	// If nil, no approval events are logged.
+	Logger logging.Logger
 }
 
 // RequestCommandOutput represents the JSON output from the request command.
@@ -163,7 +168,20 @@ func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel)
 		return err
 	}
 
-	// 9. Output success JSON
+	// 9. Log approval events if Logger is provided
+	if input.Logger != nil {
+		// Log request created event
+		createdEntry := logging.NewApprovalLogEntry(notification.EventRequestCreated, req, username)
+		input.Logger.LogApproval(createdEntry)
+
+		// If auto-approved, also log the approval event
+		if autoApproved {
+			approvedEntry := logging.NewApprovalLogEntry(notification.EventRequestApproved, req, username)
+			input.Logger.LogApproval(approvedEntry)
+		}
+	}
+
+	// 10. Output success JSON
 	output := RequestCommandOutput{
 		RequestID:    req.ID,
 		Profile:      req.Profile,
