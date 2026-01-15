@@ -16,7 +16,12 @@
 //  4. Otherwise, designated approvers must explicitly approve
 package policy
 
-import "time"
+import (
+	"fmt"
+	"time"
+
+	"github.com/byteness/aws-vault/v7/request"
+)
 
 // ApprovalPolicy defines approval routing and auto-approve rules.
 // It contains a version identifier and a list of approval rules that determine
@@ -61,4 +66,63 @@ type AutoApproveCondition struct {
 	// Requests for longer durations require explicit approval.
 	// Zero means no duration cap for auto-approval.
 	MaxDuration time.Duration `yaml:"max_duration,omitempty" json:"max_duration,omitempty"`
+}
+
+// Validate checks if the ApprovalPolicy is semantically correct.
+// It verifies at least one rule exists and all rules are valid.
+func (p *ApprovalPolicy) Validate() error {
+	if len(p.Rules) == 0 {
+		return fmt.Errorf("approval policy must have at least one rule")
+	}
+
+	for i, rule := range p.Rules {
+		if err := rule.validate(i); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validate checks if an ApprovalRule is semantically correct.
+// It verifies name is present, at least one approver exists,
+// and any auto-approve condition is valid.
+func (r *ApprovalRule) validate(index int) error {
+	if r.Name == "" {
+		return fmt.Errorf("approval rule at index %d missing name", index)
+	}
+
+	if len(r.Approvers) == 0 {
+		return fmt.Errorf("approval rule '%s' must have at least one approver", r.Name)
+	}
+
+	if r.AutoApprove != nil {
+		if err := r.AutoApprove.validate(r.Name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validate checks if an AutoApproveCondition is semantically correct.
+// At least one condition must be set (users, time, or max_duration).
+func (a *AutoApproveCondition) validate(ruleName string) error {
+	hasCondition := len(a.Users) > 0 || a.Time != nil || a.MaxDuration > 0
+
+	if !hasCondition {
+		return fmt.Errorf("auto_approve in rule '%s' must have at least one condition (users, time, or max_duration)", ruleName)
+	}
+
+	if a.Time != nil {
+		if err := a.Time.validate(ruleName); err != nil {
+			return err
+		}
+	}
+
+	if a.MaxDuration > 0 && a.MaxDuration > request.MaxDuration {
+		return fmt.Errorf("auto_approve max_duration in rule '%s' exceeds maximum of %v", ruleName, request.MaxDuration)
+	}
+
+	return nil
 }
