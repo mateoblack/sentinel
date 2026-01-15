@@ -100,10 +100,11 @@ Plans:
 **Goal**: Commands to view pending requests and check own request status
 **Depends on**: Phase 20
 **Research**: Unlikely (extends existing CLI patterns)
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 21-01: TBD
+- [x] 21-01: List command with CLI configuration and tests — completed 2026-01-15
+- [ ] 21-02: Check command with status lookup
 
 #### Phase 22: Approve/Deny Commands
 
@@ -249,7 +250,7 @@ Plans:
 | 18. Request Schema | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 19. DynamoDB Backend | v1.2 | 2/2 | Complete | 2026-01-15 |
 | 20. Request Command | v1.2 | 1/1 | Complete | 2026-01-14 |
-| 21. List/Check Commands | v1.2 | 0/? | Not started | - |
+| 21. List/Check Commands | v1.2 | 1/2 | In progress | - |
 | 22. Approve/Deny Commands | v1.2 | 0/? | Not started | - |
 | 23. Request Integration | v1.2 | 0/? | Not started | - |
 | 24. Notification Hooks | v1.2 | 0/? | Not started | - |
