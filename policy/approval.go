@@ -126,3 +126,87 @@ func (a *AutoApproveCondition) validate(ruleName string) error {
 
 	return nil
 }
+
+// FindApprovalRule returns the first rule matching the given profile.
+// An empty Profiles list in a rule acts as a wildcard and matches any profile.
+// Returns nil if no rule matches or if policy is nil.
+func FindApprovalRule(policy *ApprovalPolicy, profile string) *ApprovalRule {
+	if policy == nil {
+		return nil
+	}
+	for i := range policy.Rules {
+		rule := &policy.Rules[i]
+		if containsOrEmpty(rule.Profiles, profile) {
+			return rule
+		}
+	}
+	return nil
+}
+
+// CanApprove returns true if the given approver is authorized to approve
+// requests matching this rule.
+// Returns false if rule is nil or approver is not in the Approvers list.
+func CanApprove(rule *ApprovalRule, approver string) bool {
+	if rule == nil {
+		return false
+	}
+	for _, a := range rule.Approvers {
+		if a == approver {
+			return true
+		}
+	}
+	return false
+}
+
+// ShouldAutoApprove returns true if the request qualifies for automatic approval.
+// All configured conditions must match:
+//   - requester must be in AutoApprove.Users (or Users is empty = any user)
+//   - requestTime must fall within AutoApprove.Time window (or Time is nil = any time)
+//   - duration must be <= AutoApprove.MaxDuration (or MaxDuration is 0 = no cap)
+//
+// Returns false if rule is nil or AutoApprove is nil.
+func ShouldAutoApprove(rule *ApprovalRule, requester string, requestTime time.Time, duration time.Duration) bool {
+	if rule == nil || rule.AutoApprove == nil {
+		return false
+	}
+
+	auto := rule.AutoApprove
+
+	// Check user condition (empty list = any user can auto-approve)
+	if len(auto.Users) > 0 {
+		found := false
+		for _, u := range auto.Users {
+			if u == requester {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	// Check time condition (nil = any time)
+	if auto.Time != nil {
+		if !matchesTimeWindow(auto.Time, requestTime) {
+			return false
+		}
+	}
+
+	// Check duration condition (0 = no cap)
+	if auto.MaxDuration > 0 && duration > auto.MaxDuration {
+		return false
+	}
+
+	return true
+}
+
+// GetApprovers returns the list of users who can approve requests for
+// the given profile. Returns nil if no rule matches the profile.
+func GetApprovers(policy *ApprovalPolicy, profile string) []string {
+	rule := FindApprovalRule(policy, profile)
+	if rule == nil {
+		return nil
+	}
+	return rule.Approvers
+}
