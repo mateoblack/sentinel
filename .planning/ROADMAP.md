@@ -104,7 +104,7 @@ Plans:
 
 Plans:
 - [x] 21-01: List command with CLI configuration and tests — completed 2026-01-15
-- [ ] 21-02: Check command with status lookup
+- [x] 21-02: Check command with status lookup — completed 2026-01-15
 
 #### Phase 22: Approve/Deny Commands
 
@@ -250,7 +250,7 @@ Plans:
 | 18. Request Schema | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 19. DynamoDB Backend | v1.2 | 2/2 | Complete | 2026-01-15 |
 | 20. Request Command | v1.2 | 1/1 | Complete | 2026-01-14 |
-| 21. List/Check Commands | v1.2 | 1/2 | In progress | - |
+| 21. List/Check Commands | v1.2 | 2/2 | Complete | 2026-01-15 |
 | 22. Approve/Deny Commands | v1.2 | 0/? | Not started | - |
 | 23. Request Integration | v1.2 | 0/? | Not started | - |
 | 24. Notification Hooks | v1.2 | 0/? | Not started | - |
