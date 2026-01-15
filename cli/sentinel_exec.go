@@ -15,6 +15,7 @@ import (
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
+	"github.com/byteness/aws-vault/v7/request"
 )
 
 // SentinelExecCommandInput contains the input for the sentinel exec command.
@@ -26,8 +27,9 @@ type SentinelExecCommandInput struct {
 	Region          string
 	NoSession       bool
 	SessionDuration time.Duration
-	LogFile         string // Path to log file (empty = no file logging)
-	LogStderr       bool   // Log to stderr (default: false)
+	LogFile         string        // Path to log file (empty = no file logging)
+	LogStderr       bool          // Log to stderr (default: false)
+	Store           request.Store // Optional: for approved request checking (nil = no checking)
 }
 
 // ConfigureSentinelExecCommand sets up the sentinel exec command with kingpin.
@@ -151,17 +153,32 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	// 7. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 8. Handle deny decision - log and exit
+	// 8. Handle deny decision - check for approved request first
+	var approvedReq *request.Request
 	if decision.Effect == policy.EffectDeny {
-		if logger != nil {
-			entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
-			logger.LogDecision(entry)
+		// Check for approved request before denying
+		if input.Store != nil {
+			var storeErr error
+			approvedReq, storeErr = request.FindApprovedRequest(ctx, input.Store, username, input.ProfileName)
+			if storeErr != nil {
+				// Log store error but don't fail - fall through to deny
+				log.Printf("Warning: failed to check approved requests: %v", storeErr)
+			}
 		}
-		fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
-		return 1, fmt.Errorf("access denied: %s", decision.String())
+
+		if approvedReq == nil {
+			// No approved request - proceed with deny
+			if logger != nil {
+				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
+				logger.LogDecision(entry)
+			}
+			fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
+			return 1, fmt.Errorf("access denied: %s", decision.String())
+		}
+		// Approved request found - continue to credential issuance
 	}
 
-	// 9. EffectAllow: generate request-id and retrieve credentials
+	// 9. EffectAllow (or approved request): generate request-id and retrieve credentials
 	requestID := identity.NewRequestID()
 
 	// Create credential request with User for SourceIdentity stamping
@@ -188,6 +205,10 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 			SourceIdentity:  creds.SourceIdentity,
 			RoleARN:         creds.RoleARN,
 			SessionDuration: input.SessionDuration,
+		}
+		// Include approved request ID if credentials were issued via approval override
+		if approvedReq != nil {
+			credFields.ApprovedRequestID = approvedReq.ID
 		}
 		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, input.PolicyParameter, credFields)
 		logger.LogDecision(entry)
