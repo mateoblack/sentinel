@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/user"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
+	"github.com/byteness/aws-vault/v7/request"
 )
 
 // CredentialsCommandInput contains the input for the credentials command.
@@ -27,6 +29,7 @@ type CredentialsCommandInput struct {
 	Logger          logging.Logger // nil means no logging
 	LogFile         string         // Path to log file (empty = no file logging)
 	LogStderr       bool           // Log to stderr (default: false)
+	Store           request.Store  // Optional: for approved request checking (nil = no checking)
 }
 
 // CredentialProcessOutput represents the JSON output format for AWS credential_process.
@@ -145,17 +148,32 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	// 6. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 7. Handle deny decision - log immediately and exit
+	// 7. Handle deny decision - check for approved request first
+	var approvedReq *request.Request
 	if decision.Effect == policy.EffectDeny {
-		if input.Logger != nil {
-			entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
-			input.Logger.LogDecision(entry)
+		// Check for approved request before denying
+		if input.Store != nil {
+			var storeErr error
+			approvedReq, storeErr = request.FindApprovedRequest(ctx, input.Store, username, input.ProfileName)
+			if storeErr != nil {
+				// Log store error but don't fail - fall through to deny
+				log.Printf("Warning: failed to check approved requests: %v", storeErr)
+			}
 		}
-		fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
-		return fmt.Errorf("access denied")
+
+		if approvedReq == nil {
+			// No approved request - proceed with deny
+			if input.Logger != nil {
+				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
+				input.Logger.LogDecision(entry)
+			}
+			fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
+			return fmt.Errorf("access denied")
+		}
+		// Approved request found - continue to credential issuance
 	}
 
-	// 8. EffectAllow: generate request-id and retrieve credentials
+	// 8. EffectAllow (or approved request): generate request-id and retrieve credentials
 	requestID := identity.NewRequestID()
 
 	// Create credential request with User for SourceIdentity stamping
@@ -182,6 +200,10 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 			SourceIdentity:  creds.SourceIdentity,
 			RoleARN:         creds.RoleARN,
 			SessionDuration: input.SessionDuration,
+		}
+		// Include approved request ID if credentials were issued via approval override
+		if approvedReq != nil {
+			credFields.ApprovedRequestID = approvedReq.ID
 		}
 		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, input.PolicyParameter, credFields)
 		input.Logger.LogDecision(entry)
