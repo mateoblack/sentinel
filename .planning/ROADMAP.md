@@ -114,7 +114,7 @@ Plans:
 **Plans**: 1
 
 Plans:
-- [ ] 22-01: Approve/deny commands with state transitions and tests
+- [x] 22-01: Approve/deny commands with state transitions and tests — completed 2026-01-14
 
 #### Phase 23: Request Integration
 
@@ -251,7 +251,7 @@ Plans:
 | 19. DynamoDB Backend | v1.2 | 2/2 | Complete | 2026-01-15 |
 | 20. Request Command | v1.2 | 1/1 | Complete | 2026-01-14 |
 | 21. List/Check Commands | v1.2 | 2/2 | Complete | 2026-01-15 |
-| 22. Approve/Deny Commands | v1.2 | 0/? | Not started | - |
+| 22. Approve/Deny Commands | v1.2 | 1/1 | Complete | 2026-01-14 |
 | 23. Request Integration | v1.2 | 0/? | Not started | - |
 | 24. Notification Hooks | v1.2 | 0/? | Not started | - |
 | 25. Approval Policies | v1.2 | 0/? | Not started | - |
