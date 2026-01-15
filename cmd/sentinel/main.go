@@ -23,5 +23,11 @@ func main() {
 	cli.ConfigureApproveCommand(app, s)
 	cli.ConfigureDenyCommand(app, s)
 
+	// Break-glass emergency access commands
+	cli.ConfigureBreakGlassCommand(app, s)
+	cli.ConfigureBreakGlassListCommand(app, s)
+	cli.ConfigureBreakGlassCheckCommand(app, s)
+	cli.ConfigureBreakGlassCloseCommand(app, s)
+
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
