@@ -470,3 +470,111 @@ func TestProviderInputFieldsPassThrough(t *testing.T) {
 		t.Errorf("SessionDuration = %v, want %v", provider.Input.SessionDuration, input.SessionDuration)
 	}
 }
+
+func TestTwoHopCredentialProviderRequestIDHandling(t *testing.T) {
+	t.Run("pre-provided RequestID is stored in Input", func(t *testing.T) {
+		preGeneratedRequestID := "abc12345"
+		provider, err := NewTwoHopCredentialProvider(TwoHopCredentialProviderInput{
+			BaseCredsProvider: &mockCredentialsProvider{},
+			RoleARN:           "arn:aws:iam::123456789012:role/TestRole",
+			User:              "alice",
+			RequestID:         preGeneratedRequestID,
+		})
+		if err != nil {
+			t.Fatalf("failed to create provider: %v", err)
+		}
+
+		// Verify RequestID is stored correctly
+		if provider.Input.RequestID != preGeneratedRequestID {
+			t.Errorf("RequestID = %q, want %q", provider.Input.RequestID, preGeneratedRequestID)
+		}
+	})
+
+	t.Run("empty RequestID is valid", func(t *testing.T) {
+		provider, err := NewTwoHopCredentialProvider(TwoHopCredentialProviderInput{
+			BaseCredsProvider: &mockCredentialsProvider{},
+			RoleARN:           "arn:aws:iam::123456789012:role/TestRole",
+			User:              "alice",
+			RequestID:         "", // Empty - should be auto-generated during Retrieve
+		})
+		if err != nil {
+			t.Fatalf("failed to create provider: %v", err)
+		}
+
+		// Verify empty RequestID is allowed (will be generated during Retrieve)
+		if provider.Input.RequestID != "" {
+			t.Errorf("RequestID should be empty when not provided, got %q", provider.Input.RequestID)
+		}
+
+		// LastSourceIdentity should be nil before Retrieve is called
+		if provider.LastSourceIdentity != nil {
+			t.Error("LastSourceIdentity should be nil before Retrieve()")
+		}
+	})
+
+	t.Run("RequestID passes through with other input fields", func(t *testing.T) {
+		input := TwoHopCredentialProviderInput{
+			BaseCredsProvider:    &mockCredentialsProvider{},
+			RoleARN:              "arn:aws:iam::123456789012:role/TestRole",
+			User:                 "alice",
+			Region:               "us-west-2",
+			STSRegionalEndpoints: "regional",
+			EndpointURL:          "https://sts.us-west-2.amazonaws.com",
+			ExternalID:           "ext-123",
+			SessionDuration:      2 * time.Hour,
+			RequestID:            "def67890",
+		}
+
+		provider, err := NewTwoHopCredentialProvider(input)
+		if err != nil {
+			t.Fatalf("failed to create provider: %v", err)
+		}
+
+		// Verify RequestID is preserved alongside other fields
+		if provider.Input.RequestID != input.RequestID {
+			t.Errorf("RequestID = %q, want %q", provider.Input.RequestID, input.RequestID)
+		}
+		if provider.Input.User != input.User {
+			t.Errorf("User = %q, want %q", provider.Input.User, input.User)
+		}
+		if provider.Input.RoleARN != input.RoleARN {
+			t.Errorf("RoleARN = %q, want %q", provider.Input.RoleARN, input.RoleARN)
+		}
+	})
+}
+
+func TestTwoHopCredentialProviderLastSourceIdentity(t *testing.T) {
+	t.Run("LastSourceIdentity is nil before Retrieve", func(t *testing.T) {
+		provider, err := NewTwoHopCredentialProvider(TwoHopCredentialProviderInput{
+			BaseCredsProvider: &mockCredentialsProvider{},
+			RoleARN:           "arn:aws:iam::123456789012:role/TestRole",
+			User:              "alice",
+		})
+		if err != nil {
+			t.Fatalf("failed to create provider: %v", err)
+		}
+
+		if provider.LastSourceIdentity != nil {
+			t.Error("LastSourceIdentity should be nil before Retrieve()")
+		}
+	})
+
+	t.Run("LastSourceIdentity field is accessible on provider struct", func(t *testing.T) {
+		provider, err := NewTwoHopCredentialProvider(TwoHopCredentialProviderInput{
+			BaseCredsProvider: &mockCredentialsProvider{},
+			RoleARN:           "arn:aws:iam::123456789012:role/TestRole",
+			User:              "alice",
+		})
+		if err != nil {
+			t.Fatalf("failed to create provider: %v", err)
+		}
+
+		// Verify the field exists and is of the right type (pointer to SourceIdentity)
+		// After Retrieve() completes, callers can access this to get the SourceIdentity string
+		var _ = provider.LastSourceIdentity // Compile-time check that field exists
+
+		// Note: To fully test LastSourceIdentity population, we'd need to mock STS
+		// or run an integration test with real AWS credentials.
+		// The unit test here verifies the field exists and is correctly typed.
+	})
+}
