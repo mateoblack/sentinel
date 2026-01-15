@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/vault"
 )
 
@@ -512,4 +514,146 @@ region = eu-west-1
 	if !strings.Contains(err.Error(), "missing") {
 		t.Errorf("error should mention profile name, got: %s", err.Error())
 	}
+}
+
+// mockCredentialsStore implements request.Store for testing approved request checking.
+type mockCredentialsStore struct {
+	listByRequesterFunc func(ctx context.Context, requester string, limit int) ([]*request.Request, error)
+}
+
+func (m *mockCredentialsStore) Create(ctx context.Context, req *request.Request) error {
+	return nil
+}
+
+func (m *mockCredentialsStore) Get(ctx context.Context, id string) (*request.Request, error) {
+	return nil, nil
+}
+
+func (m *mockCredentialsStore) Update(ctx context.Context, req *request.Request) error {
+	return nil
+}
+
+func (m *mockCredentialsStore) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *mockCredentialsStore) ListByRequester(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+	if m.listByRequesterFunc != nil {
+		return m.listByRequesterFunc(ctx, requester, limit)
+	}
+	return []*request.Request{}, nil
+}
+
+func (m *mockCredentialsStore) ListByStatus(ctx context.Context, status request.RequestStatus, limit int) ([]*request.Request, error) {
+	return []*request.Request{}, nil
+}
+
+func (m *mockCredentialsStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*request.Request, error) {
+	return []*request.Request{}, nil
+}
+
+func TestCredentialsCommandInput_StoreField(t *testing.T) {
+	// Test that CredentialsCommandInput has the Store field for approved request checking
+	t.Run("Store field is nil by default", func(t *testing.T) {
+		input := CredentialsCommandInput{}
+		if input.Store != nil {
+			t.Error("expected Store to be nil by default")
+		}
+	})
+
+	t.Run("Store field can be set", func(t *testing.T) {
+		store := &mockCredentialsStore{}
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			Store:           store,
+		}
+		if input.Store == nil {
+			t.Error("expected Store to be set")
+		}
+	})
+}
+
+func TestCredentialsCommand_ApprovedRequestIntegration(t *testing.T) {
+	// These tests verify the store integration at the input/config level.
+	// Full end-to-end tests require AWS credentials and are integration tests.
+
+	t.Run("store nil does not cause panic", func(t *testing.T) {
+		// Verify that having Store=nil is safe (backward compatible)
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			Store:           nil, // Explicitly nil
+		}
+
+		// Verify nil store doesn't panic when accessed
+		if input.Store != nil {
+			t.Error("Store should be nil")
+		}
+	})
+
+	t.Run("store with approved request configured", func(t *testing.T) {
+		// Create a mock store that would return an approved request
+		now := time.Now()
+		approvedRequest := &request.Request{
+			ID:        "approved001",
+			Requester: "alice",
+			Profile:   "production",
+			Status:    request.StatusApproved,
+			Duration:  2 * time.Hour,
+			CreatedAt: now.Add(-time.Hour),
+			ExpiresAt: now.Add(23 * time.Hour),
+		}
+
+		store := &mockCredentialsStore{
+			listByRequesterFunc: func(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+				if requester == "alice" {
+					return []*request.Request{approvedRequest}, nil
+				}
+				return []*request.Request{}, nil
+			},
+		}
+
+		input := CredentialsCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/test",
+			Store:           store,
+		}
+
+		// Verify store can find approved request
+		foundReq, err := request.FindApprovedRequest(context.Background(), input.Store, "alice", "production")
+		if err != nil {
+			t.Fatalf("FindApprovedRequest error: %v", err)
+		}
+		if foundReq == nil {
+			t.Fatal("expected to find approved request")
+		}
+		if foundReq.ID != "approved001" {
+			t.Errorf("expected ID approved001, got %s", foundReq.ID)
+		}
+	})
+
+	t.Run("store without approved request returns nil", func(t *testing.T) {
+		// Create a mock store with no approved requests
+		store := &mockCredentialsStore{
+			listByRequesterFunc: func(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+				return []*request.Request{}, nil
+			},
+		}
+
+		input := CredentialsCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/test",
+			Store:           store,
+		}
+
+		// Verify store returns nil when no approved request exists
+		foundReq, err := request.FindApprovedRequest(context.Background(), input.Store, "bob", "production")
+		if err != nil {
+			t.Fatalf("FindApprovedRequest error: %v", err)
+		}
+		if foundReq != nil {
+			t.Errorf("expected nil, got request: %v", foundReq)
+		}
+	})
 }

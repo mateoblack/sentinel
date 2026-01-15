@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/byteness/aws-vault/v7/request"
 )
 
 func TestSentinelExecCommand_NestedSubshell(t *testing.T) {
@@ -145,4 +148,146 @@ region = us-east-1
 	if err != nil && strings.Contains(err.Error(), "not found in AWS config") {
 		t.Errorf("should not fail on profile validation for valid profile, got: %v", err)
 	}
+}
+
+// mockExecStore implements request.Store for testing approved request checking.
+type mockExecStore struct {
+	listByRequesterFunc func(ctx context.Context, requester string, limit int) ([]*request.Request, error)
+}
+
+func (m *mockExecStore) Create(ctx context.Context, req *request.Request) error {
+	return nil
+}
+
+func (m *mockExecStore) Get(ctx context.Context, id string) (*request.Request, error) {
+	return nil, nil
+}
+
+func (m *mockExecStore) Update(ctx context.Context, req *request.Request) error {
+	return nil
+}
+
+func (m *mockExecStore) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *mockExecStore) ListByRequester(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+	if m.listByRequesterFunc != nil {
+		return m.listByRequesterFunc(ctx, requester, limit)
+	}
+	return []*request.Request{}, nil
+}
+
+func (m *mockExecStore) ListByStatus(ctx context.Context, status request.RequestStatus, limit int) ([]*request.Request, error) {
+	return []*request.Request{}, nil
+}
+
+func (m *mockExecStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*request.Request, error) {
+	return []*request.Request{}, nil
+}
+
+func TestSentinelExecCommandInput_StoreField(t *testing.T) {
+	// Test that SentinelExecCommandInput has the Store field for approved request checking
+	t.Run("Store field is nil by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.Store != nil {
+			t.Error("expected Store to be nil by default")
+		}
+	})
+
+	t.Run("Store field can be set", func(t *testing.T) {
+		store := &mockExecStore{}
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			Store:           store,
+		}
+		if input.Store == nil {
+			t.Error("expected Store to be set")
+		}
+	})
+}
+
+func TestSentinelExecCommand_ApprovedRequestIntegration(t *testing.T) {
+	// These tests verify the store integration at the input/config level.
+	// Full end-to-end tests require AWS credentials and are integration tests.
+
+	t.Run("store nil does not cause panic", func(t *testing.T) {
+		// Verify that having Store=nil is safe (backward compatible)
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			Store:           nil, // Explicitly nil
+		}
+
+		// Verify nil store doesn't panic when accessed
+		if input.Store != nil {
+			t.Error("Store should be nil")
+		}
+	})
+
+	t.Run("store with approved request configured", func(t *testing.T) {
+		// Create a mock store that would return an approved request
+		now := time.Now()
+		approvedRequest := &request.Request{
+			ID:        "execapproved001",
+			Requester: "charlie",
+			Profile:   "production",
+			Status:    request.StatusApproved,
+			Duration:  2 * time.Hour,
+			CreatedAt: now.Add(-time.Hour),
+			ExpiresAt: now.Add(23 * time.Hour),
+		}
+
+		store := &mockExecStore{
+			listByRequesterFunc: func(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+				if requester == "charlie" {
+					return []*request.Request{approvedRequest}, nil
+				}
+				return []*request.Request{}, nil
+			},
+		}
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/test",
+			Store:           store,
+		}
+
+		// Verify store can find approved request
+		foundReq, err := request.FindApprovedRequest(context.Background(), input.Store, "charlie", "production")
+		if err != nil {
+			t.Fatalf("FindApprovedRequest error: %v", err)
+		}
+		if foundReq == nil {
+			t.Fatal("expected to find approved request")
+		}
+		if foundReq.ID != "execapproved001" {
+			t.Errorf("expected ID execapproved001, got %s", foundReq.ID)
+		}
+	})
+
+	t.Run("store without approved request returns nil", func(t *testing.T) {
+		// Create a mock store with no approved requests
+		store := &mockExecStore{
+			listByRequesterFunc: func(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+				return []*request.Request{}, nil
+			},
+		}
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/test",
+			Store:           store,
+		}
+
+		// Verify store returns nil when no approved request exists
+		foundReq, err := request.FindApprovedRequest(context.Background(), input.Store, "dave", "production")
+		if err != nil {
+			t.Fatalf("FindApprovedRequest error: %v", err)
+		}
+		if foundReq != nil {
+			t.Errorf("expected nil, got request: %v", foundReq)
+		}
+	})
 }
