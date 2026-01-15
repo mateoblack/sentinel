@@ -8,10 +8,13 @@ import (
 	"io"
 )
 
-// Logger defines the interface for logging access decisions.
+// Logger defines the interface for logging access decisions and approval events.
 type Logger interface {
 	// LogDecision logs a decision entry.
 	LogDecision(entry DecisionLogEntry)
+
+	// LogApproval logs an approval workflow event.
+	LogApproval(entry ApprovalLogEntry)
 }
 
 // JSONLogger implements Logger with JSON Lines output.
@@ -35,6 +38,16 @@ func (l *JSONLogger) LogDecision(entry DecisionLogEntry) {
 	l.writer.Write([]byte("\n"))
 }
 
+// LogApproval writes the approval entry as a single line of JSON.
+func (l *JSONLogger) LogApproval(entry ApprovalLogEntry) {
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return
+	}
+	l.writer.Write(data)
+	l.writer.Write([]byte("\n"))
+}
+
 // NopLogger implements Logger but discards all entries.
 // Useful for testing or when logging is disabled.
 type NopLogger struct{}
@@ -46,5 +59,10 @@ func NewNopLogger() *NopLogger {
 
 // LogDecision discards the entry.
 func (l *NopLogger) LogDecision(entry DecisionLogEntry) {
+	// Intentionally empty - discards all entries
+}
+
+// LogApproval discards the approval entry.
+func (l *NopLogger) LogApproval(entry ApprovalLogEntry) {
 	// Intentionally empty - discards all entries
 }

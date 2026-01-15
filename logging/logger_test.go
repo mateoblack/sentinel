@@ -169,3 +169,183 @@ func TestNopLogger_LogDecision(t *testing.T) {
 		// If we get here without panic, test passes
 	})
 }
+
+func TestJSONLogger_LogApproval(t *testing.T) {
+	t.Run("outputs valid JSON with expected fields", func(t *testing.T) {
+		var buf bytes.Buffer
+		logger := NewJSONLogger(&buf)
+
+		entry := ApprovalLogEntry{
+			Timestamp:       "2026-01-15T10:00:00Z",
+			Event:           "request.created",
+			RequestID:       "a1b2c3d4e5f67890",
+			Requester:       "alice",
+			Profile:         "production",
+			Status:          "pending",
+			Actor:           "alice",
+			Justification:   "Deploy hotfix for critical bug",
+			Duration:        7200,
+		}
+
+		logger.LogApproval(entry)
+
+		output := buf.String()
+
+		// Verify newline-terminated (JSON Lines format)
+		if !strings.HasSuffix(output, "\n") {
+			t.Errorf("output should be newline-terminated, got: %q", output)
+		}
+
+		// Verify valid JSON
+		var parsed ApprovalLogEntry
+		if err := json.Unmarshal([]byte(strings.TrimSuffix(output, "\n")), &parsed); err != nil {
+			t.Fatalf("output should be valid JSON, got error: %v", err)
+		}
+
+		// Verify all fields match
+		if parsed.Timestamp != entry.Timestamp {
+			t.Errorf("expected timestamp %q, got %q", entry.Timestamp, parsed.Timestamp)
+		}
+		if parsed.Event != entry.Event {
+			t.Errorf("expected event %q, got %q", entry.Event, parsed.Event)
+		}
+		if parsed.RequestID != entry.RequestID {
+			t.Errorf("expected request_id %q, got %q", entry.RequestID, parsed.RequestID)
+		}
+		if parsed.Requester != entry.Requester {
+			t.Errorf("expected requester %q, got %q", entry.Requester, parsed.Requester)
+		}
+		if parsed.Profile != entry.Profile {
+			t.Errorf("expected profile %q, got %q", entry.Profile, parsed.Profile)
+		}
+		if parsed.Status != entry.Status {
+			t.Errorf("expected status %q, got %q", entry.Status, parsed.Status)
+		}
+		if parsed.Actor != entry.Actor {
+			t.Errorf("expected actor %q, got %q", entry.Actor, parsed.Actor)
+		}
+		if parsed.Justification != entry.Justification {
+			t.Errorf("expected justification %q, got %q", entry.Justification, parsed.Justification)
+		}
+		if parsed.Duration != entry.Duration {
+			t.Errorf("expected duration_seconds %d, got %d", entry.Duration, parsed.Duration)
+		}
+	})
+
+	t.Run("multiple entries are newline separated", func(t *testing.T) {
+		var buf bytes.Buffer
+		logger := NewJSONLogger(&buf)
+
+		entry1 := ApprovalLogEntry{
+			Timestamp: "2026-01-15T10:00:00Z",
+			Event:     "request.created",
+			RequestID: "aaaaaaaaaaaaaaaa",
+			Requester: "alice",
+			Profile:   "production",
+			Status:    "pending",
+			Actor:     "alice",
+		}
+		entry2 := ApprovalLogEntry{
+			Timestamp: "2026-01-15T10:05:00Z",
+			Event:     "request.approved",
+			RequestID: "aaaaaaaaaaaaaaaa",
+			Requester: "alice",
+			Profile:   "production",
+			Status:    "approved",
+			Actor:     "bob",
+			Approver:  "bob",
+		}
+
+		logger.LogApproval(entry1)
+		logger.LogApproval(entry2)
+
+		output := buf.String()
+		lines := strings.Split(strings.TrimSuffix(output, "\n"), "\n")
+
+		if len(lines) != 2 {
+			t.Errorf("expected 2 lines (JSON Lines format), got %d", len(lines))
+		}
+
+		// Verify each line is valid JSON
+		for i, line := range lines {
+			var parsed ApprovalLogEntry
+			if err := json.Unmarshal([]byte(line), &parsed); err != nil {
+				t.Errorf("line %d should be valid JSON, got error: %v", i+1, err)
+			}
+		}
+	})
+
+	t.Run("handles entries with omitempty fields", func(t *testing.T) {
+		var buf bytes.Buffer
+		logger := NewJSONLogger(&buf)
+
+		// Expired event - no optional fields
+		entry := ApprovalLogEntry{
+			Timestamp: "2026-01-15T10:00:00Z",
+			Event:     "request.expired",
+			RequestID: "a1b2c3d4e5f67890",
+			Requester: "alice",
+			Profile:   "production",
+			Status:    "expired",
+			Actor:     "system",
+		}
+
+		logger.LogApproval(entry)
+
+		output := buf.String()
+
+		// Verify valid JSON even with empty optional fields
+		var parsed ApprovalLogEntry
+		if err := json.Unmarshal([]byte(strings.TrimSuffix(output, "\n")), &parsed); err != nil {
+			t.Fatalf("output should be valid JSON, got error: %v", err)
+		}
+
+		if parsed.Justification != "" {
+			t.Errorf("expected empty justification, got %q", parsed.Justification)
+		}
+		if parsed.Duration != 0 {
+			t.Errorf("expected zero duration, got %d", parsed.Duration)
+		}
+		if parsed.Approver != "" {
+			t.Errorf("expected empty approver, got %q", parsed.Approver)
+		}
+	})
+}
+
+func TestNopLogger_LogApproval(t *testing.T) {
+	t.Run("does not panic", func(t *testing.T) {
+		logger := NewNopLogger()
+
+		entry := ApprovalLogEntry{
+			Timestamp: "2026-01-15T10:00:00Z",
+			Event:     "request.created",
+			RequestID: "a1b2c3d4e5f67890",
+			Requester: "alice",
+			Profile:   "production",
+			Status:    "pending",
+			Actor:     "alice",
+		}
+
+		// Should not panic
+		logger.LogApproval(entry)
+	})
+
+	t.Run("discards entries silently", func(t *testing.T) {
+		logger := NewNopLogger()
+
+		// Log multiple entries - all should be discarded without error
+		for i := 0; i < 100; i++ {
+			entry := ApprovalLogEntry{
+				Timestamp: "2026-01-15T10:00:00Z",
+				Event:     "request.created",
+				RequestID: "a1b2c3d4e5f67890",
+				Requester: "alice",
+				Profile:   "production",
+				Status:    "pending",
+				Actor:     "alice",
+			}
+			logger.LogApproval(entry)
+		}
+		// If we get here without panic, test passes
+	})
+}
