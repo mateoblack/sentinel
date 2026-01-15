@@ -157,16 +157,17 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	}
 
 	// EffectAllow: proceed to credential retrieval
-	// Create credential request
+	// Create credential request with User for SourceIdentity stamping
 	credReq := SentinelCredentialRequest{
 		ProfileName:     input.ProfileName,
 		Region:          input.Region,
 		NoSession:       input.NoSession,
 		SessionDuration: input.SessionDuration,
+		User:            username, // For SourceIdentity stamping on role assumption
 	}
 
-	// Retrieve credentials
-	creds, err := s.GetCredentials(ctx, credReq)
+	// Retrieve credentials with SourceIdentity stamping (if profile has role_arn)
+	creds, err := s.GetCredentialsWithSourceIdentity(ctx, credReq)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to retrieve credentials: %v\n", err)
 		return err
