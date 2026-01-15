@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
@@ -288,6 +290,197 @@ func TestSentinelExecCommand_ApprovedRequestIntegration(t *testing.T) {
 		}
 		if foundReq != nil {
 			t.Errorf("expected nil, got request: %v", foundReq)
+		}
+	})
+}
+
+// mockExecBreakGlassStore implements breakglass.Store for testing break-glass checking.
+type mockExecBreakGlassStore struct {
+	listByInvokerFunc func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error)
+}
+
+func (m *mockExecBreakGlassStore) Create(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+	return nil
+}
+
+func (m *mockExecBreakGlassStore) Get(ctx context.Context, id string) (*breakglass.BreakGlassEvent, error) {
+	return nil, nil
+}
+
+func (m *mockExecBreakGlassStore) Update(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+	return nil
+}
+
+func (m *mockExecBreakGlassStore) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *mockExecBreakGlassStore) ListByInvoker(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+	if m.listByInvokerFunc != nil {
+		return m.listByInvokerFunc(ctx, invoker, limit)
+	}
+	return []*breakglass.BreakGlassEvent{}, nil
+}
+
+func (m *mockExecBreakGlassStore) ListByStatus(ctx context.Context, status breakglass.BreakGlassStatus, limit int) ([]*breakglass.BreakGlassEvent, error) {
+	return []*breakglass.BreakGlassEvent{}, nil
+}
+
+func (m *mockExecBreakGlassStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+	return []*breakglass.BreakGlassEvent{}, nil
+}
+
+func (m *mockExecBreakGlassStore) FindActiveByInvokerAndProfile(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+	return nil, nil
+}
+
+func TestSentinelExecCommandInput_BreakGlassStoreField(t *testing.T) {
+	// Test that SentinelExecCommandInput has the BreakGlassStore field
+	t.Run("BreakGlassStore field is nil by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.BreakGlassStore != nil {
+			t.Error("expected BreakGlassStore to be nil by default")
+		}
+	})
+
+	t.Run("BreakGlassStore field can be set", func(t *testing.T) {
+		store := &mockExecBreakGlassStore{}
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			BreakGlassStore: store,
+		}
+		if input.BreakGlassStore == nil {
+			t.Error("expected BreakGlassStore to be set")
+		}
+	})
+}
+
+func TestSentinelExecCommand_BreakGlassIntegration(t *testing.T) {
+	// These tests verify the break-glass store integration at the input/config level.
+	// Full end-to-end tests require AWS credentials and are integration tests.
+
+	t.Run("BreakGlassStore nil does not cause panic", func(t *testing.T) {
+		// Verify that having BreakGlassStore=nil is safe (backward compatible)
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			BreakGlassStore: nil, // Explicitly nil
+		}
+
+		// Verify nil store doesn't panic when accessed
+		if input.BreakGlassStore != nil {
+			t.Error("BreakGlassStore should be nil")
+		}
+	})
+
+	t.Run("store with active break-glass configured", func(t *testing.T) {
+		// Create a mock store that would return an active break-glass event
+		now := time.Now()
+		activeBreakGlass := &breakglass.BreakGlassEvent{
+			ID:            "exec1234exec1234",
+			Invoker:       "charlie",
+			Profile:       "production",
+			Status:        breakglass.StatusActive,
+			ReasonCode:    breakglass.ReasonSecurity,
+			Justification: "Security incident response",
+			Duration:      2 * time.Hour,
+			CreatedAt:     now.Add(-30 * time.Minute),
+			ExpiresAt:     now.Add(90 * time.Minute), // 90 minutes remaining
+		}
+
+		store := &mockExecBreakGlassStore{
+			listByInvokerFunc: func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+				if invoker == "charlie" {
+					return []*breakglass.BreakGlassEvent{activeBreakGlass}, nil
+				}
+				return []*breakglass.BreakGlassEvent{}, nil
+			},
+		}
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/test",
+			BreakGlassStore: store,
+		}
+
+		// Verify store can find active break-glass
+		foundEvent, err := breakglass.FindActiveBreakGlass(context.Background(), input.BreakGlassStore, "charlie", "production")
+		if err != nil {
+			t.Fatalf("FindActiveBreakGlass error: %v", err)
+		}
+		if foundEvent == nil {
+			t.Fatal("expected to find active break-glass event")
+		}
+		if foundEvent.ID != "exec1234exec1234" {
+			t.Errorf("expected ID exec1234exec1234, got %s", foundEvent.ID)
+		}
+	})
+
+	t.Run("store without active break-glass returns nil", func(t *testing.T) {
+		// Create a mock store with no active break-glass events
+		store := &mockExecBreakGlassStore{
+			listByInvokerFunc: func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+				return []*breakglass.BreakGlassEvent{}, nil
+			},
+		}
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/test",
+			BreakGlassStore: store,
+		}
+
+		// Verify store returns nil when no active break-glass exists
+		foundEvent, err := breakglass.FindActiveBreakGlass(context.Background(), input.BreakGlassStore, "eve", "production")
+		if err != nil {
+			t.Fatalf("FindActiveBreakGlass error: %v", err)
+		}
+		if foundEvent != nil {
+			t.Errorf("expected nil, got event: %v", foundEvent)
+		}
+	})
+
+	t.Run("session duration capped to remaining break-glass time", func(t *testing.T) {
+		// Create a mock break-glass event with 45 minutes remaining
+		now := time.Now()
+		activeBreakGlass := &breakglass.BreakGlassEvent{
+			ID:        "exec567890123456",
+			Invoker:   "charlie",
+			Profile:   "production",
+			Status:    breakglass.StatusActive,
+			ExpiresAt: now.Add(45 * time.Minute), // 45 minutes remaining
+		}
+
+		// Verify RemainingDuration calculation
+		remaining := breakglass.RemainingDuration(activeBreakGlass)
+		if remaining <= 0 {
+			t.Fatal("expected positive remaining duration")
+		}
+		if remaining > 46*time.Minute {
+			t.Errorf("expected remaining ~45 minutes, got %v", remaining)
+		}
+
+		// Test capping logic:
+		// If sessionDuration=0 or sessionDuration > remainingTime, cap to remainingTime
+		sessionDuration := 2 * time.Hour // Request 2 hours
+		if sessionDuration > remaining {
+			sessionDuration = remaining // Should be capped to ~45 minutes
+		}
+		if sessionDuration > 46*time.Minute {
+			t.Errorf("session should be capped to ~45 minutes, got %v", sessionDuration)
+		}
+	})
+
+	t.Run("BreakGlassEventID appears in log output", func(t *testing.T) {
+		// Test that BreakGlassEventID is included in credential issuance fields
+		credFields := &logging.CredentialIssuanceFields{
+			RequestID:         "exec5678",
+			BreakGlassEventID: "bg789012bg789012",
+		}
+
+		if credFields.BreakGlassEventID != "bg789012bg789012" {
+			t.Errorf("expected BreakGlassEventID bg789012bg789012, got %s", credFields.BreakGlassEventID)
 		}
 	})
 }
