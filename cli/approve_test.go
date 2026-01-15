@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"os/user"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
@@ -36,23 +38,34 @@ func testableApproveCommand(ctx context.Context, input ApproveCommandInput) (*Ap
 		return nil, err
 	}
 
-	// 5. Check if transition is valid
+	// 5. Check approver authorization if policy is provided
+	if input.ApprovalPolicy != nil {
+		rule := policy.FindApprovalRule(input.ApprovalPolicy, req.Profile)
+		if rule != nil {
+			if !policy.CanApprove(rule, approver) {
+				return nil, errors.New("user " + approver + " is not authorized to approve requests for profile " + req.Profile)
+			}
+		}
+		// If no rule found, allow (passthrough - no approval routing for this profile)
+	}
+
+	// 6. Check if transition is valid
 	if !req.CanTransitionTo(request.StatusApproved) {
 		return nil, errors.New("invalid state transition")
 	}
 
-	// 6. Update request fields
+	// 7. Update request fields
 	req.Status = request.StatusApproved
 	req.Approver = approver
 	req.ApproverComment = input.Comment
 	req.UpdatedAt = time.Now()
 
-	// 7. Store updated request
+	// 8. Store updated request
 	if err := store.Update(ctx, req); err != nil {
 		return nil, err
 	}
 
-	// 8. Return output
+	// 9. Return output
 	return &ApproveCommandOutput{
 		ID:              req.ID,
 		Profile:         req.Profile,
@@ -358,5 +371,219 @@ func TestApproveCommand_ConcurrentModification(t *testing.T) {
 
 	if !errors.Is(err, request.ErrConcurrentModification) {
 		t.Errorf("expected ErrConcurrentModification, got: %v", err)
+	}
+}
+
+// Tests for approval policy authorization
+
+func TestApproveCommand_NoPolicy_AllowsAnyApprover(t *testing.T) {
+	now := time.Now()
+	pendingReq := &request.Request{
+		ID:            "abc123def4567890",
+		Requester:     "alice",
+		Profile:       "production",
+		Justification: "Investigating incident INC-12345",
+		Duration:      2 * time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     now.Add(-1 * time.Hour),
+		UpdatedAt:     now.Add(-1 * time.Hour),
+		ExpiresAt:     now.Add(23 * time.Hour),
+	}
+
+	var updatedReq *request.Request
+	store := &mockStore{
+		getFn: func(ctx context.Context, id string) (*request.Request, error) {
+			return pendingReq, nil
+		},
+		updateFn: func(ctx context.Context, req *request.Request) error {
+			updatedReq = req
+			return nil
+		},
+	}
+
+	input := ApproveCommandInput{
+		RequestID: "abc123def4567890",
+		Store:     store,
+		// No ApprovalPolicy set
+	}
+
+	output, err := testableApproveCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should succeed without policy
+	if output.Status != "approved" {
+		t.Errorf("expected status approved, got %s", output.Status)
+	}
+	if updatedReq == nil {
+		t.Fatal("expected request to be updated")
+	}
+}
+
+func TestApproveCommand_Policy_AuthorizedApprover(t *testing.T) {
+	currentUser, _ := user.Current()
+	now := time.Now()
+	pendingReq := &request.Request{
+		ID:            "abc123def4567890",
+		Requester:     "alice",
+		Profile:       "production",
+		Justification: "Investigating incident INC-12345",
+		Duration:      2 * time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     now.Add(-1 * time.Hour),
+		UpdatedAt:     now.Add(-1 * time.Hour),
+		ExpiresAt:     now.Add(23 * time.Hour),
+	}
+
+	var updatedReq *request.Request
+	store := &mockStore{
+		getFn: func(ctx context.Context, id string) (*request.Request, error) {
+			return pendingReq, nil
+		},
+		updateFn: func(ctx context.Context, req *request.Request) error {
+			updatedReq = req
+			return nil
+		},
+	}
+
+	// Create policy where current user is an authorized approver
+	approvalPolicy := &policy.ApprovalPolicy{
+		Version: "1",
+		Rules: []policy.ApprovalRule{
+			{
+				Name:      "production-approvers",
+				Profiles:  []string{"production"},
+				Approvers: []string{currentUser.Username, "other-admin"},
+			},
+		},
+	}
+
+	input := ApproveCommandInput{
+		RequestID:      "abc123def4567890",
+		Store:          store,
+		ApprovalPolicy: approvalPolicy,
+	}
+
+	output, err := testableApproveCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should succeed for authorized approver
+	if output.Status != "approved" {
+		t.Errorf("expected status approved, got %s", output.Status)
+	}
+	if updatedReq == nil {
+		t.Fatal("expected request to be updated")
+	}
+}
+
+func TestApproveCommand_Policy_UnauthorizedApprover(t *testing.T) {
+	now := time.Now()
+	pendingReq := &request.Request{
+		ID:            "abc123def4567890",
+		Requester:     "alice",
+		Profile:       "production",
+		Justification: "Investigating incident INC-12345",
+		Duration:      2 * time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     now.Add(-1 * time.Hour),
+		UpdatedAt:     now.Add(-1 * time.Hour),
+		ExpiresAt:     now.Add(23 * time.Hour),
+	}
+
+	store := &mockStore{
+		getFn: func(ctx context.Context, id string) (*request.Request, error) {
+			return pendingReq, nil
+		},
+	}
+
+	// Create policy where current user is NOT an authorized approver
+	approvalPolicy := &policy.ApprovalPolicy{
+		Version: "1",
+		Rules: []policy.ApprovalRule{
+			{
+				Name:      "production-approvers",
+				Profiles:  []string{"production"},
+				Approvers: []string{"admin1", "admin2"}, // Current user not included
+			},
+		},
+	}
+
+	input := ApproveCommandInput{
+		RequestID:      "abc123def4567890",
+		Store:          store,
+		ApprovalPolicy: approvalPolicy,
+	}
+
+	_, err := testableApproveCommand(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error for unauthorized approver")
+	}
+
+	// Check error message contains both user and profile
+	if !strings.Contains(err.Error(), "is not authorized to approve") {
+		t.Errorf("expected authorization error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "production") {
+		t.Errorf("expected error to mention profile, got: %v", err)
+	}
+}
+
+func TestApproveCommand_Policy_NoRuleMatchesProfile(t *testing.T) {
+	now := time.Now()
+	pendingReq := &request.Request{
+		ID:            "abc123def4567890",
+		Requester:     "alice",
+		Profile:       "development", // Different from rule profiles
+		Justification: "Investigating issue",
+		Duration:      2 * time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     now.Add(-1 * time.Hour),
+		UpdatedAt:     now.Add(-1 * time.Hour),
+		ExpiresAt:     now.Add(23 * time.Hour),
+	}
+
+	var updatedReq *request.Request
+	store := &mockStore{
+		getFn: func(ctx context.Context, id string) (*request.Request, error) {
+			return pendingReq, nil
+		},
+		updateFn: func(ctx context.Context, req *request.Request) error {
+			updatedReq = req
+			return nil
+		},
+	}
+
+	// Create policy with rules only for production
+	approvalPolicy := &policy.ApprovalPolicy{
+		Version: "1",
+		Rules: []policy.ApprovalRule{
+			{
+				Name:      "production-approvers",
+				Profiles:  []string{"production"},
+				Approvers: []string{"admin1"},
+			},
+		},
+	}
+
+	input := ApproveCommandInput{
+		RequestID:      "abc123def4567890",
+		Store:          store,
+		ApprovalPolicy: approvalPolicy,
+	}
+
+	output, err := testableApproveCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should succeed when no rule matches (passthrough)
+	if output.Status != "approved" {
+		t.Errorf("expected status approved, got %s", output.Status)
+	}
+	if updatedReq == nil {
+		t.Fatal("expected request to be updated")
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/notification"
+	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
@@ -29,6 +30,10 @@ type ApproveCommandInput struct {
 	// Notifier is an optional Notifier for sending notifications on approval.
 	// If nil, no notifications are sent. If set, the store is wrapped with NotifyStore.
 	Notifier notification.Notifier
+
+	// ApprovalPolicy is an optional approval policy for approver authorization.
+	// If nil, any user can approve any request.
+	ApprovalPolicy *policy.ApprovalPolicy
 }
 
 // ApproveCommandOutput represents the JSON output from the approve command.
@@ -120,19 +125,32 @@ func ApproveCommand(ctx context.Context, input ApproveCommandInput) error {
 		return err
 	}
 
-	// 5. Check if transition is valid
+	// 5. Check approver authorization if policy is provided
+	if input.ApprovalPolicy != nil {
+		rule := policy.FindApprovalRule(input.ApprovalPolicy, req.Profile)
+		if rule != nil {
+			if !policy.CanApprove(rule, approver) {
+				errMsg := fmt.Sprintf("user %s is not authorized to approve requests for profile %s", approver, req.Profile)
+				fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+				return errors.New(errMsg)
+			}
+		}
+		// If no rule found, allow (passthrough - no approval routing for this profile)
+	}
+
+	// 6. Check if transition is valid
 	if !req.CanTransitionTo(request.StatusApproved) {
 		fmt.Fprintf(os.Stderr, "Cannot approve request: current status is %s (only pending requests can be approved)\n", req.Status)
 		return errors.New("invalid state transition")
 	}
 
-	// 6. Update request fields
+	// 7. Update request fields
 	req.Status = request.StatusApproved
 	req.Approver = approver
 	req.ApproverComment = input.Comment
 	req.UpdatedAt = time.Now()
 
-	// 7. Store updated request
+	// 8. Store updated request
 	if err := store.Update(ctx, req); err != nil {
 		if errors.Is(err, request.ErrConcurrentModification) {
 			fmt.Fprintf(os.Stderr, "Request was modified by another process, please retry\n")
@@ -142,7 +160,7 @@ func ApproveCommand(ctx context.Context, input ApproveCommandInput) error {
 		return err
 	}
 
-	// 8. Output success JSON
+	// 9. Output success JSON
 	output := ApproveCommandOutput{
 		ID:              req.ID,
 		Profile:         req.Profile,
