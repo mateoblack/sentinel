@@ -56,6 +56,11 @@ type TwoHopCredentialProviderInput struct {
 	// SessionDuration is the session duration for the assumed role.
 	// Optional - defaults to 1 hour.
 	SessionDuration time.Duration
+
+	// RequestID is an optional pre-generated request-id for correlation.
+	// If empty, a new request-id will be generated during Retrieve().
+	// Optional.
+	RequestID string
 }
 
 // TwoHopCredentialProvider implements aws.CredentialsProvider by chaining
@@ -66,10 +71,15 @@ type TwoHopCredentialProviderInput struct {
 // 2. Generate unique SourceIdentity (sentinel:<user>:<request-id>)
 // 3. Assume target role with SourceIdentity stamped
 //
-// Each Retrieve() call generates a fresh request-id, ensuring all credentials
-// can be correlated with their Sentinel issuance.
+// Each Retrieve() call generates a fresh request-id (unless pre-generated),
+// ensuring all credentials can be correlated with their Sentinel issuance.
 type TwoHopCredentialProvider struct {
 	Input TwoHopCredentialProviderInput
+
+	// LastSourceIdentity is set after Retrieve() completes successfully.
+	// It contains the SourceIdentity used for the most recent credential request.
+	// Callers can use this to retrieve the actual SourceIdentity for logging/correlation.
+	LastSourceIdentity *identity.SourceIdentity
 }
 
 // NewTwoHopCredentialProvider creates a new TwoHopCredentialProvider with the given input.
@@ -96,12 +106,16 @@ func NewTwoHopProvider(baseProvider aws.CredentialsProvider, roleARN, user, regi
 }
 
 // Retrieve generates new credentials by assuming the target role with SourceIdentity.
-// Each call generates a unique request-id for correlation.
+// If Input.RequestID is provided, it uses that; otherwise generates a new request-id.
+// After successful completion, LastSourceIdentity is populated for caller retrieval.
 //
 // Implements aws.CredentialsProvider interface.
 func (p *TwoHopCredentialProvider) Retrieve(ctx context.Context) (aws.Credentials, error) {
-	// Generate unique request-id for this credential request
-	requestID := identity.NewRequestID()
+	// Use pre-generated request-id if provided, otherwise generate new one
+	requestID := p.Input.RequestID
+	if requestID == "" {
+		requestID = identity.NewRequestID()
+	}
 
 	// Sanitize username for SourceIdentity constraints
 	sanitizedUser, err := identity.SanitizeUser(p.Input.User)
@@ -109,11 +123,14 @@ func (p *TwoHopCredentialProvider) Retrieve(ctx context.Context) (aws.Credential
 		return aws.Credentials{}, err
 	}
 
-	// Create SourceIdentity with sanitized user and new request-id
+	// Create SourceIdentity with sanitized user and request-id
 	sourceIdentity, err := identity.New(sanitizedUser, requestID)
 	if err != nil {
 		return aws.Credentials{}, err
 	}
+
+	// Store the SourceIdentity for caller retrieval
+	p.LastSourceIdentity = sourceIdentity
 
 	// Determine session duration (use default if not specified)
 	duration := p.Input.SessionDuration
