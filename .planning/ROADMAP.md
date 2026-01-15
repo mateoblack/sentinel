@@ -79,10 +79,11 @@ Plans:
 **Depends on**: Phase 18
 **Research**: Likely (new AWS service integration)
 **Research topics**: DynamoDB table design, GSI patterns, TTL, aws-sdk-go-v2 dynamodb
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 19-01: TBD
+- [ ] 19-01: Store interface and DynamoDB CRUD operations
+- [ ] 19-02: GSI query methods (ListByRequester, ListByStatus, ListByProfile)
 
 #### Phase 20: Request Command
 
