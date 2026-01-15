@@ -16,6 +16,7 @@ type SentinelCredentialRequest struct {
 	SessionDuration time.Duration
 	Region          string
 	User            string // Username for SourceIdentity (required for two-hop flow)
+	RequestID       string // Pre-generated request-id for correlation (if empty, will be generated)
 }
 
 // SentinelCredentialResult contains retrieved credentials.
@@ -25,6 +26,8 @@ type SentinelCredentialResult struct {
 	SessionToken    string
 	Expiration      time.Time
 	CanExpire       bool
+	SourceIdentity  string // Full sentinel:user:request-id string (empty if no role assumption)
+	RoleARN         string // Role ARN assumed (empty if no role assumption)
 }
 
 // GetCredentials retrieves AWS credentials for a profile using aws-vault's provider chain.
@@ -152,6 +155,7 @@ func (s *Sentinel) GetCredentialsWithSourceIdentity(ctx context.Context, req Sen
 		EndpointURL:          config.EndpointURL,
 		ExternalID:           config.ExternalID,
 		SessionDuration:      sessionDuration,
+		RequestID:            req.RequestID, // Pass pre-generated request-id if provided
 	}
 
 	twoHopProvider, err := sentinel.NewTwoHopCredentialProvider(twoHopInput)
@@ -171,10 +175,16 @@ func (s *Sentinel) GetCredentialsWithSourceIdentity(ctx context.Context, req Sen
 		SecretAccessKey: creds.SecretAccessKey,
 		SessionToken:    creds.SessionToken,
 		CanExpire:       creds.CanExpire,
+		RoleARN:         config.RoleARN,
 	}
 
 	if creds.CanExpire {
 		result.Expiration = creds.Expires
+	}
+
+	// Populate SourceIdentity from the provider after Retrieve
+	if twoHopProvider.LastSourceIdentity != nil {
+		result.SourceIdentity = twoHopProvider.LastSourceIdentity.String()
 	}
 
 	return result, nil
