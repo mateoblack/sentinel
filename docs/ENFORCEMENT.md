@@ -296,3 +296,280 @@ SCPs can break critical services if misconfigured. Always:
 2. Verify service-linked roles still work
 3. Monitor CloudTrail for access denied events
 4. Have a rollback plan ready
+
+## Deployment Guide
+
+A progressive rollout strategy for enabling Sentinel enforcement.
+
+### Phase 1: Audit Mode (1-2 weeks)
+
+Deploy Sentinel in advisory mode without any enforcement policies.
+
+**Goals:**
+- Verify Sentinel is issuing credentials correctly
+- Review decision logs to identify access patterns
+- Confirm SourceIdentity appears in CloudTrail
+
+**Steps:**
+1. Configure Sentinel with your policy rules
+2. Update `~/.aws/config` to use `credential_process = sentinel credentials --profile X`
+3. Monitor `/var/log/sentinel/decisions.log` for allow/deny decisions
+4. Query CloudTrail to verify SourceIdentity stamping:
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:*" \
+  --start-time "$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)" | jq '.Events | length'
+```
+
+**Success criteria:**
+- All user access flows through Sentinel
+- Decision logs show expected allow/deny patterns
+- CloudTrail events include Sentinel SourceIdentity
+
+### Phase 2: Pilot Enforcement (1-2 weeks)
+
+Enable enforcement on a low-risk role to validate the mechanism.
+
+**Goals:**
+- Confirm trust policy enforcement works correctly
+- Identify any edge cases or integration issues
+- Build confidence before expanding
+
+**Steps:**
+1. Select a low-risk role (e.g., development environment read-only)
+2. Update the role's trust policy to require Sentinel SourceIdentity:
+
+```bash
+# Get current trust policy
+aws iam get-role --role-name DevReadOnly --query 'Role.AssumeRolePolicyDocument' > trust-policy.json
+
+# Add Sentinel condition (see Pattern A above)
+# Edit trust-policy.json to add sts:SourceIdentity condition
+
+# Update the trust policy
+aws iam update-assume-role-policy \
+  --role-name DevReadOnly \
+  --policy-document file://trust-policy.json
+```
+
+3. Test access through Sentinel (should succeed)
+4. Test access without Sentinel (should fail with AccessDenied)
+5. Monitor for unexpected access failures
+
+**Success criteria:**
+- Sentinel-issued credentials can assume the role
+- Non-Sentinel credentials are rejected
+- No unexpected disruptions
+
+### Phase 3: Expand to Sensitive Roles
+
+Enable enforcement on production and admin roles.
+
+**Goals:**
+- Protect sensitive access paths
+- Maintain migration period for legacy access if needed
+
+**Steps:**
+1. Identify sensitive roles requiring protection:
+   - Production access roles
+   - Admin/privileged roles
+   - Cross-account roles
+
+2. For each role, choose the appropriate pattern:
+   - Pattern A: Require any Sentinel credentials
+   - Pattern B: Require Sentinel + specific users (for highly sensitive roles)
+   - Pattern C: Migration mode (if legacy access must continue temporarily)
+
+3. Update trust policies incrementally
+4. Monitor CloudTrail for access denied events:
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRole \
+  --start-time "$(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ)" | \
+  jq '.Events[].CloudTrailEvent | fromjson | select(.errorCode == "AccessDenied")'
+```
+
+**Success criteria:**
+- All sensitive roles require Sentinel
+- Legacy migration paths documented and time-boxed
+- No critical workflows disrupted
+
+### Phase 4: Organization-Wide SCP (Optional)
+
+Apply SCP-level enforcement across the organization.
+
+**Goals:**
+- Defense in depth beyond individual trust policies
+- Catch roles that weren't updated with trust policy enforcement
+- Organizational-level audit and compliance
+
+**Steps:**
+1. Create the SCP in AWS Organizations:
+
+```bash
+aws organizations create-policy \
+  --name "RequireSentinelSourceIdentity" \
+  --description "Require Sentinel SourceIdentity for role assumptions" \
+  --type SERVICE_CONTROL_POLICY \
+  --content file://sentinel-scp.json
+```
+
+2. Attach to a test OU first:
+
+```bash
+aws organizations attach-policy \
+  --policy-id p-xxxxxx \
+  --target-id ou-xxxx-sandbox
+```
+
+3. Verify all workflows in the test OU continue working
+4. Expand to production OUs
+5. Optionally attach to organization root for full enforcement
+
+**Success criteria:**
+- SCP active across target OUs/accounts
+- Service-linked roles exempted and functioning
+- Clear audit trail of enforcement
+
+## Troubleshooting
+
+### AccessDenied When Assuming Role
+
+**Symptom:** AssumeRole fails with AccessDenied even though the user is authorized.
+
+**Checks:**
+
+1. **Is Sentinel being used?**
+   ```bash
+   # Verify credential_process is configured
+   grep -A5 "profile production" ~/.aws/config
+   # Should show: credential_process = sentinel credentials --profile production
+   ```
+
+2. **Is the condition key correct?**
+   ```bash
+   # Get the trust policy
+   aws iam get-role --role-name MyRole --query 'Role.AssumeRolePolicyDocument'
+   # Verify it uses sts:SourceIdentity (not aws:SourceIdentity)
+   ```
+
+3. **Is StringLike used for wildcards?**
+   ```bash
+   # Check for StringLike vs StringEquals
+   # StringEquals won't match sentinel:alice:a1b2c3d4 against sentinel:*
+   ```
+
+4. **Does the Sentinel log show allow?**
+   ```bash
+   # Check recent decision logs
+   tail -10 /var/log/sentinel/decisions.log | jq 'select(.effect == "deny")'
+   ```
+
+### SCP Blocking Service Roles
+
+**Symptom:** AWS services fail with permission errors after enabling SCP enforcement.
+
+**Checks:**
+
+1. **Identify the failing service:**
+   ```bash
+   # Find access denied events in CloudTrail
+   aws cloudtrail lookup-events \
+     --lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRole \
+     --start-time "$(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ)" | \
+     jq '.Events[].CloudTrailEvent | fromjson | select(.errorCode != null) | {principal: .userIdentity.arn, error: .errorCode}'
+   ```
+
+2. **Add service role exceptions to SCP:**
+   - Include `ArnNotLike` condition for `aws-service-role/*` patterns
+   - See Pattern C in SCP Patterns section
+
+3. **Common service roles to exempt:**
+   - `arn:aws:iam::*:role/aws-service-role/*`
+   - `arn:aws:iam::*:role/AWSServiceRole*`
+   - CI/CD pipeline roles (if not using Sentinel)
+
+### SourceIdentity Not Appearing in CloudTrail
+
+**Symptom:** CloudTrail events don't show the Sentinel SourceIdentity.
+
+**Checks:**
+
+1. **Did AssumeRole succeed?**
+   ```bash
+   # SourceIdentity is only stamped on successful AssumeRole
+   # Check for errors in Sentinel logs
+   tail -20 /var/log/sentinel/decisions.log | jq 'select(.effect == "allow")'
+   ```
+
+2. **Are you looking at the right events?**
+   ```bash
+   # SourceIdentity appears in userIdentity.sourceIdentity field
+   aws cloudtrail lookup-events \
+     --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+     --start-time "2024-01-15T00:00:00Z"
+   ```
+
+3. **Is CloudTrail configured correctly?**
+   - Management events are logged by default
+   - Data events (S3 object-level, Lambda) require explicit configuration
+   - Check trail configuration for event selectors
+
+4. **Is there CloudTrail delivery delay?**
+   - CloudTrail events can take up to 15 minutes to appear
+   - Use `lookup-events` for recent events (last 90 days)
+   - Use Athena for historical queries
+
+## Security Considerations
+
+### Credential Process Control
+
+Sentinel's effectiveness depends on controlling the `credential_process` path. If users can bypass Sentinel:
+
+- **Direct IAM user credentials** - Users with IAM access keys can call AssumeRole directly without Sentinel
+- **Other credential providers** - Environment variables, instance profiles, or other credential sources
+
+**Mitigations:**
+- Remove IAM user access keys where possible
+- Use IAM policies to restrict who can call AssumeRole directly
+- SCPs provide defense-in-depth by enforcing at the organization level
+
+### Trust Policy vs SCP Enforcement
+
+| Aspect | Trust Policy | SCP |
+|--------|--------------|-----|
+| Scope | Per-role | Per-OU or organization |
+| Management | IAM (decentralized) | Organizations (centralized) |
+| Bypass | Another statement can allow | Cannot be bypassed by IAM |
+| Service roles | Handled automatically | Need explicit exceptions |
+
+**Recommendation:** Use both for defense-in-depth:
+- Trust policies for per-role user restrictions
+- SCPs for organization-wide enforcement baseline
+
+### SourceIdentity Spoofing
+
+Can someone spoof a Sentinel SourceIdentity to bypass enforcement?
+
+**No**, because:
+1. SourceIdentity can only be set by the caller of AssumeRole
+2. The caller must have valid credentials to call AssumeRole
+3. Trust policies control who can assume the role in the first place
+
+The only way to set `sentinel:alice:*` as SourceIdentity is to call AssumeRole with credentials that the trust policy accepts. If the trust policy requires `sentinel:*` SourceIdentity, the caller must already have gone through Sentinel.
+
+### Audit Trail Integrity
+
+Sentinel logs (`/var/log/sentinel/decisions.log`) and CloudTrail provide complementary audit trails:
+
+| Log Source | Contains | Integrity |
+|------------|----------|-----------|
+| Sentinel logs | Access decisions (allow/deny), policy rule matched | Local file - protect with file permissions |
+| CloudTrail | AWS API calls with SourceIdentity | AWS-managed - tamper-evident |
+
+**Recommendation:**
+- Ship Sentinel logs to a centralized log aggregator (CloudWatch Logs, Splunk, etc.)
+- Enable CloudTrail log file integrity validation
+- Correlate both sources using request_id/source_identity
