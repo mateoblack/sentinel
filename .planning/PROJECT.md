@@ -29,22 +29,25 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ CloudTrail correlation via request-id in decision logs — v1.1
 - ✓ IAM trust policy enforcement patterns documented — v1.1
 - ✓ SCP enforcement patterns for organization-wide control — v1.1
+- ✓ Approval request/approve workflow with DynamoDB state machine — v1.2
+- ✓ SNS and Webhook notification hooks for request lifecycle events — v1.2
+- ✓ Approval policies with auto-approve conditions and approver routing — v1.2
+- ✓ Approval audit trail logging for compliance — v1.2
+- ✓ CLI commands: request, list, check, approve, deny — v1.2
 
 ### Active
 
-(None — all v1.1 requirements validated)
+(None — all v1.2 requirements validated)
 
 ### Out of Scope
-
-- Approval workflows — deferred (requires DynamoDB + notification integration)
-- Break-glass mode — deferred (standard access only for v1)
+- Break-glass mode — deferred to v1.3
 - User management — AWS SSO handles identity
 - Authorization inside AWS resources — IAM/SCPs handle that
 - Daemon mode — CLI-first, no background process
 
 ## Context
 
-Shipped v1.1 with 13,986 LOC Go.
+Shipped v1.2 with 23,657 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -59,11 +62,18 @@ Sentinel adds the policy evaluation "brain" with:
 - First-match-wins rule evaluation with default deny
 - Structured JSON Lines logging for audit trails
 
-v1.1 adds credential provenance via Sentinel Fingerprint:
+v1.1 added credential provenance via Sentinel Fingerprint:
 - SourceIdentity stamping (sentinel:<user>:<request-id>) on all role assumptions
 - Two-hop credential flow: aws-vault base creds → SentinelAssumeRole → fingerprinted credentials
 - CloudTrail correlation via request-id matching between Sentinel logs and AWS events
 - Optional IAM enforcement via trust policies and SCPs
+
+v1.2 adds approval workflows:
+- Request/approve flow with DynamoDB state machine (pending → approved/denied/expired/cancelled)
+- SNS and Webhook notification hooks for request lifecycle events
+- Approval policies with auto-approve conditions and profile-based approver routing
+- Approval audit trail logging parallel to decision logging
+- CLI commands: request, list, check, approve, deny
 
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
@@ -93,6 +103,13 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Crypto/rand for request-id | Security-first entropy for correlation IDs | ✓ Good |
 | User sanitization at call time | Allows raw user storage, sanitizes for AWS constraints | ✓ Good |
 | omitempty for new log fields | Backward compatibility with existing log consumers | ✓ Good |
+| DynamoDB single-table design | GSIs for flexible query patterns, TTL for expiration | ✓ Good |
+| Request state machine | Finite states (pending/approved/denied/expired/cancelled) with clear transitions | ✓ Good |
+| Notifier interface | Common interface for SNS/Webhook, NotifyStore wrapper | ✓ Good |
+| EffectRequireApproval policy effect | Extends existing policy schema, triggers approval flow | ✓ Good |
+| Auto-approve conditions | User lists, time windows, max duration for self-service | ✓ Good |
+| Profile-based approver routing | Specific approvers per profile pattern | ✓ Good |
+| Approval audit trail | Parallel to decision logging, same JSON Lines format | ✓ Good |
 
 ---
-*Last updated: 2026-01-15 after v1.1 milestone*
+*Last updated: 2026-01-15 after v1.2 milestone*

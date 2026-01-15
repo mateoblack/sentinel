@@ -1,5 +1,31 @@
 # Project Milestones: Sentinel
 
+## v1.2 Approval Workflows (Shipped: 2026-01-15)
+
+**Delivered:** Request/approve flow for sensitive access with DynamoDB state machine, SNS/Webhook notification hooks, and approval policies with auto-approve conditions.
+
+**Phases completed:** 18-26 (18 plans total)
+
+**Key accomplishments:**
+- Request schema with state machine (pending → approved/denied/expired/cancelled)
+- DynamoDB backend with GSI query patterns and TTL expiration
+- CLI commands: request, list, check, approve, deny
+- SNS and Webhook notifiers with NotifyStore wrapper for automatic notifications
+- Approval policies with EffectRequireApproval, auto-approve conditions, and approver routing
+- Approval audit trail logging parallel to decision logging
+
+**Stats:**
+- 81 files created/modified
+- 23,657 lines of Go (total codebase)
+- 9 phases, 18 plans, ~45 tasks
+- 1 day from v1.1 to v1.2
+
+**Git range:** `feat(18-01)` → `feat(26-02)`
+
+**What's next:** v1.3 Break-Glass for emergency access bypass with enhanced audit
+
+---
+
 ## v1.1 Sentinel Fingerprint (Shipped: 2026-01-15)
 
 **Delivered:** Enforceable credential provenance via SourceIdentity stamping on all role assumptions, enabling CloudTrail correlation and optional IAM enforcement.
