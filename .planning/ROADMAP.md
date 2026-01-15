@@ -66,16 +66,15 @@ Plans:
 Plans:
 - [x] 10-01: Create SentinelAssumeRole function with SourceIdentity stamping
 
-#### Phase 11: Two-Hop Orchestration
+#### Phase 11: Two-Hop Orchestration (Complete)
 
 **Goal**: Chain aws-vault base credentials → Sentinel AssumeRole with SourceIdentity
 **Depends on**: Phase 10
-**Research**: Likely (aws-vault credential provider internals)
-**Research topics**: How aws-vault credential_process works with role chaining, session duration propagation
-**Plans**: TBD
+**Research**: Not needed (followed vault patterns)
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 11-01: TBD
+- [x] 11-01: Create TwoHopCredentialProvider with SourceIdentity generation
 
 #### Phase 12: Credential Process Update
 
@@ -143,7 +142,7 @@ Plans:
 |-------|-----------|-------|--------|-----------|
 | 9. Source Identity Schema | v1.1 | 1/1 | Complete | 2026-01-14 |
 | 10. AssumeRole Provider | v1.1 | 1/1 | Complete | 2026-01-14 |
-| 11. Two-Hop Orchestration | v1.1 | 0/? | Not started | - |
+| 11. Two-Hop Orchestration | v1.1 | 1/1 | Complete | 2026-01-14 |
 | 12. Credential Process Update | v1.1 | 0/? | Not started | - |
 | 13. Exec Command Update | v1.1 | 0/? | Not started | - |
 | 14. Enhanced Decision Logging | v1.1 | 0/? | Not started | - |
