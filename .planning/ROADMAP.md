@@ -109,15 +109,15 @@ Plans:
 - [x] 14-03: Integrate enhanced logging into exec command
 - [x] 14-04: Add logging integration tests
 
-#### Phase 15: CloudTrail Correlation
+#### Phase 15: CloudTrail Correlation (Complete)
 
 **Goal**: Documentation and tooling for correlating Sentinel logs with CloudTrail events
 **Depends on**: Phase 14
 **Research**: Unlikely (documentation focus)
-**Plans**: TBD
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 15-01: TBD
+- [x] 15-01: Create CloudTrail correlation documentation
 
 #### Phase 16: Enforcement Patterns
 
@@ -149,6 +149,6 @@ Plans:
 | 12. Credential Process Update | v1.1 | 1/1 | Complete | 2026-01-15 |
 | 13. Exec Command Update | v1.1 | 1/1 | Complete | 2026-01-15 |
 | 14. Enhanced Decision Logging | v1.1 | 4/4 | Complete | 2026-01-15 |
-| 15. CloudTrail Correlation | v1.1 | 0/? | Not started | - |
+| 15. CloudTrail Correlation | v1.1 | 1/1 | Complete | 2026-01-15 |
 | 16. Enforcement Patterns | v1.1 | 0/? | Not started | - |
 | 17. Integration Testing | v1.1 | 0/? | Not started | - |
