@@ -25,10 +25,14 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ Decision logging (user, profile, allow/deny, rule matched) — v1.0
 - ✓ `sentinel exec` command for direct invocation — v1.0
 - ✓ Compatibility with existing aws-vault profiles — v1.0
+- ✓ SourceIdentity stamping on all role assumptions — v1.1
+- ✓ CloudTrail correlation via request-id in decision logs — v1.1
+- ✓ IAM trust policy enforcement patterns documented — v1.1
+- ✓ SCP enforcement patterns for organization-wide control — v1.1
 
 ### Active
 
-(None — all v1.0 requirements validated)
+(None — all v1.1 requirements validated)
 
 ### Out of Scope
 
@@ -40,7 +44,7 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.0 with 10,762 LOC Go.
+Shipped v1.1 with 13,986 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -54,6 +58,12 @@ Sentinel adds the policy evaluation "brain" with:
 - SSM Parameter Store integration for centralized policy
 - First-match-wins rule evaluation with default deny
 - Structured JSON Lines logging for audit trails
+
+v1.1 adds credential provenance via Sentinel Fingerprint:
+- SourceIdentity stamping (sentinel:<user>:<request-id>) on all role assumptions
+- Two-hop credential flow: aws-vault base creds → SentinelAssumeRole → fingerprinted credentials
+- CloudTrail correlation via request-id matching between Sentinel logs and AWS events
+- Optional IAM enforcement via trust policies and SCPs
 
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
@@ -78,6 +88,11 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Default deny on no match | Security-first approach | ✓ Good |
 | 5-minute cache TTL | Balance API calls vs freshness | ✓ Good |
 | JSON Lines logging format | Log aggregation compatibility | ✓ Good |
+| SourceIdentity format sentinel:<user>:<request-id> | Unique per-request correlation, fits AWS 64-char limit | ✓ Good |
+| Two-hop credential flow | Enables SourceIdentity stamping on all role assumptions | ✓ Good |
+| Crypto/rand for request-id | Security-first entropy for correlation IDs | ✓ Good |
+| User sanitization at call time | Allows raw user storage, sanitizes for AWS constraints | ✓ Good |
+| omitempty for new log fields | Backward compatibility with existing log consumers | ✓ Good |
 
 ---
-*Last updated: 2026-01-14 after v1.0 milestone*
+*Last updated: 2026-01-15 after v1.1 milestone*

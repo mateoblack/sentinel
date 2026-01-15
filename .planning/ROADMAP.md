@@ -7,7 +7,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 ## Milestones
 
 - ✅ **v1.0 MVP** - [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md) (Phases 1-8, shipped 2026-01-14)
-- ✅ **v1.1 Sentinel Fingerprint** - Phases 9-17 (shipped 2026-01-15)
+- ✅ **v1.1 Sentinel Fingerprint** - [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) (Phases 9-17, shipped 2026-01-15)
 
 ## Completed Milestones
 
@@ -42,113 +42,24 @@ None
 | 7. Exec Command | v1.0 | 2/2 | Complete | 2026-01-14 |
 | 8. Profile Compatibility | v1.0 | 2/2 | Complete | 2026-01-14 |
 
-### ✅ v1.1 Sentinel Fingerprint (Complete)
+<details>
+<summary>✅ v1.1 Sentinel Fingerprint (Phases 9-17) — SHIPPED 2026-01-15</summary>
 
-**Milestone Goal:** Make Sentinel enforceable and provable inside AWS by stamping all sessions with a Sentinel-controlled SourceIdentity.
+- [x] Phase 9: Source Identity Schema (1/1 plans) — completed 2026-01-14
+- [x] Phase 10: AssumeRole Provider (1/1 plans) — completed 2026-01-14
+- [x] Phase 11: Two-Hop Orchestration (1/1 plans) — completed 2026-01-14
+- [x] Phase 12: Credential Process Update (1/1 plans) — completed 2026-01-15
+- [x] Phase 13: Exec Command Update (1/1 plans) — completed 2026-01-15
+- [x] Phase 14: Enhanced Decision Logging (4/4 plans) — completed 2026-01-15
+- [x] Phase 15: CloudTrail Correlation (1/1 plans) — completed 2026-01-15
+- [x] Phase 16: Enforcement Patterns (1/1 plans) — completed 2026-01-15
+- [x] Phase 17: Integration Testing (1/1 plans) — completed 2026-01-15
 
-#### Phase 9: Source Identity Schema (Complete)
+</details>
 
-**Goal**: Define SourceIdentity format (`sentinel:<user>:<request-id>`) and request-id generation
-**Depends on**: v1.0 complete
-**Research**: Unlikely (internal design)
-**Plans**: 1/1 complete
+## Progress (All Milestones)
 
-Plans:
-- [x] 09-01: Create SourceIdentity type and request-id generation
-
-#### Phase 10: AssumeRole Provider (Complete)
-
-**Goal**: Build AssumeRole wrapper that stamps SourceIdentity on all role assumptions
-**Depends on**: Phase 9
-**Research**: Unlikely (followed vault patterns)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 10-01: Create SentinelAssumeRole function with SourceIdentity stamping
-
-#### Phase 11: Two-Hop Orchestration (Complete)
-
-**Goal**: Chain aws-vault base credentials → Sentinel AssumeRole with SourceIdentity
-**Depends on**: Phase 10
-**Research**: Not needed (followed vault patterns)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 11-01: Create TwoHopCredentialProvider with SourceIdentity generation
-
-#### Phase 12: Credential Process Update (Complete)
-
-**Goal**: Update credential_process command to use two-hop pattern for SourceIdentity stamping
-**Depends on**: Phase 11
-**Research**: Unlikely (extending existing implementation)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 12-01: Integrate GetCredentialsWithSourceIdentity into credentials command
-
-#### Phase 13: Exec Command Update (Complete)
-
-**Goal**: Update exec command to use two-hop credential flow with SourceIdentity
-**Depends on**: Phase 12
-**Research**: Unlikely (parallel to credential_process changes)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 13-01: Update exec command to use GetCredentialsWithSourceIdentity
-
-#### Phase 14: Enhanced Decision Logging (Complete)
-
-**Goal**: Add request-id, source-identity, role-arn, session-duration to decision logs
-**Depends on**: Phase 13
-**Research**: Unlikely (extending existing logging)
-**Plans**: 4/4 complete
-
-Plans:
-- [x] 14-01: Extend DecisionLogEntry with CloudTrail correlation fields
-- [x] 14-02: Integrate enhanced logging into credential_process
-- [x] 14-03: Integrate enhanced logging into exec command
-- [x] 14-04: Add logging integration tests
-
-#### Phase 15: CloudTrail Correlation (Complete)
-
-**Goal**: Documentation and tooling for correlating Sentinel logs with CloudTrail events
-**Depends on**: Phase 14
-**Research**: Unlikely (documentation focus)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 15-01: Create CloudTrail correlation documentation
-
-#### Phase 16: Enforcement Patterns (Complete)
-
-**Goal**: Document trust policy and SCP patterns for optional Sentinel enforcement
-**Depends on**: Phase 15
-**Research**: Unlikely (IAM patterns documentation)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 16-01: Create enforcement patterns documentation
-
-#### Phase 17: Integration Testing (Complete)
-
-**Goal**: End-to-end testing of fingerprint flow with real AWS resources
-**Depends on**: Phase 16
-**Research**: Unlikely (testing existing implementation)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 17-01: Create integration tests for Sentinel Fingerprint flow
-
-## Progress (v1.1)
-
-| Phase | Milestone | Plans | Status | Completed |
-|-------|-----------|-------|--------|-----------|
-| 9. Source Identity Schema | v1.1 | 1/1 | Complete | 2026-01-14 |
-| 10. AssumeRole Provider | v1.1 | 1/1 | Complete | 2026-01-14 |
-| 11. Two-Hop Orchestration | v1.1 | 1/1 | Complete | 2026-01-14 |
-| 12. Credential Process Update | v1.1 | 1/1 | Complete | 2026-01-15 |
-| 13. Exec Command Update | v1.1 | 1/1 | Complete | 2026-01-15 |
-| 14. Enhanced Decision Logging | v1.1 | 4/4 | Complete | 2026-01-15 |
-| 15. CloudTrail Correlation | v1.1 | 1/1 | Complete | 2026-01-15 |
-| 16. Enforcement Patterns | v1.1 | 1/1 | Complete | 2026-01-15 |
-| 17. Integration Testing | v1.1 | 1/1 | Complete | 2026-01-15 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1-8 | v1.0 | 16/16 | Complete | 2026-01-14 |
+| 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
