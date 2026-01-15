@@ -10,6 +10,7 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
@@ -24,6 +25,10 @@ type RequestCommandInput struct {
 	// Store is an optional Store implementation for testing.
 	// If nil, a DynamoDB store will be created using the RequestTable and Region.
 	Store request.Store
+
+	// Notifier is an optional Notifier for sending notifications on request creation.
+	// If nil, no notifications are sent. If set, the store is wrapped with NotifyStore.
+	Notifier notification.Notifier
 }
 
 // RequestCommandOutput represents the JSON output from the request command.
@@ -107,6 +112,11 @@ func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel)
 
 		// Create DynamoDB store
 		store = request.NewDynamoDBStore(awsCfg, input.RequestTable)
+	}
+
+	// Wrap store with NotifyStore if Notifier is provided
+	if input.Notifier != nil {
+		store = notification.NewNotifyStore(store, input.Notifier)
 	}
 
 	// 5. Build Request struct
