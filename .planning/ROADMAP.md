@@ -90,10 +90,10 @@ Plans:
 **Goal**: CLI command to submit access requests with profile/duration/justification
 **Depends on**: Phase 19
 **Research**: Unlikely (extends existing CLI patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 20-01: TBD
+- [x] 20-01: Request command with CLI configuration and tests — completed 2026-01-14
 
 #### Phase 21: List/Check Commands
 
@@ -248,7 +248,7 @@ Plans:
 | 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
 | 18. Request Schema | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 19. DynamoDB Backend | v1.2 | 2/2 | Complete | 2026-01-15 |
-| 20. Request Command | v1.2 | 0/? | Not started | - |
+| 20. Request Command | v1.2 | 1/1 | Complete | 2026-01-14 |
 | 21. List/Check Commands | v1.2 | 0/? | Not started | - |
 | 22. Approve/Deny Commands | v1.2 | 0/? | Not started | - |
 | 23. Request Integration | v1.2 | 0/? | Not started | - |
