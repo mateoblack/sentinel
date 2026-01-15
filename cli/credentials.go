@@ -12,6 +12,7 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
@@ -26,10 +27,11 @@ type CredentialsCommandInput struct {
 	Region          string
 	NoSession       bool
 	SessionDuration time.Duration
-	Logger          logging.Logger // nil means no logging
-	LogFile         string         // Path to log file (empty = no file logging)
-	LogStderr       bool           // Log to stderr (default: false)
-	Store           request.Store  // Optional: for approved request checking (nil = no checking)
+	Logger          logging.Logger   // nil means no logging
+	LogFile         string           // Path to log file (empty = no file logging)
+	LogStderr       bool             // Log to stderr (default: false)
+	Store           request.Store    // Optional: for approved request checking (nil = no checking)
+	BreakGlassStore breakglass.Store // Optional: for break-glass checking (nil = no checking)
 }
 
 // CredentialProcessOutput represents the JSON output format for AWS credential_process.
@@ -148,8 +150,9 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	// 6. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 7. Handle deny decision - check for approved request first
+	// 7. Handle deny decision - check for approved request or break-glass first
 	var approvedReq *request.Request
+	var activeBreakGlass *breakglass.BreakGlassEvent
 	if decision.Effect == policy.EffectDeny {
 		// Check for approved request before denying
 		if input.Store != nil {
@@ -161,8 +164,17 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 			}
 		}
 
-		if approvedReq == nil {
-			// No approved request - proceed with deny
+		// If no approved request, check for active break-glass
+		if approvedReq == nil && input.BreakGlassStore != nil {
+			var bgErr error
+			activeBreakGlass, bgErr = breakglass.FindActiveBreakGlass(ctx, input.BreakGlassStore, username, input.ProfileName)
+			if bgErr != nil {
+				log.Printf("Warning: failed to check break-glass: %v", bgErr)
+			}
+		}
+
+		if approvedReq == nil && activeBreakGlass == nil {
+			// No approved request and no active break-glass - proceed with deny
 			if input.Logger != nil {
 				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
 				input.Logger.LogDecision(entry)
@@ -170,7 +182,17 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 			fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
 			return fmt.Errorf("access denied")
 		}
-		// Approved request found - continue to credential issuance
+		// Approved request or active break-glass found - continue to credential issuance
+	}
+
+	// 7.5. Cap session duration to remaining break-glass time if applicable
+	sessionDuration := input.SessionDuration
+	if activeBreakGlass != nil {
+		remainingTime := breakglass.RemainingDuration(activeBreakGlass)
+		if sessionDuration == 0 || sessionDuration > remainingTime {
+			sessionDuration = remainingTime
+			log.Printf("Capping session duration to break-glass remaining time: %v", remainingTime)
+		}
 	}
 
 	// 8. EffectAllow (or approved request): generate request-id and retrieve credentials
@@ -181,9 +203,9 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		ProfileName:     input.ProfileName,
 		Region:          input.Region,
 		NoSession:       input.NoSession,
-		SessionDuration: input.SessionDuration,
-		User:            username,  // For SourceIdentity stamping on role assumption
-		RequestID:       requestID, // For CloudTrail correlation
+		SessionDuration: sessionDuration, // May be capped to break-glass remaining time
+		User:            username,         // For SourceIdentity stamping on role assumption
+		RequestID:       requestID,        // For CloudTrail correlation
 	}
 
 	// Retrieve credentials with SourceIdentity stamping (if profile has role_arn)
@@ -199,11 +221,15 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 			RequestID:       requestID,
 			SourceIdentity:  creds.SourceIdentity,
 			RoleARN:         creds.RoleARN,
-			SessionDuration: input.SessionDuration,
+			SessionDuration: sessionDuration, // May be capped to break-glass remaining time
 		}
 		// Include approved request ID if credentials were issued via approval override
 		if approvedReq != nil {
 			credFields.ApprovedRequestID = approvedReq.ID
+		}
+		// Include break-glass event ID if credentials were issued via break-glass override
+		if activeBreakGlass != nil {
+			credFields.BreakGlassEventID = activeBreakGlass.ID
 		}
 		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, input.PolicyParameter, credFields)
 		input.Logger.LogDecision(entry)
