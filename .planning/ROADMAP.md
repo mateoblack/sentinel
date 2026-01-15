@@ -125,7 +125,7 @@ Plans:
 
 Plans:
 - [x] 23-01: Request checker function with FindApprovedRequest — completed 2026-01-15
-- [ ] 23-02: TBD
+- [x] 23-02: Credential issuance integration with Store field — completed 2026-01-15
 
 #### Phase 24: Notification Hooks
 
@@ -253,7 +253,7 @@ Plans:
 | 20. Request Command | v1.2 | 1/1 | Complete | 2026-01-14 |
 | 21. List/Check Commands | v1.2 | 2/2 | Complete | 2026-01-15 |
 | 22. Approve/Deny Commands | v1.2 | 1/1 | Complete | 2026-01-14 |
-| 23. Request Integration | v1.2 | 1/2 | In progress | - |
+| 23. Request Integration | v1.2 | 2/2 | Complete | 2026-01-15 |
 | 24. Notification Hooks | v1.2 | 0/? | Not started | - |
 | 25. Approval Policies | v1.2 | 0/? | Not started | - |
 | 26. Approval Audit Trail | v1.2 | 0/? | Not started | - |
