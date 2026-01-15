@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/notification"
+	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
@@ -29,14 +30,19 @@ type RequestCommandInput struct {
 	// Notifier is an optional Notifier for sending notifications on request creation.
 	// If nil, no notifications are sent. If set, the store is wrapped with NotifyStore.
 	Notifier notification.Notifier
+
+	// ApprovalPolicy is an optional approval policy for auto-approve checking.
+	// If nil, no auto-approve checking is performed.
+	ApprovalPolicy *policy.ApprovalPolicy
 }
 
 // RequestCommandOutput represents the JSON output from the request command.
 type RequestCommandOutput struct {
-	RequestID string    `json:"request_id"`
-	Profile   string    `json:"profile"`
-	Status    string    `json:"status"`
-	ExpiresAt time.Time `json:"expires_at"`
+	RequestID    string    `json:"request_id"`
+	Profile      string    `json:"profile"`
+	Status       string    `json:"status"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	AutoApproved bool      `json:"auto_approved,omitempty"`
 }
 
 // ConfigureRequestCommand sets up the request command with kingpin.
@@ -133,24 +139,37 @@ func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel)
 		ExpiresAt:     now.Add(request.DefaultRequestTTL),
 	}
 
-	// 6. Validate request
+	// 6. Check auto-approve if approval policy is provided
+	autoApproved := false
+	if input.ApprovalPolicy != nil {
+		rule := policy.FindApprovalRule(input.ApprovalPolicy, input.ProfileName)
+		if rule != nil && policy.ShouldAutoApprove(rule, username, now, duration) {
+			req.Status = request.StatusApproved
+			req.Approver = username
+			req.ApproverComment = "auto-approved by policy"
+			autoApproved = true
+		}
+	}
+
+	// 7. Validate request
 	if err := req.Validate(); err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid request: %v\n", err)
 		return err
 	}
 
-	// 7. Store request
+	// 8. Store request
 	if err := store.Create(ctx, req); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create request: %v\n", err)
 		return err
 	}
 
-	// 8. Output success JSON
+	// 9. Output success JSON
 	output := RequestCommandOutput{
-		RequestID: req.ID,
-		Profile:   req.Profile,
-		Status:    string(req.Status),
-		ExpiresAt: req.ExpiresAt,
+		RequestID:    req.ID,
+		Profile:      req.Profile,
+		Status:       string(req.Status),
+		ExpiresAt:    req.ExpiresAt,
+		AutoApproved: autoApproved,
 	}
 
 	jsonBytes, err := json.MarshalIndent(&output, "", "  ")

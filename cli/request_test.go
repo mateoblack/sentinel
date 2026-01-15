@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
@@ -86,18 +87,24 @@ func (m *mockSentinel) ValidateProfile(profileName string) error {
 	return nil
 }
 
+// testableRequestCommandOutput contains test output with auto-approval status.
+type testableRequestCommandOutput struct {
+	Request      *request.Request
+	AutoApproved bool
+}
+
 // testableRequestCommand is a testable version that accepts a profile validator.
-func testableRequestCommand(ctx context.Context, input RequestCommandInput, validateProfile func(string) error) error {
+func testableRequestCommand(ctx context.Context, input RequestCommandInput, validateProfile func(string) error) (*testableRequestCommandOutput, error) {
 	// 1. Get current user
 	currentUser, err := user.Current()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	username := currentUser.Username
 
 	// 2. Validate profile exists in AWS config
 	if err := validateProfile(input.ProfileName); err != nil {
-		return err
+		return nil, err
 	}
 
 	// 3. Cap duration at MaxDuration
@@ -109,7 +116,7 @@ func testableRequestCommand(ctx context.Context, input RequestCommandInput, vali
 	// 4. Get store (must be provided for testing)
 	store := input.Store
 	if store == nil {
-		return errors.New("store is required for testing")
+		return nil, errors.New("store is required for testing")
 	}
 
 	// 5. Build Request struct
@@ -126,17 +133,32 @@ func testableRequestCommand(ctx context.Context, input RequestCommandInput, vali
 		ExpiresAt:     now.Add(request.DefaultRequestTTL),
 	}
 
-	// 6. Validate request
+	// 6. Check auto-approve if approval policy is provided
+	autoApproved := false
+	if input.ApprovalPolicy != nil {
+		rule := policy.FindApprovalRule(input.ApprovalPolicy, input.ProfileName)
+		if rule != nil && policy.ShouldAutoApprove(rule, username, now, duration) {
+			req.Status = request.StatusApproved
+			req.Approver = username
+			req.ApproverComment = "auto-approved by policy"
+			autoApproved = true
+		}
+	}
+
+	// 7. Validate request
 	if err := req.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 
-	// 7. Store request
+	// 8. Store request
 	if err := store.Create(ctx, req); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &testableRequestCommandOutput{
+		Request:      req,
+		AutoApproved: autoApproved,
+	}, nil
 }
 
 func TestRequestCommand_Success(t *testing.T) {
@@ -155,7 +177,7 @@ func TestRequestCommand_Success(t *testing.T) {
 		Store:         store,
 	}
 
-	err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	output, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -178,6 +200,11 @@ func TestRequestCommand_Success(t *testing.T) {
 	if storedRequest.Justification != "Testing the request command functionality" {
 		t.Errorf("unexpected justification: %s", storedRequest.Justification)
 	}
+
+	// Verify auto-approve is false when no policy
+	if output.AutoApproved {
+		t.Error("expected AutoApproved to be false without policy")
+	}
 }
 
 func TestRequestCommand_ProfileNotFound(t *testing.T) {
@@ -194,7 +221,7 @@ func TestRequestCommand_ProfileNotFound(t *testing.T) {
 		return errors.New("profile \"nonexistent-profile\" not found in AWS config; available profiles: [default, dev]")
 	}
 
-	err := testableRequestCommand(context.Background(), input, validateProfile)
+	_, err := testableRequestCommand(context.Background(), input, validateProfile)
 	if err == nil {
 		t.Fatal("expected error for nonexistent profile")
 	}
@@ -213,7 +240,7 @@ func TestRequestCommand_JustificationTooShort(t *testing.T) {
 		Store:         store,
 	}
 
-	err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
 	if err == nil {
 		t.Fatal("expected error for short justification")
 	}
@@ -238,7 +265,7 @@ func TestRequestCommand_JustificationTooLong(t *testing.T) {
 		Store:         store,
 	}
 
-	err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
 	if err == nil {
 		t.Fatal("expected error for long justification")
 	}
@@ -263,7 +290,7 @@ func TestRequestCommand_DurationExceedsMax(t *testing.T) {
 		Store:         store,
 	}
 
-	err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -291,7 +318,7 @@ func TestRequestCommand_StoreCreateFails(t *testing.T) {
 		Store:         store,
 	}
 
-	err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
 	if err == nil {
 		t.Fatal("expected error when store.Create fails")
 	}
@@ -316,7 +343,7 @@ func TestRequestCommand_RequestFieldsPopulated(t *testing.T) {
 		Store:         store,
 	}
 
-	err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -367,5 +394,235 @@ func TestRequestCommand_RequestFieldsPopulated(t *testing.T) {
 	expectedExpiry := time.Now().Add(request.DefaultRequestTTL)
 	if storedRequest.ExpiresAt.Sub(expectedExpiry) > time.Second {
 		t.Errorf("ExpiresAt differs from expected by more than 1 second")
+	}
+}
+
+// Tests for approval policy integration
+
+func TestRequestCommand_AutoApprove_NoPolicy(t *testing.T) {
+	var storedRequest *request.Request
+	store := &mockStore{
+		createFn: func(ctx context.Context, req *request.Request) error {
+			storedRequest = req
+			return nil
+		},
+	}
+
+	input := RequestCommandInput{
+		ProfileName:   "production",
+		Duration:      1 * time.Hour,
+		Justification: "Testing request without approval policy",
+		Store:         store,
+		// No ApprovalPolicy set
+	}
+
+	output, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Request should stay pending without policy
+	if storedRequest.Status != request.StatusPending {
+		t.Errorf("expected status pending, got %s", storedRequest.Status)
+	}
+	if output.AutoApproved {
+		t.Error("expected AutoApproved to be false without policy")
+	}
+}
+
+func TestRequestCommand_AutoApprove_MatchingPolicy(t *testing.T) {
+	currentUser, _ := user.Current()
+	var storedRequest *request.Request
+	store := &mockStore{
+		createFn: func(ctx context.Context, req *request.Request) error {
+			storedRequest = req
+			return nil
+		},
+	}
+
+	// Create policy with auto-approve for current user
+	approvalPolicy := &policy.ApprovalPolicy{
+		Version: "1",
+		Rules: []policy.ApprovalRule{
+			{
+				Name:      "production-auto-approve",
+				Profiles:  []string{"production"},
+				Approvers: []string{"admin"},
+				AutoApprove: &policy.AutoApproveCondition{
+					Users:       []string{currentUser.Username},
+					MaxDuration: 2 * time.Hour,
+				},
+			},
+		},
+	}
+
+	input := RequestCommandInput{
+		ProfileName:    "production",
+		Duration:       1 * time.Hour,
+		Justification:  "Testing auto-approve with matching policy",
+		Store:          store,
+		ApprovalPolicy: approvalPolicy,
+	}
+
+	output, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Request should be auto-approved
+	if storedRequest.Status != request.StatusApproved {
+		t.Errorf("expected status approved, got %s", storedRequest.Status)
+	}
+	if storedRequest.Approver != currentUser.Username {
+		t.Errorf("expected approver %s, got %s", currentUser.Username, storedRequest.Approver)
+	}
+	if storedRequest.ApproverComment != "auto-approved by policy" {
+		t.Errorf("unexpected approver comment: %s", storedRequest.ApproverComment)
+	}
+	if !output.AutoApproved {
+		t.Error("expected AutoApproved to be true")
+	}
+}
+
+func TestRequestCommand_AutoApprove_NonMatchingPolicy(t *testing.T) {
+	var storedRequest *request.Request
+	store := &mockStore{
+		createFn: func(ctx context.Context, req *request.Request) error {
+			storedRequest = req
+			return nil
+		},
+	}
+
+	// Create policy with auto-approve for different user
+	approvalPolicy := &policy.ApprovalPolicy{
+		Version: "1",
+		Rules: []policy.ApprovalRule{
+			{
+				Name:      "production-auto-approve",
+				Profiles:  []string{"production"},
+				Approvers: []string{"admin"},
+				AutoApprove: &policy.AutoApproveCondition{
+					Users:       []string{"different-user"},
+					MaxDuration: 2 * time.Hour,
+				},
+			},
+		},
+	}
+
+	input := RequestCommandInput{
+		ProfileName:    "production",
+		Duration:       1 * time.Hour,
+		Justification:  "Testing auto-approve with non-matching user",
+		Store:          store,
+		ApprovalPolicy: approvalPolicy,
+	}
+
+	output, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Request should stay pending
+	if storedRequest.Status != request.StatusPending {
+		t.Errorf("expected status pending, got %s", storedRequest.Status)
+	}
+	if output.AutoApproved {
+		t.Error("expected AutoApproved to be false for non-matching user")
+	}
+}
+
+func TestRequestCommand_AutoApprove_DurationExceedsMax(t *testing.T) {
+	currentUser, _ := user.Current()
+	var storedRequest *request.Request
+	store := &mockStore{
+		createFn: func(ctx context.Context, req *request.Request) error {
+			storedRequest = req
+			return nil
+		},
+	}
+
+	// Create policy with max duration of 1 hour
+	approvalPolicy := &policy.ApprovalPolicy{
+		Version: "1",
+		Rules: []policy.ApprovalRule{
+			{
+				Name:      "production-auto-approve",
+				Profiles:  []string{"production"},
+				Approvers: []string{"admin"},
+				AutoApprove: &policy.AutoApproveCondition{
+					Users:       []string{currentUser.Username},
+					MaxDuration: 1 * time.Hour,
+				},
+			},
+		},
+	}
+
+	input := RequestCommandInput{
+		ProfileName:    "production",
+		Duration:       2 * time.Hour, // Exceeds auto-approve max of 1h
+		Justification:  "Testing auto-approve with duration exceeding max",
+		Store:          store,
+		ApprovalPolicy: approvalPolicy,
+	}
+
+	output, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Request should stay pending because duration exceeds max
+	if storedRequest.Status != request.StatusPending {
+		t.Errorf("expected status pending, got %s", storedRequest.Status)
+	}
+	if output.AutoApproved {
+		t.Error("expected AutoApproved to be false when duration exceeds max")
+	}
+}
+
+func TestRequestCommand_AutoApprove_ProfileNoRule(t *testing.T) {
+	currentUser, _ := user.Current()
+	var storedRequest *request.Request
+	store := &mockStore{
+		createFn: func(ctx context.Context, req *request.Request) error {
+			storedRequest = req
+			return nil
+		},
+	}
+
+	// Create policy for different profile
+	approvalPolicy := &policy.ApprovalPolicy{
+		Version: "1",
+		Rules: []policy.ApprovalRule{
+			{
+				Name:      "staging-auto-approve",
+				Profiles:  []string{"staging"},
+				Approvers: []string{"admin"},
+				AutoApprove: &policy.AutoApproveCondition{
+					Users:       []string{currentUser.Username},
+					MaxDuration: 2 * time.Hour,
+				},
+			},
+		},
+	}
+
+	input := RequestCommandInput{
+		ProfileName:    "production", // Different from rule profiles
+		Duration:       1 * time.Hour,
+		Justification:  "Testing request with no matching rule for profile",
+		Store:          store,
+		ApprovalPolicy: approvalPolicy,
+	}
+
+	output, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Request should stay pending because no rule matches profile
+	if storedRequest.Status != request.StatusPending {
+		t.Errorf("expected status pending, got %s", storedRequest.Status)
+	}
+	if output.AutoApproved {
+		t.Error("expected AutoApproved to be false when no rule matches profile")
 	}
 }
