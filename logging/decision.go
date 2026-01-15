@@ -22,6 +22,7 @@ type DecisionLogEntry struct {
 	RoleARN           string `json:"role_arn,omitempty"`                 // Target role ARN if applicable
 	SessionDuration   int    `json:"session_duration_seconds,omitempty"` // Session duration in seconds
 	ApprovedRequestID string `json:"approved_request_id,omitempty"`      // ID of approved request that overrode policy deny
+	BreakGlassEventID string `json:"break_glass_event_id,omitempty"`     // ID of break-glass event that overrode policy deny
 }
 
 // NewDecisionLogEntry creates a DecisionLogEntry from policy evaluation results.
@@ -45,6 +46,7 @@ type CredentialIssuanceFields struct {
 	RoleARN           string
 	SessionDuration   time.Duration
 	ApprovedRequestID string // ID of approved request that overrode policy deny (empty if policy allowed)
+	BreakGlassEventID string // ID of break-glass event that overrode policy deny (empty if not break-glass)
 }
 
 // NewEnhancedDecisionLogEntry creates a DecisionLogEntry with credential issuance details.
@@ -60,6 +62,7 @@ func NewEnhancedDecisionLogEntry(req *policy.Request, decision policy.Decision, 
 			entry.SessionDuration = int(creds.SessionDuration.Seconds())
 		}
 		entry.ApprovedRequestID = creds.ApprovedRequestID
+		entry.BreakGlassEventID = creds.BreakGlassEventID
 	}
 
 	return entry
