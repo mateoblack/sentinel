@@ -190,7 +190,7 @@ Plans:
 
 Plans:
 - [x] 28-01: Break-glass storage layer with Store interface and DynamoDB — completed 2026-01-15
-- [ ] 28-02: Break-glass CLI command
+- [x] 28-02: Break-glass CLI command — completed 2026-01-15
 
 #### Phase 29: Elevated Audit
 
@@ -260,7 +260,7 @@ Plans:
 | 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
 | 18-26 | v1.2 | 17/17 | Complete | 2026-01-15 |
 | 27. Break-Glass Schema | v1.3 | 1/1 | Complete | 2026-01-15 |
-| 28. Break-Glass Command | v1.3 | 1/2 | In progress | - |
+| 28. Break-Glass Command | v1.3 | 2/2 | Complete | 2026-01-15 |
 | 29. Elevated Audit | v1.3 | 0/? | Not started | - |
 | 30. Time-Bounded Sessions | v1.3 | 0/? | Not started | - |
 | 31. Notification Blast | v1.3 | 0/? | Not started | - |
