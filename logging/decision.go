@@ -36,3 +36,28 @@ func NewDecisionLogEntry(req *policy.Request, decision policy.Decision, policyPa
 		PolicyPath: policyPath,
 	}
 }
+
+// CredentialIssuanceFields contains fields populated when credentials are issued.
+type CredentialIssuanceFields struct {
+	RequestID       string
+	SourceIdentity  string // Full sentinel:user:request-id string
+	RoleARN         string
+	SessionDuration time.Duration
+}
+
+// NewEnhancedDecisionLogEntry creates a DecisionLogEntry with credential issuance details.
+// Use this when credentials are being issued (allow decisions with credential context).
+func NewEnhancedDecisionLogEntry(req *policy.Request, decision policy.Decision, policyPath string, creds *CredentialIssuanceFields) DecisionLogEntry {
+	entry := NewDecisionLogEntry(req, decision, policyPath)
+
+	if creds != nil {
+		entry.RequestID = creds.RequestID
+		entry.SourceIdentity = creds.SourceIdentity
+		entry.RoleARN = creds.RoleARN
+		if creds.SessionDuration > 0 {
+			entry.SessionDuration = int(creds.SessionDuration.Seconds())
+		}
+	}
+
+	return entry
+}
