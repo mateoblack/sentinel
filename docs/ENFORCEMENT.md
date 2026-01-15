@@ -160,3 +160,139 @@ For cross-account roles, the principal must match the account making the AssumeR
   ]
 }
 ```
+
+## SCP Patterns
+
+Service Control Policies (SCPs) provide organization-wide enforcement. Unlike trust policies (which are per-role), SCPs apply across all accounts in an OU or organization.
+
+### Pattern A: Deny AssumeRole Without Sentinel (Strict)
+
+Block all role assumptions that don't have a Sentinel SourceIdentity:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RequireSentinelSourceIdentity",
+      "Effect": "Deny",
+      "Action": "sts:AssumeRole",
+      "Resource": "*",
+      "Condition": {
+        "StringNotLike": {
+          "sts:SourceIdentity": "sentinel:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Use case**: Full enforcement - all human access must go through Sentinel.
+
+### Pattern B: Deny Only for Sensitive Roles (Targeted)
+
+Require Sentinel only for production and admin roles:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RequireSentinelForProductionRoles",
+      "Effect": "Deny",
+      "Action": "sts:AssumeRole",
+      "Resource": [
+        "arn:aws:iam::*:role/Production*",
+        "arn:aws:iam::*:role/*Admin*"
+      ],
+      "Condition": {
+        "StringNotLike": {
+          "sts:SourceIdentity": "sentinel:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Use case**: Targeted enforcement - protect sensitive roles while allowing unrestricted access to development roles.
+
+### Pattern C: Deny with Exceptions for Service Roles
+
+Require Sentinel but allow AWS service-linked roles to operate normally:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RequireSentinelExceptServiceRoles",
+      "Effect": "Deny",
+      "Action": "sts:AssumeRole",
+      "Resource": "*",
+      "Condition": {
+        "StringNotLike": {
+          "sts:SourceIdentity": "sentinel:*"
+        },
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::*:role/aws-service-role/*",
+            "arn:aws:iam::*:role/AWSServiceRole*"
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Use case**: Full enforcement with service exceptions - Sentinel required for human access, AWS services can operate normally.
+
+## SCP Considerations
+
+### SCPs Cannot Grant Permissions
+
+SCPs only restrict - they cannot grant permissions. The SCP patterns above deny access when conditions aren't met, but you still need appropriate trust policies for the Allow.
+
+### SCP Evaluation Order
+
+SCP evaluation happens BEFORE IAM policies:
+
+```
+Request → SCP evaluation → IAM Policy evaluation → Resource Policy evaluation
+```
+
+If an SCP denies, IAM policies are never evaluated.
+
+### Apply to OU or Account Level
+
+SCPs are attached via AWS Organizations:
+
+```bash
+# Attach SCP to an OU
+aws organizations attach-policy \
+  --policy-id p-xxxxxx \
+  --target-id ou-xxxx-xxxxxxxx
+
+# Attach SCP to a specific account
+aws organizations attach-policy \
+  --policy-id p-xxxxxx \
+  --target-id 123456789012
+```
+
+### Service-Linked Role Exceptions
+
+AWS service-linked roles (used by services like Auto Scaling, RDS, etc.) don't set SourceIdentity. Always include exceptions for:
+
+- `arn:aws:iam::*:role/aws-service-role/*`
+- `arn:aws:iam::*:role/AWSServiceRole*`
+
+### Test in Non-Production First
+
+SCPs can break critical services if misconfigured. Always:
+
+1. Test in a sandbox OU first
+2. Verify service-linked roles still work
+3. Monitor CloudTrail for access denied events
+4. Have a rollback plan ready
