@@ -13,12 +13,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
+// GSI name constants for DynamoDB Global Secondary Indexes.
+// These indexes are created externally via Terraform/CloudFormation.
+const (
+	// GSIRequester indexes requests by requester with created_at sort key.
+	GSIRequester = "gsi-requester"
+	// GSIStatus indexes requests by status with created_at sort key.
+	GSIStatus = "gsi-status"
+	// GSIProfile indexes requests by profile with created_at sort key.
+	GSIProfile = "gsi-profile"
+)
+
 // dynamoDBAPI defines the DynamoDB operations used by DynamoDBStore.
 // This interface enables testing with mock implementations.
 type dynamoDBAPI interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
+	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 }
 
 // DynamoDBStore implements Store using AWS DynamoDB.
@@ -252,4 +264,65 @@ func parseDynamoDBTime(s string) (time.Time, error) {
 		return time.Unix(unix, 0), nil
 	}
 	return time.Time{}, fmt.Errorf("cannot parse time: %q", s)
+}
+
+// ListByRequester returns all requests from a specific user, ordered by created_at desc.
+// Returns empty slice if no requests found.
+func (s *DynamoDBStore) ListByRequester(ctx context.Context, requester string, limit int) ([]*Request, error) {
+	return s.queryByIndex(ctx, GSIRequester, "requester", requester, limit)
+}
+
+// ListByStatus returns all requests with a specific status, ordered by created_at desc.
+// Commonly used to list pending requests for approvers.
+func (s *DynamoDBStore) ListByStatus(ctx context.Context, status RequestStatus, limit int) ([]*Request, error) {
+	return s.queryByIndex(ctx, GSIStatus, "status", string(status), limit)
+}
+
+// ListByProfile returns all requests for a specific AWS profile, ordered by created_at desc.
+// Useful for viewing request history for a profile.
+func (s *DynamoDBStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*Request, error) {
+	return s.queryByIndex(ctx, GSIProfile, "profile", profile, limit)
+}
+
+// queryByIndex executes a query against a GSI with the given partition key.
+// Results are ordered by created_at descending (newest first).
+func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, keyValue string, limit int) ([]*Request, error) {
+	// Apply limit defaults and cap
+	effectiveLimit := limit
+	if effectiveLimit <= 0 {
+		effectiveLimit = DefaultQueryLimit
+	}
+	if effectiveLimit > MaxQueryLimit {
+		effectiveLimit = MaxQueryLimit
+	}
+
+	output, err := s.client.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		IndexName:              aws.String(indexName),
+		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :v", keyAttr)),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":v": &types.AttributeValueMemberS{Value: keyValue},
+		},
+		ScanIndexForward: aws.Bool(false), // Descending order (newest first)
+		Limit:            aws.Int32(int32(effectiveLimit)),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("dynamodb Query %s: %w", indexName, err)
+	}
+
+	// Convert items to requests
+	requests := make([]*Request, 0, len(output.Items))
+	for _, av := range output.Items {
+		var item dynamoItem
+		if err := attributevalue.UnmarshalMap(av, &item); err != nil {
+			return nil, fmt.Errorf("unmarshal request: %w", err)
+		}
+		req, err := itemToRequest(&item)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, req)
+	}
+
+	return requests, nil
 }
