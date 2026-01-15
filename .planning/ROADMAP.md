@@ -176,10 +176,10 @@ Plans:
 **Goal**: Define emergency access model with reason codes, expiry, and validation
 **Depends on**: v1.2 complete
 **Research**: Unlikely (extends existing types)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 27-01: TBD
+- [x] 27-01: Break-glass types with state machine and validation — completed 2026-01-15
 
 #### Phase 28: Break-Glass Command
 
@@ -258,7 +258,7 @@ Plans:
 | 1-8 | v1.0 | 16/16 | Complete | 2026-01-14 |
 | 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
 | 18-26 | v1.2 | 17/17 | Complete | 2026-01-15 |
-| 27. Break-Glass Schema | v1.3 | 0/? | Not started | - |
+| 27. Break-Glass Schema | v1.3 | 1/1 | Complete | 2026-01-15 |
 | 28. Break-Glass Command | v1.3 | 0/? | Not started | - |
 | 29. Elevated Audit | v1.3 | 0/? | Not started | - |
 | 30. Time-Bounded Sessions | v1.3 | 0/? | Not started | - |
