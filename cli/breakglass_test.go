@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/logging"
 )
 
 // mockBreakGlassStore implements breakglass.Store for testing.
@@ -95,6 +96,25 @@ func (m *mockBreakGlassSentinel) ValidateProfile(profileName string) error {
 	return nil
 }
 
+// mockBreakGlassLogger implements logging.Logger for testing break-glass logging.
+type mockBreakGlassLogger struct {
+	decisionEntries   []logging.DecisionLogEntry
+	approvalEntries   []logging.ApprovalLogEntry
+	breakGlassEntries []logging.BreakGlassLogEntry
+}
+
+func (m *mockBreakGlassLogger) LogDecision(entry logging.DecisionLogEntry) {
+	m.decisionEntries = append(m.decisionEntries, entry)
+}
+
+func (m *mockBreakGlassLogger) LogApproval(entry logging.ApprovalLogEntry) {
+	m.approvalEntries = append(m.approvalEntries, entry)
+}
+
+func (m *mockBreakGlassLogger) LogBreakGlass(entry logging.BreakGlassLogEntry) {
+	m.breakGlassEntries = append(m.breakGlassEntries, entry)
+}
+
 // testableBreakGlassCommandOutput contains test output for break-glass command.
 type testableBreakGlassCommandOutput struct {
 	Event *breakglass.BreakGlassEvent
@@ -166,6 +186,12 @@ func testableBreakGlassCommand(ctx context.Context, input BreakGlassCommandInput
 	// 9. Store event
 	if err := store.Create(ctx, event); err != nil {
 		return nil, err
+	}
+
+	// 10. Log break-glass invocation if Logger is provided
+	if input.Logger != nil {
+		entry := logging.NewBreakGlassLogEntry(logging.BreakGlassEventInvoked, event)
+		input.Logger.LogBreakGlass(entry)
 	}
 
 	return &testableBreakGlassCommandOutput{
@@ -760,5 +786,159 @@ func TestBreakGlassCommand_MinimumValidDuration(t *testing.T) {
 	}
 	if storedEvent.Duration != 1*time.Minute {
 		t.Errorf("expected duration 1m, got %v", storedEvent.Duration)
+	}
+}
+
+// ============================================================================
+// Logging Integration
+// ============================================================================
+
+func TestBreakGlassCommand_LogsInvocation(t *testing.T) {
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	logger := &mockBreakGlassLogger{}
+
+	input := BreakGlassCommandInput{
+		ProfileName:   "production",
+		Duration:      2 * time.Hour,
+		ReasonCode:    "incident",
+		Justification: "Production database outage requiring immediate investigation",
+		Store:         store,
+		Logger:        logger,
+	}
+
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify logger received exactly one break-glass entry
+	if len(logger.breakGlassEntries) != 1 {
+		t.Fatalf("expected 1 break-glass log entry, got %d", len(logger.breakGlassEntries))
+	}
+
+	entry := logger.breakGlassEntries[0]
+
+	// Verify event type
+	if entry.Event != logging.BreakGlassEventInvoked {
+		t.Errorf("expected event %q, got %q", logging.BreakGlassEventInvoked, entry.Event)
+	}
+
+	// Verify event ID matches output
+	if entry.EventID != output.Event.ID {
+		t.Errorf("expected event_id %q, got %q", output.Event.ID, entry.EventID)
+	}
+
+	// Verify request ID matches output
+	if entry.RequestID != output.Event.RequestID {
+		t.Errorf("expected request_id %q, got %q", output.Event.RequestID, entry.RequestID)
+	}
+
+	// Verify invoker is current user
+	currentUser, _ := user.Current()
+	if entry.Invoker != currentUser.Username {
+		t.Errorf("expected invoker %q, got %q", currentUser.Username, entry.Invoker)
+	}
+
+	// Verify profile
+	if entry.Profile != "production" {
+		t.Errorf("expected profile %q, got %q", "production", entry.Profile)
+	}
+
+	// Verify reason code
+	if entry.ReasonCode != "incident" {
+		t.Errorf("expected reason_code %q, got %q", "incident", entry.ReasonCode)
+	}
+
+	// Verify justification
+	if entry.Justification != "Production database outage requiring immediate investigation" {
+		t.Errorf("expected justification %q, got %q", "Production database outage requiring immediate investigation", entry.Justification)
+	}
+
+	// Verify status is active
+	if entry.Status != "active" {
+		t.Errorf("expected status %q, got %q", "active", entry.Status)
+	}
+
+	// Verify duration is 2 hours in seconds
+	expectedDuration := int((2 * time.Hour).Seconds())
+	if entry.Duration != expectedDuration {
+		t.Errorf("expected duration_seconds %d, got %d", expectedDuration, entry.Duration)
+	}
+
+	// Verify expires_at is non-empty
+	if entry.ExpiresAt == "" {
+		t.Error("expected expires_at to be set")
+	}
+
+	// Verify timestamp is non-empty (ISO8601 format)
+	if entry.Timestamp == "" {
+		t.Error("expected timestamp to be set")
+	}
+
+	// Verify no other log types were called
+	if len(logger.decisionEntries) != 0 {
+		t.Errorf("expected no decision entries, got %d", len(logger.decisionEntries))
+	}
+	if len(logger.approvalEntries) != 0 {
+		t.Errorf("expected no approval entries, got %d", len(logger.approvalEntries))
+	}
+
+	_ = storedEvent // Verified in other tests
+}
+
+func TestBreakGlassCommand_NoLoggingWhenLoggerNil(t *testing.T) {
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	// Explicitly set Logger to nil (default behavior)
+	input := BreakGlassCommandInput{
+		ProfileName:   "test-profile",
+		Duration:      1 * time.Hour,
+		ReasonCode:    "maintenance",
+		Justification: "Testing break-glass succeeds without logger",
+		Store:         store,
+		Logger:        nil, // Explicitly nil
+	}
+
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error with nil Logger: %v", err)
+	}
+
+	// Verify command succeeded
+	if output == nil {
+		t.Fatal("expected output to be non-nil")
+	}
+	if output.Event == nil {
+		t.Fatal("expected event to be created")
+	}
+	if storedEvent == nil {
+		t.Fatal("expected event to be stored")
+	}
+
+	// Verify event was stored correctly
+	if storedEvent.Profile != "test-profile" {
+		t.Errorf("expected profile 'test-profile', got '%s'", storedEvent.Profile)
+	}
+	if storedEvent.Status != breakglass.StatusActive {
+		t.Errorf("expected status 'active', got '%s'", storedEvent.Status)
 	}
 }

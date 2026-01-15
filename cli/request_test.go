@@ -75,8 +75,9 @@ func (m *mockStore) ListByProfile(ctx context.Context, profile string, limit int
 
 // mockLogger captures approval log entries for testing.
 type mockLogger struct {
-	approvalEntries []logging.ApprovalLogEntry
-	decisionEntries []logging.DecisionLogEntry
+	approvalEntries   []logging.ApprovalLogEntry
+	decisionEntries   []logging.DecisionLogEntry
+	breakGlassEntries []logging.BreakGlassLogEntry
 }
 
 func (m *mockLogger) LogApproval(entry logging.ApprovalLogEntry) {
@@ -85,6 +86,10 @@ func (m *mockLogger) LogApproval(entry logging.ApprovalLogEntry) {
 
 func (m *mockLogger) LogDecision(entry logging.DecisionLogEntry) {
 	m.decisionEntries = append(m.decisionEntries, entry)
+}
+
+func (m *mockLogger) LogBreakGlass(entry logging.BreakGlassLogEntry) {
+	m.breakGlassEntries = append(m.breakGlassEntries, entry)
 }
 
 // mockSentinel provides a Sentinel stub for testing that bypasses profile validation.
