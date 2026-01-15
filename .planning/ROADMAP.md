@@ -133,10 +133,13 @@ Plans:
 **Depends on**: Phase 23
 **Research**: Likely (external service integration)
 **Research topics**: SNS publish API, webhook patterns, retry semantics
-**Plans**: TBD
+**Plans**: 4
 
 Plans:
-- [ ] 24-01: TBD
+- [ ] 24-01: Notification types and Notifier interface
+- [ ] 24-02: SNS notifier implementation
+- [ ] 24-03: Webhook notifier implementation
+- [ ] 24-04: NotifyStore wrapper and CLI integration
 
 #### Phase 25: Approval Policies
 
