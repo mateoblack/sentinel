@@ -178,9 +178,10 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 	}
 
 	// 10. Log break-glass invocation if Logger is provided
-	// Note: Full break-glass audit logging will be implemented in Phase 29 (elevated-audit)
-	// For now, we log a placeholder entry to maintain audit trail
-	_ = input.Logger // Logger reserved for Phase 29
+	if input.Logger != nil {
+		entry := logging.NewBreakGlassLogEntry(logging.BreakGlassEventInvoked, event)
+		input.Logger.LogBreakGlass(entry)
+	}
 
 	// 11. Output success JSON
 	output := BreakGlassCommandOutput{
