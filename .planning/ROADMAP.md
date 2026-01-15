@@ -8,6 +8,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 
 - ✅ **v1.0 MVP** - [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md) (Phases 1-8, shipped 2026-01-14)
 - ✅ **v1.1 Sentinel Fingerprint** - [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) (Phases 9-17, shipped 2026-01-15)
+- 🚧 **v1.2 Approval Workflows** - Phases 18-26 (in progress)
 
 ## Completed Milestones
 
@@ -57,9 +58,114 @@ None
 
 </details>
 
+### 🚧 v1.2 Approval Workflows (In Progress)
+
+**Milestone Goal:** Add request/approve flow for sensitive access with DynamoDB state, notification hooks, and approval policies.
+
+#### Phase 18: Request Schema
+
+**Goal**: Define approval request data model, state machine, and validation
+**Depends on**: v1.1 complete
+**Research**: Unlikely (internal design, extends existing types)
+**Plans**: TBD
+
+Plans:
+- [ ] 18-01: TBD (run /gsd:plan-phase 18 to break down)
+
+#### Phase 19: DynamoDB Backend
+
+**Goal**: Create request storage with TTL, indexes, and query patterns
+**Depends on**: Phase 18
+**Research**: Likely (new AWS service integration)
+**Research topics**: DynamoDB table design, GSI patterns, TTL, aws-sdk-go-v2 dynamodb
+**Plans**: TBD
+
+Plans:
+- [ ] 19-01: TBD
+
+#### Phase 20: Request Command
+
+**Goal**: CLI command to submit access requests with profile/duration/justification
+**Depends on**: Phase 19
+**Research**: Unlikely (extends existing CLI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 20-01: TBD
+
+#### Phase 21: List/Check Commands
+
+**Goal**: Commands to view pending requests and check own request status
+**Depends on**: Phase 20
+**Research**: Unlikely (extends existing CLI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 21-01: TBD
+
+#### Phase 22: Approve/Deny Commands
+
+**Goal**: Approver actions with request validation and signature verification
+**Depends on**: Phase 21
+**Research**: Unlikely (extends existing CLI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 22-01: TBD
+
+#### Phase 23: Request Integration
+
+**Goal**: Wire approved requests into credential issuance flow
+**Depends on**: Phase 22
+**Research**: Unlikely (internal integration)
+**Plans**: TBD
+
+Plans:
+- [ ] 23-01: TBD
+
+#### Phase 24: Notification Hooks
+
+**Goal**: Webhook/SNS integration for request lifecycle events
+**Depends on**: Phase 23
+**Research**: Likely (external service integration)
+**Research topics**: SNS publish API, webhook patterns, retry semantics
+**Plans**: TBD
+
+Plans:
+- [ ] 24-01: TBD
+
+#### Phase 25: Approval Policies
+
+**Goal**: Policy rules for auto-approve conditions and approval routing
+**Depends on**: Phase 24
+**Research**: Unlikely (extends existing policy schema)
+**Plans**: TBD
+
+Plans:
+- [ ] 25-01: TBD
+
+#### Phase 26: Approval Audit Trail
+
+**Goal**: Enhanced logging for approval request lifecycle events
+**Depends on**: Phase 25
+**Research**: Unlikely (extends existing logging)
+**Plans**: TBD
+
+Plans:
+- [ ] 26-01: TBD
+
 ## Progress (All Milestones)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1-8 | v1.0 | 16/16 | Complete | 2026-01-14 |
 | 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
+| 18. Request Schema | v1.2 | 0/? | Not started | - |
+| 19. DynamoDB Backend | v1.2 | 0/? | Not started | - |
+| 20. Request Command | v1.2 | 0/? | Not started | - |
+| 21. List/Check Commands | v1.2 | 0/? | Not started | - |
+| 22. Approve/Deny Commands | v1.2 | 0/? | Not started | - |
+| 23. Request Integration | v1.2 | 0/? | Not started | - |
+| 24. Notification Hooks | v1.2 | 0/? | Not started | - |
+| 25. Approval Policies | v1.2 | 0/? | Not started | - |
+| 26. Approval Audit Trail | v1.2 | 0/? | Not started | - |
