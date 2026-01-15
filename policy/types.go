@@ -32,6 +32,9 @@ const (
 	EffectAllow Effect = "allow"
 	// EffectDeny rejects access when a rule matches.
 	EffectDeny Effect = "deny"
+	// EffectRequireApproval triggers approval workflow when a rule matches.
+	// Instead of direct credential issuance, the request needs approval.
+	EffectRequireApproval Effect = "require_approval"
 )
 
 // Condition defines matching criteria for a rule.
@@ -82,7 +85,7 @@ type HourRange struct {
 
 // IsValid returns true if the Effect is a known value.
 func (e Effect) IsValid() bool {
-	return e == EffectAllow || e == EffectDeny
+	return e == EffectAllow || e == EffectDeny || e == EffectRequireApproval
 }
 
 // String returns the string representation of the Effect.
