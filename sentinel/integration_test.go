@@ -57,8 +57,13 @@
 package sentinel
 
 import (
+	"context"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/byteness/aws-vault/v7/identity"
 )
 
 // integrationConfig holds configuration for integration tests.
@@ -104,4 +109,66 @@ func getIntegrationConfig(t *testing.T) integrationConfig {
 		RoleARN: roleARN,
 		Region:  region,
 	}
+}
+
+// TestIntegration_SentinelAssumeRole tests that SentinelAssumeRole correctly
+// assumes a role with SourceIdentity stamping using real AWS credentials.
+func TestIntegration_SentinelAssumeRole(t *testing.T) {
+	skipIfNoIntegrationEnv(t)
+	cfg := getIntegrationConfig(t)
+	ctx := context.Background()
+
+	// Load AWS credentials using default credential chain
+	// This respects AWS_PROFILE, AWS_ACCESS_KEY_ID, instance profiles, etc.
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region))
+	if err != nil {
+		t.Fatalf("failed to load AWS config: %v", err)
+	}
+
+	// Create SourceIdentity with test user and generated request-id
+	testUser := "integrationtest"
+	requestID := identity.NewRequestID()
+	sourceIdentity, err := identity.New(testUser, requestID)
+	if err != nil {
+		t.Fatalf("failed to create SourceIdentity: %v", err)
+	}
+
+	// Call SentinelAssumeRole
+	input := &SentinelAssumeRoleInput{
+		CredsProvider:  awsCfg.Credentials,
+		RoleARN:        cfg.RoleARN,
+		SourceIdentity: sourceIdentity,
+		Region:         cfg.Region,
+	}
+
+	result, err := SentinelAssumeRole(ctx, input)
+	if err != nil {
+		t.Fatalf("SentinelAssumeRole failed: %v", err)
+	}
+
+	// Verify credentials are populated
+	if result.Credentials.AccessKeyID == "" {
+		t.Error("Credentials.AccessKeyID is empty")
+	}
+	if result.Credentials.SecretAccessKey == "" {
+		t.Error("Credentials.SecretAccessKey is empty")
+	}
+	if result.Credentials.SessionToken == "" {
+		t.Error("Credentials.SessionToken is empty (assumed role should always have session token)")
+	}
+
+	// Verify SourceIdentity matches the formatted input
+	expectedSourceIdentity := sourceIdentity.Format()
+	if result.SourceIdentity != expectedSourceIdentity {
+		t.Errorf("SourceIdentity = %q, want %q", result.SourceIdentity, expectedSourceIdentity)
+	}
+
+	// Verify AssumedRoleArn contains the role ARN
+	// The full ARN looks like: arn:aws:sts::123456789012:assumed-role/RoleName/session-name
+	if !strings.Contains(result.AssumedRoleArn, "assumed-role") {
+		t.Errorf("AssumedRoleArn %q does not contain 'assumed-role'", result.AssumedRoleArn)
+	}
+
+	t.Logf("Successfully assumed role with SourceIdentity: %s", result.SourceIdentity)
+	t.Logf("AssumedRoleArn: %s", result.AssumedRoleArn)
 }
