@@ -149,7 +149,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 25-01: TBD
+- [x] 25-01: Approval policy schema — completed 2026-01-15
+- [ ] 25-02: Approval policy validation
+- [ ] 25-03: Approval policy matching
 
 #### Phase 26: Approval Audit Trail
 
@@ -258,7 +260,7 @@ Plans:
 | 22. Approve/Deny Commands | v1.2 | 1/1 | Complete | 2026-01-14 |
 | 23. Request Integration | v1.2 | 2/2 | Complete | 2026-01-15 |
 | 24. Notification Hooks | v1.2 | 4/4 | Complete | 2026-01-15 |
-| 25. Approval Policies | v1.2 | 0/? | Not started | - |
+| 25. Approval Policies | v1.2 | 1/3 | In progress | - |
 | 26. Approval Audit Trail | v1.2 | 0/? | Not started | - |
 | 27. Break-Glass Schema | v1.3 | 0/? | Not started | - |
 | 28. Break-Glass Command | v1.3 | 0/? | Not started | - |

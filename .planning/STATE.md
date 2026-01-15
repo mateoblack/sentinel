@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-15)
 
 ## Current Position
 
-Phase: 24 of 26 (Notification Hooks)
-Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-01-15 — Completed 24-04-PLAN.md
+Phase: 25 of 26 (Approval Policies)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-15 — Completed 25-01-PLAN.md
 
-Progress: ████████░░ 37%
+Progress: ████████░░ 38%
 
 ## Milestone Summary
 
@@ -66,7 +66,7 @@ None — clean start for v1.2.
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 24-04-PLAN.md (NotifyStore wrapper and CLI integration)
+Stopped at: Completed 25-01-PLAN.md (Approval policy schema)
 Resume file: None
 
 ## Roadmap Evolution
