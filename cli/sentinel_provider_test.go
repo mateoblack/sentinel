@@ -72,3 +72,60 @@ func TestSentinelCredentialResultWithoutExpiration(t *testing.T) {
 		t.Errorf("SessionToken should be empty for long-lived credentials")
 	}
 }
+
+func TestSentinelCredentialRequest_UserField(t *testing.T) {
+	// Test that User field is properly set for SourceIdentity stamping
+	req := SentinelCredentialRequest{
+		ProfileName: "test-profile",
+		User:        "alice",
+	}
+
+	if req.User != "alice" {
+		t.Errorf("expected User 'alice', got %q", req.User)
+	}
+}
+
+func TestSentinelCredentialRequest_UserFieldWithAllFields(t *testing.T) {
+	// Test User field alongside all other fields
+	req := SentinelCredentialRequest{
+		ProfileName:     "production",
+		NoSession:       true,
+		SessionDuration: 2 * time.Hour,
+		Region:          "us-east-1",
+		User:            "bob@example.com",
+	}
+
+	if req.ProfileName != "production" {
+		t.Errorf("ProfileName not set correctly")
+	}
+	if !req.NoSession {
+		t.Errorf("NoSession not set correctly")
+	}
+	if req.SessionDuration != 2*time.Hour {
+		t.Errorf("SessionDuration not set correctly")
+	}
+	if req.Region != "us-east-1" {
+		t.Errorf("Region not set correctly")
+	}
+	if req.User != "bob@example.com" {
+		t.Errorf("User not set correctly, got %q", req.User)
+	}
+}
+
+func TestSentinelCredentialRequest_EmptyUser(t *testing.T) {
+	// Document that empty User is valid for profiles without role_arn
+	// The actual validation happens in TwoHopCredentialProvider when
+	// the profile has role_arn and requires SourceIdentity
+	req := SentinelCredentialRequest{
+		ProfileName: "no-role-profile",
+		User:        "", // Empty user - valid for profiles without role_arn
+	}
+
+	if req.User != "" {
+		t.Errorf("expected empty User for this test case")
+	}
+
+	// Note: For profiles WITH role_arn, empty User will cause
+	// TwoHopCredentialProvider to return ErrMissingUser
+	// This is tested in sentinel/provider_test.go
+}
