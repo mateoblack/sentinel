@@ -5,6 +5,14 @@ import (
 	"errors"
 )
 
+// Query limit constants for List operations.
+const (
+	// DefaultQueryLimit is the default number of results for List operations.
+	DefaultQueryLimit = 100
+	// MaxQueryLimit is the maximum number of results for List operations.
+	MaxQueryLimit = 1000
+)
+
 // Storage-related sentinel errors for Store implementations.
 // These errors support errors.Is() checking for robust error handling.
 var (
@@ -37,4 +45,19 @@ type Store interface {
 
 	// Delete removes a request by ID. No-op if not exists (idempotent).
 	Delete(ctx context.Context, id string) error
+
+	// ListByRequester returns all requests from a specific user, ordered by created_at desc.
+	// Returns empty slice if no requests found.
+	// If limit is 0, DefaultQueryLimit is used. Limit is capped at MaxQueryLimit.
+	ListByRequester(ctx context.Context, requester string, limit int) ([]*Request, error)
+
+	// ListByStatus returns all requests with a specific status, ordered by created_at desc.
+	// Commonly used to list pending requests for approvers.
+	// If limit is 0, DefaultQueryLimit is used. Limit is capped at MaxQueryLimit.
+	ListByStatus(ctx context.Context, status RequestStatus, limit int) ([]*Request, error)
+
+	// ListByProfile returns all requests for a specific AWS profile, ordered by created_at desc.
+	// Useful for viewing request history for a profile.
+	// If limit is 0, DefaultQueryLimit is used. Limit is capped at MaxQueryLimit.
+	ListByProfile(ctx context.Context, profile string, limit int) ([]*Request, error)
 }
