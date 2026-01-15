@@ -9,6 +9,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.0 MVP** - [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md) (Phases 1-8, shipped 2026-01-14)
 - ✅ **v1.1 Sentinel Fingerprint** - [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) (Phases 9-17, shipped 2026-01-15)
 - 🚧 **v1.2 Approval Workflows** - Phases 18-26 (in progress)
+- 📋 **v1.3 Break-Glass** - Phases 27-34 (planned)
 
 ## Completed Milestones
 
@@ -154,6 +155,90 @@ Plans:
 Plans:
 - [ ] 26-01: TBD
 
+### 📋 v1.3 Break-Glass (Planned)
+
+**Milestone Goal:** Emergency access bypass with enhanced audit, time-bounded sessions, and immediate security notifications.
+
+#### Phase 27: Break-Glass Schema
+
+**Goal**: Define emergency access model with reason codes, expiry, and validation
+**Depends on**: v1.2 complete
+**Research**: Unlikely (extends existing types)
+**Plans**: TBD
+
+Plans:
+- [ ] 27-01: TBD
+
+#### Phase 28: Break-Glass Command
+
+**Goal**: CLI command to invoke emergency access with mandatory justification
+**Depends on**: Phase 27
+**Research**: Unlikely (extends existing CLI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 28-01: TBD
+
+#### Phase 29: Elevated Audit
+
+**Goal**: Enhanced logging with mandatory justification and incident correlation
+**Depends on**: Phase 28
+**Research**: Unlikely (extends existing logging)
+**Plans**: TBD
+
+Plans:
+- [ ] 29-01: TBD
+
+#### Phase 30: Time-Bounded Sessions
+
+**Goal**: Automatic credential expiry and renewal limits for break-glass access
+**Depends on**: Phase 29
+**Research**: Unlikely (extends existing credential handling)
+**Plans**: TBD
+
+Plans:
+- [ ] 30-01: TBD
+
+#### Phase 31: Notification Blast
+
+**Goal**: Immediate alerts to security team on break-glass invocation
+**Depends on**: Phase 30
+**Research**: Unlikely (reuses v1.2 notification infrastructure)
+**Plans**: TBD
+
+Plans:
+- [ ] 31-01: TBD
+
+#### Phase 32: Post-Incident Review
+
+**Goal**: Commands to list, review, and close break-glass events
+**Depends on**: Phase 31
+**Research**: Unlikely (extends existing CLI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 32-01: TBD
+
+#### Phase 33: Rate Limiting
+
+**Goal**: Prevent break-glass abuse with cooldowns, quotas, and escalation
+**Depends on**: Phase 32
+**Research**: Unlikely (internal design)
+**Plans**: TBD
+
+Plans:
+- [ ] 33-01: TBD
+
+#### Phase 34: Break-Glass Policies
+
+**Goal**: Policy rules for who can invoke break-glass and under what conditions
+**Depends on**: Phase 33
+**Research**: Unlikely (extends existing policy schema)
+**Plans**: TBD
+
+Plans:
+- [ ] 34-01: TBD
+
 ## Progress (All Milestones)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -169,3 +254,11 @@ Plans:
 | 24. Notification Hooks | v1.2 | 0/? | Not started | - |
 | 25. Approval Policies | v1.2 | 0/? | Not started | - |
 | 26. Approval Audit Trail | v1.2 | 0/? | Not started | - |
+| 27. Break-Glass Schema | v1.3 | 0/? | Not started | - |
+| 28. Break-Glass Command | v1.3 | 0/? | Not started | - |
+| 29. Elevated Audit | v1.3 | 0/? | Not started | - |
+| 30. Time-Bounded Sessions | v1.3 | 0/? | Not started | - |
+| 31. Notification Blast | v1.3 | 0/? | Not started | - |
+| 32. Post-Incident Review | v1.3 | 0/? | Not started | - |
+| 33. Rate Limiting | v1.3 | 0/? | Not started | - |
+| 34. Break-Glass Policies | v1.3 | 0/? | Not started | - |
