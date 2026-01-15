@@ -71,7 +71,7 @@ None
 **Plans**: TBD
 
 Plans:
-- [ ] 18-01: TBD (run /gsd:plan-phase 18 to break down)
+- [x] 18-01: Request types with state machine and validation — completed 2026-01-15
 
 #### Phase 19: DynamoDB Backend
 
@@ -245,7 +245,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-8 | v1.0 | 16/16 | Complete | 2026-01-14 |
 | 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
-| 18. Request Schema | v1.2 | 0/? | Not started | - |
+| 18. Request Schema | v1.2 | 1/1 | Complete | 2026-01-15 |
 | 19. DynamoDB Backend | v1.2 | 0/? | Not started | - |
 | 20. Request Command | v1.2 | 0/? | Not started | - |
 | 21. List/Check Commands | v1.2 | 0/? | Not started | - |
