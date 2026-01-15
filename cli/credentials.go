@@ -11,6 +11,7 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
@@ -144,26 +145,27 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	// 6. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 7. Log decision (before handling, so both allow and deny are logged)
-	if input.Logger != nil {
-		entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
-		input.Logger.LogDecision(entry)
-	}
-
-	// 8. Handle decision
+	// 7. Handle deny decision - log immediately and exit
 	if decision.Effect == policy.EffectDeny {
+		if input.Logger != nil {
+			entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
+			input.Logger.LogDecision(entry)
+		}
 		fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
 		return fmt.Errorf("access denied")
 	}
 
-	// EffectAllow: proceed to credential retrieval
+	// 8. EffectAllow: generate request-id and retrieve credentials
+	requestID := identity.NewRequestID()
+
 	// Create credential request with User for SourceIdentity stamping
 	credReq := SentinelCredentialRequest{
 		ProfileName:     input.ProfileName,
 		Region:          input.Region,
 		NoSession:       input.NoSession,
 		SessionDuration: input.SessionDuration,
-		User:            username, // For SourceIdentity stamping on role assumption
+		User:            username,  // For SourceIdentity stamping on role assumption
+		RequestID:       requestID, // For CloudTrail correlation
 	}
 
 	// Retrieve credentials with SourceIdentity stamping (if profile has role_arn)
@@ -171,6 +173,18 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to retrieve credentials: %v\n", err)
 		return err
+	}
+
+	// 9. Log allow decision with credential context for CloudTrail correlation
+	if input.Logger != nil {
+		credFields := &logging.CredentialIssuanceFields{
+			RequestID:       requestID,
+			SourceIdentity:  creds.SourceIdentity,
+			RoleARN:         creds.RoleARN,
+			SessionDuration: input.SessionDuration,
+		}
+		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, input.PolicyParameter, credFields)
+		input.Logger.LogDecision(entry)
 	}
 
 	// Build credential_process output
