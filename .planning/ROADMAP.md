@@ -8,7 +8,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 
 - ✅ **v1.0 MVP** - [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md) (Phases 1-8, shipped 2026-01-14)
 - ✅ **v1.1 Sentinel Fingerprint** - [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) (Phases 9-17, shipped 2026-01-15)
-- 🚧 **v1.2 Approval Workflows** - Phases 18-26 (in progress)
+- ✅ **v1.2 Approval Workflows** - [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) (Phases 18-26, shipped 2026-01-15)
 - 📋 **v1.3 Break-Glass** - Phases 27-34 (planned)
 
 ## Completed Milestones
@@ -59,7 +59,8 @@ None
 
 </details>
 
-### 🚧 v1.2 Approval Workflows (In Progress)
+<details>
+<summary>✅ v1.2 Approval Workflows (Phases 18-26) — SHIPPED 2026-01-15</summary>
 
 **Milestone Goal:** Add request/approve flow for sensitive access with DynamoDB state, notification hooks, and approval policies.
 
@@ -164,6 +165,8 @@ Plans:
 - [x] 26-01: Approval audit trail logging infrastructure — completed 2026-01-15
 - [x] 26-02: CLI approval logging integration — completed 2026-01-15
 
+</details>
+
 ### 📋 v1.3 Break-Glass (Planned)
 
 **Milestone Goal:** Emergency access bypass with enhanced audit, time-bounded sessions, and immediate security notifications.
@@ -254,15 +257,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-8 | v1.0 | 16/16 | Complete | 2026-01-14 |
 | 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
-| 18. Request Schema | v1.2 | 1/1 | Complete | 2026-01-15 |
-| 19. DynamoDB Backend | v1.2 | 2/2 | Complete | 2026-01-15 |
-| 20. Request Command | v1.2 | 1/1 | Complete | 2026-01-14 |
-| 21. List/Check Commands | v1.2 | 2/2 | Complete | 2026-01-15 |
-| 22. Approve/Deny Commands | v1.2 | 1/1 | Complete | 2026-01-14 |
-| 23. Request Integration | v1.2 | 2/2 | Complete | 2026-01-15 |
-| 24. Notification Hooks | v1.2 | 4/4 | Complete | 2026-01-15 |
-| 25. Approval Policies | v1.2 | 3/3 | Complete | 2026-01-15 |
-| 26. Approval Audit Trail | v1.2 | 2/2 | Complete | 2026-01-15 |
+| 18-26 | v1.2 | 17/17 | Complete | 2026-01-15 |
 | 27. Break-Glass Schema | v1.3 | 0/? | Not started | - |
 | 28. Break-Glass Command | v1.3 | 0/? | Not started | - |
 | 29. Elevated Audit | v1.3 | 0/? | Not started | - |
