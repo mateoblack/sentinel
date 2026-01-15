@@ -11,6 +11,7 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
@@ -150,26 +151,27 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	// 7. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 8. Log decision (before handling, so both allow and deny are logged)
-	if logger != nil {
-		entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
-		logger.LogDecision(entry)
-	}
-
-	// 9. Handle decision
+	// 8. Handle deny decision - log and exit
 	if decision.Effect == policy.EffectDeny {
+		if logger != nil {
+			entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
+			logger.LogDecision(entry)
+		}
 		fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
 		return 1, fmt.Errorf("access denied: %s", decision.String())
 	}
 
-	// 10. EffectAllow: proceed to credential retrieval
+	// 9. EffectAllow: generate request-id and retrieve credentials
+	requestID := identity.NewRequestID()
+
 	// Create credential request with User for SourceIdentity stamping
 	credReq := SentinelCredentialRequest{
 		ProfileName:     input.ProfileName,
 		Region:          input.Region,
 		NoSession:       input.NoSession,
 		SessionDuration: input.SessionDuration,
-		User:            username, // For SourceIdentity stamping on role assumption
+		User:            username,   // For SourceIdentity stamping on role assumption
+		RequestID:       requestID,  // For CloudTrail correlation
 	}
 
 	// Retrieve credentials with SourceIdentity stamping (if profile has role_arn)
@@ -177,6 +179,18 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to retrieve credentials: %v\n", err)
 		return 1, err
+	}
+
+	// 10. Log allow decision with credential context
+	if logger != nil {
+		credFields := &logging.CredentialIssuanceFields{
+			RequestID:       requestID,
+			SourceIdentity:  creds.SourceIdentity,
+			RoleARN:         creds.RoleARN,
+			SessionDuration: input.SessionDuration,
+		}
+		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, input.PolicyParameter, credFields)
+		logger.LogDecision(entry)
 	}
 
 	// 11. Default to shell if no command specified
