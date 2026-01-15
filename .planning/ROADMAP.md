@@ -212,6 +212,7 @@ Plans:
 
 Plans:
 - [x] 30-01: Break-glass checker function with FindActiveBreakGlass — completed 2026-01-15
+- [x] 30-02: Break-glass credential integration with duration capping — completed 2026-01-15
 
 #### Phase 31: Notification Blast
 
@@ -263,7 +264,7 @@ Plans:
 | 27. Break-Glass Schema | v1.3 | 1/1 | Complete | 2026-01-15 |
 | 28. Break-Glass Command | v1.3 | 2/2 | Complete | 2026-01-15 |
 | 29. Elevated Audit | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 30. Time-Bounded Sessions | v1.3 | 1/2 | In progress | - |
+| 30. Time-Bounded Sessions | v1.3 | 2/2 | Complete | 2026-01-15 |
 | 31. Notification Blast | v1.3 | 0/? | Not started | - |
 | 32. Post-Incident Review | v1.3 | 0/? | Not started | - |
 | 33. Rate Limiting | v1.3 | 0/? | Not started | - |
