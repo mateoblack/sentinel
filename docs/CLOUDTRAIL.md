@@ -304,3 +304,138 @@ Example output:
 [2024-01-15T10:38:42Z] iam.amazonaws.com: GetUser
 ```
 
+## Athena Queries
+
+For advanced analysis, historical queries beyond 90 days, or data events (S3 object-level operations, Lambda invocations), use Amazon Athena to query CloudTrail logs stored in S3.
+
+### Prerequisites
+
+1. **CloudTrail logs exported to S3** - Configure a trail to deliver logs to an S3 bucket
+2. **Athena table for CloudTrail logs** - Create a table using the CloudTrail schema
+
+For setup instructions, see [Querying CloudTrail Logs with Athena](https://docs.aws.amazon.com/athena/latest/ug/cloudtrail-logs.html) in the AWS documentation.
+
+### Find All Actions by Sentinel Session
+
+Query all API calls made with a specific Sentinel-issued session:
+
+```sql
+SELECT
+    eventtime,
+    eventsource,
+    eventname,
+    sourceipaddress,
+    useridentity.sourceidentity
+FROM cloudtrail_logs
+WHERE useridentity.sourceidentity = 'sentinel:alice:a1b2c3d4'
+ORDER BY eventtime;
+```
+
+### Aggregate Sentinel Usage by User
+
+Summarize API call volume and action diversity per Sentinel user:
+
+```sql
+SELECT
+    REGEXP_EXTRACT(useridentity.sourceidentity, 'sentinel:([^:]+):', 1) AS sentinel_user,
+    COUNT(*) AS api_calls,
+    COUNT(DISTINCT eventname) AS unique_actions,
+    COUNT(DISTINCT eventsource) AS services_used
+FROM cloudtrail_logs
+WHERE useridentity.sourceidentity LIKE 'sentinel:%'
+    AND eventtime >= '2024-01-01T00:00:00Z'
+GROUP BY 1
+ORDER BY api_calls DESC;
+```
+
+### Find High-Risk Actions by Sentinel Users
+
+Identify potentially sensitive operations:
+
+```sql
+SELECT
+    eventtime,
+    useridentity.sourceidentity,
+    eventsource,
+    eventname,
+    errorcode,
+    errormessage
+FROM cloudtrail_logs
+WHERE useridentity.sourceidentity LIKE 'sentinel:%'
+    AND (
+        eventname LIKE 'Delete%'
+        OR eventname LIKE 'Put%Policy'
+        OR eventname LIKE 'Create%'
+        OR eventname LIKE 'Attach%'
+        OR eventname LIKE 'Detach%'
+    )
+ORDER BY eventtime DESC
+LIMIT 100;
+```
+
+### Daily Session Count by User
+
+Track Sentinel usage patterns over time:
+
+```sql
+SELECT
+    DATE(eventtime) AS day,
+    REGEXP_EXTRACT(useridentity.sourceidentity, 'sentinel:([^:]+):', 1) AS sentinel_user,
+    COUNT(DISTINCT useridentity.sourceidentity) AS unique_sessions,
+    COUNT(*) AS total_api_calls
+FROM cloudtrail_logs
+WHERE useridentity.sourceidentity LIKE 'sentinel:%'
+    AND eventtime >= DATE_ADD('day', -30, CURRENT_DATE)
+GROUP BY 1, 2
+ORDER BY 1 DESC, 4 DESC;
+```
+
+### Cross-Reference with Sentinel Logs
+
+For complete correlation, export Sentinel decision logs to S3 in JSON Lines format (Athena-compatible). Then join the two sources:
+
+```sql
+-- Assuming sentinel_logs table exists with Sentinel decision log data
+SELECT
+    s.timestamp AS sentinel_decision_time,
+    s.user,
+    s.profile,
+    s.effect,
+    s.rule,
+    c.eventtime AS aws_action_time,
+    c.eventsource,
+    c.eventname
+FROM sentinel_logs s
+LEFT JOIN cloudtrail_logs c
+    ON c.useridentity.sourceidentity = s.source_identity
+    AND c.eventtime >= s.timestamp
+    AND c.eventtime <= DATE_ADD('hour', 1, CAST(s.timestamp AS timestamp))
+WHERE s.effect = 'allow'
+    AND s.timestamp >= '2024-01-15T00:00:00Z'
+ORDER BY s.timestamp, c.eventtime;
+```
+
+This query shows each Sentinel allow decision alongside the AWS actions taken within the session duration.
+
+### Creating the Sentinel Logs Table
+
+If you export Sentinel decision logs to S3, create an Athena table:
+
+```sql
+CREATE EXTERNAL TABLE sentinel_logs (
+    timestamp STRING,
+    user STRING,
+    profile STRING,
+    effect STRING,
+    rule STRING,
+    rule_index INT,
+    reason STRING,
+    policy_path STRING,
+    request_id STRING,
+    source_identity STRING,
+    role_arn STRING,
+    session_duration_seconds INT
+)
+ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
+LOCATION 's3://your-bucket/sentinel-logs/';
+```
