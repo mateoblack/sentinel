@@ -18,6 +18,7 @@ func main() {
 	cli.ConfigureCredentialsCommand(app, s)
 	cli.ConfigureSentinelExecCommand(app, s)
 	cli.ConfigureRequestCommand(app, s)
+	cli.ConfigureSentinelListCommand(app, s)
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
