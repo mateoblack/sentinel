@@ -16,6 +16,7 @@ type mockDynamoDBClient struct {
 	putItemFunc    func(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	getItemFunc    func(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	deleteItemFunc func(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
+	queryFunc      func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 }
 
 func (m *mockDynamoDBClient) PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
@@ -37,6 +38,13 @@ func (m *mockDynamoDBClient) DeleteItem(ctx context.Context, params *dynamodb.De
 		return m.deleteItemFunc(ctx, params, optFns...)
 	}
 	return &dynamodb.DeleteItemOutput{}, nil
+}
+
+func (m *mockDynamoDBClient) Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+	if m.queryFunc != nil {
+		return m.queryFunc(ctx, params, optFns...)
+	}
+	return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{}}, nil
 }
 
 // testRequest returns a valid Request for testing.
@@ -438,4 +446,290 @@ func TestDynamoDBStore_Get_DynamoDBError(t *testing.T) {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+// TestDynamoDBStore_ListByRequester_Success tests returning requests for a user, newest first.
+func TestDynamoDBStore_ListByRequester_Success(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Nanosecond)
+	req1 := &Request{
+		ID:            "req001",
+		Requester:     "alice",
+		Profile:       "production",
+		Justification: "First request",
+		Duration:      time.Hour,
+		Status:        StatusPending,
+		CreatedAt:     now.Add(-time.Hour),
+		UpdatedAt:     now.Add(-time.Hour),
+		ExpiresAt:     now.Add(DefaultRequestTTL),
+	}
+	req2 := &Request{
+		ID:            "req002",
+		Requester:     "alice",
+		Profile:       "staging",
+		Justification: "Second request",
+		Duration:      time.Hour,
+		Status:        StatusApproved,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		ExpiresAt:     now.Add(DefaultRequestTTL),
+	}
+
+	item1, _ := attributevalue.MarshalMap(requestToItem(req1))
+	item2, _ := attributevalue.MarshalMap(requestToItem(req2))
+
+	var capturedInput *dynamodb.QueryInput
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			capturedInput = params
+			// Return newest first (req2 before req1)
+			return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{item2, item1}}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	results, err := store.ListByRequester(context.Background(), "alice", 10)
+	if err != nil {
+		t.Fatalf("ListByRequester() error = %v", err)
+	}
+
+	// Verify query parameters
+	if *capturedInput.IndexName != GSIRequester {
+		t.Errorf("IndexName = %q, want %q", *capturedInput.IndexName, GSIRequester)
+	}
+	if *capturedInput.KeyConditionExpression != "requester = :v" {
+		t.Errorf("KeyConditionExpression = %q, want %q", *capturedInput.KeyConditionExpression, "requester = :v")
+	}
+	if *capturedInput.ScanIndexForward != false {
+		t.Error("ScanIndexForward should be false for descending order")
+	}
+	if *capturedInput.Limit != 10 {
+		t.Errorf("Limit = %d, want %d", *capturedInput.Limit, 10)
+	}
+
+	// Verify results
+	if len(results) != 2 {
+		t.Fatalf("ListByRequester() returned %d results, want 2", len(results))
+	}
+	if results[0].ID != "req002" {
+		t.Errorf("First result ID = %q, want %q (newest first)", results[0].ID, "req002")
+	}
+	if results[1].ID != "req001" {
+		t.Errorf("Second result ID = %q, want %q", results[1].ID, "req001")
+	}
+}
+
+// TestDynamoDBStore_ListByRequester_Empty tests returning empty slice for unknown user.
+func TestDynamoDBStore_ListByRequester_Empty(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{}}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	results, err := store.ListByRequester(context.Background(), "unknown-user", 10)
+	if err != nil {
+		t.Fatalf("ListByRequester() error = %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("ListByRequester() returned %d results, want 0 for unknown user", len(results))
+	}
+}
+
+// TestDynamoDBStore_ListByStatus_Pending tests returning pending requests for approver view.
+func TestDynamoDBStore_ListByStatus_Pending(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Nanosecond)
+	req := &Request{
+		ID:            "pending001",
+		Requester:     "bob",
+		Profile:       "production",
+		Justification: "Pending request",
+		Duration:      time.Hour,
+		Status:        StatusPending,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		ExpiresAt:     now.Add(DefaultRequestTTL),
+	}
+
+	item, _ := attributevalue.MarshalMap(requestToItem(req))
+
+	var capturedInput *dynamodb.QueryInput
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			capturedInput = params
+			return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{item}}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	results, err := store.ListByStatus(context.Background(), StatusPending, 50)
+	if err != nil {
+		t.Fatalf("ListByStatus() error = %v", err)
+	}
+
+	// Verify query parameters
+	if *capturedInput.IndexName != GSIStatus {
+		t.Errorf("IndexName = %q, want %q", *capturedInput.IndexName, GSIStatus)
+	}
+	if *capturedInput.KeyConditionExpression != "status = :v" {
+		t.Errorf("KeyConditionExpression = %q, want %q", *capturedInput.KeyConditionExpression, "status = :v")
+	}
+	// Verify the status value in expression attributes
+	if v, ok := capturedInput.ExpressionAttributeValues[":v"].(*types.AttributeValueMemberS); !ok || v.Value != "pending" {
+		t.Errorf("ExpressionAttributeValues[:v] = %v, want %q", capturedInput.ExpressionAttributeValues[":v"], "pending")
+	}
+
+	// Verify results
+	if len(results) != 1 {
+		t.Fatalf("ListByStatus() returned %d results, want 1", len(results))
+	}
+	if results[0].Status != StatusPending {
+		t.Errorf("Result status = %q, want %q", results[0].Status, StatusPending)
+	}
+}
+
+// TestDynamoDBStore_ListByStatus_Empty tests returning empty slice when no matching status.
+func TestDynamoDBStore_ListByStatus_Empty(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{}}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	results, err := store.ListByStatus(context.Background(), StatusExpired, 10)
+	if err != nil {
+		t.Fatalf("ListByStatus() error = %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("ListByStatus() returned %d results, want 0 for status with no matches", len(results))
+	}
+}
+
+// TestDynamoDBStore_ListByProfile_Success tests returning requests for a profile.
+func TestDynamoDBStore_ListByProfile_Success(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Nanosecond)
+	req := &Request{
+		ID:            "profile001",
+		Requester:     "charlie",
+		Profile:       "production",
+		Justification: "Profile access request",
+		Duration:      time.Hour,
+		Status:        StatusApproved,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		ExpiresAt:     now.Add(DefaultRequestTTL),
+	}
+
+	item, _ := attributevalue.MarshalMap(requestToItem(req))
+
+	var capturedInput *dynamodb.QueryInput
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			capturedInput = params
+			return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{item}}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	results, err := store.ListByProfile(context.Background(), "production", 25)
+	if err != nil {
+		t.Fatalf("ListByProfile() error = %v", err)
+	}
+
+	// Verify query parameters
+	if *capturedInput.IndexName != GSIProfile {
+		t.Errorf("IndexName = %q, want %q", *capturedInput.IndexName, GSIProfile)
+	}
+	if *capturedInput.KeyConditionExpression != "profile = :v" {
+		t.Errorf("KeyConditionExpression = %q, want %q", *capturedInput.KeyConditionExpression, "profile = :v")
+	}
+
+	// Verify results
+	if len(results) != 1 {
+		t.Fatalf("ListByProfile() returned %d results, want 1", len(results))
+	}
+	if results[0].Profile != "production" {
+		t.Errorf("Result profile = %q, want %q", results[0].Profile, "production")
+	}
+}
+
+// TestDynamoDBStore_ListByProfile_Empty tests returning empty slice for unused profile.
+func TestDynamoDBStore_ListByProfile_Empty(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{}}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	results, err := store.ListByProfile(context.Background(), "unused-profile", 10)
+	if err != nil {
+		t.Fatalf("ListByProfile() error = %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("ListByProfile() returned %d results, want 0 for unused profile", len(results))
+	}
+}
+
+// TestDynamoDBStore_QueryLimit tests limit parameter handling.
+func TestDynamoDBStore_QueryLimit(t *testing.T) {
+	tests := []struct {
+		name          string
+		inputLimit    int
+		expectedLimit int32
+	}{
+		{"zero uses default", 0, int32(DefaultQueryLimit)},
+		{"positive uses value", 50, 50},
+		{"exceeds max gets capped", 2000, int32(MaxQueryLimit)},
+		{"negative uses default", -5, int32(DefaultQueryLimit)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var capturedLimit int32
+			mock := &mockDynamoDBClient{
+				queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+					capturedLimit = *params.Limit
+					return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{}}, nil
+				},
+			}
+
+			store := newDynamoDBStoreWithClient(mock, "test-table")
+
+			_, err := store.ListByRequester(context.Background(), "user", tt.inputLimit)
+			if err != nil {
+				t.Fatalf("ListByRequester() error = %v", err)
+			}
+
+			if capturedLimit != tt.expectedLimit {
+				t.Errorf("Limit = %d, want %d", capturedLimit, tt.expectedLimit)
+			}
+		})
+	}
+}
+
+// TestDynamoDBStore_Query_DynamoDBError tests error handling for query operations.
+func TestDynamoDBStore_Query_DynamoDBError(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return nil, errors.New("network error")
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	_, err := store.ListByRequester(context.Background(), "user", 10)
+	if err == nil {
+		t.Fatal("ListByRequester() should return error on DynamoDB failure")
+	}
 }
