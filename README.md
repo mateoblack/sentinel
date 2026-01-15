@@ -1,191 +1,98 @@
-# AWS Vault
+# Sentinel
 
-[![Downloads](https://img.shields.io/github/downloads/byteness/aws-vault/total)](https://github.com/byteness/aws-vault/releases)
-[![Continuous Integration](https://github.com/byteness/aws-vault/workflows/Continuous%20Integration/badge.svg)](https://github.com/byteness/aws-vault/actions)
+![alt text](image.png)
 
-> [!NOTE]
-> This is a maintained fork of https://github.com/99designs/aws-vault which seems to be an abandoned project.
-> Contributions are welcome and preferably please open an [issue](https://github.com/ByteNess/aws-vault/issues) first.
+## What This Is
 
-AWS Vault is a tool to securely store and access AWS credentials in a development environment.
+Sentinel is an intent-aware access control layer for AWS credentials, built on top of aws-vault. It evaluates policy rules before issuing credentials, allowing teams to use powerful AWS tooling without handing out unchecked access. Sentinel integrates at the credential boundary via `credential_process` and `exec` commands, making it invisible to downstream tools.
 
-AWS Vault stores IAM credentials in your operating system's secure keystore and then generates temporary credentials from those to expose to your shell and applications. It's designed to be complementary to the AWS CLI tools, and is aware of your [profiles and configuration in `~/.aws/config`](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-config-files).
+## Core Value
 
-Check out the [announcement blog post](https://99designs.com.au/tech-blog/blog/2015/10/26/aws-vault/) for more details.
+Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
 
-## Installing
+## Requirements
 
-You can install AWS Vault:
-- by downloading the [latest release](https://github.com/byteness/aws-vault/releases/latest)
-- using [Homebrew](https://formulae.brew.sh/formula/aws-vault): `brew install aws-vault`
-- on Windows with [Chocolatey](https://chocolatey.org/packages/aws-vault): `choco install aws-vault` ([repo](https://github.com/gusztavvargadr/aws-vault-chocolatey) by [Gusztáv Varga](https://github.com/gusztavvargadr))
-- on [NixOS](https://search.nixos.org/packages?channel=unstable&query=aws-vault) (currently only available on the unstable channel): `nix-env -iA nixos.aws-vault`
+### Validated
 
-## Documentation
+- ✓ Secure credential storage via system keyring — existing (aws-vault)
+- ✓ AWS SSO integration — existing (aws-vault)
+- ✓ Session caching with expiration — existing (aws-vault)
+- ✓ EC2/ECS metadata server emulation — existing (aws-vault)
+- ✓ Cross-platform support (macOS, Linux, Windows) — existing (aws-vault)
+- ✓ Policy evaluation before credential issuance — v1.0
+- ✓ AWS-native policy store (SSM Parameter Store) — v1.0
+- ✓ `credential_process` integration (`sentinel credentials --profile X`) — v1.0
+- ✓ Decision logging (user, profile, allow/deny, rule matched) — v1.0
+- ✓ `sentinel exec` command for direct invocation — v1.0
+- ✓ Compatibility with existing aws-vault profiles — v1.0
+- ✓ SourceIdentity stamping on all role assumptions — v1.1
+- ✓ CloudTrail correlation via request-id in decision logs — v1.1
+- ✓ IAM trust policy enforcement patterns documented — v1.1
+- ✓ SCP enforcement patterns for organization-wide control — v1.1
 
-Config, usage, tips and tricks are available in the [USAGE.md](./USAGE.md) file.
+### Active
 
-## Vaulting Backends
+(None — all v1.1 requirements validated)
 
-The supported vaulting backends are:
+### Out of Scope
 
-* [macOS Keychain](https://support.apple.com/en-au/guide/keychain-access/welcome/mac)
-* [Windows Credential Manager](https://support.microsoft.com/en-au/help/4026814/windows-accessing-credential-manager)
-* Secret Service ([Gnome Keyring](https://wiki.gnome.org/Projects/GnomeKeyring), [KWallet](https://kde.org/applications/system/org.kde.kwalletmanager5))
-* [KWallet](https://kde.org/applications/system/org.kde.kwalletmanager5)
-* [Pass](https://www.passwordstore.org/)
-* Encrypted file
-* [1Password Connect](https://developer.1password.com/docs/connect/)
-* [1Password Service Accounts](https://developer.1password.com/docs/service-accounts)
+- Approval workflows — deferred (requires DynamoDB + notification integration)
+- Break-glass mode — deferred (standard access only for v1)
+- User management — AWS SSO handles identity
+- Authorization inside AWS resources — IAM/SCPs handle that
+- Daemon mode — CLI-first, no background process
 
-Use the `--backend` flag or `AWS_VAULT_BACKEND` environment variable to specify.
+## Context
 
-## Quick start
+Shipped v1.1 with 13,986 LOC Go.
+Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework.
 
-```shell
-# Store AWS credentials for the "jonsmith" profile
-$ aws-vault add jonsmith
-Enter Access Key Id: ABDCDEFDASDASF
-Enter Secret Key: ****************************************
-Enter MFA Device ARN (If MFA is not enabled, leave this blank): arn:aws:iam::123456789012:mfa/jonsmith
-Added credentials to profile "jonsmith" in vault
+Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
+- Credential storage abstraction (keyring backends)
+- AWS SDK v2 integration
+- Provider chain pattern for credential resolution
+- Local metadata servers for SDK compatibility
 
-# Execute a command (using temporary credentials)
-$ aws-vault exec jonsmith -- aws s3 ls
-bucket_1
-bucket_2
+Sentinel adds the policy evaluation "brain" with:
+- YAML policy schema with time windows and conditions
+- SSM Parameter Store integration for centralized policy
+- First-match-wins rule evaluation with default deny
+- Structured JSON Lines logging for audit trails
 
-# open a browser window and login to the AWS Console
-$ aws-vault login jonsmith
+v1.1 adds credential provenance via Sentinel Fingerprint:
+- SourceIdentity stamping (sentinel:<user>:<request-id>) on all role assumptions
+- Two-hop credential flow: aws-vault base creds → SentinelAssumeRole → fingerprinted credentials
+- CloudTrail correlation via request-id matching between Sentinel logs and AWS events
+- Optional IAM enforcement via trust policies and SCPs
 
-# List credentials
-$ aws-vault list
-Profile                  Credentials              Sessions
-=======                  ===========              ========
-jonsmith                 jonsmith                 -
+Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
-# Start a subshell with temporary credentials
-$ aws-vault exec jonsmith
-Starting subshell /bin/zsh, use `exit` to exit the subshell
-$ aws s3 ls
-bucket_1
-bucket_2
-```
+## Constraints
 
-## How it works
+- **Existing profiles**: Must work with existing `~/.aws/config` without requiring profile changes
+- **CLI-first**: No daemon, no background process, simple invocation model
+- **AWS-native policy**: Policies stored in SSM Parameter Store (already exists in most orgs)
+- **Go**: Building on existing aws-vault codebase (Go 1.25)
 
-`aws-vault` uses Amazon's STS service to generate [temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html) via the `GetSessionToken` or `AssumeRole` API calls. These expire in a short period of time, so the risk of leaking credentials is reduced.
+## Key Decisions
 
-AWS Vault then exposes the temporary credentials to the sub-process in one of two ways
+| Decision | Rationale | Outcome |
+|----------|-----------|---------|
+| Build on aws-vault | Battle-tested credential plumbing, focus on policy layer | ✓ Good |
+| Policy in SSM | Centralized, versioned, IAM-protected, already deployed | ✓ Good |
+| credential_process first | Invisible to tools, proves full integration | ✓ Good |
+| Use kingpin (not cobra) | Match existing aws-vault codebase patterns | ✓ Good |
+| String type aliases for Effect/Weekday | Type safety with IsValid() validation methods | ✓ Good |
+| Hour range [start, end) semantics | Inclusive start, exclusive end for intuitive business hours | ✓ Good |
+| Empty list = wildcard matching | Enable rules like "any user on staging profile" | ✓ Good |
+| Default deny on no match | Security-first approach | ✓ Good |
+| 5-minute cache TTL | Balance API calls vs freshness | ✓ Good |
+| JSON Lines logging format | Log aggregation compatibility | ✓ Good |
+| SourceIdentity format sentinel:<user>:<request-id> | Unique per-request correlation, fits AWS 64-char limit | ✓ Good |
+| Two-hop credential flow | Enables SourceIdentity stamping on all role assumptions | ✓ Good |
+| Crypto/rand for request-id | Security-first entropy for correlation IDs | ✓ Good |
+| User sanitization at call time | Allows raw user storage, sanitizes for AWS constraints | ✓ Good |
+| omitempty for new log fields | Backward compatibility with existing log consumers | ✓ Good |
 
-1. **Environment variables** are written to the sub-process. Notice in the below example how the AWS credentials get written out
-   ```shell
-   $ aws-vault exec jonsmith -- env | grep AWS
-   AWS_VAULT=jonsmith
-   AWS_DEFAULT_REGION=us-east-1
-   AWS_REGION=us-east-1
-   AWS_ACCESS_KEY_ID=%%%
-   AWS_SECRET_ACCESS_KEY=%%%
-   AWS_SESSION_TOKEN=%%%
-   AWS_CREDENTIAL_EXPIRATION=2020-04-16T11:16:27Z
-   ```
-2. **Local metadata server** is started. This approach has the advantage that anything that uses Amazon's SDKs will automatically refresh credentials as needed, so session times can be as short as possible.
-   ```shell
-   $ aws-vault exec --server jonsmith -- env | grep AWS
-   AWS_VAULT=jonsmith
-   AWS_DEFAULT_REGION=us-east-1
-   AWS_REGION=us-east-1
-   AWS_CONTAINER_CREDENTIALS_FULL_URI=%%%
-   AWS_CONTAINER_AUTHORIZATION_TOKEN=%%%
-   ```
-
-The default is to use environment variables, but you can opt-in to the local instance metadata server with the `--server` flag on the `exec` command.
-
-## Roles and MFA
-
-[Best-practice](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#delegate-using-roles) is to [create Roles to delegate permissions](https://docs.aws.amazon.com/cli/latest/userguide/cli-roles.html). For security, you should also require that users provide a one-time key generated from a multi-factor authentication (MFA) device.
-
-First you'll need to create the users and roles in IAM, as well as [setup an MFA device](https://docs.aws.amazon.com/IAM/latest/UserGuide/GenerateMFAConfigAccount.html). You can then [set up IAM roles to enforce MFA](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html#cli-configure-role-mfa).
-
-Here's an example configuration using roles and MFA:
-
-```ini
-[default]
-region = us-east-1
-
-[profile jonsmith]
-mfa_serial = arn:aws:iam::111111111111:mfa/jonsmith
-
-[profile foo-readonly]
-source_profile = jonsmith
-role_arn = arn:aws:iam::22222222222:role/ReadOnly
-
-[profile foo-admin]
-source_profile = jonsmith
-role_arn = arn:aws:iam::22222222222:role/Administrator
-mfa_serial = arn:aws:iam::111111111111:mfa/jonsmith
-
-[profile bar-role1]
-source_profile = jonsmith
-role_arn = arn:aws:iam::333333333333:role/Role1
-mfa_serial = arn:aws:iam::111111111111:mfa/jonsmith
-
-[profile bar-role2]
-source_profile = bar-role1
-role_arn = arn:aws:iam::333333333333:role/Role2
-mfa_serial = arn:aws:iam::111111111111:mfa/jonsmith
-```
-
-Here's what you can expect from aws-vault
-
-| Command                                  | Credentials                 | Cached        | MFA |
-|------------------------------------------|-----------------------------|---------------|-----|
-| `aws-vault exec jonsmith --no-session`   | Long-term credentials       | No            | No  |
-| `aws-vault exec jonsmith`                | session-token               | session-token | Yes |
-| `aws-vault exec foo-readonly`            | role                        | No            | No  |
-| `aws-vault exec foo-admin`               | session-token + role        | session-token | Yes |
-| `aws-vault exec foo-admin --duration=2h` | role                        | role          | Yes |
-| `aws-vault exec bar-role2`               | session-token + role + role | session-token | Yes |
-| `aws-vault exec bar-role2 --no-session`  | role + role                 | role          | Yes |
-
-## Auto-logout
-
-Since v7.3+ `aws-vault` introduced option to automatically try and do a logout first, before login when executing `aws-vault login <profile>`.
-
-This behavour can be achieved by using `--auto-logout` or `-a` flag! Read more in [USAGE.md](./USAGE.md) file.
-
-## Development
-
-The [macOS release builds](https://github.com/byteness/aws-vault/releases) are code-signed to avoid extra prompts in Keychain. You can verify this with:
-```shell
-$ codesign --verify --verbose $(which aws-vault)
-```
-
-If you are developing or compiling the aws-vault binary yourself, you can [generate a self-signed certificate](https://support.apple.com/en-au/guide/keychain-access/kyca8916/mac) by accessing Keychain Access > Certificate Assistant > Create Certificate -> Certificate Type: Code Signing. You can then sign your binary with:
-```shell
-$ go build .
-$ codesign --sign <Name of certificate created above> ./aws-vault
-```
-
-## 🧰 Contributing
-
-Report issues/questions/feature requests on in the [issues](https://github.com/byteness/aws-vault/issues/new) section.
-
-Full contributing [guidelines are covered here](.github/CONTRIBUTING.md).
-
-## Maintainers
-
-* [Marko Bevc](https://github.com/mbevc1)
-* Full [contributors list](https://github.com/byteness/aws-vault/graphs/contributors)
-
-
-## References and Inspiration
-
- * https://github.com/pda/aws-keychain
- * https://docs.aws.amazon.com/IAM/latest/UserGuide/MFAProtectedAPI.html
- * https://docs.aws.amazon.com/IAM/latest/UserGuide/IAMBestPractices.html#create-iam-users
- * https://github.com/makethunder/awsudo
- * https://github.com/AdRoll/hologram
- * https://github.com/realestate-com-au/credulous
- * https://github.com/dump247/aws-mock-metadata
- * https://boto.readthedocs.org/en/latest/boto_config_tut.html
+---
+*Last updated: 2026-01-15 after v1.1 milestone*
