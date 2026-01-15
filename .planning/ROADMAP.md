@@ -230,10 +230,11 @@ Plans:
 **Goal**: Commands to list, review, and close break-glass events
 **Depends on**: Phase 31
 **Research**: Unlikely (extends existing CLI patterns)
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 32-01: TBD
+- [ ] 32-01: breakglass-list and breakglass-check commands
+- [ ] 32-02: breakglass-close command with notifications/logging
 
 #### Phase 33: Rate Limiting
 
@@ -267,6 +268,6 @@ Plans:
 | 29. Elevated Audit | v1.3 | 2/2 | Complete | 2026-01-15 |
 | 30. Time-Bounded Sessions | v1.3 | 2/2 | Complete | 2026-01-15 |
 | 31. Notification Blast | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 32. Post-Incident Review | v1.3 | 0/? | Not started | - |
+| 32. Post-Incident Review | v1.3 | 0/2 | Not started | - |
 | 33. Rate Limiting | v1.3 | 0/? | Not started | - |
 | 34. Break-Glass Policies | v1.3 | 0/? | Not started | - |
