@@ -96,15 +96,18 @@ Plans:
 Plans:
 - [x] 13-01: Update exec command to use GetCredentialsWithSourceIdentity
 
-#### Phase 14: Enhanced Decision Logging
+#### Phase 14: Enhanced Decision Logging (In Progress)
 
 **Goal**: Add request-id, source-identity, role-arn, session-duration to decision logs
 **Depends on**: Phase 13
 **Research**: Unlikely (extending existing logging)
-**Plans**: TBD
+**Plans**: 1/4 complete
 
 Plans:
-- [ ] 14-01: TBD
+- [x] 14-01: Extend DecisionLogEntry with CloudTrail correlation fields
+- [ ] 14-02: Integrate enhanced logging into credential_process
+- [ ] 14-03: Integrate enhanced logging into exec command
+- [ ] 14-04: Add logging integration tests
 
 #### Phase 15: CloudTrail Correlation
 
@@ -145,7 +148,7 @@ Plans:
 | 11. Two-Hop Orchestration | v1.1 | 1/1 | Complete | 2026-01-14 |
 | 12. Credential Process Update | v1.1 | 1/1 | Complete | 2026-01-15 |
 | 13. Exec Command Update | v1.1 | 1/1 | Complete | 2026-01-15 |
-| 14. Enhanced Decision Logging | v1.1 | 0/? | Not started | - |
+| 14. Enhanced Decision Logging | v1.1 | 1/4 | In progress | - |
 | 15. CloudTrail Correlation | v1.1 | 0/? | Not started | - |
 | 16. Enforcement Patterns | v1.1 | 0/? | Not started | - |
 | 17. Integration Testing | v1.1 | 0/? | Not started | - |
