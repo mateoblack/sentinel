@@ -10,6 +10,7 @@ import (
 
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/notification"
 )
 
 // mockBreakGlassStore implements breakglass.Store for testing.
@@ -115,6 +116,20 @@ func (m *mockBreakGlassLogger) LogBreakGlass(entry logging.BreakGlassLogEntry) {
 	m.breakGlassEntries = append(m.breakGlassEntries, entry)
 }
 
+// mockBreakGlassNotifier implements notification.BreakGlassNotifier for testing.
+type mockBreakGlassNotifier struct {
+	notifyFn func(ctx context.Context, event *notification.BreakGlassEvent) error
+	events   []*notification.BreakGlassEvent
+}
+
+func (m *mockBreakGlassNotifier) NotifyBreakGlass(ctx context.Context, event *notification.BreakGlassEvent) error {
+	m.events = append(m.events, event)
+	if m.notifyFn != nil {
+		return m.notifyFn(ctx, event)
+	}
+	return nil
+}
+
 // testableBreakGlassCommandOutput contains test output for break-glass command.
 type testableBreakGlassCommandOutput struct {
 	Event *breakglass.BreakGlassEvent
@@ -192,6 +207,14 @@ func testableBreakGlassCommand(ctx context.Context, input BreakGlassCommandInput
 	if input.Logger != nil {
 		entry := logging.NewBreakGlassLogEntry(logging.BreakGlassEventInvoked, event)
 		input.Logger.LogBreakGlass(entry)
+	}
+
+	// 11. Fire notification if Notifier is provided
+	// Notification errors are logged but don't fail the command (security alerts are best-effort)
+	if input.Notifier != nil {
+		bgEvent := notification.NewBreakGlassEvent(notification.EventBreakGlassInvoked, event, username)
+		// In tests, we capture the error but don't fail - mirrors production behavior
+		_ = input.Notifier.NotifyBreakGlass(ctx, bgEvent)
 	}
 
 	return &testableBreakGlassCommandOutput{
@@ -940,5 +963,154 @@ func TestBreakGlassCommand_NoLoggingWhenLoggerNil(t *testing.T) {
 	}
 	if storedEvent.Status != breakglass.StatusActive {
 		t.Errorf("expected status 'active', got '%s'", storedEvent.Status)
+	}
+}
+
+// ============================================================================
+// Notification Integration
+// ============================================================================
+
+func TestBreakGlassCommand_NotifiesOnInvocation(t *testing.T) {
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	notifier := &mockBreakGlassNotifier{}
+
+	input := BreakGlassCommandInput{
+		ProfileName:   "production",
+		Duration:      2 * time.Hour,
+		ReasonCode:    "incident",
+		Justification: "Production incident requiring emergency access",
+		Store:         store,
+		Notifier:      notifier,
+	}
+
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify notification was sent
+	if len(notifier.events) != 1 {
+		t.Fatalf("expected 1 notification event, got %d", len(notifier.events))
+	}
+
+	event := notifier.events[0]
+
+	// Verify event type
+	if event.Type != notification.EventBreakGlassInvoked {
+		t.Errorf("expected event type %q, got %q", notification.EventBreakGlassInvoked, event.Type)
+	}
+
+	// Verify break-glass event matches
+	if event.BreakGlass.ID != output.Event.ID {
+		t.Errorf("expected break-glass ID %q, got %q", output.Event.ID, event.BreakGlass.ID)
+	}
+	if event.BreakGlass.Profile != "production" {
+		t.Errorf("expected profile %q, got %q", "production", event.BreakGlass.Profile)
+	}
+
+	// Verify actor is current user
+	currentUser, _ := user.Current()
+	if event.Actor != currentUser.Username {
+		t.Errorf("expected actor %q, got %q", currentUser.Username, event.Actor)
+	}
+
+	// Verify timestamp is set
+	if event.Timestamp.IsZero() {
+		t.Error("expected timestamp to be set")
+	}
+
+	_ = storedEvent
+}
+
+func TestBreakGlassCommand_NotificationErrorDoesNotFail(t *testing.T) {
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	notifier := &mockBreakGlassNotifier{
+		notifyFn: func(ctx context.Context, event *notification.BreakGlassEvent) error {
+			return errors.New("notification delivery failed")
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:   "production",
+		Duration:      1 * time.Hour,
+		ReasonCode:    "security",
+		Justification: "Security incident requiring immediate access",
+		Store:         store,
+		Notifier:      notifier,
+	}
+
+	// Command should succeed even when notification fails
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("command should not fail when notification fails: %v", err)
+	}
+
+	// Verify event was still created
+	if output == nil || output.Event == nil {
+		t.Fatal("expected event to be created")
+	}
+	if storedEvent == nil {
+		t.Fatal("expected event to be stored")
+	}
+
+	// Verify notification was attempted
+	if len(notifier.events) != 1 {
+		t.Fatalf("expected 1 notification attempt, got %d", len(notifier.events))
+	}
+}
+
+func TestBreakGlassCommand_NilNotifierDoesNotPanic(t *testing.T) {
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:   "test-profile",
+		Duration:      1 * time.Hour,
+		ReasonCode:    "maintenance",
+		Justification: "Testing break-glass without notifier",
+		Store:         store,
+		Notifier:      nil, // Explicitly nil
+	}
+
+	// Should not panic with nil notifier
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error with nil notifier: %v", err)
+	}
+
+	// Verify command succeeded
+	if output == nil || output.Event == nil {
+		t.Fatal("expected event to be created")
+	}
+	if storedEvent == nil {
+		t.Fatal("expected event to be stored")
 	}
 }

@@ -29,9 +29,9 @@ type BreakGlassCommandInput struct {
 	// If nil, a DynamoDB store will be created using the BreakGlassTable and Region.
 	Store breakglass.Store
 
-	// Notifier is an optional Notifier for sending notifications on break-glass invocation.
-	// If nil, no notifications are sent.
-	Notifier notification.Notifier
+	// Notifier is an optional BreakGlassNotifier for sending notifications on break-glass invocation.
+	// If nil, no notifications are sent. Notification errors are logged but don't fail the command.
+	Notifier notification.BreakGlassNotifier
 
 	// Logger is an optional Logger for audit trail logging.
 	// If nil, no break-glass events are logged.
@@ -183,7 +183,16 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 		input.Logger.LogBreakGlass(entry)
 	}
 
-	// 11. Output success JSON
+	// 11. Fire notification if Notifier is provided
+	// Notification errors are logged but don't fail the command (security alerts are best-effort)
+	if input.Notifier != nil {
+		bgEvent := notification.NewBreakGlassEvent(notification.EventBreakGlassInvoked, event, username)
+		if err := input.Notifier.NotifyBreakGlass(ctx, bgEvent); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to send break-glass notification: %v\n", err)
+		}
+	}
+
+	// 12. Output success JSON
 	output := BreakGlassCommandOutput{
 		EventID:    event.ID,
 		Profile:    event.Profile,
