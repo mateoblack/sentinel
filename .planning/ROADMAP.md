@@ -111,10 +111,10 @@ Plans:
 **Goal**: Approver actions with request validation and signature verification
 **Depends on**: Phase 21
 **Research**: Unlikely (extends existing CLI patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 22-01: TBD
+- [ ] 22-01: Approve/deny commands with state transitions and tests
 
 #### Phase 23: Request Integration
 
