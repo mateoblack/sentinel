@@ -11,6 +11,7 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/request"
 )
@@ -29,6 +30,10 @@ type DenyCommandInput struct {
 	// Notifier is an optional Notifier for sending notifications on denial.
 	// If nil, no notifications are sent. If set, the store is wrapped with NotifyStore.
 	Notifier notification.Notifier
+
+	// Logger is an optional Logger for audit trail logging.
+	// If nil, no approval events are logged.
+	Logger logging.Logger
 }
 
 // DenyCommandOutput represents the JSON output from the deny command.
@@ -142,7 +147,13 @@ func DenyCommand(ctx context.Context, input DenyCommandInput) error {
 		return err
 	}
 
-	// 8. Output success JSON
+	// 8. Log denial event if Logger is provided
+	if input.Logger != nil {
+		entry := logging.NewApprovalLogEntry(notification.EventRequestDenied, req, approver)
+		input.Logger.LogApproval(entry)
+	}
+
+	// 9. Output success JSON
 	output := DenyCommandOutput{
 		ID:              req.ID,
 		Profile:         req.Profile,

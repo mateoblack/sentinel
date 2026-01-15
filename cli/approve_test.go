@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
@@ -65,7 +67,13 @@ func testableApproveCommand(ctx context.Context, input ApproveCommandInput) (*Ap
 		return nil, err
 	}
 
-	// 9. Return output
+	// 9. Log approval event if Logger is provided
+	if input.Logger != nil {
+		entry := logging.NewApprovalLogEntry(notification.EventRequestApproved, req, approver)
+		input.Logger.LogApproval(entry)
+	}
+
+	// 10. Return output
 	return &ApproveCommandOutput{
 		ID:              req.ID,
 		Profile:         req.Profile,
@@ -585,5 +593,115 @@ func TestApproveCommand_Policy_NoRuleMatchesProfile(t *testing.T) {
 	}
 	if updatedReq == nil {
 		t.Fatal("expected request to be updated")
+	}
+}
+
+// Tests for approval logging
+
+func TestApproveCommand_Logger_LogsApprovedEvent(t *testing.T) {
+	currentUser, _ := user.Current()
+	now := time.Now()
+	pendingReq := &request.Request{
+		ID:            "abc123def4567890",
+		Requester:     "alice",
+		Profile:       "production",
+		Justification: "Investigating incident INC-12345",
+		Duration:      2 * time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     now.Add(-1 * time.Hour),
+		UpdatedAt:     now.Add(-1 * time.Hour),
+		ExpiresAt:     now.Add(23 * time.Hour),
+	}
+
+	store := &mockStore{
+		getFn: func(ctx context.Context, id string) (*request.Request, error) {
+			return pendingReq, nil
+		},
+		updateFn: func(ctx context.Context, req *request.Request) error {
+			return nil
+		},
+	}
+
+	logger := &mockLogger{}
+
+	input := ApproveCommandInput{
+		RequestID: "abc123def4567890",
+		Comment:   "Approved for maintenance window",
+		Store:     store,
+		Logger:    logger,
+	}
+
+	output, err := testableApproveCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify output
+	if output.Status != "approved" {
+		t.Errorf("expected status approved, got %s", output.Status)
+	}
+
+	// Verify logger received the approved event
+	if len(logger.approvalEntries) != 1 {
+		t.Fatalf("expected 1 approval log entry, got %d", len(logger.approvalEntries))
+	}
+
+	entry := logger.approvalEntries[0]
+	if entry.Event != string(notification.EventRequestApproved) {
+		t.Errorf("expected event %q, got %q", notification.EventRequestApproved, entry.Event)
+	}
+	if entry.RequestID != "abc123def4567890" {
+		t.Errorf("expected request ID %q, got %q", "abc123def4567890", entry.RequestID)
+	}
+	if entry.Profile != "production" {
+		t.Errorf("expected profile %q, got %q", "production", entry.Profile)
+	}
+	if entry.Status != string(request.StatusApproved) {
+		t.Errorf("expected status %q, got %q", request.StatusApproved, entry.Status)
+	}
+	if entry.Actor != currentUser.Username {
+		t.Errorf("expected actor %q, got %q", currentUser.Username, entry.Actor)
+	}
+	if entry.Approver != currentUser.Username {
+		t.Errorf("expected approver %q, got %q", currentUser.Username, entry.Approver)
+	}
+	if entry.ApproverComment != "Approved for maintenance window" {
+		t.Errorf("expected comment %q, got %q", "Approved for maintenance window", entry.ApproverComment)
+	}
+}
+
+func TestApproveCommand_NoLogger_NoPanic(t *testing.T) {
+	now := time.Now()
+	pendingReq := &request.Request{
+		ID:            "abc123def4567890",
+		Requester:     "alice",
+		Profile:       "production",
+		Justification: "Investigating incident INC-12345",
+		Duration:      2 * time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     now.Add(-1 * time.Hour),
+		UpdatedAt:     now.Add(-1 * time.Hour),
+		ExpiresAt:     now.Add(23 * time.Hour),
+	}
+
+	store := &mockStore{
+		getFn: func(ctx context.Context, id string) (*request.Request, error) {
+			return pendingReq, nil
+		},
+		updateFn: func(ctx context.Context, req *request.Request) error {
+			return nil
+		},
+	}
+
+	input := ApproveCommandInput{
+		RequestID: "abc123def4567890",
+		Store:     store,
+		// Logger is nil
+	}
+
+	// Should not panic when Logger is nil
+	_, err := testableApproveCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

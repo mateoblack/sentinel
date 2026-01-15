@@ -11,6 +11,7 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
@@ -34,6 +35,10 @@ type ApproveCommandInput struct {
 	// ApprovalPolicy is an optional approval policy for approver authorization.
 	// If nil, any user can approve any request.
 	ApprovalPolicy *policy.ApprovalPolicy
+
+	// Logger is an optional Logger for audit trail logging.
+	// If nil, no approval events are logged.
+	Logger logging.Logger
 }
 
 // ApproveCommandOutput represents the JSON output from the approve command.
@@ -160,7 +165,13 @@ func ApproveCommand(ctx context.Context, input ApproveCommandInput) error {
 		return err
 	}
 
-	// 9. Output success JSON
+	// 9. Log approval event if Logger is provided
+	if input.Logger != nil {
+		entry := logging.NewApprovalLogEntry(notification.EventRequestApproved, req, approver)
+		input.Logger.LogApproval(entry)
+	}
+
+	// 10. Output success JSON
 	output := ApproveCommandOutput{
 		ID:              req.ID,
 		Profile:         req.Profile,

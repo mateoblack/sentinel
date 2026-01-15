@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
@@ -52,7 +54,13 @@ func testableDenyCommand(ctx context.Context, input DenyCommandInput) (*DenyComm
 		return nil, err
 	}
 
-	// 8. Return output
+	// 8. Log denial event if Logger is provided
+	if input.Logger != nil {
+		entry := logging.NewApprovalLogEntry(notification.EventRequestDenied, req, approver)
+		input.Logger.LogApproval(entry)
+	}
+
+	// 9. Return output
 	return &DenyCommandOutput{
 		ID:              req.ID,
 		Profile:         req.Profile,
@@ -358,5 +366,115 @@ func TestDenyCommand_ConcurrentModification(t *testing.T) {
 
 	if !errors.Is(err, request.ErrConcurrentModification) {
 		t.Errorf("expected ErrConcurrentModification, got: %v", err)
+	}
+}
+
+// Tests for denial logging
+
+func TestDenyCommand_Logger_LogsDeniedEvent(t *testing.T) {
+	currentUser, _ := user.Current()
+	now := time.Now()
+	pendingReq := &request.Request{
+		ID:            "abc123def4567890",
+		Requester:     "alice",
+		Profile:       "production",
+		Justification: "Investigating incident INC-12345",
+		Duration:      2 * time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     now.Add(-1 * time.Hour),
+		UpdatedAt:     now.Add(-1 * time.Hour),
+		ExpiresAt:     now.Add(23 * time.Hour),
+	}
+
+	store := &mockStore{
+		getFn: func(ctx context.Context, id string) (*request.Request, error) {
+			return pendingReq, nil
+		},
+		updateFn: func(ctx context.Context, req *request.Request) error {
+			return nil
+		},
+	}
+
+	logger := &mockLogger{}
+
+	input := DenyCommandInput{
+		RequestID: "abc123def4567890",
+		Comment:   "Insufficient justification provided",
+		Store:     store,
+		Logger:    logger,
+	}
+
+	output, err := testableDenyCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify output
+	if output.Status != "denied" {
+		t.Errorf("expected status denied, got %s", output.Status)
+	}
+
+	// Verify logger received the denied event
+	if len(logger.approvalEntries) != 1 {
+		t.Fatalf("expected 1 approval log entry, got %d", len(logger.approvalEntries))
+	}
+
+	entry := logger.approvalEntries[0]
+	if entry.Event != string(notification.EventRequestDenied) {
+		t.Errorf("expected event %q, got %q", notification.EventRequestDenied, entry.Event)
+	}
+	if entry.RequestID != "abc123def4567890" {
+		t.Errorf("expected request ID %q, got %q", "abc123def4567890", entry.RequestID)
+	}
+	if entry.Profile != "production" {
+		t.Errorf("expected profile %q, got %q", "production", entry.Profile)
+	}
+	if entry.Status != string(request.StatusDenied) {
+		t.Errorf("expected status %q, got %q", request.StatusDenied, entry.Status)
+	}
+	if entry.Actor != currentUser.Username {
+		t.Errorf("expected actor %q, got %q", currentUser.Username, entry.Actor)
+	}
+	if entry.Approver != currentUser.Username {
+		t.Errorf("expected approver %q, got %q", currentUser.Username, entry.Approver)
+	}
+	if entry.ApproverComment != "Insufficient justification provided" {
+		t.Errorf("expected comment %q, got %q", "Insufficient justification provided", entry.ApproverComment)
+	}
+}
+
+func TestDenyCommand_NoLogger_NoPanic(t *testing.T) {
+	now := time.Now()
+	pendingReq := &request.Request{
+		ID:            "abc123def4567890",
+		Requester:     "alice",
+		Profile:       "production",
+		Justification: "Investigating incident INC-12345",
+		Duration:      2 * time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     now.Add(-1 * time.Hour),
+		UpdatedAt:     now.Add(-1 * time.Hour),
+		ExpiresAt:     now.Add(23 * time.Hour),
+	}
+
+	store := &mockStore{
+		getFn: func(ctx context.Context, id string) (*request.Request, error) {
+			return pendingReq, nil
+		},
+		updateFn: func(ctx context.Context, req *request.Request) error {
+			return nil
+		},
+	}
+
+	input := DenyCommandInput{
+		RequestID: "abc123def4567890",
+		Store:     store,
+		// Logger is nil
+	}
+
+	// Should not panic when Logger is nil
+	_, err := testableDenyCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
