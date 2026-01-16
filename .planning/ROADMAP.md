@@ -9,7 +9,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.0 MVP** - [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md) (Phases 1-8, shipped 2026-01-14)
 - ✅ **v1.1 Sentinel Fingerprint** - [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) (Phases 9-17, shipped 2026-01-15)
 - ✅ **v1.2 Approval Workflows** - [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) (Phases 18-26, shipped 2026-01-15)
-- ✅ **v1.3 Break-Glass** - [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) (Phases 27-34, shipped 2026-01-16)
+- ✅ **v1.3 Break-Glass** — [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) (Phases 27-34, shipped 2026-01-16)
 
 ## Completed Milestones
 
@@ -167,96 +167,19 @@ Plans:
 
 </details>
 
-### ✅ v1.3 Break-Glass — SHIPPED 2026-01-16
+<details>
+<summary>✅ v1.3 Break-Glass (Phases 27-34) — SHIPPED 2026-01-16</summary>
 
-**Milestone Goal:** Emergency access bypass with enhanced audit, time-bounded sessions, and immediate security notifications.
+- [x] Phase 27: Break-Glass Schema (1/1 plans) — completed 2026-01-15
+- [x] Phase 28: Break-Glass Command (2/2 plans) — completed 2026-01-15
+- [x] Phase 29: Elevated Audit (2/2 plans) — completed 2026-01-15
+- [x] Phase 30: Time-Bounded Sessions (2/2 plans) — completed 2026-01-15
+- [x] Phase 31: Notification Blast (2/2 plans) — completed 2026-01-15
+- [x] Phase 32: Post-Incident Review (2/2 plans) — completed 2026-01-15
+- [x] Phase 33: Rate Limiting (2/2 plans) — completed 2026-01-15
+- [x] Phase 34: Break-Glass Policies (2/2 plans) — completed 2026-01-16
 
-#### Phase 27: Break-Glass Schema
-
-**Goal**: Define emergency access model with reason codes, expiry, and validation
-**Depends on**: v1.2 complete
-**Research**: Unlikely (extends existing types)
-**Plans**: 1
-
-Plans:
-- [x] 27-01: Break-glass types with state machine and validation — completed 2026-01-15
-
-#### Phase 28: Break-Glass Command
-
-**Goal**: CLI command to invoke emergency access with mandatory justification
-**Depends on**: Phase 27
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 2
-
-Plans:
-- [x] 28-01: Break-glass storage layer with Store interface and DynamoDB — completed 2026-01-15
-- [x] 28-02: Break-glass CLI command — completed 2026-01-15
-
-#### Phase 29: Elevated Audit
-
-**Goal**: Enhanced logging with mandatory justification and incident correlation
-**Depends on**: Phase 28
-**Research**: Unlikely (extends existing logging)
-**Plans**: 2
-
-Plans:
-- [x] 29-01: Break-glass audit logging infrastructure — completed 2026-01-15
-- [x] 29-02: CLI break-glass logging integration — completed 2026-01-15
-
-#### Phase 30: Time-Bounded Sessions
-
-**Goal**: Automatic credential expiry and renewal limits for break-glass access
-**Depends on**: Phase 29
-**Research**: Unlikely (extends existing credential handling)
-**Plans**: TBD
-
-Plans:
-- [x] 30-01: Break-glass checker function with FindActiveBreakGlass — completed 2026-01-15
-- [x] 30-02: Break-glass credential integration with duration capping — completed 2026-01-15
-
-#### Phase 31: Notification Blast
-
-**Goal**: Immediate alerts to security team on break-glass invocation
-**Depends on**: Phase 30
-**Research**: Unlikely (reuses v1.2 notification infrastructure)
-**Plans**: 2
-
-Plans:
-- [x] 31-01: Break-glass notification types and BreakGlassEvent struct — completed 2026-01-15
-- [x] 31-02: BreakGlassNotifier interface and CLI integration — completed 2026-01-15
-
-#### Phase 32: Post-Incident Review
-
-**Goal**: Commands to list, review, and close break-glass events
-**Depends on**: Phase 31
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 2
-
-Plans:
-- [x] 32-01: breakglass-list and breakglass-check commands — completed 2026-01-15
-- [x] 32-02: breakglass-close command with notifications/logging — completed 2026-01-15
-
-#### Phase 33: Rate Limiting
-
-**Goal**: Prevent break-glass abuse with cooldowns, quotas, and escalation
-**Depends on**: Phase 32
-**Research**: Unlikely (internal design)
-**Plans**: 2
-
-Plans:
-- [x] 33-01: Rate limit types, validation, and Store count methods — completed 2026-01-15
-- [x] 33-02: Rate limit checker and CLI integration — completed 2026-01-15
-
-#### Phase 34: Break-Glass Policies
-
-**Goal**: Policy rules for who can invoke break-glass and under what conditions
-**Depends on**: Phase 33
-**Research**: Unlikely (extends existing policy schema)
-**Plans**: 2
-
-Plans:
-- [x] 34-01: Break-glass policy types with validation and matching — completed 2026-01-16
-- [x] 34-02: CLI break-glass policy integration — completed 2026-01-16
+</details>
 
 ## Progress (All Milestones)
 
@@ -265,11 +188,4 @@ Plans:
 | 1-8 | v1.0 | 16/16 | Complete | 2026-01-14 |
 | 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
 | 18-26 | v1.2 | 17/17 | Complete | 2026-01-15 |
-| 27. Break-Glass Schema | v1.3 | 1/1 | Complete | 2026-01-15 |
-| 28. Break-Glass Command | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 29. Elevated Audit | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 30. Time-Bounded Sessions | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 31. Notification Blast | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 32. Post-Incident Review | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 33. Rate Limiting | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 34. Break-Glass Policies | v1.3 | 2/2 | Complete | 2026-01-16 |
+| 27-34 | v1.3 | 15/15 | Complete | 2026-01-16 |

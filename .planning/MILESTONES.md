@@ -1,5 +1,33 @@
 # Project Milestones: Sentinel
 
+## v1.3 Break-Glass (Shipped: 2026-01-16)
+
+**Delivered:** Emergency access bypass with mandatory justification, time-bounded sessions, rate limiting, and immediate security notifications for incident response.
+
+**Phases completed:** 27-34 (15 plans total)
+
+**Key accomplishments:**
+- Break-glass event model with state machine (active → closed/expired) and reason codes
+- DynamoDB storage with access stacking prevention (one active event per user/profile)
+- Elevated audit logging with BreakGlassLogEntry for comprehensive incident records
+- Time-bounded sessions with automatic duration capping to remaining break-glass time
+- Immediate SNS/Webhook notifications for security team awareness
+- Post-incident review commands: breakglass-list, breakglass-check, breakglass-close
+- Rate limiting with cooldowns, per-user/per-profile quotas, and escalation thresholds
+- Break-glass policies controlling who can invoke emergency access and under what conditions
+
+**Stats:**
+- 66 files created/modified
+- 35,726 lines of Go (total codebase)
+- 8 phases, 15 plans, ~40 tasks
+- 1 day from v1.2 to v1.3
+
+**Git range:** `feat(27-01)` → `feat(34-02)`
+
+**What's next:** Consider multi-account policy federation, policy versioning, or UI dashboard for v2.0
+
+---
+
 ## v1.2 Approval Workflows (Shipped: 2026-01-15)
 
 **Delivered:** Request/approve flow for sensitive access with DynamoDB state machine, SNS/Webhook notification hooks, and approval policies with auto-approve conditions.
