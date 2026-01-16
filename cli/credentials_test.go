@@ -699,6 +699,18 @@ func (m *mockCredentialsBreakGlassStore) FindActiveByInvokerAndProfile(ctx conte
 	return nil, nil
 }
 
+func (m *mockCredentialsBreakGlassStore) CountByInvokerSince(ctx context.Context, invoker string, since time.Time) (int, error) {
+	return 0, nil
+}
+
+func (m *mockCredentialsBreakGlassStore) CountByProfileSince(ctx context.Context, profile string, since time.Time) (int, error) {
+	return 0, nil
+}
+
+func (m *mockCredentialsBreakGlassStore) GetLastByInvokerAndProfile(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+	return nil, nil
+}
+
 func TestCredentialsCommandInput_BreakGlassStoreField(t *testing.T) {
 	// Test that CredentialsCommandInput has the BreakGlassStore field
 	t.Run("BreakGlassStore field is nil by default", func(t *testing.T) {

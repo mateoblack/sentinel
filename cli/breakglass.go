@@ -36,6 +36,10 @@ type BreakGlassCommandInput struct {
 	// Logger is an optional Logger for audit trail logging.
 	// If nil, no break-glass events are logged.
 	Logger logging.Logger
+
+	// RateLimitPolicy is an optional policy for rate limiting break-glass invocations.
+	// If nil, no rate limiting is enforced.
+	RateLimitPolicy *breakglass.RateLimitPolicy
 }
 
 // BreakGlassCommandOutput represents the JSON output from the breakglass command.
@@ -146,6 +150,27 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 			existingEvent.ID, existingEvent.ExpiresAt.Format(time.RFC3339))
 		fmt.Fprintf(os.Stderr, "%s\n", errMsg)
 		return errors.New("active break-glass already exists for this profile")
+	}
+
+	// 6.5 Check rate limits if policy is provided
+	if input.RateLimitPolicy != nil {
+		result, err := breakglass.CheckRateLimit(ctx, store, input.RateLimitPolicy, username, input.ProfileName, time.Now())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to check rate limits: %v\n", err)
+			return err
+		}
+		if !result.Allowed {
+			errMsg := fmt.Sprintf("Break-glass rate limited: %s", result.Reason)
+			if result.RetryAfter > 0 {
+				errMsg += fmt.Sprintf(" (retry after %v)", result.RetryAfter.Round(time.Second))
+			}
+			fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+			return errors.New("rate limit exceeded")
+		}
+		// If escalation threshold reached, emit warning (notification handled elsewhere)
+		if result.ShouldEscalate {
+			fmt.Fprintf(os.Stderr, "Warning: break-glass usage approaching escalation threshold\n")
+		}
 	}
 
 	// 7. Build BreakGlassEvent struct

@@ -15,14 +15,17 @@ import (
 
 // mockBreakGlassStore implements breakglass.Store for testing.
 type mockBreakGlassStore struct {
-	createFn                      func(ctx context.Context, event *breakglass.BreakGlassEvent) error
-	getFn                         func(ctx context.Context, id string) (*breakglass.BreakGlassEvent, error)
-	updateFn                      func(ctx context.Context, event *breakglass.BreakGlassEvent) error
-	deleteFn                      func(ctx context.Context, id string) error
-	listByInvokerFn               func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error)
-	listByStatusFn                func(ctx context.Context, status breakglass.BreakGlassStatus, limit int) ([]*breakglass.BreakGlassEvent, error)
-	listByProfileFn               func(ctx context.Context, profile string, limit int) ([]*breakglass.BreakGlassEvent, error)
+	createFn                        func(ctx context.Context, event *breakglass.BreakGlassEvent) error
+	getFn                           func(ctx context.Context, id string) (*breakglass.BreakGlassEvent, error)
+	updateFn                        func(ctx context.Context, event *breakglass.BreakGlassEvent) error
+	deleteFn                        func(ctx context.Context, id string) error
+	listByInvokerFn                 func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error)
+	listByStatusFn                  func(ctx context.Context, status breakglass.BreakGlassStatus, limit int) ([]*breakglass.BreakGlassEvent, error)
+	listByProfileFn                 func(ctx context.Context, profile string, limit int) ([]*breakglass.BreakGlassEvent, error)
 	findActiveByInvokerAndProfileFn func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error)
+	countByInvokerSinceFn           func(ctx context.Context, invoker string, since time.Time) (int, error)
+	countByProfileSinceFn           func(ctx context.Context, profile string, since time.Time) (int, error)
+	getLastByInvokerAndProfileFn    func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error)
 }
 
 func (m *mockBreakGlassStore) Create(ctx context.Context, event *breakglass.BreakGlassEvent) error {
@@ -77,6 +80,27 @@ func (m *mockBreakGlassStore) ListByProfile(ctx context.Context, profile string,
 func (m *mockBreakGlassStore) FindActiveByInvokerAndProfile(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
 	if m.findActiveByInvokerAndProfileFn != nil {
 		return m.findActiveByInvokerAndProfileFn(ctx, invoker, profile)
+	}
+	return nil, nil
+}
+
+func (m *mockBreakGlassStore) CountByInvokerSince(ctx context.Context, invoker string, since time.Time) (int, error) {
+	if m.countByInvokerSinceFn != nil {
+		return m.countByInvokerSinceFn(ctx, invoker, since)
+	}
+	return 0, nil
+}
+
+func (m *mockBreakGlassStore) CountByProfileSince(ctx context.Context, profile string, since time.Time) (int, error) {
+	if m.countByProfileSinceFn != nil {
+		return m.countByProfileSinceFn(ctx, profile, since)
+	}
+	return 0, nil
+}
+
+func (m *mockBreakGlassStore) GetLastByInvokerAndProfile(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+	if m.getLastByInvokerAndProfileFn != nil {
+		return m.getLastByInvokerAndProfileFn(ctx, invoker, profile)
 	}
 	return nil, nil
 }
@@ -174,6 +198,18 @@ func testableBreakGlassCommand(ctx context.Context, input BreakGlassCommandInput
 	}
 	if existingEvent != nil {
 		return nil, errors.New("active break-glass already exists for this profile")
+	}
+
+	// 6.5 Check rate limits if policy is provided
+	if input.RateLimitPolicy != nil {
+		result, err := breakglass.CheckRateLimit(ctx, store, input.RateLimitPolicy, username, input.ProfileName, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		if !result.Allowed {
+			return nil, errors.New("rate limit exceeded: " + result.Reason)
+		}
+		// Escalation warning handled silently in tests
 	}
 
 	// 7. Build BreakGlassEvent struct
@@ -1107,6 +1143,207 @@ func TestBreakGlassCommand_NilNotifierDoesNotPanic(t *testing.T) {
 	}
 
 	// Verify command succeeded
+	if output == nil || output.Event == nil {
+		t.Fatal("expected event to be created")
+	}
+	if storedEvent == nil {
+		t.Fatal("expected event to be stored")
+	}
+}
+
+// ============================================================================
+// Rate Limiting Integration
+// ============================================================================
+
+func TestBreakGlassCommand_RateLimitBlocked_Cooldown(t *testing.T) {
+	now := time.Now()
+	lastEventTime := now.Add(-30 * time.Minute) // Recent event, cooldown not elapsed
+
+	store := &mockBreakGlassStore{
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil // No active event
+		},
+		getLastByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return &breakglass.BreakGlassEvent{
+				ID:        "last001",
+				Invoker:   invoker,
+				Profile:   profile,
+				CreatedAt: lastEventTime,
+			}, nil
+		},
+	}
+
+	policy := &breakglass.RateLimitPolicy{
+		Version: "1",
+		Rules: []breakglass.RateLimitRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Cooldown: time.Hour, // 1 hour cooldown
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "production",
+		Duration:        1 * time.Hour,
+		ReasonCode:      "incident",
+		Justification:   "Testing rate limit cooldown blocking",
+		Store:           store,
+		RateLimitPolicy: policy,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err == nil {
+		t.Fatal("expected error when rate limited by cooldown")
+	}
+	if !strings.Contains(err.Error(), "rate limit exceeded") {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "cooldown period not elapsed") {
+		t.Errorf("expected cooldown reason, got: %v", err)
+	}
+}
+
+func TestBreakGlassCommand_RateLimitBlocked_Quota(t *testing.T) {
+	store := &mockBreakGlassStore{
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil // No active event
+		},
+		countByInvokerSinceFn: func(ctx context.Context, invoker string, since time.Time) (int, error) {
+			return 5, nil // At quota limit
+		},
+	}
+
+	policy := &breakglass.RateLimitPolicy{
+		Version: "1",
+		Rules: []breakglass.RateLimitRule{
+			{
+				Name:        "production",
+				Profiles:    []string{"production"},
+				MaxPerUser:  5,
+				QuotaWindow: 24 * time.Hour,
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "production",
+		Duration:        1 * time.Hour,
+		ReasonCode:      "incident",
+		Justification:   "Testing rate limit quota blocking",
+		Store:           store,
+		RateLimitPolicy: policy,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err == nil {
+		t.Fatal("expected error when rate limited by quota")
+	}
+	if !strings.Contains(err.Error(), "rate limit exceeded") {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "user quota exceeded") {
+		t.Errorf("expected user quota reason, got: %v", err)
+	}
+}
+
+func TestBreakGlassCommand_RateLimitAllowed(t *testing.T) {
+	now := time.Now()
+	lastEventTime := now.Add(-2 * time.Hour) // Well past cooldown
+
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil // No active event
+		},
+		getLastByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return &breakglass.BreakGlassEvent{
+				ID:        "last001",
+				Invoker:   invoker,
+				Profile:   profile,
+				CreatedAt: lastEventTime,
+			}, nil
+		},
+		countByInvokerSinceFn: func(ctx context.Context, invoker string, since time.Time) (int, error) {
+			return 2, nil // Under quota
+		},
+		countByProfileSinceFn: func(ctx context.Context, profile string, since time.Time) (int, error) {
+			return 3, nil // Under quota
+		},
+	}
+
+	policy := &breakglass.RateLimitPolicy{
+		Version: "1",
+		Rules: []breakglass.RateLimitRule{
+			{
+				Name:          "production",
+				Profiles:      []string{"production"},
+				Cooldown:      time.Hour,
+				MaxPerUser:    5,
+				MaxPerProfile: 10,
+				QuotaWindow:   24 * time.Hour,
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "production",
+		Duration:        1 * time.Hour,
+		ReasonCode:      "incident",
+		Justification:   "Testing rate limit allowed with all checks passing",
+		Store:           store,
+		RateLimitPolicy: policy,
+	}
+
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify event was created
+	if output == nil || output.Event == nil {
+		t.Fatal("expected event to be created")
+	}
+	if storedEvent == nil {
+		t.Fatal("expected event to be stored")
+	}
+	if storedEvent.Profile != "production" {
+		t.Errorf("expected profile 'production', got '%s'", storedEvent.Profile)
+	}
+}
+
+func TestBreakGlassCommand_NilRateLimitPolicy(t *testing.T) {
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "test-profile",
+		Duration:        1 * time.Hour,
+		ReasonCode:      "incident",
+		Justification:   "Testing break-glass without rate limit policy",
+		Store:           store,
+		RateLimitPolicy: nil, // Explicitly nil
+	}
+
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error with nil rate limit policy: %v", err)
+	}
+
+	// Verify command succeeded without rate limit checks
 	if output == nil || output.Event == nil {
 		t.Fatal("expected event to be created")
 	}
