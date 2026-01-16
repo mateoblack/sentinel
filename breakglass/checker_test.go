@@ -7,9 +7,12 @@ import (
 	"time"
 )
 
-// mockCheckerStore implements Store interface for testing FindActiveBreakGlass.
+// mockCheckerStore implements Store interface for testing break-glass checker functions.
 type mockCheckerStore struct {
-	listByInvokerFunc func(ctx context.Context, invoker string, limit int) ([]*BreakGlassEvent, error)
+	listByInvokerFunc             func(ctx context.Context, invoker string, limit int) ([]*BreakGlassEvent, error)
+	countByInvokerSinceFunc       func(ctx context.Context, invoker string, since time.Time) (int, error)
+	countByProfileSinceFunc       func(ctx context.Context, profile string, since time.Time) (int, error)
+	getLastByInvokerAndProfileFunc func(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error)
 }
 
 func (m *mockCheckerStore) Create(ctx context.Context, event *BreakGlassEvent) error {
@@ -48,14 +51,23 @@ func (m *mockCheckerStore) FindActiveByInvokerAndProfile(ctx context.Context, in
 }
 
 func (m *mockCheckerStore) CountByInvokerSince(ctx context.Context, invoker string, since time.Time) (int, error) {
+	if m.countByInvokerSinceFunc != nil {
+		return m.countByInvokerSinceFunc(ctx, invoker, since)
+	}
 	return 0, nil
 }
 
 func (m *mockCheckerStore) CountByProfileSince(ctx context.Context, profile string, since time.Time) (int, error) {
+	if m.countByProfileSinceFunc != nil {
+		return m.countByProfileSinceFunc(ctx, profile, since)
+	}
 	return 0, nil
 }
 
 func (m *mockCheckerStore) GetLastByInvokerAndProfile(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+	if m.getLastByInvokerAndProfileFunc != nil {
+		return m.getLastByInvokerAndProfileFunc(ctx, invoker, profile)
+	}
 	return nil, nil
 }
 
@@ -413,5 +425,467 @@ func TestIsBreakGlassValid(t *testing.T) {
 				t.Errorf("isBreakGlassValid() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// ============================================================================
+// CheckRateLimit Tests
+// ============================================================================
+
+// TestCheckRateLimit_NilPolicy tests that nil policy returns allowed.
+func TestCheckRateLimit_NilPolicy(t *testing.T) {
+	store := &mockCheckerStore{}
+	now := time.Now()
+
+	result, err := CheckRateLimit(context.Background(), store, nil, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if !result.Allowed {
+		t.Error("CheckRateLimit() with nil policy should be allowed")
+	}
+}
+
+// TestCheckRateLimit_NoMatchingRule tests that no matching rule returns allowed.
+func TestCheckRateLimit_NoMatchingRule(t *testing.T) {
+	store := &mockCheckerStore{}
+	now := time.Now()
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "staging-only",
+				Profiles: []string{"staging"},
+				Cooldown: time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if !result.Allowed {
+		t.Error("CheckRateLimit() with no matching rule should be allowed")
+	}
+}
+
+// TestCheckRateLimit_CooldownBlocked tests blocking when cooldown hasn't elapsed.
+func TestCheckRateLimit_CooldownBlocked(t *testing.T) {
+	now := time.Now()
+	lastEventTime := now.Add(-30 * time.Minute) // 30 minutes ago
+
+	store := &mockCheckerStore{
+		getLastByInvokerAndProfileFunc: func(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+			return &BreakGlassEvent{
+				ID:        "last001",
+				Invoker:   invoker,
+				Profile:   profile,
+				CreatedAt: lastEventTime,
+			}, nil
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Cooldown: time.Hour, // 1 hour cooldown, only 30 min elapsed
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if result.Allowed {
+		t.Error("CheckRateLimit() should block when cooldown hasn't elapsed")
+	}
+	if result.Reason != "cooldown period not elapsed" {
+		t.Errorf("CheckRateLimit() Reason = %q, want %q", result.Reason, "cooldown period not elapsed")
+	}
+	// Should have approximately 30 minutes remaining
+	if result.RetryAfter < 25*time.Minute || result.RetryAfter > 35*time.Minute {
+		t.Errorf("CheckRateLimit() RetryAfter = %v, want approximately 30 minutes", result.RetryAfter)
+	}
+}
+
+// TestCheckRateLimit_CooldownElapsed tests allowing when cooldown has elapsed.
+func TestCheckRateLimit_CooldownElapsed(t *testing.T) {
+	now := time.Now()
+	lastEventTime := now.Add(-2 * time.Hour) // 2 hours ago
+
+	store := &mockCheckerStore{
+		getLastByInvokerAndProfileFunc: func(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+			return &BreakGlassEvent{
+				ID:        "last001",
+				Invoker:   invoker,
+				Profile:   profile,
+				CreatedAt: lastEventTime,
+			}, nil
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Cooldown: time.Hour, // 1 hour cooldown, 2 hours elapsed
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if !result.Allowed {
+		t.Error("CheckRateLimit() should allow when cooldown has elapsed")
+	}
+	if result.RetryAfter != 0 {
+		t.Errorf("CheckRateLimit() RetryAfter = %v, want 0", result.RetryAfter)
+	}
+}
+
+// TestCheckRateLimit_UserQuotaExceeded tests blocking when user quota is exceeded.
+func TestCheckRateLimit_UserQuotaExceeded(t *testing.T) {
+	now := time.Now()
+
+	store := &mockCheckerStore{
+		countByInvokerSinceFunc: func(ctx context.Context, invoker string, since time.Time) (int, error) {
+			return 5, nil // Already at limit
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:        "production",
+				Profiles:    []string{"production"},
+				MaxPerUser:  5,
+				QuotaWindow: 24 * time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if result.Allowed {
+		t.Error("CheckRateLimit() should block when user quota exceeded")
+	}
+	if result.Reason != "user quota exceeded" {
+		t.Errorf("CheckRateLimit() Reason = %q, want %q", result.Reason, "user quota exceeded")
+	}
+	if result.UserCount != 5 {
+		t.Errorf("CheckRateLimit() UserCount = %d, want 5", result.UserCount)
+	}
+}
+
+// TestCheckRateLimit_ProfileQuotaExceeded tests blocking when profile quota is exceeded.
+func TestCheckRateLimit_ProfileQuotaExceeded(t *testing.T) {
+	now := time.Now()
+
+	store := &mockCheckerStore{
+		countByInvokerSinceFunc: func(ctx context.Context, invoker string, since time.Time) (int, error) {
+			return 2, nil // Under user limit
+		},
+		countByProfileSinceFunc: func(ctx context.Context, profile string, since time.Time) (int, error) {
+			return 10, nil // At profile limit
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:          "production",
+				Profiles:      []string{"production"},
+				MaxPerUser:    5,
+				MaxPerProfile: 10,
+				QuotaWindow:   24 * time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if result.Allowed {
+		t.Error("CheckRateLimit() should block when profile quota exceeded")
+	}
+	if result.Reason != "profile quota exceeded" {
+		t.Errorf("CheckRateLimit() Reason = %q, want %q", result.Reason, "profile quota exceeded")
+	}
+	if result.ProfileCount != 10 {
+		t.Errorf("CheckRateLimit() ProfileCount = %d, want 10", result.ProfileCount)
+	}
+}
+
+// TestCheckRateLimit_EscalationFlagged tests escalation flag when threshold met.
+func TestCheckRateLimit_EscalationFlagged(t *testing.T) {
+	now := time.Now()
+
+	store := &mockCheckerStore{
+		countByInvokerSinceFunc: func(ctx context.Context, invoker string, since time.Time) (int, error) {
+			return 3, nil // At escalation threshold but under quota
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:                "production",
+				Profiles:            []string{"production"},
+				MaxPerUser:          5,
+				QuotaWindow:         24 * time.Hour,
+				EscalationThreshold: 3,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if !result.Allowed {
+		t.Error("CheckRateLimit() should allow when under quota even at escalation threshold")
+	}
+	if !result.ShouldEscalate {
+		t.Error("CheckRateLimit() ShouldEscalate should be true when at escalation threshold")
+	}
+	if result.UserCount != 3 {
+		t.Errorf("CheckRateLimit() UserCount = %d, want 3", result.UserCount)
+	}
+}
+
+// TestCheckRateLimit_AllChecksPass tests successful pass through all checks.
+func TestCheckRateLimit_AllChecksPass(t *testing.T) {
+	now := time.Now()
+	lastEventTime := now.Add(-2 * time.Hour) // Well past cooldown
+
+	store := &mockCheckerStore{
+		getLastByInvokerAndProfileFunc: func(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+			return &BreakGlassEvent{
+				ID:        "last001",
+				Invoker:   invoker,
+				Profile:   profile,
+				CreatedAt: lastEventTime,
+			}, nil
+		},
+		countByInvokerSinceFunc: func(ctx context.Context, invoker string, since time.Time) (int, error) {
+			return 2, nil // Under user limit
+		},
+		countByProfileSinceFunc: func(ctx context.Context, profile string, since time.Time) (int, error) {
+			return 5, nil // Under profile limit
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:                "production",
+				Profiles:            []string{"production"},
+				Cooldown:            time.Hour,
+				MaxPerUser:          5,
+				MaxPerProfile:       10,
+				QuotaWindow:         24 * time.Hour,
+				EscalationThreshold: 4,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if !result.Allowed {
+		t.Errorf("CheckRateLimit() should be allowed, got Reason=%q", result.Reason)
+	}
+	if result.UserCount != 2 {
+		t.Errorf("CheckRateLimit() UserCount = %d, want 2", result.UserCount)
+	}
+	if result.ProfileCount != 5 {
+		t.Errorf("CheckRateLimit() ProfileCount = %d, want 5", result.ProfileCount)
+	}
+	if result.ShouldEscalate {
+		t.Error("CheckRateLimit() ShouldEscalate should be false when under threshold")
+	}
+	if result.RetryAfter != 0 {
+		t.Errorf("CheckRateLimit() RetryAfter = %v, want 0", result.RetryAfter)
+	}
+}
+
+// TestCheckRateLimit_WildcardRuleMatches tests that wildcard rule (empty Profiles) matches any profile.
+func TestCheckRateLimit_WildcardRuleMatches(t *testing.T) {
+	now := time.Now()
+
+	store := &mockCheckerStore{
+		countByInvokerSinceFunc: func(ctx context.Context, invoker string, since time.Time) (int, error) {
+			return 10, nil // At limit
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:        "global-limit",
+				Profiles:    []string{}, // Wildcard - matches all profiles
+				MaxPerUser:  10,
+				QuotaWindow: 24 * time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "any-profile", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if result.Allowed {
+		t.Error("CheckRateLimit() wildcard rule should match any profile")
+	}
+	if result.Reason != "user quota exceeded" {
+		t.Errorf("CheckRateLimit() Reason = %q, want %q", result.Reason, "user quota exceeded")
+	}
+}
+
+// TestCheckRateLimit_CooldownNoLastEvent tests cooldown check with no previous event.
+func TestCheckRateLimit_CooldownNoLastEvent(t *testing.T) {
+	now := time.Now()
+
+	store := &mockCheckerStore{
+		getLastByInvokerAndProfileFunc: func(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+			return nil, nil // No previous event
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Cooldown: time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+	if !result.Allowed {
+		t.Error("CheckRateLimit() should allow when no previous event exists")
+	}
+}
+
+// TestCheckRateLimit_StoreErrorOnCooldown tests error propagation from store during cooldown check.
+func TestCheckRateLimit_StoreErrorOnCooldown(t *testing.T) {
+	now := time.Now()
+	expectedErr := errors.New("database connection failed")
+
+	store := &mockCheckerStore{
+		getLastByInvokerAndProfileFunc: func(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+			return nil, expectedErr
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Cooldown: time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err == nil {
+		t.Fatal("CheckRateLimit() error = nil, want error")
+	}
+	if result != nil {
+		t.Errorf("CheckRateLimit() result = %v, want nil on error", result)
+	}
+}
+
+// TestCheckRateLimit_StoreErrorOnUserCount tests error propagation from store during user count.
+func TestCheckRateLimit_StoreErrorOnUserCount(t *testing.T) {
+	now := time.Now()
+	expectedErr := errors.New("database timeout")
+
+	store := &mockCheckerStore{
+		countByInvokerSinceFunc: func(ctx context.Context, invoker string, since time.Time) (int, error) {
+			return 0, expectedErr
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:        "production",
+				Profiles:    []string{"production"},
+				MaxPerUser:  5,
+				QuotaWindow: 24 * time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err == nil {
+		t.Fatal("CheckRateLimit() error = nil, want error")
+	}
+	if result != nil {
+		t.Errorf("CheckRateLimit() result = %v, want nil on error", result)
+	}
+}
+
+// TestCheckRateLimit_StoreErrorOnProfileCount tests error propagation from store during profile count.
+func TestCheckRateLimit_StoreErrorOnProfileCount(t *testing.T) {
+	now := time.Now()
+	expectedErr := errors.New("database timeout")
+
+	store := &mockCheckerStore{
+		countByInvokerSinceFunc: func(ctx context.Context, invoker string, since time.Time) (int, error) {
+			return 2, nil // Under user limit
+		},
+		countByProfileSinceFunc: func(ctx context.Context, profile string, since time.Time) (int, error) {
+			return 0, expectedErr
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:          "production",
+				Profiles:      []string{"production"},
+				MaxPerUser:    5,
+				MaxPerProfile: 10,
+				QuotaWindow:   24 * time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err == nil {
+		t.Fatal("CheckRateLimit() error = nil, want error")
+	}
+	if result != nil {
+		t.Errorf("CheckRateLimit() result = %v, want nil on error", result)
 	}
 }
