@@ -29,5 +29,8 @@ func main() {
 	cli.ConfigureBreakGlassCheckCommand(app, s)
 	cli.ConfigureBreakGlassCloseCommand(app, s)
 
+	// Bootstrap commands
+	cli.ConfigureBootstrapCommand(app, s)
+
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
