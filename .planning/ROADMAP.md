@@ -252,10 +252,10 @@ Plans:
 **Goal**: `sentinel init status` showing policy root, profiles with parameters, versions
 **Depends on**: Phase 40
 **Research**: Unlikely (existing CLI patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 41-01: TBD
+- [x] 41-01: Status command with SSM query and human/JSON output — completed 2026-01-16
 
 #### Phase 42: Bootstrap Documentation
 
@@ -281,5 +281,5 @@ Plans:
 | 38. Sample Policy Generation | v1.4 | 1/1 | Complete | 2026-01-16 |
 | 39. IAM Policy Generation | v1.4 | 1/1 | Complete | 2026-01-16 |
 | 40. Bootstrap Command | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 41. Status Command | v1.4 | 0/? | Not started | - |
+| 41. Status Command | v1.4 | 1/1 | Complete | 2026-01-16 |
 | 42. Bootstrap Documentation | v1.4 | 0/? | Not started | - |

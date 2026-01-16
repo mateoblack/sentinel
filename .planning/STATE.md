@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 40 of 42 (Bootstrap Command)
+Phase: 41 of 42 (Status Command)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-16 — Completed 40-01-PLAN.md
+Last activity: 2026-01-16 — Completed 41-01-PLAN.md
 
-Progress: ██████░░░░ 48%
+Progress: ███████░░░ 50%
 
 ## Milestone Summary
 
@@ -52,9 +52,9 @@ Progress: ██████░░░░ 48%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 62
+- Total plans completed: 63
 - Average duration: 3.0 min
-- Total execution time: ~185 min
+- Total execution time: ~188 min
 
 **By Milestone:**
 
@@ -97,6 +97,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Continue processing on individual failures (don't abort entire apply)
 - Skip IAM policy resources (not SSM) and non-actionable states
 
+**v1.4 Status Command decisions (Phase 41):**
+- Separate ssmStatusAPI interface (GetParametersByPath) from planner's ssmAPI (GetParameter)
+- Non-recursive query (Recursive=false) to get direct children only
+- Human output includes profile name padding for alignment
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -108,7 +113,7 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 40-01-PLAN.md
+Stopped at: Completed 41-01-PLAN.md
 Resume file: None
 
 ## Roadmap Evolution
