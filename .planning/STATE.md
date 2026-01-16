@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 47 of 49 (Audit Verify Command)
+Phase: 48 of 49 (Require Sentinel Mode)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-16 — Completed 47-01-PLAN.md
+Last activity: 2026-01-16 — Completed 48-01-PLAN.md
 
-Progress: █████░░░░░ 43%
+Progress: ██████░░░░ 57%
 
 ## Milestone Summary
 
@@ -114,6 +114,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Human output shows time window, summary stats, pass rate, and detailed issues
 - JSON output marshals VerificationResult directly for machine parsing
 
+**v1.5 Require Sentinel Mode decisions (Phase 48):**
+- DriftChecker uses existing Advisor for IAM analysis
+- Drift checking is advisory only - credentials still issued despite warnings
+- TestDriftChecker enables CLI testing with custom check functions
+- DriftStatus mapped from existing EnforcementStatus (Full->OK, Partial->Partial, None->None)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -125,7 +131,7 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 47-01-PLAN.md (Phase 47 complete)
+Stopped at: Completed 48-01-PLAN.md (Phase 48 complete)
 Resume file: None
 
 ## Roadmap Evolution
