@@ -242,10 +242,10 @@ Plans:
 **Goal**: `sentinel init bootstrap` command with --plan/--yes/--profile flags
 **Depends on**: Phase 39
 **Research**: Unlikely (existing CLI patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 40-01: TBD
+- [ ] 40-01: Bootstrap command with plan/apply workflow and CLI integration
 
 #### Phase 41: Status Command
 
@@ -280,6 +280,6 @@ Plans:
 | 37. SSM Parameter Creation | v1.4 | 1/1 | Complete | 2026-01-16 |
 | 38. Sample Policy Generation | v1.4 | 1/1 | Complete | 2026-01-16 |
 | 39. IAM Policy Generation | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 40. Bootstrap Command | v1.4 | 0/? | Not started | - |
+| 40. Bootstrap Command | v1.4 | 0/1 | Planned | - |
 | 41. Status Command | v1.4 | 0/? | Not started | - |
 | 42. Bootstrap Documentation | v1.4 | 0/? | Not started | - |
