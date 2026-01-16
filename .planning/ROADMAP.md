@@ -262,17 +262,17 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 48-01: TBD (run /gsd:plan-phase 48 to break down)
+- [x] 48-01: Drift detection with DriftChecker and --require-sentinel flag — completed 2026-01-16
 
 #### Phase 49: Enforcement Documentation
 
 **Goal**: Setup guides for enforcement tiers, adoption patterns, and verification procedures
 **Depends on**: Phase 48
 **Research**: Unlikely (internal documentation work)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 49-01: TBD (run /gsd:plan-phase 49 to break down)
+- [x] 49-01: Update ENFORCEMENT.md and create ASSURANCE.md — completed 2026-01-16
 
 ## Progress (All Milestones)
 
@@ -288,5 +288,5 @@ Plans:
 | 45. Trust Policy Templates | v1.5 | 1/1 | Complete | 2026-01-16 |
 | 46. CloudTrail Query Types | v1.5 | 1/1 | Complete | 2026-01-16 |
 | 47. Audit Verify Command | v1.5 | 1/1 | Complete | 2026-01-16 |
-| 48. Require Sentinel Mode | v1.5 | 0/? | Not started | - |
-| 49. Enforcement Documentation | v1.5 | 0/? | Not started | - |
+| 48. Require Sentinel Mode | v1.5 | 1/1 | Complete | 2026-01-16 |
+| 49. Enforcement Documentation | v1.5 | 1/1 | Complete | 2026-01-16 |

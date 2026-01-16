@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 48 of 49 (Require Sentinel Mode)
+Phase: 49 of 49 (Enforcement Documentation)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-16 — Completed 48-01-PLAN.md
+Last activity: 2026-01-16 — Completed 49-01-PLAN.md
 
-Progress: ██████░░░░ 57%
+Progress: ██████████ 100%
 
 ## Milestone Summary
 
@@ -120,6 +120,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - TestDriftChecker enables CLI testing with custom check functions
 - DriftStatus mapped from existing EnforcementStatus (Full->OK, Partial->Partial, None->None)
 
+**v1.5 Enforcement Documentation decisions (Phase 49):**
+- CLI Commands section placed after How Enforcement Works for concept-to-command flow
+- Drift Detection section placed before Troubleshooting for operational focus
+- ASSURANCE.md structured around three verification levels: deployment, runtime, continuous
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -131,7 +136,7 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 48-01-PLAN.md (Phase 48 complete)
+Stopped at: Completed 49-01-PLAN.md (Phase 49 complete, Milestone v1.5 complete)
 Resume file: None
 
 ## Roadmap Evolution
