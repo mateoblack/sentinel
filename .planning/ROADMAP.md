@@ -241,10 +241,11 @@ Plans:
 **Goal**: Prevent break-glass abuse with cooldowns, quotas, and escalation
 **Depends on**: Phase 32
 **Research**: Unlikely (internal design)
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 33-01: TBD
+- [ ] 33-01: Rate limit types, validation, and Store count methods
+- [ ] 33-02: Rate limit checker and CLI integration
 
 #### Phase 34: Break-Glass Policies
 
