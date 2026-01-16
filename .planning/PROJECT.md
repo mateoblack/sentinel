@@ -40,10 +40,20 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ Break-glass notifications for immediate security awareness — v1.3
 - ✓ Break-glass policies for authorization control — v1.3
 - ✓ Post-incident review commands: breakglass-list, breakglass-check, breakglass-close — v1.3
+- ✓ Bootstrap system for automated SSM parameter setup — v1.4
+- ✓ Sample policy generation from profile configuration — v1.4
+- ✓ IAM policy document generation for least-privilege access — v1.4
+- ✓ Bootstrap status command for deployment health checks — v1.4
+- ✓ IAM trust policy analysis and enforcement status reporting — v1.5
+- ✓ Trust policy template generation (Pattern A/B/C) — v1.5
+- ✓ CloudTrail session verification for SourceIdentity compliance — v1.5
+- ✓ `sentinel audit verify` command for unmanaged session detection — v1.5
+- ✓ Drift detection with --require-sentinel flag — v1.5
+- ✓ Enforcement and assurance documentation (ENFORCEMENT.md, ASSURANCE.md) — v1.5
 
 ### Active
 
-(None — all v1.3 requirements validated)
+(None — all v1.5 requirements validated)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -52,8 +62,8 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.3 with 35,726 LOC Go.
-Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB.
+Shipped v1.5 with 49,588 LOC Go.
+Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
 - Credential storage abstraction (keyring backends)
@@ -87,6 +97,21 @@ v1.3 adds break-glass emergency access:
 - Immediate SNS/Webhook notifications for security team awareness
 - Post-incident review commands for auditing and closing events
 - Break-glass policies for controlling who can invoke emergency access
+
+v1.4 adds Sentinel bootstrapping:
+- Bootstrap planner to analyze existing SSM parameters
+- Automated SSM parameter creation for policy storage
+- Sample policy generation based on profile configuration
+- IAM policy document generation for least-privilege access
+- Status command for deployment health monitoring
+
+v1.5 adds enforcement and assurance:
+- IAM trust policy analysis to verify SourceIdentity enforcement
+- Trust policy template generation (Pattern A/B/C) for different security postures
+- CloudTrail session verification to audit SourceIdentity compliance
+- `sentinel audit verify` command for detecting unmanaged sessions
+- Drift detection with --require-sentinel flag for credential requests
+- Complete enforcement documentation (ENFORCEMENT.md, ASSURANCE.md)
 
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
@@ -134,6 +159,14 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Escalation threshold | Flags for notification only, doesn't block | ✓ Good |
 | Empty lists = wildcards | AllowedReasonCodes, Profiles: empty = all allowed | ✓ Good |
 | Break-glass policy integration | Check after profile validation, before rate limit | ✓ Good |
+| Bootstrap ResourceState | 'exists' and 'skip' as separate states for clarity | ✓ Good |
+| SSM String type | Not SecureString since policy YAML is not sensitive | ✓ Good |
+| ssmAPI interface pattern | Follows notification/sns.go pattern for testability | ✓ Good |
+| EnforcementStatus levels | Full/Partial/None with clear definitions | ✓ Good |
+| Trust policy Pattern A/B/C | Different SourceIdentity strictness levels | ✓ Good |
+| CloudTrail pass rate metric | 100% for zero sessions (no issues is success) | ✓ Good |
+| Drift detection advisory-only | Warnings logged but credentials still issued | ✓ Good |
+| Three-level assurance model | Deployment, runtime, continuous verification | ✓ Good |
 
 ---
-*Last updated: 2026-01-16 after v1.3 milestone*
+*Last updated: 2026-01-16 after v1.5 milestone*

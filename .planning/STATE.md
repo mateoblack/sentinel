@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-16)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.5 Enforcement & Assurance — Prove Sentinel is actually enforced
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 49 of 49 (Enforcement Documentation)
-Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-16 — Completed 49-01-PLAN.md
+Phase: 49 of 49 complete
+Plan: All plans complete
+Status: v1.5 shipped — ready for next milestone
+Last activity: 2026-01-16 — v1.5 Enforcement & Assurance complete
 
-Progress: ██████████ 100%
+Progress: ██████████ 100% (all milestones through v1.5 shipped)
 
 ## Milestone Summary
 
@@ -49,12 +49,31 @@ Progress: ██████████ 100%
 - Rate limiting with cooldowns and quotas
 - Policy-based authorization control
 
+**v1.4 Sentinel Bootstrapping shipped:** 2026-01-16
+- 8 phases, 8 plans
+- +9,087 lines of Go (44,813 total)
+- Bootstrap planner with SSM existence checks
+- Automated SSM parameter creation
+- Sample policy generation
+- IAM policy document generation
+- Status command for deployment health
+
+**v1.5 Enforcement & Assurance shipped:** 2026-01-16
+- 7 phases, 8 plans
+- +4,775 lines of Go (49,588 total)
+- IAM trust policy analysis and enforcement status
+- Trust policy template generation (Pattern A/B/C)
+- CloudTrail session verification
+- Audit verify command for compliance
+- Drift detection with --require-sentinel flag
+- Complete enforcement documentation
+
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 63
+- Total plans completed: 76
 - Average duration: 3.0 min
-- Total execution time: ~188 min
+- Total execution time: ~228 min
 
 **By Milestone:**
 
@@ -64,6 +83,8 @@ Progress: ██████████ 100%
 | v1.1 Sentinel Fingerprint | 9 | 12 | ~29 min |
 | v1.2 Approval Workflows | 9 | 17 | ~44 min |
 | v1.3 Break-Glass | 8 | 15 | ~45 min |
+| v1.4 Sentinel Bootstrapping | 8 | 8 | ~20 min |
+| v1.5 Enforcement & Assurance | 7 | 8 | ~20 min |
 
 ## Accumulated Context
 
@@ -136,7 +157,7 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 49-01-PLAN.md (Phase 49 complete, Milestone v1.5 complete)
+Stopped at: v1.5 milestone complete
 Resume file: None
 
 ## Roadmap Evolution
@@ -146,4 +167,4 @@ Resume file: None
 - Milestone v1.2 shipped: 2026-01-15 — Approval Workflows (Phases 18-26)
 - Milestone v1.3 shipped: 2026-01-16 — Break-Glass (Phases 27-34)
 - Milestone v1.4 shipped: 2026-01-16 — Sentinel Bootstrapping (Phases 35-42)
-- Milestone v1.5 created: 2026-01-16 — Enforcement & Assurance (Phases 43-49)
+- Milestone v1.5 shipped: 2026-01-16 — Enforcement & Assurance (Phases 43-49)

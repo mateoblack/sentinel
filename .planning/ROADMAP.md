@@ -11,7 +11,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.2 Approval Workflows** - [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) (Phases 18-26, shipped 2026-01-15)
 - ✅ **v1.3 Break-Glass** — [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) (Phases 27-34, shipped 2026-01-16)
 - ✅ **v1.4 Sentinel Bootstrapping** — [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) (Phases 35-42, shipped 2026-01-16)
-- 🚧 **v1.5 Enforcement & Assurance** — Phases 43-49 (in progress)
+- ✅ **v1.5 Enforcement & Assurance** — [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) (Phases 43-49, shipped 2026-01-16)
 
 ## Completed Milestones
 
@@ -197,96 +197,28 @@ Plans:
 
 </details>
 
-### 🚧 v1.5 Enforcement & Assurance (In Progress)
+<details>
+<summary>✅ v1.5 Enforcement & Assurance (Phases 43-49) — SHIPPED 2026-01-16</summary>
 
-**Milestone Goal:** Close the loop between Sentinel decisions and AWS enforcement; help teams prove Sentinel is actually in effect.
+- [x] Phase 43: Enforcement Types (2/2 plans) — completed 2026-01-16
+- [x] Phase 44: Enforcement Advisor (1/1 plans) — completed 2026-01-16
+- [x] Phase 45: Trust Policy Templates (1/1 plans) — completed 2026-01-16
+- [x] Phase 46: CloudTrail Query Types (1/1 plans) — completed 2026-01-16
+- [x] Phase 47: Audit Verify Command (1/1 plans) — completed 2026-01-16
+- [x] Phase 48: Require Sentinel Mode (1/1 plans) — completed 2026-01-16
+- [x] Phase 49: Enforcement Documentation (1/1 plans) — completed 2026-01-16
 
-#### Phase 43: Enforcement Types
-
-**Goal**: Define enforcement analysis types, IAM trust policy parsing, and condition evaluation logic
-**Depends on**: v1.4 complete
-**Research**: Likely (IAM trust policy structure, condition operators)
-**Research topics**: IAM trust policy document structure, sts:SourceIdentity condition, policy condition operators
-**Plans**: TBD
-
-Plans:
-- [x] 43-01: Trust policy document types and JSON parsing — completed 2026-01-16
-- [x] 43-02: Enforcement analyzer implementation — completed 2026-01-16
-
-#### Phase 44: Enforcement Advisor
-
-**Goal**: `sentinel enforce plan` command with tiered enforcement status reporting and remediation guidance
-**Depends on**: Phase 43
-**Research**: Unlikely (internal CLI patterns)
-**Plans**: TBD
-
-Plans:
-- [x] 44-01: Enforcement advisor with IAM integration and CLI command — completed 2026-01-16
-
-#### Phase 45: Trust Policy Templates
-
-**Goal**: `sentinel enforce generate trust-policy` outputs ready-to-use JSON trust policy snippets with SourceIdentity conditions
-**Depends on**: Phase 44
-**Research**: Unlikely (JSON generation, internal patterns)
-**Plans**: 1
-
-Plans:
-- [x] 45-01: Trust policy generator with Pattern A/B/C templates and CLI command — completed 2026-01-16
-
-#### Phase 46: CloudTrail Query Types
-
-**Goal**: Define CloudTrail query types and assurance logic for session verification
-**Depends on**: Phase 45
-**Research**: Likely (CloudTrail Lookup Events API, event structure)
-**Research topics**: CloudTrail LookupEvents API, AssumeRole event fields, SourceIdentity in CloudTrail
-**Plans**: 1
-
-Plans:
-- [x] 46-01: CloudTrail query types and session verifier — completed 2026-01-16
-
-#### Phase 47: Audit Verify Command
-
-**Goal**: `sentinel audit verify` queries CloudTrail for sessions lacking SourceIdentity, break-glass anomalies, and bypass detection
-**Depends on**: Phase 46
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 1
-
-Plans:
-- [x] 47-01: Create audit verify CLI command with AWS integration — completed 2026-01-16
-
-#### Phase 48: Require Sentinel Mode
-
-**Goal**: Policy/config flag `enforcement.require_sentinel: true` with warning output and drift logging
-**Depends on**: Phase 47
-**Research**: Unlikely (internal policy/config extension)
-**Plans**: TBD
-
-Plans:
-- [x] 48-01: Drift detection with DriftChecker and --require-sentinel flag — completed 2026-01-16
-
-#### Phase 49: Enforcement Documentation
-
-**Goal**: Setup guides for enforcement tiers, adoption patterns, and verification procedures
-**Depends on**: Phase 48
-**Research**: Unlikely (internal documentation work)
-**Plans**: 1
-
-Plans:
-- [x] 49-01: Update ENFORCEMENT.md and create ASSURANCE.md — completed 2026-01-16
+</details>
 
 ## Progress (All Milestones)
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1-8 | v1.0 | 16/16 | Complete | 2026-01-14 |
-| 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
-| 18-26 | v1.2 | 17/17 | Complete | 2026-01-15 |
-| 27-34 | v1.3 | 15/15 | Complete | 2026-01-16 |
-| 35-42 | v1.4 | 8/8 | Complete | 2026-01-16 |
-| 43. Enforcement Types | v1.5 | 2/2 | Complete | 2026-01-16 |
-| 44. Enforcement Advisor | v1.5 | 1/1 | Complete | 2026-01-16 |
-| 45. Trust Policy Templates | v1.5 | 1/1 | Complete | 2026-01-16 |
-| 46. CloudTrail Query Types | v1.5 | 1/1 | Complete | 2026-01-16 |
-| 47. Audit Verify Command | v1.5 | 1/1 | Complete | 2026-01-16 |
-| 48. Require Sentinel Mode | v1.5 | 1/1 | Complete | 2026-01-16 |
-| 49. Enforcement Documentation | v1.5 | 1/1 | Complete | 2026-01-16 |
+| Milestone | Phases | Plans | Status | Shipped |
+|-----------|--------|-------|--------|---------|
+| v1.0 MVP | 1-8 | 16/16 | ✅ Complete | 2026-01-14 |
+| v1.1 Sentinel Fingerprint | 9-17 | 12/12 | ✅ Complete | 2026-01-15 |
+| v1.2 Approval Workflows | 18-26 | 17/17 | ✅ Complete | 2026-01-15 |
+| v1.3 Break-Glass | 27-34 | 15/15 | ✅ Complete | 2026-01-16 |
+| v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
+| v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
+
+**Totals:** 6 milestones, 49 phases, 76 plans shipped
