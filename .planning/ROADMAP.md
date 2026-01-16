@@ -10,6 +10,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.1 Sentinel Fingerprint** - [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) (Phases 9-17, shipped 2026-01-15)
 - ✅ **v1.2 Approval Workflows** - [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) (Phases 18-26, shipped 2026-01-15)
 - ✅ **v1.3 Break-Glass** — [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) (Phases 27-34, shipped 2026-01-16)
+- 🚧 **v1.4 Sentinel Bootstrapping** — Phases 35-42 (in progress)
 
 ## Completed Milestones
 
@@ -181,6 +182,91 @@ Plans:
 
 </details>
 
+### 🚧 v1.4 Sentinel Bootstrapping (In Progress)
+
+**Milestone Goal:** Prepare AWS to be a trustworthy policy source for Sentinel with deterministic, reversible CLI-driven setup.
+
+#### Phase 35: Bootstrap Schema
+
+**Goal**: Define bootstrap configuration types, resource specifications, and state tracking
+**Depends on**: v1.3 complete
+**Research**: Unlikely (internal design)
+**Plans**: TBD
+
+Plans:
+- [ ] 35-01: TBD (run /gsd:plan-phase 35 to break down)
+
+#### Phase 36: Bootstrap Planner
+
+**Goal**: Dry-run logic to determine resources to create, existence checks, plan output formatting
+**Depends on**: Phase 35
+**Research**: Unlikely (internal logic)
+**Plans**: TBD
+
+Plans:
+- [ ] 36-01: TBD
+
+#### Phase 37: SSM Parameter Creation
+
+**Goal**: Create SSM policy parameters, handle existing parameters, versioning awareness
+**Depends on**: Phase 36
+**Research**: Unlikely (existing SSM patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 37-01: TBD
+
+#### Phase 38: Sample Policy Generation
+
+**Goal**: Generate safe starter policy YAML per profile with validation
+**Depends on**: Phase 37
+**Research**: Unlikely (internal patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 38-01: TBD
+
+#### Phase 39: IAM Policy Generation
+
+**Goal**: Generate SentinelPolicyReader and SentinelPolicyAdmin IAM policy documents
+**Depends on**: Phase 38
+**Research**: Likely (IAM policy document structure, least-privilege patterns)
+**Research topics**: IAM policy best practices, resource ARN patterns, condition keys
+**Plans**: TBD
+
+Plans:
+- [ ] 39-01: TBD
+
+#### Phase 40: Bootstrap Command
+
+**Goal**: `sentinel init bootstrap` command with --plan/--yes/--profile flags
+**Depends on**: Phase 39
+**Research**: Unlikely (existing CLI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 40-01: TBD
+
+#### Phase 41: Status Command
+
+**Goal**: `sentinel init status` showing policy root, profiles with parameters, versions
+**Depends on**: Phase 40
+**Research**: Unlikely (existing CLI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 41-01: TBD
+
+#### Phase 42: Bootstrap Documentation
+
+**Goal**: Setup guide, security properties documentation, adoption guide
+**Depends on**: Phase 41
+**Research**: Unlikely (internal work)
+**Plans**: TBD
+
+Plans:
+- [ ] 42-01: TBD
+
 ## Progress (All Milestones)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -189,3 +275,11 @@ Plans:
 | 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
 | 18-26 | v1.2 | 17/17 | Complete | 2026-01-15 |
 | 27-34 | v1.3 | 15/15 | Complete | 2026-01-16 |
+| 35. Bootstrap Schema | v1.4 | 0/? | Not started | - |
+| 36. Bootstrap Planner | v1.4 | 0/? | Not started | - |
+| 37. SSM Parameter Creation | v1.4 | 0/? | Not started | - |
+| 38. Sample Policy Generation | v1.4 | 0/? | Not started | - |
+| 39. IAM Policy Generation | v1.4 | 0/? | Not started | - |
+| 40. Bootstrap Command | v1.4 | 0/? | Not started | - |
+| 41. Status Command | v1.4 | 0/? | Not started | - |
+| 42. Bootstrap Documentation | v1.4 | 0/? | Not started | - |

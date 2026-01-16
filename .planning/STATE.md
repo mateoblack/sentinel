@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-16)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Planning next milestone
+**Current focus:** v1.4 Sentinel Bootstrapping — AWS setup automation
 
 ## Current Position
 
-Phase: All v1.0-v1.3 phases complete (34 phases total)
-Plan: All plans complete (60 plans total)
-Status: Ready for next milestone
-Last activity: 2026-01-16 — v1.3 milestone archived
+Phase: 35 of 42 (Bootstrap Schema)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-16 — Milestone v1.4 created
 
-Progress: ████████████████ 100% (v1.3 complete)
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone Summary
 
@@ -85,12 +85,12 @@ None — clean implementation across all milestones.
 
 ### Blockers/Concerns Carried Forward
 
-None — clean start for v1.3.
+None — clean start for v1.4.
 
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: v1.3 milestone archived
+Stopped at: Milestone v1.4 initialization
 Resume file: None
 
 ## Roadmap Evolution
@@ -99,3 +99,4 @@ Resume file: None
 - Milestone v1.1 shipped: 2026-01-15 — Sentinel Fingerprint (Phases 9-17)
 - Milestone v1.2 shipped: 2026-01-15 — Approval Workflows (Phases 18-26)
 - Milestone v1.3 shipped: 2026-01-16 — Break-Glass (Phases 27-34)
+- Milestone v1.4 created: 2026-01-16 — Sentinel Bootstrapping (Phases 35-42)
