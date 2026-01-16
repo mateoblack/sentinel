@@ -244,7 +244,7 @@ Plans:
 **Plans**: 2
 
 Plans:
-- [ ] 33-01: Rate limit types, validation, and Store count methods
+- [x] 33-01: Rate limit types, validation, and Store count methods — completed 2026-01-16
 - [ ] 33-02: Rate limit checker and CLI integration
 
 #### Phase 34: Break-Glass Policies
@@ -270,5 +270,5 @@ Plans:
 | 30. Time-Bounded Sessions | v1.3 | 2/2 | Complete | 2026-01-15 |
 | 31. Notification Blast | v1.3 | 2/2 | Complete | 2026-01-15 |
 | 32. Post-Incident Review | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 33. Rate Limiting | v1.3 | 0/? | Not started | - |
+| 33. Rate Limiting | v1.3 | 1/2 | In progress | - |
 | 34. Break-Glass Policies | v1.3 | 0/? | Not started | - |
