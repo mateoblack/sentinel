@@ -228,10 +228,10 @@ Plans:
 **Goal**: `sentinel enforce generate trust-policy` outputs ready-to-use JSON trust policy snippets with SourceIdentity conditions
 **Depends on**: Phase 44
 **Research**: Unlikely (JSON generation, internal patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 45-01: TBD (run /gsd:plan-phase 45 to break down)
+- [x] 45-01: Trust policy generator with Pattern A/B/C templates and CLI command — completed 2026-01-16
 
 #### Phase 46: CloudTrail Query Types
 
@@ -285,7 +285,7 @@ Plans:
 | 35-42 | v1.4 | 8/8 | Complete | 2026-01-16 |
 | 43. Enforcement Types | v1.5 | 2/2 | Complete | 2026-01-16 |
 | 44. Enforcement Advisor | v1.5 | 1/1 | Complete | 2026-01-16 |
-| 45. Trust Policy Templates | v1.5 | 0/? | Not started | - |
+| 45. Trust Policy Templates | v1.5 | 1/1 | Complete | 2026-01-16 |
 | 46. CloudTrail Query Types | v1.5 | 0/? | Not started | - |
 | 47. Audit Verify Command | v1.5 | 0/? | Not started | - |
 | 48. Require Sentinel Mode | v1.5 | 0/? | Not started | - |
