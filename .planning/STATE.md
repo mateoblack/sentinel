@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 45 of 49 (Trust Policy Templates)
+Phase: 46 of 49 (CloudTrail Query Types)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-16 — Completed 45-01-PLAN.md
+Last activity: 2026-01-16 — Completed 46-01-PLAN.md
 
-Progress: ███░░░░░░░ 24%
+Progress: ████░░░░░░ 25%
 
 ## Milestone Summary
 
@@ -102,6 +102,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Non-recursive query (Recursive=false) to get direct children only
 - Human output includes profile name padding for alignment
 
+**v1.5 CloudTrail Query Types decisions (Phase 46):**
+- cloudtrailAPI interface follows notification/sns.go pattern for testability
+- ParseSourceIdentity uses SplitN for handling colons in request-id
+- PassRate returns 100% for zero sessions (no issues is success)
+- Issues created as warnings for non-Sentinel sessions
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -113,7 +119,7 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 45-01-PLAN.md (Phase 45 complete)
+Stopped at: Completed 46-01-PLAN.md (Phase 46 complete)
 Resume file: None
 
 ## Roadmap Evolution
