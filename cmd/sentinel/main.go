@@ -33,5 +33,8 @@ func main() {
 	cli.ConfigureBootstrapCommand(app, s)
 	cli.ConfigureStatusCommand(app, s)
 
+	// Enforcement commands
+	cli.ConfigureEnforcePlanCommand(app, s)
+
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
