@@ -360,3 +360,73 @@ func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, ke
 
 	return events, nil
 }
+
+// CountByInvokerSince counts events from a specific user since the given time.
+// Uses Select: COUNT for efficiency, minimizing data transfer.
+func (s *DynamoDBStore) CountByInvokerSince(ctx context.Context, invoker string, since time.Time) (int, error) {
+	return s.countByIndexSince(ctx, GSIInvoker, "invoker", invoker, since)
+}
+
+// CountByProfileSince counts events for a specific profile since the given time.
+// Uses Select: COUNT for efficiency, minimizing data transfer.
+func (s *DynamoDBStore) CountByProfileSince(ctx context.Context, profile string, since time.Time) (int, error) {
+	return s.countByIndexSince(ctx, GSIProfile, "profile", profile, since)
+}
+
+// GetLastByInvokerAndProfile returns the most recent event for a user+profile combination.
+// Returns nil, nil if no events found. Used for cooldown checking.
+func (s *DynamoDBStore) GetLastByInvokerAndProfile(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+	output, err := s.client.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		IndexName:              aws.String(GSIInvoker),
+		KeyConditionExpression: aws.String("invoker = :invoker"),
+		FilterExpression:       aws.String("profile = :profile"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":invoker": &types.AttributeValueMemberS{Value: invoker},
+			":profile": &types.AttributeValueMemberS{Value: profile},
+		},
+		ScanIndexForward: aws.Bool(false), // Newest first
+		Limit:            aws.Int32(1),    // Only need the most recent
+	})
+	if err != nil {
+		return nil, fmt.Errorf("dynamodb Query: %w", err)
+	}
+
+	if len(output.Items) == 0 {
+		return nil, nil // No events found
+	}
+
+	var item dynamoItem
+	if err := attributevalue.UnmarshalMap(output.Items[0], &item); err != nil {
+		return nil, fmt.Errorf("unmarshal event: %w", err)
+	}
+
+	return itemToEvent(&item)
+}
+
+// countByIndexSince counts events matching the given index key since a specific time.
+// Uses Select: COUNT for efficiency - only returns count, not full items.
+func (s *DynamoDBStore) countByIndexSince(ctx context.Context, indexName, keyAttr, keyValue string, since time.Time) (int, error) {
+	// Format time as RFC3339Nano for string comparison in DynamoDB
+	sinceStr := since.Format(time.RFC3339Nano)
+
+	output, err := s.client.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		IndexName:              aws.String(indexName),
+		KeyConditionExpression: aws.String("#pk = :v"),
+		FilterExpression:       aws.String("created_at >= :since"),
+		ExpressionAttributeNames: map[string]string{
+			"#pk": keyAttr,
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":v":     &types.AttributeValueMemberS{Value: keyValue},
+			":since": &types.AttributeValueMemberS{Value: sinceStr},
+		},
+		Select: types.SelectCount, // Only return count, not items
+	})
+	if err != nil {
+		return 0, fmt.Errorf("dynamodb Query %s: %w", indexName, err)
+	}
+
+	return int(output.Count), nil
+}

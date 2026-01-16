@@ -47,6 +47,18 @@ func (m *mockCheckerStore) FindActiveByInvokerAndProfile(ctx context.Context, in
 	return nil, nil
 }
 
+func (m *mockCheckerStore) CountByInvokerSince(ctx context.Context, invoker string, since time.Time) (int, error) {
+	return 0, nil
+}
+
+func (m *mockCheckerStore) CountByProfileSince(ctx context.Context, profile string, since time.Time) (int, error) {
+	return 0, nil
+}
+
+func (m *mockCheckerStore) GetLastByInvokerAndProfile(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+	return nil, nil
+}
+
 // TestFindActiveBreakGlass_Found tests finding an active break-glass for matching invoker+profile.
 func TestFindActiveBreakGlass_Found(t *testing.T) {
 	now := time.Now()

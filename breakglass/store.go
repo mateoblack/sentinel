@@ -3,6 +3,7 @@ package breakglass
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // Query limit constants for List operations.
@@ -65,4 +66,16 @@ type Store interface {
 	// for a profile. Returns the active event if found, nil if no active event exists.
 	// This is critical to prevent stacking of break-glass access.
 	FindActiveByInvokerAndProfile(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error)
+
+	// CountByInvokerSince counts events from a specific user since the given time.
+	// Used for per-user quota checking in rate limiting.
+	CountByInvokerSince(ctx context.Context, invoker string, since time.Time) (int, error)
+
+	// CountByProfileSince counts events for a specific profile since the given time.
+	// Used for per-profile quota checking in rate limiting.
+	CountByProfileSince(ctx context.Context, profile string, since time.Time) (int, error)
+
+	// GetLastByInvokerAndProfile returns the most recent event for a user+profile combination.
+	// Returns nil, nil if no events found. Used for cooldown checking.
+	GetLastByInvokerAndProfile(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error)
 }

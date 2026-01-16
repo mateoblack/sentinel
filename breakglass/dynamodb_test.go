@@ -839,3 +839,236 @@ func TestDynamoDBStore_Query_DynamoDBError(t *testing.T) {
 		t.Fatal("ListByInvoker() should return error on DynamoDB failure")
 	}
 }
+
+// TestDynamoDBStore_CountByInvokerSince_Success tests counting events for a user within a time window.
+func TestDynamoDBStore_CountByInvokerSince_Success(t *testing.T) {
+	var capturedInput *dynamodb.QueryInput
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			capturedInput = params
+			return &dynamodb.QueryOutput{Count: 3}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+	since := time.Now().Add(-24 * time.Hour)
+
+	count, err := store.CountByInvokerSince(context.Background(), "alice", since)
+	if err != nil {
+		t.Fatalf("CountByInvokerSince() error = %v", err)
+	}
+
+	// Verify query parameters
+	if *capturedInput.IndexName != GSIInvoker {
+		t.Errorf("IndexName = %q, want %q", *capturedInput.IndexName, GSIInvoker)
+	}
+	if capturedInput.Select != types.SelectCount {
+		t.Errorf("Select = %v, want %v for efficient counting", capturedInput.Select, types.SelectCount)
+	}
+	if capturedInput.FilterExpression == nil || *capturedInput.FilterExpression != "created_at >= :since" {
+		t.Errorf("FilterExpression = %v, want filter for created_at >= :since", capturedInput.FilterExpression)
+	}
+
+	// Verify result
+	if count != 3 {
+		t.Errorf("CountByInvokerSince() = %d, want 3", count)
+	}
+}
+
+// TestDynamoDBStore_CountByInvokerSince_Empty tests returning zero for no matching events.
+func TestDynamoDBStore_CountByInvokerSince_Empty(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return &dynamodb.QueryOutput{Count: 0}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+	since := time.Now().Add(-time.Hour)
+
+	count, err := store.CountByInvokerSince(context.Background(), "unknown-user", since)
+	if err != nil {
+		t.Fatalf("CountByInvokerSince() error = %v", err)
+	}
+
+	if count != 0 {
+		t.Errorf("CountByInvokerSince() = %d, want 0 for no matches", count)
+	}
+}
+
+// TestDynamoDBStore_CountByInvokerSince_Error tests error handling.
+func TestDynamoDBStore_CountByInvokerSince_Error(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return nil, errors.New("network error")
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	_, err := store.CountByInvokerSince(context.Background(), "alice", time.Now())
+	if err == nil {
+		t.Fatal("CountByInvokerSince() should return error on DynamoDB failure")
+	}
+}
+
+// TestDynamoDBStore_CountByProfileSince_Success tests counting events for a profile within a time window.
+func TestDynamoDBStore_CountByProfileSince_Success(t *testing.T) {
+	var capturedInput *dynamodb.QueryInput
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			capturedInput = params
+			return &dynamodb.QueryOutput{Count: 5}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+	since := time.Now().Add(-24 * time.Hour)
+
+	count, err := store.CountByProfileSince(context.Background(), "production", since)
+	if err != nil {
+		t.Fatalf("CountByProfileSince() error = %v", err)
+	}
+
+	// Verify query parameters
+	if *capturedInput.IndexName != GSIProfile {
+		t.Errorf("IndexName = %q, want %q", *capturedInput.IndexName, GSIProfile)
+	}
+	if capturedInput.Select != types.SelectCount {
+		t.Errorf("Select = %v, want %v for efficient counting", capturedInput.Select, types.SelectCount)
+	}
+
+	// Verify result
+	if count != 5 {
+		t.Errorf("CountByProfileSince() = %d, want 5", count)
+	}
+}
+
+// TestDynamoDBStore_CountByProfileSince_Empty tests returning zero for no matching events.
+func TestDynamoDBStore_CountByProfileSince_Empty(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return &dynamodb.QueryOutput{Count: 0}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+	since := time.Now().Add(-time.Hour)
+
+	count, err := store.CountByProfileSince(context.Background(), "unused-profile", since)
+	if err != nil {
+		t.Fatalf("CountByProfileSince() error = %v", err)
+	}
+
+	if count != 0 {
+		t.Errorf("CountByProfileSince() = %d, want 0 for no matches", count)
+	}
+}
+
+// TestDynamoDBStore_CountByProfileSince_Error tests error handling.
+func TestDynamoDBStore_CountByProfileSince_Error(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return nil, errors.New("network error")
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	_, err := store.CountByProfileSince(context.Background(), "production", time.Now())
+	if err == nil {
+		t.Fatal("CountByProfileSince() should return error on DynamoDB failure")
+	}
+}
+
+// TestDynamoDBStore_GetLastByInvokerAndProfile_Found tests returning the most recent event.
+func TestDynamoDBStore_GetLastByInvokerAndProfile_Found(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Nanosecond)
+	event := &BreakGlassEvent{
+		ID:            "newest001",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    ReasonIncident,
+		Justification: "Most recent break-glass event for cooldown check",
+		Duration:      time.Hour,
+		Status:        StatusClosed,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		ExpiresAt:     now.Add(DefaultBreakGlassTTL),
+	}
+
+	item, _ := attributevalue.MarshalMap(eventToItem(event))
+
+	var capturedInput *dynamodb.QueryInput
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			capturedInput = params
+			return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{item}}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	result, err := store.GetLastByInvokerAndProfile(context.Background(), "alice", "production")
+	if err != nil {
+		t.Fatalf("GetLastByInvokerAndProfile() error = %v", err)
+	}
+
+	// Verify query parameters
+	if *capturedInput.IndexName != GSIInvoker {
+		t.Errorf("IndexName = %q, want %q", *capturedInput.IndexName, GSIInvoker)
+	}
+	if *capturedInput.ScanIndexForward != false {
+		t.Error("ScanIndexForward should be false for newest first")
+	}
+	if *capturedInput.Limit != 1 {
+		t.Errorf("Limit = %d, want 1 for getting last event only", *capturedInput.Limit)
+	}
+	if capturedInput.FilterExpression == nil || *capturedInput.FilterExpression != "profile = :profile" {
+		t.Errorf("FilterExpression = %v, want filter for profile", capturedInput.FilterExpression)
+	}
+
+	// Verify result
+	if result == nil {
+		t.Fatal("GetLastByInvokerAndProfile() returned nil, want event")
+	}
+	if result.ID != "newest001" {
+		t.Errorf("Result ID = %q, want %q", result.ID, "newest001")
+	}
+}
+
+// TestDynamoDBStore_GetLastByInvokerAndProfile_NotFound tests returning nil when no events exist.
+func TestDynamoDBStore_GetLastByInvokerAndProfile_NotFound(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{}}, nil
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	result, err := store.GetLastByInvokerAndProfile(context.Background(), "alice", "staging")
+	if err != nil {
+		t.Fatalf("GetLastByInvokerAndProfile() error = %v", err)
+	}
+
+	if result != nil {
+		t.Errorf("GetLastByInvokerAndProfile() = %v, want nil for no events", result)
+	}
+}
+
+// TestDynamoDBStore_GetLastByInvokerAndProfile_Error tests error handling.
+func TestDynamoDBStore_GetLastByInvokerAndProfile_Error(t *testing.T) {
+	mock := &mockDynamoDBClient{
+		queryFunc: func(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+			return nil, errors.New("network error")
+		},
+	}
+
+	store := newDynamoDBStoreWithClient(mock, "test-table")
+
+	_, err := store.GetLastByInvokerAndProfile(context.Background(), "alice", "production")
+	if err == nil {
+		t.Fatal("GetLastByInvokerAndProfile() should return error on DynamoDB failure")
+	}
+}
