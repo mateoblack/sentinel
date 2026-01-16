@@ -42,6 +42,183 @@ IAM trust policies can require this prefix using the `sts:SourceIdentity` condit
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
+## Enforcement CLI Commands
+
+Sentinel provides CLI commands to analyze and generate trust policies for enforcement.
+
+### sentinel enforce plan
+
+Analyze role trust policies for Sentinel enforcement status.
+
+**Usage:**
+
+```bash
+sentinel enforce plan --role=ROLE_ARN [--role=ROLE_ARN...] [--region=REGION] [--json]
+```
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--role` | Role ARN to analyze (repeatable) | Yes |
+| `--region` | AWS region for IAM operations | No |
+| `--json` | Output in JSON format | No |
+
+**Example:**
+
+```bash
+sentinel enforce plan --role=arn:aws:iam::123456789012:role/ProductionAdmin
+```
+
+**Output:**
+
+```
+Sentinel Enforcement Analysis
+=============================
+
+Role: arn:aws:iam::123456789012:role/ProductionAdmin
+Status: FULL ✓
+Level: trust-policy
+Recommendations:
+  - Role is fully enforced for Sentinel access
+
+Summary
+-------
+Full enforcement:    1 role(s)
+Partial enforcement: 0 role(s)
+No enforcement:      0 role(s)
+```
+
+**Status Levels:**
+
+| Status | Symbol | Meaning |
+|--------|--------|---------|
+| FULL | ✓ | Role requires Sentinel SourceIdentity for all access |
+| PARTIAL | ⚠ | Some statements require Sentinel, others don't |
+| NONE | ✗ | Role has no Sentinel enforcement |
+| ERROR | - | Failed to analyze (check permissions) |
+
+### sentinel enforce generate trust-policy
+
+Generate IAM trust policy JSON with Sentinel conditions.
+
+**Usage:**
+
+```bash
+sentinel enforce generate trust-policy --pattern=PATTERN --principal=ARN [--users=USER...] [--legacy-principal=ARN]
+```
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--pattern` | Pattern: `any-sentinel`, `specific-users`, or `migration` | Yes |
+| `--principal` | AWS principal ARN (e.g., `arn:aws:iam::123456789012:root`) | Yes |
+| `--users` | Username for `specific-users` pattern (repeatable) | For `specific-users` |
+| `--legacy-principal` | Legacy principal ARN for `migration` pattern | For `migration` |
+
+**Pattern A: Any Sentinel Credentials**
+
+Allow any credentials issued by Sentinel:
+
+```bash
+sentinel enforce generate trust-policy \
+  --pattern=any-sentinel \
+  --principal=arn:aws:iam::123456789012:root
+```
+
+Output:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowSentinelAccess",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringLike": {
+          "sts:SourceIdentity": "sentinel:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Pattern B: Specific Users via Sentinel**
+
+Allow only specific users (via Sentinel):
+
+```bash
+sentinel enforce generate trust-policy \
+  --pattern=specific-users \
+  --principal=arn:aws:iam::123456789012:root \
+  --users=alice \
+  --users=bob
+```
+
+Output:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowSentinelUsers",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringLike": {
+          "sts:SourceIdentity": ["sentinel:alice:*", "sentinel:bob:*"]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Pattern C: Migration (Sentinel OR Legacy)**
+
+Allow both Sentinel and legacy access during migration:
+
+```bash
+sentinel enforce generate trust-policy \
+  --pattern=migration \
+  --principal=arn:aws:iam::123456789012:root \
+  --legacy-principal=arn:aws:iam::123456789012:role/LegacyServiceRole
+```
+
+Output:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowSentinelAccess",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringLike": {
+          "sts:SourceIdentity": "sentinel:*"
+        }
+      }
+    },
+    {
+      "Sid": "AllowLegacyAccess",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:role/LegacyServiceRole"},
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
 ## Trust Policy Patterns
 
 Trust policies define who can assume a role. Adding `sts:SourceIdentity` conditions makes Sentinel enforcement mandatory for that role.
@@ -338,24 +515,45 @@ Enable enforcement on a low-risk role to validate the mechanism.
 
 **Steps:**
 1. Select a low-risk role (e.g., development environment read-only)
-2. Update the role's trust policy to require Sentinel SourceIdentity:
+2. Check current enforcement status:
 
 ```bash
-# Get current trust policy
-aws iam get-role --role-name DevReadOnly --query 'Role.AssumeRolePolicyDocument' > trust-policy.json
+sentinel enforce plan --role=arn:aws:iam::123456789012:role/DevReadOnly
+```
 
-# Add Sentinel condition (see Pattern A above)
-# Edit trust-policy.json to add sts:SourceIdentity condition
+3. Generate a trust policy with Sentinel enforcement:
 
-# Update the trust policy
+```bash
+sentinel enforce generate trust-policy \
+  --pattern=any-sentinel \
+  --principal=arn:aws:iam::123456789012:root > trust-policy.json
+```
+
+4. Update the role's trust policy:
+
+```bash
 aws iam update-assume-role-policy \
   --role-name DevReadOnly \
   --policy-document file://trust-policy.json
 ```
 
-3. Test access through Sentinel (should succeed)
-4. Test access without Sentinel (should fail with AccessDenied)
-5. Monitor for unexpected access failures
+5. Verify enforcement is active:
+
+```bash
+sentinel enforce plan --role=arn:aws:iam::123456789012:role/DevReadOnly
+# Should show: Status: FULL
+```
+
+6. Test access through Sentinel (should succeed)
+7. Test access without Sentinel (should fail with AccessDenied)
+8. Verify with CloudTrail audit:
+
+```bash
+sentinel audit verify \
+  --start=$(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) \
+  --end=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --role=arn:aws:iam::123456789012:role/DevReadOnly
+```
 
 **Success criteria:**
 - Sentinel-issued credentials can assume the role
@@ -432,6 +630,84 @@ aws organizations attach-policy \
 - SCP active across target OUs/accounts
 - Service-linked roles exempted and functioning
 - Clear audit trail of enforcement
+
+## Drift Detection
+
+Sentinel can detect when roles lack proper trust policy enforcement at credential issuance time. This provides early warning that credentials may work even without Sentinel, indicating incomplete enforcement.
+
+### Enabling Drift Detection
+
+Add the `--require-sentinel` flag to the credentials command:
+
+```bash
+sentinel credentials --profile prod --require-sentinel
+```
+
+Or configure in your AWS config:
+
+```ini
+[profile prod]
+credential_process = sentinel credentials --profile prod --policy-parameter /sentinel/policies/default --require-sentinel
+```
+
+### Drift Status Values
+
+| Status | Meaning |
+|--------|---------|
+| `ok` | Role has full Sentinel enforcement |
+| `partial` | Role has partial enforcement (some statements missing condition) |
+| `none` | Role has no Sentinel enforcement |
+| `unknown` | Check failed (IAM permissions, role doesn't exist) |
+
+### Warning Output
+
+When drift is detected, warnings are written to stderr (credentials still issued):
+
+**Partial enforcement:**
+```
+Warning: Role arn:aws:iam::123456789012:role/MyRole has partial Sentinel enforcement (Some statements allow access without Sentinel SourceIdentity)
+```
+
+**No enforcement:**
+```
+Warning: Role arn:aws:iam::123456789012:role/MyRole has no Sentinel enforcement (Add sts:SourceIdentity condition to trust policy)
+```
+
+**Unknown status:**
+```
+Warning: Could not verify Sentinel enforcement for arn:aws:iam::123456789012:role/MyRole: access denied
+```
+
+### Decision Log Fields
+
+When `--require-sentinel` is enabled, drift status is recorded in decision logs:
+
+```json
+{
+  "timestamp": "2026-01-16T10:30:00Z",
+  "user": "alice",
+  "profile": "production",
+  "effect": "allow",
+  "drift_status": "partial",
+  "drift_message": "Some statements allow access without Sentinel SourceIdentity"
+}
+```
+
+| Field | Description | Present |
+|-------|-------------|---------|
+| `drift_status` | Status value (`ok`, `partial`, `none`, `unknown`) | When --require-sentinel |
+| `drift_message` | Human-readable explanation | When --require-sentinel |
+
+### Advisory Mode
+
+Drift detection is **advisory only** - credentials are always issued regardless of drift status. This allows teams to:
+
+1. Deploy Sentinel without breaking existing workflows
+2. Monitor drift status via decision logs
+3. Progressively remediate trust policies
+4. Avoid credential failures during migration
+
+To enforce Sentinel, use trust policy conditions as documented above.
 
 ## Troubleshooting
 
