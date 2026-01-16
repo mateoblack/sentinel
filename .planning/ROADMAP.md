@@ -221,10 +221,10 @@ Plans:
 **Goal**: Generate safe starter policy YAML per profile with validation
 **Depends on**: Phase 37
 **Research**: Unlikely (internal patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 38-01: TBD
+- [x] 38-01: Sample policy generator with GenerateSamplePolicy function — completed 2026-01-16
 
 #### Phase 39: IAM Policy Generation
 
@@ -278,7 +278,7 @@ Plans:
 | 35. Bootstrap Schema | v1.4 | 1/1 | Complete | 2026-01-16 |
 | 36. Bootstrap Planner | v1.4 | 1/1 | Complete | 2026-01-15 |
 | 37. SSM Parameter Creation | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 38. Sample Policy Generation | v1.4 | 0/? | Not started | - |
+| 38. Sample Policy Generation | v1.4 | 1/1 | Complete | 2026-01-16 |
 | 39. IAM Policy Generation | v1.4 | 0/? | Not started | - |
 | 40. Bootstrap Command | v1.4 | 0/? | Not started | - |
 | 41. Status Command | v1.4 | 0/? | Not started | - |
