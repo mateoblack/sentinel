@@ -232,10 +232,10 @@ Plans:
 **Depends on**: Phase 38
 **Research**: Likely (IAM policy document structure, least-privilege patterns)
 **Research topics**: IAM policy best practices, resource ARN patterns, condition keys
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 39-01: TBD
+- [x] 39-01: IAM policy document types and generator functions — completed 2026-01-16
 
 #### Phase 40: Bootstrap Command
 
@@ -279,7 +279,7 @@ Plans:
 | 36. Bootstrap Planner | v1.4 | 1/1 | Complete | 2026-01-15 |
 | 37. SSM Parameter Creation | v1.4 | 1/1 | Complete | 2026-01-16 |
 | 38. Sample Policy Generation | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 39. IAM Policy Generation | v1.4 | 0/? | Not started | - |
+| 39. IAM Policy Generation | v1.4 | 1/1 | Complete | 2026-01-16 |
 | 40. Bootstrap Command | v1.4 | 0/? | Not started | - |
 | 41. Status Command | v1.4 | 0/? | Not started | - |
 | 42. Bootstrap Documentation | v1.4 | 0/? | Not started | - |
