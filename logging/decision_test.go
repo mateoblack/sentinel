@@ -639,3 +639,158 @@ func TestEnhancedDecisionLogEntry_RequestIDOnly(t *testing.T) {
 		t.Errorf("JSON should NOT contain session_duration_seconds when zero, got: %s", jsonStr)
 	}
 }
+
+func TestNewEnhancedDecisionLogEntry_DriftFields(t *testing.T) {
+	t.Run("populates drift fields when present", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect:      policy.EffectAllow,
+			MatchedRule: "allow-production",
+			RuleIndex:   0,
+		}
+
+		creds := &CredentialIssuanceFields{
+			RequestID:    "a1b2c3d4",
+			RoleARN:      "arn:aws:iam::123456789012:role/ProductionRole",
+			DriftStatus:  "partial",
+			DriftMessage: "Role has partial Sentinel enforcement",
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/sentinel/policies/default", creds)
+
+		if entry.DriftStatus != "partial" {
+			t.Errorf("expected drift_status 'partial', got %q", entry.DriftStatus)
+		}
+		if entry.DriftMessage != "Role has partial Sentinel enforcement" {
+			t.Errorf("expected drift_message, got %q", entry.DriftMessage)
+		}
+	})
+
+	t.Run("omits drift fields when empty", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "bob",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect: policy.EffectAllow,
+		}
+
+		creds := &CredentialIssuanceFields{
+			RequestID: "test1234",
+			// DriftStatus and DriftMessage not set
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+
+		if entry.DriftStatus != "" {
+			t.Errorf("expected empty drift_status, got %q", entry.DriftStatus)
+		}
+		if entry.DriftMessage != "" {
+			t.Errorf("expected empty drift_message, got %q", entry.DriftMessage)
+		}
+	})
+}
+
+func TestDecisionLogEntry_DriftFields_JSONMarshal(t *testing.T) {
+	t.Run("includes drift fields in JSON when present", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect: policy.EffectAllow,
+		}
+
+		creds := &CredentialIssuanceFields{
+			RequestID:    "a1b2c3d4",
+			RoleARN:      "arn:aws:iam::123456789012:role/TestRole",
+			DriftStatus:  "none",
+			DriftMessage: "Role has no Sentinel enforcement",
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+
+		data, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatalf("failed to marshal entry: %v", err)
+		}
+
+		jsonStr := string(data)
+
+		if !containsSubstring(jsonStr, `"drift_status":"none"`) {
+			t.Errorf("JSON should contain drift_status field, got: %s", jsonStr)
+		}
+		if !containsSubstring(jsonStr, `"drift_message":"Role has no Sentinel enforcement"`) {
+			t.Errorf("JSON should contain drift_message field, got: %s", jsonStr)
+		}
+	})
+
+	t.Run("omits drift fields in JSON when empty (omitempty)", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "bob",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect: policy.EffectDeny,
+		}
+
+		// No creds - deny decision without drift checking
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", nil)
+
+		data, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatalf("failed to marshal entry: %v", err)
+		}
+
+		jsonStr := string(data)
+
+		if containsSubstring(jsonStr, `"drift_status"`) {
+			t.Errorf("JSON should NOT contain drift_status field when empty, got: %s", jsonStr)
+		}
+		if containsSubstring(jsonStr, `"drift_message"`) {
+			t.Errorf("JSON should NOT contain drift_message field when empty, got: %s", jsonStr)
+		}
+	})
+
+	t.Run("all drift status values marshal correctly", func(t *testing.T) {
+		statuses := []string{"ok", "partial", "none", "unknown"}
+
+		for _, status := range statuses {
+			req := &policy.Request{
+				User:    "alice",
+				Profile: "production",
+				Time:    time.Now(),
+			}
+
+			decision := policy.Decision{Effect: policy.EffectAllow}
+			creds := &CredentialIssuanceFields{
+				RequestID:   "test1234",
+				DriftStatus: status,
+			}
+
+			entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+
+			data, err := json.Marshal(entry)
+			if err != nil {
+				t.Fatalf("failed to marshal entry for status %s: %v", status, err)
+			}
+
+			jsonStr := string(data)
+			expected := `"drift_status":"` + status + `"`
+			if !containsSubstring(jsonStr, expected) {
+				t.Errorf("JSON should contain %s, got: %s", expected, jsonStr)
+			}
+		}
+	})
+}

@@ -23,6 +23,8 @@ type DecisionLogEntry struct {
 	SessionDuration   int    `json:"session_duration_seconds,omitempty"` // Session duration in seconds
 	ApprovedRequestID string `json:"approved_request_id,omitempty"`      // ID of approved request that overrode policy deny
 	BreakGlassEventID string `json:"break_glass_event_id,omitempty"`     // ID of break-glass event that overrode policy deny
+	DriftStatus       string `json:"drift_status,omitempty"`             // Sentinel enforcement drift status: "ok", "partial", "none", "unknown"
+	DriftMessage      string `json:"drift_message,omitempty"`            // Human-readable explanation of drift status
 }
 
 // NewDecisionLogEntry creates a DecisionLogEntry from policy evaluation results.
@@ -47,6 +49,8 @@ type CredentialIssuanceFields struct {
 	SessionDuration   time.Duration
 	ApprovedRequestID string // ID of approved request that overrode policy deny (empty if policy allowed)
 	BreakGlassEventID string // ID of break-glass event that overrode policy deny (empty if not break-glass)
+	DriftStatus       string // Drift check result: "ok", "partial", "none", "unknown"
+	DriftMessage      string // Human-readable explanation of drift status
 }
 
 // NewEnhancedDecisionLogEntry creates a DecisionLogEntry with credential issuance details.
@@ -63,6 +67,8 @@ func NewEnhancedDecisionLogEntry(req *policy.Request, decision policy.Decision, 
 		}
 		entry.ApprovedRequestID = creds.ApprovedRequestID
 		entry.BreakGlassEventID = creds.BreakGlassEventID
+		entry.DriftStatus = creds.DriftStatus
+		entry.DriftMessage = creds.DriftMessage
 	}
 
 	return entry
