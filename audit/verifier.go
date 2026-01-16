@@ -16,6 +16,12 @@ type cloudtrailAPI interface {
 	LookupEvents(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error)
 }
 
+// SessionVerifier defines the interface for session verification.
+// Both Verifier and TestVerifier implement this interface.
+type SessionVerifier interface {
+	Verify(ctx context.Context, input *VerifyInput) (*VerificationResult, error)
+}
+
 // Verifier queries CloudTrail and analyzes sessions for Sentinel enforcement.
 type Verifier struct {
 	client cloudtrailAPI
@@ -190,4 +196,26 @@ func parseCloudTrailEvent(event types.Event) (*SessionInfo, error) {
 	}
 
 	return info, nil
+}
+
+// VerifyFunc is a function type for custom verify implementations (used for testing).
+type VerifyFunc func(ctx context.Context, input *VerifyInput) (*VerificationResult, error)
+
+// TestVerifier wraps a VerifyFunc for testing purposes.
+// Use NewVerifierForTest to create instances.
+type TestVerifier struct {
+	verifyFunc VerifyFunc
+}
+
+// NewVerifierForTest creates a TestVerifier that uses a custom verify function.
+// This is used for testing CLI commands without actual AWS calls.
+func NewVerifierForTest(fn VerifyFunc) *TestVerifier {
+	return &TestVerifier{
+		verifyFunc: fn,
+	}
+}
+
+// Verify calls the custom verify function.
+func (v *TestVerifier) Verify(ctx context.Context, input *VerifyInput) (*VerificationResult, error) {
+	return v.verifyFunc(ctx, input)
 }
