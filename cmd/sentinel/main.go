@@ -37,5 +37,8 @@ func main() {
 	cli.ConfigureEnforcePlanCommand(app, s)
 	cli.ConfigureEnforceGenerateTrustPolicyCommand(app, s)
 
+	// Audit commands
+	cli.ConfigureAuditVerifyCommand(app, s)
+
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
