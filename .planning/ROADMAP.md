@@ -9,7 +9,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.0 MVP** - [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md) (Phases 1-8, shipped 2026-01-14)
 - ✅ **v1.1 Sentinel Fingerprint** - [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) (Phases 9-17, shipped 2026-01-15)
 - ✅ **v1.2 Approval Workflows** - [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) (Phases 18-26, shipped 2026-01-15)
-- 📋 **v1.3 Break-Glass** - Phases 27-34 (planned)
+- ✅ **v1.3 Break-Glass** - [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) (Phases 27-34, shipped 2026-01-16)
 
 ## Completed Milestones
 
@@ -167,7 +167,7 @@ Plans:
 
 </details>
 
-### 📋 v1.3 Break-Glass (Planned)
+### ✅ v1.3 Break-Glass — SHIPPED 2026-01-16
 
 **Milestone Goal:** Emergency access bypass with enhanced audit, time-bounded sessions, and immediate security notifications.
 

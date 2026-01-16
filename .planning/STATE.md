@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-15)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Executing v1.3 Break-Glass
+**Current focus:** Milestone v1.3 Break-Glass complete
 
 ## Current Position
 
@@ -37,12 +37,23 @@ Progress: ████████████████ 100%
 - Approval policies with auto-approve conditions
 - Approval audit trail logging
 
+**v1.3 Break-Glass shipped:** 2026-01-16
+- 8 phases, 16 plans, ~40 tasks
+- Emergency access model with state machine
+- DynamoDB storage with TTL and GSI queries
+- Elevated audit logging with incident correlation
+- Time-bounded sessions with duration capping
+- Immediate security notifications
+- Post-incident review commands
+- Rate limiting with cooldowns and quotas
+- Policy-based authorization control
+
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 55
+- Total plans completed: 61
 - Average duration: 2.4 min
-- Total execution time: ~141 min
+- Total execution time: ~172 min
 
 **By Milestone:**
 
@@ -51,6 +62,7 @@ Progress: ████████████████ 100%
 | v1.0 MVP | 8 | 16 | ~37 min |
 | v1.1 Sentinel Fingerprint | 9 | 12 | ~29 min |
 | v1.2 Approval Workflows | 9 | 18 | ~44 min |
+| v1.3 Break-Glass | 8 | 16 | ~31 min |
 
 ## Accumulated Context
 
@@ -85,3 +97,4 @@ Resume file: None
 - Milestone v1.0 shipped: MVP (Phases 1-8)
 - Milestone v1.1 shipped: Sentinel Fingerprint (Phases 9-17)
 - Milestone v1.2 shipped: Approval Workflows (Phases 18-26)
+- Milestone v1.3 shipped: Break-Glass (Phases 27-34)
