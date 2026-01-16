@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/enforce"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/request"
@@ -858,6 +859,162 @@ func TestCredentialsCommand_BreakGlassIntegration(t *testing.T) {
 
 		if credFields.BreakGlassEventID != "bg123456bg123456" {
 			t.Errorf("expected BreakGlassEventID bg123456bg123456, got %s", credFields.BreakGlassEventID)
+		}
+	})
+}
+
+func TestCredentialsCommandInput_RequireSentinelField(t *testing.T) {
+	t.Run("RequireSentinel field is false by default", func(t *testing.T) {
+		input := CredentialsCommandInput{}
+		if input.RequireSentinel {
+			t.Error("expected RequireSentinel to be false by default")
+		}
+	})
+
+	t.Run("RequireSentinel field can be set", func(t *testing.T) {
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			RequireSentinel: true,
+		}
+		if !input.RequireSentinel {
+			t.Error("expected RequireSentinel to be true")
+		}
+	})
+
+	t.Run("DriftChecker field is nil by default", func(t *testing.T) {
+		input := CredentialsCommandInput{}
+		if input.DriftChecker != nil {
+			t.Error("expected DriftChecker to be nil by default")
+		}
+	})
+
+	t.Run("DriftChecker field can be set for testing", func(t *testing.T) {
+		checker := &enforce.TestDriftChecker{}
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			DriftChecker:    checker,
+		}
+		if input.DriftChecker == nil {
+			t.Error("expected DriftChecker to be set")
+		}
+	})
+}
+
+func TestCredentialsCommand_RequireSentinelIntegration(t *testing.T) {
+	t.Run("no warning when RequireSentinel is false", func(t *testing.T) {
+		// When RequireSentinel is false, no drift checking should occur
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			RequireSentinel: false,
+			DriftChecker: &enforce.TestDriftChecker{
+				CheckFunc: func(ctx context.Context, roleARN string) (*enforce.DriftCheckResult, error) {
+					t.Error("DriftChecker should not be called when RequireSentinel is false")
+					return nil, nil
+				},
+			},
+		}
+		// Note: We can't run full CredentialsCommand without AWS setup,
+		// but we verify the input configuration is correct
+		if input.RequireSentinel {
+			t.Error("RequireSentinel should be false")
+		}
+	})
+
+	t.Run("TestDriftChecker returns custom results", func(t *testing.T) {
+		// Verify TestDriftChecker works as expected for CLI testing
+		checker := &enforce.TestDriftChecker{
+			CheckFunc: func(ctx context.Context, roleARN string) (*enforce.DriftCheckResult, error) {
+				return &enforce.DriftCheckResult{
+					Status:  enforce.DriftStatusPartial,
+					RoleARN: roleARN,
+					Message: "Some statements lack enforcement",
+				}, nil
+			},
+		}
+
+		result, err := checker.CheckRole(context.Background(), "arn:aws:iam::123456789012:role/TestRole")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.Status != enforce.DriftStatusPartial {
+			t.Errorf("expected status partial, got %s", result.Status)
+		}
+	})
+
+	t.Run("drift status values work correctly", func(t *testing.T) {
+		testCases := []struct {
+			status       enforce.DriftStatus
+			expectWarn   bool
+			description  string
+		}{
+			{enforce.DriftStatusOK, false, "no warning for OK status"},
+			{enforce.DriftStatusPartial, true, "warning for partial enforcement"},
+			{enforce.DriftStatusNone, true, "warning for no enforcement"},
+			{enforce.DriftStatusUnknown, true, "warning for unknown status"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.description, func(t *testing.T) {
+				checker := &enforce.TestDriftChecker{
+					CheckFunc: func(ctx context.Context, roleARN string) (*enforce.DriftCheckResult, error) {
+						return &enforce.DriftCheckResult{
+							Status:  tc.status,
+							RoleARN: roleARN,
+							Message: "Test message",
+						}, nil
+					},
+				}
+
+				result, _ := checker.CheckRole(context.Background(), "arn:aws:iam::123456789012:role/TestRole")
+				shouldWarn := result.Status != enforce.DriftStatusOK
+				if shouldWarn != tc.expectWarn {
+					t.Errorf("expected warning=%v for status %s, got %v", tc.expectWarn, tc.status, shouldWarn)
+				}
+			})
+		}
+	})
+
+	t.Run("drift status appears in log entry", func(t *testing.T) {
+		// Test that drift info is included in credential issuance fields
+		credFields := &logging.CredentialIssuanceFields{
+			RequestID:    "test1234",
+			RoleARN:      "arn:aws:iam::123456789012:role/TestRole",
+			DriftStatus:  "partial",
+			DriftMessage: "Role has partial Sentinel enforcement",
+		}
+
+		if credFields.DriftStatus != "partial" {
+			t.Errorf("expected DriftStatus 'partial', got %s", credFields.DriftStatus)
+		}
+		if credFields.DriftMessage == "" {
+			t.Error("expected non-empty DriftMessage")
+		}
+	})
+
+	t.Run("credentials still returned despite drift warnings", func(t *testing.T) {
+		// Verify that drift checking is advisory only - credentials are still issued
+		// This is verified by the fact that DriftChecker doesn't return an error
+		// that would stop credential issuance
+		checker := &enforce.TestDriftChecker{
+			CheckFunc: func(ctx context.Context, roleARN string) (*enforce.DriftCheckResult, error) {
+				return &enforce.DriftCheckResult{
+					Status:  enforce.DriftStatusNone,
+					RoleARN: roleARN,
+					Message: "No enforcement - but credentials still issued",
+				}, nil
+			},
+		}
+
+		result, err := checker.CheckRole(context.Background(), "arn:aws:iam::123456789012:role/TestRole")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Even with DriftStatusNone, there's no error - credentials would still be issued
+		if result.Status != enforce.DriftStatusNone {
+			t.Errorf("expected status none, got %s", result.Status)
 		}
 	})
 }

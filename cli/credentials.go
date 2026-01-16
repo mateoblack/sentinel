@@ -13,6 +13,7 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/enforce"
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
@@ -32,6 +33,8 @@ type CredentialsCommandInput struct {
 	LogStderr       bool             // Log to stderr (default: false)
 	Store           request.Store    // Optional: for approved request checking (nil = no checking)
 	BreakGlassStore breakglass.Store // Optional: for break-glass checking (nil = no checking)
+	RequireSentinel bool             // Check role enforcement before issuing credentials
+	DriftChecker    enforce.DriftChecker // Optional: for testing (nil = create from AWS config)
 }
 
 // CredentialProcessOutput represents the JSON output format for AWS credential_process.
@@ -74,6 +77,9 @@ func ConfigureCredentialsCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("log-stderr", "Write decision logs to stderr").
 		BoolVar(&input.LogStderr)
+
+	cmd.Flag("require-sentinel", "Warn if target role lacks Sentinel trust policy enforcement").
+		BoolVar(&input.RequireSentinel)
 
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := CredentialsCommand(context.Background(), input, s)
@@ -215,6 +221,38 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		return err
 	}
 
+	// 8.5. Check drift status if --require-sentinel is enabled
+	var driftResult *enforce.DriftCheckResult
+	if input.RequireSentinel && creds.RoleARN != "" {
+		// Get or create drift checker
+		checker := input.DriftChecker
+		if checker == nil {
+			checker = enforce.NewDriftChecker(awsCfg)
+		}
+
+		// Check the target role for Sentinel enforcement
+		driftResult, err = checker.CheckRole(ctx, creds.RoleARN)
+		if err != nil {
+			// Log error but don't fail - drift checking is advisory
+			fmt.Fprintf(os.Stderr, "Warning: failed to check Sentinel enforcement: %v\n", err)
+		} else {
+			// Output warnings for non-OK statuses
+			switch driftResult.Status {
+			case enforce.DriftStatusPartial:
+				fmt.Fprintf(os.Stderr, "Warning: Role %s has partial Sentinel enforcement (%s)\n", creds.RoleARN, driftResult.Message)
+			case enforce.DriftStatusNone:
+				fmt.Fprintf(os.Stderr, "Warning: Role %s has no Sentinel enforcement (%s)\n", creds.RoleARN, driftResult.Message)
+			case enforce.DriftStatusUnknown:
+				if driftResult.Error != "" {
+					fmt.Fprintf(os.Stderr, "Warning: Could not verify Sentinel enforcement for %s: %s\n", creds.RoleARN, driftResult.Error)
+				} else {
+					fmt.Fprintf(os.Stderr, "Warning: Could not verify Sentinel enforcement for %s\n", creds.RoleARN)
+				}
+			// DriftStatusOK - no warning needed
+			}
+		}
+	}
+
 	// 9. Log allow decision with credential context for CloudTrail correlation
 	if input.Logger != nil {
 		credFields := &logging.CredentialIssuanceFields{
@@ -230,6 +268,11 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		// Include break-glass event ID if credentials were issued via break-glass override
 		if activeBreakGlass != nil {
 			credFields.BreakGlassEventID = activeBreakGlass.ID
+		}
+		// Include drift status if checked
+		if driftResult != nil {
+			credFields.DriftStatus = string(driftResult.Status)
+			credFields.DriftMessage = driftResult.Message
 		}
 		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, input.PolicyParameter, credFields)
 		input.Logger.LogDecision(entry)
