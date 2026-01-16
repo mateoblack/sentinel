@@ -201,10 +201,10 @@ Plans:
 **Goal**: Dry-run logic to determine resources to create, existence checks, plan output formatting
 **Depends on**: Phase 35
 **Research**: Unlikely (internal logic)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 36-01: TBD
+- [x] 36-01: SSM existence checks and plan output formatting — completed 2026-01-15
 
 #### Phase 37: SSM Parameter Creation
 
@@ -276,7 +276,7 @@ Plans:
 | 18-26 | v1.2 | 17/17 | Complete | 2026-01-15 |
 | 27-34 | v1.3 | 15/15 | Complete | 2026-01-16 |
 | 35. Bootstrap Schema | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 36. Bootstrap Planner | v1.4 | 0/? | Not started | - |
+| 36. Bootstrap Planner | v1.4 | 1/1 | Complete | 2026-01-15 |
 | 37. SSM Parameter Creation | v1.4 | 0/? | Not started | - |
 | 38. Sample Policy Generation | v1.4 | 0/? | Not started | - |
 | 39. IAM Policy Generation | v1.4 | 0/? | Not started | - |

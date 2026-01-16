@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 35 of 42 (Bootstrap Schema)
+Phase: 36 of 42 (Bootstrap Planner)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-16 — Completed 35-01-PLAN.md
+Last activity: 2026-01-15 — Completed 36-01-PLAN.md
 
-Progress: █░░░░░░░░░ 12%
+Progress: ██░░░░░░░░ 25%
 
 ## Milestone Summary
 
@@ -85,6 +85,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - SSM path validation uses regex for alphanumeric, /, -, _ characters
 - Profile name validation matches AWS conventions (alphanumeric, -, _)
 
+**v1.4 Bootstrap Planner decisions (Phase 36):**
+- ssmAPI interface follows notification/sns.go pattern for testability
+- Planner validates config before making any SSM calls
+- IAM policy documents always show StateCreate (generated, not actual IAM resources)
+- Format symbols: + (create), ~ (update), = (exists), - (skip)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -95,8 +101,8 @@ None — clean start for v1.4.
 
 ## Session Continuity
 
-Last session: 2026-01-16
-Stopped at: Completed 35-01-PLAN.md
+Last session: 2026-01-15
+Stopped at: Completed 36-01-PLAN.md
 Resume file: None
 
 ## Roadmap Evolution
