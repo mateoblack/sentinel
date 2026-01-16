@@ -221,7 +221,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 44-01: TBD (run /gsd:plan-phase 44 to break down)
+- [x] 44-01: Enforcement advisor with IAM integration and CLI command — completed 2026-01-16
 
 #### Phase 45: Trust Policy Templates
 
@@ -284,7 +284,7 @@ Plans:
 | 27-34 | v1.3 | 15/15 | Complete | 2026-01-16 |
 | 35-42 | v1.4 | 8/8 | Complete | 2026-01-16 |
 | 43. Enforcement Types | v1.5 | 2/2 | Complete | 2026-01-16 |
-| 44. Enforcement Advisor | v1.5 | 0/? | Not started | - |
+| 44. Enforcement Advisor | v1.5 | 1/1 | Complete | 2026-01-16 |
 | 45. Trust Policy Templates | v1.5 | 0/? | Not started | - |
 | 46. CloudTrail Query Types | v1.5 | 0/? | Not started | - |
 | 47. Audit Verify Command | v1.5 | 0/? | Not started | - |
