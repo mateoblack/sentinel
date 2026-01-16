@@ -252,10 +252,11 @@ Plans:
 **Goal**: Policy rules for who can invoke break-glass and under what conditions
 **Depends on**: Phase 33
 **Research**: Unlikely (extends existing policy schema)
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 34-01: TBD
+- [ ] 34-01: Break-glass policy types with validation and matching
+- [ ] 34-02: CLI break-glass policy integration
 
 ## Progress (All Milestones)
 
@@ -271,4 +272,4 @@ Plans:
 | 31. Notification Blast | v1.3 | 2/2 | Complete | 2026-01-15 |
 | 32. Post-Incident Review | v1.3 | 2/2 | Complete | 2026-01-15 |
 | 33. Rate Limiting | v1.3 | 2/2 | Complete | 2026-01-15 |
-| 34. Break-Glass Policies | v1.3 | 0/? | Not started | - |
+| 34. Break-Glass Policies | v1.3 | 0/2 | Planned | - |
