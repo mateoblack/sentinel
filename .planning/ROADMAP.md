@@ -10,7 +10,8 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.1 Sentinel Fingerprint** - [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) (Phases 9-17, shipped 2026-01-15)
 - ✅ **v1.2 Approval Workflows** - [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) (Phases 18-26, shipped 2026-01-15)
 - ✅ **v1.3 Break-Glass** — [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) (Phases 27-34, shipped 2026-01-16)
-- 🚧 **v1.4 Sentinel Bootstrapping** — Phases 35-42 (in progress)
+- ✅ **v1.4 Sentinel Bootstrapping** — [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) (Phases 35-42, shipped 2026-01-16)
+- 🚧 **v1.5 Enforcement & Assurance** — Phases 43-49 (in progress)
 
 ## Completed Milestones
 
@@ -182,90 +183,95 @@ Plans:
 
 </details>
 
-### 🚧 v1.4 Sentinel Bootstrapping (In Progress)
+<details>
+<summary>✅ v1.4 Sentinel Bootstrapping (Phases 35-42) — SHIPPED 2026-01-16</summary>
 
-**Milestone Goal:** Prepare AWS to be a trustworthy policy source for Sentinel with deterministic, reversible CLI-driven setup.
+- [x] Phase 35: Bootstrap Schema (1/1 plans) — completed 2026-01-16
+- [x] Phase 36: Bootstrap Planner (1/1 plans) — completed 2026-01-15
+- [x] Phase 37: SSM Parameter Creation (1/1 plans) — completed 2026-01-16
+- [x] Phase 38: Sample Policy Generation (1/1 plans) — completed 2026-01-16
+- [x] Phase 39: IAM Policy Generation (1/1 plans) — completed 2026-01-16
+- [x] Phase 40: Bootstrap Command (1/1 plans) — completed 2026-01-16
+- [x] Phase 41: Status Command (1/1 plans) — completed 2026-01-16
+- [x] Phase 42: Bootstrap Documentation (1/1 plans) — completed 2026-01-16
 
-#### Phase 35: Bootstrap Schema
+</details>
 
-**Goal**: Define bootstrap configuration types, resource specifications, and state tracking
-**Depends on**: v1.3 complete
-**Research**: Unlikely (internal design)
-**Plans**: 1
+### 🚧 v1.5 Enforcement & Assurance (In Progress)
 
-Plans:
-- [x] 35-01: Bootstrap config types with resource specs, state tracking, and validation — completed 2026-01-16
+**Milestone Goal:** Close the loop between Sentinel decisions and AWS enforcement; help teams prove Sentinel is actually in effect.
 
-#### Phase 36: Bootstrap Planner
+#### Phase 43: Enforcement Types
 
-**Goal**: Dry-run logic to determine resources to create, existence checks, plan output formatting
-**Depends on**: Phase 35
-**Research**: Unlikely (internal logic)
-**Plans**: 1
-
-Plans:
-- [x] 36-01: SSM existence checks and plan output formatting — completed 2026-01-15
-
-#### Phase 37: SSM Parameter Creation
-
-**Goal**: Create SSM policy parameters, handle existing parameters, versioning awareness
-**Depends on**: Phase 36
-**Research**: Unlikely (existing SSM patterns)
-**Plans**: 1
+**Goal**: Define enforcement analysis types, IAM trust policy parsing, and condition evaluation logic
+**Depends on**: v1.4 complete
+**Research**: Likely (IAM trust policy structure, condition operators)
+**Research topics**: IAM trust policy document structure, sts:SourceIdentity condition, policy condition operators
+**Plans**: TBD
 
 Plans:
-- [x] 37-01: Executor with Apply method for SSM parameter creation — completed 2026-01-16
+- [ ] 43-01: TBD (run /gsd:plan-phase 43 to break down)
 
-#### Phase 38: Sample Policy Generation
+#### Phase 44: Enforcement Advisor
 
-**Goal**: Generate safe starter policy YAML per profile with validation
-**Depends on**: Phase 37
-**Research**: Unlikely (internal patterns)
-**Plans**: 1
-
-Plans:
-- [x] 38-01: Sample policy generator with GenerateSamplePolicy function — completed 2026-01-16
-
-#### Phase 39: IAM Policy Generation
-
-**Goal**: Generate SentinelPolicyReader and SentinelPolicyAdmin IAM policy documents
-**Depends on**: Phase 38
-**Research**: Likely (IAM policy document structure, least-privilege patterns)
-**Research topics**: IAM policy best practices, resource ARN patterns, condition keys
-**Plans**: 1
+**Goal**: `sentinel enforce plan` command with tiered enforcement status reporting and remediation guidance
+**Depends on**: Phase 43
+**Research**: Unlikely (internal CLI patterns)
+**Plans**: TBD
 
 Plans:
-- [x] 39-01: IAM policy document types and generator functions — completed 2026-01-16
+- [ ] 44-01: TBD (run /gsd:plan-phase 44 to break down)
 
-#### Phase 40: Bootstrap Command
+#### Phase 45: Trust Policy Templates
 
-**Goal**: `sentinel init bootstrap` command with --plan/--yes/--profile flags
-**Depends on**: Phase 39
-**Research**: Unlikely (existing CLI patterns)
-**Plans**: 1
-
-Plans:
-- [x] 40-01: Bootstrap command with plan/apply workflow and CLI integration — completed 2026-01-16
-
-#### Phase 41: Status Command
-
-**Goal**: `sentinel init status` showing policy root, profiles with parameters, versions
-**Depends on**: Phase 40
-**Research**: Unlikely (existing CLI patterns)
-**Plans**: 1
+**Goal**: `sentinel enforce generate trust-policy` outputs ready-to-use JSON trust policy snippets with SourceIdentity conditions
+**Depends on**: Phase 44
+**Research**: Unlikely (JSON generation, internal patterns)
+**Plans**: TBD
 
 Plans:
-- [x] 41-01: Status command with SSM query and human/JSON output — completed 2026-01-16
+- [ ] 45-01: TBD (run /gsd:plan-phase 45 to break down)
 
-#### Phase 42: Bootstrap Documentation
+#### Phase 46: CloudTrail Query Types
 
-**Goal**: Setup guide, security properties documentation, adoption guide
-**Depends on**: Phase 41
-**Research**: Unlikely (internal work)
-**Plans**: 1
+**Goal**: Define CloudTrail query types and assurance logic for session verification
+**Depends on**: Phase 45
+**Research**: Likely (CloudTrail Lookup Events API, event structure)
+**Research topics**: CloudTrail LookupEvents API, AssumeRole event fields, SourceIdentity in CloudTrail
+**Plans**: TBD
 
 Plans:
-- [x] 42-01: Comprehensive bootstrap documentation with setup guide — completed 2026-01-16
+- [ ] 46-01: TBD (run /gsd:plan-phase 46 to break down)
+
+#### Phase 47: Audit Verify Command
+
+**Goal**: `sentinel audit verify` queries CloudTrail for sessions lacking SourceIdentity, break-glass anomalies, and bypass detection
+**Depends on**: Phase 46
+**Research**: Unlikely (extends existing CLI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 47-01: TBD (run /gsd:plan-phase 47 to break down)
+
+#### Phase 48: Require Sentinel Mode
+
+**Goal**: Policy/config flag `enforcement.require_sentinel: true` with warning output and drift logging
+**Depends on**: Phase 47
+**Research**: Unlikely (internal policy/config extension)
+**Plans**: TBD
+
+Plans:
+- [ ] 48-01: TBD (run /gsd:plan-phase 48 to break down)
+
+#### Phase 49: Enforcement Documentation
+
+**Goal**: Setup guides for enforcement tiers, adoption patterns, and verification procedures
+**Depends on**: Phase 48
+**Research**: Unlikely (internal documentation work)
+**Plans**: TBD
+
+Plans:
+- [ ] 49-01: TBD (run /gsd:plan-phase 49 to break down)
 
 ## Progress (All Milestones)
 
@@ -275,11 +281,11 @@ Plans:
 | 9-17 | v1.1 | 12/12 | Complete | 2026-01-15 |
 | 18-26 | v1.2 | 17/17 | Complete | 2026-01-15 |
 | 27-34 | v1.3 | 15/15 | Complete | 2026-01-16 |
-| 35. Bootstrap Schema | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 36. Bootstrap Planner | v1.4 | 1/1 | Complete | 2026-01-15 |
-| 37. SSM Parameter Creation | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 38. Sample Policy Generation | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 39. IAM Policy Generation | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 40. Bootstrap Command | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 41. Status Command | v1.4 | 1/1 | Complete | 2026-01-16 |
-| 42. Bootstrap Documentation | v1.4 | 1/1 | Complete | 2026-01-16 |
+| 35-42 | v1.4 | 8/8 | Complete | 2026-01-16 |
+| 43. Enforcement Types | v1.5 | 0/? | Not started | - |
+| 44. Enforcement Advisor | v1.5 | 0/? | Not started | - |
+| 45. Trust Policy Templates | v1.5 | 0/? | Not started | - |
+| 46. CloudTrail Query Types | v1.5 | 0/? | Not started | - |
+| 47. Audit Verify Command | v1.5 | 0/? | Not started | - |
+| 48. Require Sentinel Mode | v1.5 | 0/? | Not started | - |
+| 49. Enforcement Documentation | v1.5 | 0/? | Not started | - |
