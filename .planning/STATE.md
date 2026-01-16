@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 46 of 49 (CloudTrail Query Types)
+Phase: 47 of 49 (Audit Verify Command)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-16 — Completed 46-01-PLAN.md
+Last activity: 2026-01-16 — Completed 47-01-PLAN.md
 
-Progress: ████░░░░░░ 25%
+Progress: █████░░░░░ 43%
 
 ## Milestone Summary
 
@@ -108,6 +108,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - PassRate returns 100% for zero sessions (no issues is success)
 - Issues created as warnings for non-Sentinel sessions
 
+**v1.5 Audit Verify Command decisions (Phase 47):**
+- SessionVerifier interface enables CLI testing with mock verifiers
+- Return non-zero exit code when issues found for scripting integration
+- Human output shows time window, summary stats, pass rate, and detailed issues
+- JSON output marshals VerificationResult directly for machine parsing
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -119,7 +125,7 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 46-01-PLAN.md (Phase 46 complete)
+Stopped at: Completed 47-01-PLAN.md (Phase 47 complete)
 Resume file: None
 
 ## Roadmap Evolution
