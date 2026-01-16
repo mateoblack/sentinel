@@ -11,6 +11,7 @@ import (
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
+	"github.com/byteness/aws-vault/v7/policy"
 )
 
 // mockBreakGlassStore implements breakglass.Store for testing.
@@ -177,6 +178,44 @@ func testableBreakGlassCommand(ctx context.Context, input BreakGlassCommandInput
 	reasonCode := breakglass.ReasonCode(input.ReasonCode)
 	if !reasonCode.IsValid() {
 		return nil, errors.New("invalid reason code: must be one of: incident, maintenance, security, recovery, other")
+	}
+
+	// 3.5 Check break-glass policy authorization if policy is provided
+	if input.BreakGlassPolicy != nil {
+		rule := breakglass.FindBreakGlassPolicyRule(input.BreakGlassPolicy, input.ProfileName)
+		if rule == nil {
+			// Policy exists but no rule matches - deny access
+			return nil, errors.New("no break-glass policy rule matches profile")
+		}
+
+		// Check full authorization (user, reason code, time window, duration)
+		if !breakglass.IsBreakGlassAllowed(rule, username, reasonCode, time.Now(), input.Duration) {
+			// Determine specific reason for denial
+			if !breakglass.CanInvokeBreakGlass(rule, username) {
+				return nil, errors.New("not authorized to invoke break-glass for profile")
+			}
+			// Check reason code (empty = all allowed)
+			if len(rule.AllowedReasonCodes) > 0 {
+				found := false
+				for _, rc := range rule.AllowedReasonCodes {
+					if rc == reasonCode {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return nil, errors.New("reason code not allowed for this profile")
+				}
+			}
+			// Check time window
+			if rule.Time != nil {
+				return nil, errors.New("break-glass not allowed at this time")
+			}
+			// Check duration cap
+			if rule.MaxDuration > 0 && input.Duration > rule.MaxDuration {
+				return nil, errors.New("duration exceeds maximum allowed for this profile")
+			}
+		}
 	}
 
 	// 4. Cap duration at MaxDuration (4h)
@@ -1349,5 +1388,461 @@ func TestBreakGlassCommand_NilRateLimitPolicy(t *testing.T) {
 	}
 	if storedEvent == nil {
 		t.Fatal("expected event to be stored")
+	}
+}
+
+// ============================================================================
+// Break-Glass Policy Integration
+// ============================================================================
+
+func TestBreakGlassCommand_PolicyAuthorized(t *testing.T) {
+	currentUser, _ := user.Current()
+
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Users:    []string{currentUser.Username},
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:      "production",
+		Duration:         1 * time.Hour,
+		ReasonCode:       "incident",
+		Justification:    "Testing policy authorized break-glass invocation",
+		Store:            store,
+		BreakGlassPolicy: bgPolicy,
+	}
+
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify event was created
+	if output == nil || output.Event == nil {
+		t.Fatal("expected event to be created")
+	}
+	if storedEvent == nil {
+		t.Fatal("expected event to be stored")
+	}
+	if storedEvent.Profile != "production" {
+		t.Errorf("expected profile 'production', got '%s'", storedEvent.Profile)
+	}
+}
+
+func TestBreakGlassCommand_PolicyUserNotAuthorized(t *testing.T) {
+	store := &mockBreakGlassStore{
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Users:    []string{"different-user"}, // Current user not in list
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:      "production",
+		Duration:         1 * time.Hour,
+		ReasonCode:       "incident",
+		Justification:    "Testing policy user not authorized",
+		Store:            store,
+		BreakGlassPolicy: bgPolicy,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err == nil {
+		t.Fatal("expected error when user not authorized")
+	}
+	if !strings.Contains(err.Error(), "not authorized") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestBreakGlassCommand_PolicyReasonCodeNotAllowed(t *testing.T) {
+	currentUser, _ := user.Current()
+
+	store := &mockBreakGlassStore{
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:               "production",
+				Profiles:           []string{"production"},
+				Users:              []string{currentUser.Username},
+				AllowedReasonCodes: []breakglass.ReasonCode{breakglass.ReasonIncident, breakglass.ReasonSecurity}, // maintenance not allowed
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:      "production",
+		Duration:         1 * time.Hour,
+		ReasonCode:       "maintenance", // Not in allowed list
+		Justification:    "Testing policy reason code not allowed",
+		Store:            store,
+		BreakGlassPolicy: bgPolicy,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err == nil {
+		t.Fatal("expected error when reason code not allowed")
+	}
+	if !strings.Contains(err.Error(), "reason code not allowed") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestBreakGlassCommand_PolicyTimeWindowBlocked(t *testing.T) {
+	currentUser, _ := user.Current()
+
+	store := &mockBreakGlassStore{
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	// Create a time window that definitely doesn't match current time
+	// Use a day that is not today
+	today := time.Now().Weekday()
+	var blockedDay policy.Weekday
+	switch today {
+	case time.Monday:
+		blockedDay = policy.Tuesday
+	case time.Tuesday:
+		blockedDay = policy.Wednesday
+	case time.Wednesday:
+		blockedDay = policy.Thursday
+	case time.Thursday:
+		blockedDay = policy.Friday
+	case time.Friday:
+		blockedDay = policy.Saturday
+	case time.Saturday:
+		blockedDay = policy.Sunday
+	case time.Sunday:
+		blockedDay = policy.Monday
+	}
+
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Users:    []string{currentUser.Username},
+				Time: &policy.TimeWindow{
+					Days: []policy.Weekday{blockedDay}, // A day that is not today
+				},
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:      "production",
+		Duration:         1 * time.Hour,
+		ReasonCode:       "incident",
+		Justification:    "Testing policy time window blocked",
+		Store:            store,
+		BreakGlassPolicy: bgPolicy,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err == nil {
+		t.Fatal("expected error when time window blocked")
+	}
+	if !strings.Contains(err.Error(), "not allowed at this time") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestBreakGlassCommand_PolicyDurationExceedsMaximum(t *testing.T) {
+	currentUser, _ := user.Current()
+
+	store := &mockBreakGlassStore{
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:        "production",
+				Profiles:    []string{"production"},
+				Users:       []string{currentUser.Username},
+				MaxDuration: 30 * time.Minute, // Cap at 30 minutes
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:      "production",
+		Duration:         1 * time.Hour, // Exceeds 30 minute cap
+		ReasonCode:       "incident",
+		Justification:    "Testing policy duration exceeds maximum",
+		Store:            store,
+		BreakGlassPolicy: bgPolicy,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err == nil {
+		t.Fatal("expected error when duration exceeds maximum")
+	}
+	if !strings.Contains(err.Error(), "duration exceeds maximum") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestBreakGlassCommand_PolicyNoMatchingRule(t *testing.T) {
+	store := &mockBreakGlassStore{
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:     "staging",
+				Profiles: []string{"staging"}, // Only staging, not production
+				Users:    []string{"anyone"},
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:      "production", // No rule matches production
+		Duration:         1 * time.Hour,
+		ReasonCode:       "incident",
+		Justification:    "Testing policy no matching rule",
+		Store:            store,
+		BreakGlassPolicy: bgPolicy,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err == nil {
+		t.Fatal("expected error when no policy rule matches")
+	}
+	if !strings.Contains(err.Error(), "no break-glass policy rule matches") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestBreakGlassCommand_NilPolicyAllows(t *testing.T) {
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:      "any-profile",
+		Duration:         1 * time.Hour,
+		ReasonCode:       "incident",
+		Justification:    "Testing nil policy allows any user (backward compatible)",
+		Store:            store,
+		BreakGlassPolicy: nil, // Explicitly nil - no policy enforcement
+	}
+
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error with nil policy: %v", err)
+	}
+
+	// Verify command succeeded without policy checks
+	if output == nil || output.Event == nil {
+		t.Fatal("expected event to be created")
+	}
+	if storedEvent == nil {
+		t.Fatal("expected event to be stored")
+	}
+}
+
+func TestBreakGlassCommand_PolicyWildcardProfile(t *testing.T) {
+	currentUser, _ := user.Current()
+
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:     "all-profiles",
+				Profiles: []string{}, // Empty = wildcard, matches all profiles
+				Users:    []string{currentUser.Username},
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:      "any-profile-name",
+		Duration:         1 * time.Hour,
+		ReasonCode:       "incident",
+		Justification:    "Testing wildcard profile matches any profile",
+		Store:            store,
+		BreakGlassPolicy: bgPolicy,
+	}
+
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify event was created
+	if output == nil || output.Event == nil {
+		t.Fatal("expected event to be created")
+	}
+	if storedEvent == nil {
+		t.Fatal("expected event to be stored")
+	}
+}
+
+func TestBreakGlassCommand_PolicyEmptyReasonCodesAllowsAll(t *testing.T) {
+	currentUser, _ := user.Current()
+
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:               "production",
+				Profiles:           []string{"production"},
+				Users:              []string{currentUser.Username},
+				AllowedReasonCodes: []breakglass.ReasonCode{}, // Empty = all allowed
+			},
+		},
+	}
+
+	// Test with various reason codes - all should be allowed
+	reasonCodes := []string{"incident", "maintenance", "security", "recovery", "other"}
+
+	for _, rc := range reasonCodes {
+		t.Run(rc, func(t *testing.T) {
+			input := BreakGlassCommandInput{
+				ProfileName:      "production",
+				Duration:         1 * time.Hour,
+				ReasonCode:       rc,
+				Justification:    "Testing empty reason codes allows all",
+				Store:            store,
+				BreakGlassPolicy: bgPolicy,
+			}
+
+			output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+			if err != nil {
+				t.Fatalf("unexpected error for reason code %s: %v", rc, err)
+			}
+			if output == nil || output.Event == nil {
+				t.Fatal("expected event to be created")
+			}
+			if storedEvent == nil {
+				t.Fatal("expected event to be stored")
+			}
+		})
+	}
+}
+
+func TestBreakGlassCommand_PolicyZeroMaxDurationNoLimit(t *testing.T) {
+	currentUser, _ := user.Current()
+
+	var storedEvent *breakglass.BreakGlassEvent
+	store := &mockBreakGlassStore{
+		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+			storedEvent = event
+			return nil
+		},
+		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+			return nil, nil
+		},
+	}
+
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:        "production",
+				Profiles:    []string{"production"},
+				Users:       []string{currentUser.Username},
+				MaxDuration: 0, // Zero = no duration cap (system default applies)
+			},
+		},
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:      "production",
+		Duration:         4 * time.Hour, // Max system duration
+		ReasonCode:       "incident",
+		Justification:    "Testing zero max duration allows any duration up to system max",
+		Store:            store,
+		BreakGlassPolicy: bgPolicy,
+	}
+
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify event was created with 4h duration (capped at system max)
+	if output == nil || output.Event == nil {
+		t.Fatal("expected event to be created")
+	}
+	if storedEvent == nil {
+		t.Fatal("expected event to be stored")
+	}
+	if storedEvent.Duration != 4*time.Hour {
+		t.Errorf("expected duration 4h, got %v", storedEvent.Duration)
 	}
 }
