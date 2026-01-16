@@ -31,6 +31,7 @@ func main() {
 
 	// Bootstrap commands
 	cli.ConfigureBootstrapCommand(app, s)
+	cli.ConfigureStatusCommand(app, s)
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
