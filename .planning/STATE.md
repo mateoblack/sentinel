@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 35 of 42 (Bootstrap Schema)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-16 — Milestone v1.4 created
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-01-16 — Completed 35-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0%
+Progress: █░░░░░░░░░ 12%
 
 ## Milestone Summary
 
@@ -52,9 +52,9 @@ Progress: ░░░░░░░░░░ 0%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 60
+- Total plans completed: 61
 - Average duration: 3.0 min
-- Total execution time: ~180 min
+- Total execution time: ~183 min
 
 **By Milestone:**
 
@@ -79,6 +79,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Empty Profiles = rule applies to all profiles (wildcard)
 - MaxDuration 0 = no cap (use system default)
 
+**v1.4 Bootstrap Schema decisions (Phase 35):**
+- ResourceState includes 'exists' and 'skip' as separate states for clarity
+- PlanSummary.ToSkip counts both skip and exists states
+- SSM path validation uses regex for alphanumeric, /, -, _ characters
+- Profile name validation matches AWS conventions (alphanumeric, -, _)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -90,7 +96,7 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Milestone v1.4 initialization
+Stopped at: Completed 35-01-PLAN.md
 Resume file: None
 
 ## Roadmap Evolution
