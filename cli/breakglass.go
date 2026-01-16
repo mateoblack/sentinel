@@ -40,6 +40,10 @@ type BreakGlassCommandInput struct {
 	// RateLimitPolicy is an optional policy for rate limiting break-glass invocations.
 	// If nil, no rate limiting is enforced.
 	RateLimitPolicy *breakglass.RateLimitPolicy
+
+	// BreakGlassPolicy is an optional policy for authorization control.
+	// If nil, any user can invoke break-glass (no policy enforcement).
+	BreakGlassPolicy *breakglass.BreakGlassPolicy
 }
 
 // BreakGlassCommandOutput represents the JSON output from the breakglass command.
@@ -112,6 +116,54 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 		errMsg := fmt.Sprintf("Invalid reason code: %q (must be one of: incident, maintenance, security, recovery, other)", input.ReasonCode)
 		fmt.Fprintf(os.Stderr, "%s\n", errMsg)
 		return errors.New(errMsg)
+	}
+
+	// 3.5 Check break-glass policy authorization if policy is provided
+	if input.BreakGlassPolicy != nil {
+		rule := breakglass.FindBreakGlassPolicyRule(input.BreakGlassPolicy, input.ProfileName)
+		if rule == nil {
+			// Policy exists but no rule matches - deny access
+			errMsg := fmt.Sprintf("No break-glass policy rule matches profile %q", input.ProfileName)
+			fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+			return errors.New(errMsg)
+		}
+
+		// Check full authorization (user, reason code, time window, duration)
+		if !breakglass.IsBreakGlassAllowed(rule, username, reasonCode, time.Now(), input.Duration) {
+			// Determine specific reason for denial
+			if !breakglass.CanInvokeBreakGlass(rule, username) {
+				errMsg := fmt.Sprintf("Not authorized to invoke break-glass for profile %q", input.ProfileName)
+				fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+				return errors.New(errMsg)
+			}
+			// Check reason code (empty = all allowed)
+			if len(rule.AllowedReasonCodes) > 0 {
+				found := false
+				for _, rc := range rule.AllowedReasonCodes {
+					if rc == reasonCode {
+						found = true
+						break
+					}
+				}
+				if !found {
+					errMsg := fmt.Sprintf("Reason code %q not allowed for this profile", input.ReasonCode)
+					fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+					return errors.New(errMsg)
+				}
+			}
+			// Check time window
+			if rule.Time != nil {
+				errMsg := "Break-glass not allowed at this time"
+				fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+				return errors.New(errMsg)
+			}
+			// Check duration cap
+			if rule.MaxDuration > 0 && input.Duration > rule.MaxDuration {
+				errMsg := fmt.Sprintf("Duration %v exceeds maximum allowed %v for this profile", input.Duration, rule.MaxDuration)
+				fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+				return errors.New(errMsg)
+			}
+		}
 	}
 
 	// 4. Cap duration at MaxDuration (4h)
