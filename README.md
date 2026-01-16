@@ -40,10 +40,14 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ Break-glass notifications for immediate security awareness — v1.3
 - ✓ Break-glass policies for authorization control — v1.3
 - ✓ Post-incident review commands: breakglass-list, breakglass-check, breakglass-close — v1.3
+- ✓ Enforcement analyzer for trust policy verification — v1.5
+- ✓ Trust policy generation for enforcement patterns A/B/C — v1.5
+- ✓ CloudTrail session verification with audit command — v1.5
+- ✓ Drift detection with --require-sentinel flag — v1.5
 
 ### Active
 
-(None — all v1.3 requirements validated)
+(None — all v1.5 requirements validated)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -52,7 +56,7 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.3 with 35,726 LOC Go.
+Shipped v1.5 with 49,588 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -87,6 +91,12 @@ v1.3 adds break-glass emergency access:
 - Immediate SNS/Webhook notifications for security team awareness
 - Post-incident review commands for auditing and closing events
 - Break-glass policies for controlling who can invoke emergency access
+
+v1.5 adds enforcement and assurance:
+- Trust policy analyzer with enforcement status (Full/Partial/None)
+- Trust policy generator for patterns A/B/C
+- CloudTrail session verifier for compliance auditing
+- Drift detection at credential time with --require-sentinel flag
 
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
@@ -131,9 +141,10 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Duration capping | Automatic cap to remaining break-glass time | ✓ Good |
 | Best-effort notifications | Errors logged but don't fail break-glass command | ✓ Good |
 | Rate limit check order | cooldown → user quota → profile quota → escalation flag | ✓ Good |
-| Escalation threshold | Flags for notification only, doesn't block | ✓ Good |
+| Escalation threshold | Flags for notification only, doesn't block                                                                 | ✓ Good |
 | Empty lists = wildcards | AllowedReasonCodes, Profiles: empty = all allowed | ✓ Good |
-| Break-glass policy integration | Check after profile validation, before rate limit | ✓ Good |
-
+| Break-glass policy integration | Check after profile validation, before rate limit | ✓ Good |                         
+          
 ---
-*Last updated: 2026-01-16 after v1.3 milestone*
+*Last updated: 2026-01-16 after v1.5 milestone*
+                                                                                                                           `                         
