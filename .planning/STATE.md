@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-16)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.6 Testing & Hardening — comprehensive test coverage before production
+**Current focus:** v1.6 Testing & Hardening — COMPLETE
 
 ## Current Position
 
 Phase: 59 of 59 (Pre-Release Validation)
-Plan: 2 of 3 in current phase (complete)
-Status: In progress
-Last activity: 2026-01-17 — Completed 59-02-PLAN.md (Documentation Validation)
+Plan: 3 of 3 in current phase (complete)
+Status: v1.6 Testing & Hardening COMPLETE
+Last activity: 2026-01-17 — Completed 59-03-PLAN.md (Pre-Release Checklist)
 
-Progress: █████████░ 96% (v1.6 Testing & Hardening)
+Progress: ██████████ 100% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -68,12 +68,22 @@ Progress: █████████░ 96% (v1.6 Testing & Hardening)
 - Drift detection with --require-sentinel flag
 - Complete enforcement documentation
 
+**v1.6 Testing & Hardening shipped:** 2026-01-17
+- 10 phases, 25 plans
+- +25,042 lines of Go (74,630 total)
+- Comprehensive test infrastructure (mock framework, test helpers)
+- >80% coverage on all 11 Sentinel packages (94.1% average)
+- Security regression test suite
+- Performance benchmarks and load simulation
+- 1,085 tests total
+- Pre-release validation complete
+
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 85
+- Total plans completed: 101
 - Average duration: 3.0 min
-- Total execution time: ~263 min
+- Total execution time: ~311 min
 
 **By Milestone:**
 
@@ -85,6 +95,7 @@ Progress: █████████░ 96% (v1.6 Testing & Hardening)
 | v1.3 Break-Glass | 8 | 15 | ~45 min |
 | v1.4 Sentinel Bootstrapping | 8 | 8 | ~20 min |
 | v1.5 Enforcement & Assurance | 7 | 8 | ~20 min |
+| v1.6 Testing & Hardening | 10 | 25 | ~48 min |
 
 ## Accumulated Context
 
@@ -275,9 +286,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 59-02-PLAN.md (Plan 2 of 3 in Phase 59)
+Stopped at: v1.6 milestone complete
 Resume file: None
-Next: 59-03-PLAN.md (Pre-Release Checklist)
+Next: v1.7 planning (future)
 
 ## Roadmap Evolution
 
@@ -287,4 +298,4 @@ Next: 59-03-PLAN.md (Pre-Release Checklist)
 - Milestone v1.3 shipped: 2026-01-16 — Break-Glass (Phases 27-34)
 - Milestone v1.4 shipped: 2026-01-16 — Sentinel Bootstrapping (Phases 35-42)
 - Milestone v1.5 shipped: 2026-01-16 — Enforcement & Assurance (Phases 43-49)
-- Milestone v1.6 created: 2026-01-16 — Testing & Hardening (Phases 50-59, 25 plans)
+- Milestone v1.6 shipped: 2026-01-17 — Testing & Hardening (Phases 50-59, 25 plans)
