@@ -794,3 +794,336 @@ func TestExecutor_Apply_StateUpdateWithMixedResults(t *testing.T) {
 		t.Errorf("expected update-2 to fail, got %s", result.Failed[0].Name)
 	}
 }
+
+// ============================================================================
+// End-to-End Bootstrap Workflow Integration Test
+// ============================================================================
+
+// inMemorySSMStore simulates SSM state for end-to-end testing.
+// It maintains parameter state across Planner, Executor, and StatusChecker.
+type inMemorySSMStore struct {
+	mu         sync.Mutex
+	parameters map[string]*inMemoryParameter
+}
+
+type inMemoryParameter struct {
+	Name    string
+	Value   string
+	Version int64
+	Type    types.ParameterType
+}
+
+func newInMemorySSMStore() *inMemorySSMStore {
+	return &inMemorySSMStore{
+		parameters: make(map[string]*inMemoryParameter),
+	}
+}
+
+// GetParameter implements ssmAPI for Planner.
+func (s *inMemorySSMStore) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	name := aws.ToString(params.Name)
+	param, exists := s.parameters[name]
+	if !exists {
+		return nil, &types.ParameterNotFound{Message: aws.String("Parameter not found")}
+	}
+
+	return &ssm.GetParameterOutput{
+		Parameter: &types.Parameter{
+			Name:    aws.String(param.Name),
+			Value:   aws.String(param.Value),
+			Version: param.Version,
+			Type:    param.Type,
+		},
+	}, nil
+}
+
+// PutParameter implements ssmWriterAPI for Executor.
+func (s *inMemorySSMStore) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	name := aws.ToString(params.Name)
+	overwrite := aws.ToBool(params.Overwrite)
+
+	existing, exists := s.parameters[name]
+	if exists && !overwrite {
+		return nil, &types.ParameterAlreadyExists{Message: aws.String("Parameter already exists")}
+	}
+
+	var version int64 = 1
+	if exists {
+		version = existing.Version + 1
+	}
+
+	s.parameters[name] = &inMemoryParameter{
+		Name:    name,
+		Value:   aws.ToString(params.Value),
+		Version: version,
+		Type:    params.Type,
+	}
+
+	return &ssm.PutParameterOutput{Version: version}, nil
+}
+
+// GetParametersByPath implements ssmStatusAPI for StatusChecker.
+func (s *inMemorySSMStore) GetParametersByPath(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	path := aws.ToString(params.Path)
+	var result []types.Parameter
+
+	for name, param := range s.parameters {
+		// Check if parameter is under the path
+		if strings.HasPrefix(name, path+"/") || name == path {
+			result = append(result, types.Parameter{
+				Name:    aws.String(param.Name),
+				Value:   aws.String(param.Value),
+				Version: param.Version,
+				Type:    param.Type,
+			})
+		}
+	}
+
+	return &ssm.GetParametersByPathOutput{
+		Parameters: result,
+	}, nil
+}
+
+// Seed adds an existing parameter to the store (for testing existing params)
+func (s *inMemorySSMStore) Seed(name, value string, version int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.parameters[name] = &inMemoryParameter{
+		Name:    name,
+		Value:   value,
+		Version: version,
+		Type:    types.ParameterTypeString,
+	}
+}
+
+func TestBootstrapWorkflow_EndToEnd(t *testing.T) {
+	// Create shared in-memory SSM store
+	store := newInMemorySSMStore()
+
+	// Seed some existing parameters
+	store.Seed("/sentinel/policies/existing-profile", "version: \"1\"\nrules: []\n", 3)
+
+	// Create components using the shared store
+	planner := newPlannerWithClient(store)
+	executor := newExecutorWithClient(store)
+	statusChecker := newStatusCheckerWithClient(store)
+
+	// Create bootstrap config with multiple profiles
+	config := &BootstrapConfig{
+		PolicyRoot: "/sentinel/policies",
+		Profiles: []ProfileConfig{
+			{Name: "new-profile-1"},    // Should be created
+			{Name: "new-profile-2"},    // Should be created
+			{Name: "existing-profile"}, // Should show as existing
+		},
+	}
+
+	// Step 1: Plan
+	plan, err := planner.Plan(context.Background(), config)
+	if err != nil {
+		t.Fatalf("Plan() error = %v", err)
+	}
+
+	// Verify plan shows correct states
+	stateMap := make(map[string]ResourceState)
+	for _, r := range plan.Resources {
+		if r.Type == ResourceTypeSSMParameter {
+			stateMap[r.Name] = r.State
+		}
+	}
+
+	if stateMap["/sentinel/policies/new-profile-1"] != StateCreate {
+		t.Errorf("new-profile-1 should be StateCreate, got %v", stateMap["/sentinel/policies/new-profile-1"])
+	}
+	if stateMap["/sentinel/policies/new-profile-2"] != StateCreate {
+		t.Errorf("new-profile-2 should be StateCreate, got %v", stateMap["/sentinel/policies/new-profile-2"])
+	}
+	if stateMap["/sentinel/policies/existing-profile"] != StateExists {
+		t.Errorf("existing-profile should be StateExists, got %v", stateMap["/sentinel/policies/existing-profile"])
+	}
+
+	// Verify plan summary
+	if plan.Summary.ToCreate != 2 {
+		t.Errorf("expected ToCreate=2, got %d", plan.Summary.ToCreate)
+	}
+	if plan.Summary.ToSkip != 1 {
+		t.Errorf("expected ToSkip=1 (existing), got %d", plan.Summary.ToSkip)
+	}
+
+	// Step 2: Apply
+	result, err := executor.Apply(context.Background(), plan)
+	if err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+
+	// Verify apply results
+	if len(result.Created) != 2 {
+		t.Errorf("expected 2 created, got %d: %v", len(result.Created), result.Created)
+	}
+	if len(result.Skipped) != 1 {
+		t.Errorf("expected 1 skipped (existing), got %d: %v", len(result.Skipped), result.Skipped)
+	}
+	if len(result.Failed) != 0 {
+		t.Errorf("expected 0 failed, got %d: %v", len(result.Failed), result.Failed)
+	}
+
+	// Step 3: Verify with StatusChecker
+	status, err := statusChecker.GetStatus(context.Background(), "/sentinel/policies")
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	// Should now have 3 parameters total
+	if status.Count != 3 {
+		t.Errorf("expected 3 parameters in status, got %d", status.Count)
+	}
+
+	// Verify all parameters appear in status
+	paramNames := make(map[string]int64)
+	for _, p := range status.Parameters {
+		paramNames[p.Name] = p.Version
+	}
+
+	// New profiles should have version 1
+	if v, ok := paramNames["new-profile-1"]; !ok || v != 1 {
+		t.Errorf("new-profile-1 should exist with version 1, got %v", paramNames["new-profile-1"])
+	}
+	if v, ok := paramNames["new-profile-2"]; !ok || v != 1 {
+		t.Errorf("new-profile-2 should exist with version 1, got %v", paramNames["new-profile-2"])
+	}
+	// Existing profile should still have version 3
+	if v, ok := paramNames["existing-profile"]; !ok || v != 3 {
+		t.Errorf("existing-profile should exist with version 3, got %v", paramNames["existing-profile"])
+	}
+
+	// Verify plan summary matches execution results
+	if plan.Summary.ToCreate != len(result.Created) {
+		t.Errorf("plan ToCreate (%d) should match result Created (%d)",
+			plan.Summary.ToCreate, len(result.Created))
+	}
+}
+
+func TestBootstrapWorkflow_UpdateExisting(t *testing.T) {
+	store := newInMemorySSMStore()
+
+	// Seed existing parameter
+	store.Seed("/sentinel/policies/prod", "version: \"1\"\nrules: []\n", 5)
+
+	planner := newPlannerWithClient(store)
+	executor := newExecutorWithClient(store)
+	statusChecker := newStatusCheckerWithClient(store)
+
+	// Create config requesting the existing profile
+	config := &BootstrapConfig{
+		PolicyRoot: "/sentinel/policies",
+		Profiles: []ProfileConfig{
+			{Name: "prod"},
+		},
+	}
+
+	// Plan should show exists
+	plan, err := planner.Plan(context.Background(), config)
+	if err != nil {
+		t.Fatalf("Plan() error = %v", err)
+	}
+
+	if len(plan.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(plan.Resources))
+	}
+	if plan.Resources[0].State != StateExists {
+		t.Errorf("expected StateExists, got %v", plan.Resources[0].State)
+	}
+	if plan.Resources[0].CurrentVersion != "5" {
+		t.Errorf("expected version 5, got %q", plan.Resources[0].CurrentVersion)
+	}
+
+	// Apply should skip
+	result, err := executor.Apply(context.Background(), plan)
+	if err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+
+	if len(result.Skipped) != 1 {
+		t.Errorf("expected 1 skipped, got %d", len(result.Skipped))
+	}
+
+	// Status should show unchanged version
+	status, err := statusChecker.GetStatus(context.Background(), "/sentinel/policies")
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status.Count != 1 {
+		t.Errorf("expected 1 parameter, got %d", status.Count)
+	}
+	if status.Parameters[0].Version != 5 {
+		t.Errorf("version should still be 5, got %d", status.Parameters[0].Version)
+	}
+}
+
+func TestBootstrapWorkflow_WithIAMPolicies(t *testing.T) {
+	store := newInMemorySSMStore()
+
+	planner := newPlannerWithClient(store)
+	executor := newExecutorWithClient(store)
+
+	// Config requesting IAM policy generation
+	config := &BootstrapConfig{
+		PolicyRoot:          "/sentinel/policies",
+		GenerateIAMPolicies: true,
+		Profiles: []ProfileConfig{
+			{Name: "dev"},
+		},
+	}
+
+	// Plan should include IAM policies
+	plan, err := planner.Plan(context.Background(), config)
+	if err != nil {
+		t.Fatalf("Plan() error = %v", err)
+	}
+
+	// Should have 1 SSM + 2 IAM = 3 resources
+	if len(plan.Resources) != 3 {
+		t.Errorf("expected 3 resources (1 SSM + 2 IAM), got %d", len(plan.Resources))
+	}
+
+	ssmCount := 0
+	iamCount := 0
+	for _, r := range plan.Resources {
+		switch r.Type {
+		case ResourceTypeSSMParameter:
+			ssmCount++
+		case ResourceTypeIAMPolicy:
+			iamCount++
+		}
+	}
+
+	if ssmCount != 1 {
+		t.Errorf("expected 1 SSM parameter, got %d", ssmCount)
+	}
+	if iamCount != 2 {
+		t.Errorf("expected 2 IAM policies, got %d", iamCount)
+	}
+
+	// Apply should skip IAM policies (not created via SSM)
+	result, err := executor.Apply(context.Background(), plan)
+	if err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+
+	if len(result.Created) != 1 {
+		t.Errorf("expected 1 created (SSM only), got %d", len(result.Created))
+	}
+	if len(result.Skipped) != 2 {
+		t.Errorf("expected 2 skipped (IAM policies), got %d", len(result.Skipped))
+	}
+}
