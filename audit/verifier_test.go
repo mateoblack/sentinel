@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1128,5 +1129,299 @@ func TestVerifier_IssueClassification_SeverityIsWarning(t *testing.T) {
 		if issue.Severity != SeverityWarning {
 			t.Errorf("Issue[%d].Severity = %q, want %q", i, issue.Severity, SeverityWarning)
 		}
+	}
+}
+
+// VerifyInput time window tests
+
+func TestVerifier_Verify_TimeWindowEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		startTime time.Time
+		endTime   time.Time
+	}{
+		{
+			name:      "StartTime equals EndTime",
+			startTime: time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC),
+			endTime:   time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "StartTime after EndTime (inverted window)",
+			startTime: time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC),
+			endTime:   time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "very wide time window (30 days)",
+			startTime: time.Now().Add(-30 * 24 * time.Hour),
+			endTime:   time.Now(),
+		},
+		{
+			name:      "future time window",
+			startTime: time.Now().Add(1 * time.Hour),
+			endTime:   time.Now().Add(2 * time.Hour),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var capturedInput *cloudtrail.LookupEventsInput
+
+			client := &mockCloudTrailClient{
+				lookupEventsFunc: func(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
+					capturedInput = params
+					return &cloudtrail.LookupEventsOutput{}, nil
+				},
+			}
+
+			verifier := newVerifierWithClient(client)
+			result, err := verifier.Verify(context.Background(), &VerifyInput{
+				StartTime: tt.startTime,
+				EndTime:   tt.endTime,
+			})
+
+			// Should not error - CloudTrail API may reject, but we pass through
+			if err != nil {
+				t.Fatalf("Verify() error = %v", err)
+			}
+
+			// Verify the times were passed correctly
+			if capturedInput == nil {
+				t.Fatal("expected lookupEventsFunc to be called")
+			}
+			if !capturedInput.StartTime.Equal(tt.startTime) {
+				t.Errorf("StartTime = %v, want %v", capturedInput.StartTime, tt.startTime)
+			}
+			if !capturedInput.EndTime.Equal(tt.endTime) {
+				t.Errorf("EndTime = %v, want %v", capturedInput.EndTime, tt.endTime)
+			}
+
+			// Result should have the same times
+			if !result.StartTime.Equal(tt.startTime) {
+				t.Errorf("result.StartTime = %v, want %v", result.StartTime, tt.startTime)
+			}
+			if !result.EndTime.Equal(tt.endTime) {
+				t.Errorf("result.EndTime = %v, want %v", result.EndTime, tt.endTime)
+			}
+		})
+	}
+}
+
+// Concurrent verification tests
+
+func TestVerifier_Verify_Concurrent(t *testing.T) {
+	now := time.Now()
+	eventTime := now.Add(-30 * time.Minute)
+
+	// Create a mock that returns different results based on username filter
+	client := &mockCloudTrailClient{
+		lookupEventsFunc: func(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
+			// Simulate some work
+			time.Sleep(1 * time.Millisecond)
+
+			username := ""
+			if len(params.LookupAttributes) > 0 && params.LookupAttributes[0].AttributeValue != nil {
+				username = *params.LookupAttributes[0].AttributeValue
+			}
+
+			// Return different results for different usernames
+			switch username {
+			case "alice":
+				return &cloudtrail.LookupEventsOutput{
+					Events: []types.Event{
+						{
+							EventId:         aws.String("event-alice"),
+							EventName:       aws.String("AssumeRole"),
+							EventTime:       aws.Time(eventTime),
+							Username:        aws.String("alice"),
+							CloudTrailEvent: aws.String(`{"userIdentity": {"sourceIdentity": "sentinel:alice:abc123"}}`),
+						},
+					},
+				}, nil
+			case "bob":
+				return &cloudtrail.LookupEventsOutput{
+					Events: []types.Event{
+						{
+							EventId:         aws.String("event-bob"),
+							EventName:       aws.String("AssumeRole"),
+							EventTime:       aws.Time(eventTime),
+							Username:        aws.String("bob"),
+							CloudTrailEvent: aws.String(`{"userIdentity": {}}`),
+						},
+					},
+				}, nil
+			default:
+				return &cloudtrail.LookupEventsOutput{}, nil
+			}
+		},
+	}
+
+	verifier := newVerifierWithClient(client)
+
+	// Run multiple concurrent Verify calls
+	const numGoroutines = 10
+	results := make(chan *VerificationResult, numGoroutines)
+	errors := make(chan error, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(n int) {
+			username := "alice"
+			if n%2 == 0 {
+				username = "bob"
+			}
+
+			result, err := verifier.Verify(context.Background(), &VerifyInput{
+				StartTime: now.Add(-1 * time.Hour),
+				EndTime:   now,
+				Username:  username,
+			})
+
+			if err != nil {
+				errors <- err
+				return
+			}
+			results <- result
+		}(i)
+	}
+
+	// Collect results
+	for i := 0; i < numGoroutines; i++ {
+		select {
+		case err := <-errors:
+			t.Errorf("Concurrent Verify() error = %v", err)
+		case result := <-results:
+			// Verify result is valid and consistent
+			if result.TotalSessions != 1 {
+				t.Errorf("TotalSessions = %d, want 1", result.TotalSessions)
+			}
+			// Either all sentinel (alice) or all non-sentinel (bob)
+			if result.SentinelSessions != 1 && result.NonSentinelSessions != 1 {
+				t.Errorf("Result is inconsistent: SentinelSessions=%d, NonSentinelSessions=%d",
+					result.SentinelSessions, result.NonSentinelSessions)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for concurrent results")
+		}
+	}
+}
+
+func TestVerifier_Verify_Concurrent_NoInterference(t *testing.T) {
+	now := time.Now()
+	eventTime := now.Add(-30 * time.Minute)
+
+	// Create a mock that always returns the same result
+	client := &mockCloudTrailClient{
+		lookupEventsFunc: func(ctx context.Context, params *cloudtrail.LookupEventsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.LookupEventsOutput, error) {
+			return &cloudtrail.LookupEventsOutput{
+				Events: []types.Event{
+					{
+						EventId:         aws.String("event-1"),
+						EventName:       aws.String("AssumeRole"),
+						EventTime:       aws.Time(eventTime),
+						Username:        aws.String("alice"),
+						CloudTrailEvent: aws.String(`{"userIdentity": {"sourceIdentity": "sentinel:alice:abc123"}}`),
+					},
+					{
+						EventId:         aws.String("event-2"),
+						EventName:       aws.String("AssumeRole"),
+						EventTime:       aws.Time(eventTime),
+						Username:        aws.String("bob"),
+						CloudTrailEvent: aws.String(`{"userIdentity": {}}`),
+					},
+				},
+			}, nil
+		},
+	}
+
+	verifier := newVerifierWithClient(client)
+
+	// Run multiple concurrent Verify calls
+	const numGoroutines = 20
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	resultsChan := make(chan *VerificationResult, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+
+			result, err := verifier.Verify(context.Background(), &VerifyInput{
+				StartTime: now.Add(-1 * time.Hour),
+				EndTime:   now,
+			})
+
+			if err != nil {
+				t.Errorf("Verify() error = %v", err)
+				return
+			}
+			resultsChan <- result
+		}()
+	}
+
+	wg.Wait()
+	close(resultsChan)
+
+	// Verify all results are identical (no interference)
+	var firstResult *VerificationResult
+	for result := range resultsChan {
+		if firstResult == nil {
+			firstResult = result
+			continue
+		}
+
+		// All results should be identical
+		if result.TotalSessions != firstResult.TotalSessions {
+			t.Errorf("TotalSessions mismatch: got %d, want %d", result.TotalSessions, firstResult.TotalSessions)
+		}
+		if result.SentinelSessions != firstResult.SentinelSessions {
+			t.Errorf("SentinelSessions mismatch: got %d, want %d", result.SentinelSessions, firstResult.SentinelSessions)
+		}
+		if result.NonSentinelSessions != firstResult.NonSentinelSessions {
+			t.Errorf("NonSentinelSessions mismatch: got %d, want %d", result.NonSentinelSessions, firstResult.NonSentinelSessions)
+		}
+		if len(result.Issues) != len(firstResult.Issues) {
+			t.Errorf("Issues length mismatch: got %d, want %d", len(result.Issues), len(firstResult.Issues))
+		}
+	}
+}
+
+// TestVerifier interface implementation
+
+func TestTestVerifier_Implements_SessionVerifier(t *testing.T) {
+	t.Parallel()
+	// Ensure TestVerifier implements SessionVerifier interface
+	var _ SessionVerifier = (*TestVerifier)(nil)
+	var _ SessionVerifier = (*Verifier)(nil)
+}
+
+func TestTestVerifier_CustomFunc(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+
+	customResult := &VerificationResult{
+		StartTime:           now.Add(-1 * time.Hour),
+		EndTime:             now,
+		TotalSessions:       42,
+		SentinelSessions:    40,
+		NonSentinelSessions: 2,
+	}
+
+	verifier := NewVerifierForTest(func(ctx context.Context, input *VerifyInput) (*VerificationResult, error) {
+		return customResult, nil
+	})
+
+	result, err := verifier.Verify(context.Background(), &VerifyInput{
+		StartTime: now.Add(-1 * time.Hour),
+		EndTime:   now,
+	})
+
+	if err != nil {
+		t.Fatalf("Verify() error = %v", err)
+	}
+	if result != customResult {
+		t.Error("Verify() did not return the custom result")
 	}
 }

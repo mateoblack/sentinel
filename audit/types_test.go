@@ -428,3 +428,230 @@ func TestVerifyInput_Fields(t *testing.T) {
 		t.Errorf("VerifyInput.RoleARN = %q, want %q", input.RoleARN, "arn:aws:iam::123456789012:role/TestRole")
 	}
 }
+
+// PassRate edge cases
+
+func TestVerificationResult_PassRate_EdgeCases(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		result VerificationResult
+		want   float64
+		delta  float64 // tolerance for floating point comparison
+	}{
+		{
+			name:   "1 total, 0 sentinel = 0%",
+			result: VerificationResult{TotalSessions: 1, SentinelSessions: 0},
+			want:   0.0,
+			delta:  0.001,
+		},
+		{
+			name:   "1 total, 1 sentinel = 100%",
+			result: VerificationResult{TotalSessions: 1, SentinelSessions: 1},
+			want:   100.0,
+			delta:  0.001,
+		},
+		{
+			name:   "large numbers - 1,000,000 sessions",
+			result: VerificationResult{TotalSessions: 1000000, SentinelSessions: 750000},
+			want:   75.0,
+			delta:  0.001,
+		},
+		{
+			name:   "floating point precision - 1/3 sessions",
+			result: VerificationResult{TotalSessions: 3, SentinelSessions: 1},
+			want:   33.333333,
+			delta:  0.001,
+		},
+		{
+			name:   "floating point precision - 2/3 sessions",
+			result: VerificationResult{TotalSessions: 3, SentinelSessions: 2},
+			want:   66.666666,
+			delta:  0.001,
+		},
+		{
+			name:   "very small percentage - 1/1000000",
+			result: VerificationResult{TotalSessions: 1000000, SentinelSessions: 1},
+			want:   0.0001,
+			delta:  0.00001,
+		},
+		{
+			name:   "almost 100% - 999999/1000000",
+			result: VerificationResult{TotalSessions: 1000000, SentinelSessions: 999999},
+			want:   99.9999,
+			delta:  0.0001,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := tt.result.PassRate()
+			if got < tt.want-tt.delta || got > tt.want+tt.delta {
+				t.Errorf("PassRate() = %v, want %v (delta %v)", got, tt.want, tt.delta)
+			}
+		})
+	}
+}
+
+// HasIssues consistency tests
+
+func TestVerificationResult_HasIssues_Consistency(t *testing.T) {
+	t.Parallel()
+	t.Run("adding issue changes HasIssues from false to true", func(t *testing.T) {
+		t.Parallel()
+		result := VerificationResult{}
+		if result.HasIssues() {
+			t.Error("HasIssues() = true before adding issues, want false")
+		}
+
+		result.Issues = append(result.Issues, SessionIssue{
+			Severity: SeverityWarning,
+			Type:     IssueTypeMissingSourceIdentity,
+			Message:  "test issue",
+		})
+
+		if !result.HasIssues() {
+			t.Error("HasIssues() = false after adding issue, want true")
+		}
+	})
+
+	t.Run("multiple issues still returns true", func(t *testing.T) {
+		t.Parallel()
+		result := VerificationResult{
+			Issues: []SessionIssue{
+				{Severity: SeverityWarning, Type: IssueTypeMissingSourceIdentity, Message: "issue 1"},
+				{Severity: SeverityWarning, Type: IssueTypeMissingSourceIdentity, Message: "issue 2"},
+				{Severity: SeverityError, Type: IssueTypeBypassDetected, Message: "issue 3"},
+			},
+		}
+
+		if !result.HasIssues() {
+			t.Error("HasIssues() = false with multiple issues, want true")
+		}
+	})
+}
+
+// Type validation tests
+
+func TestIssueSeverity_IsValid_EdgeCases(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		severity IssueSeverity
+		want     bool
+	}{
+		{
+			name:     "empty string is invalid",
+			severity: IssueSeverity(""),
+			want:     false,
+		},
+		{
+			name:     "whitespace is invalid",
+			severity: IssueSeverity(" "),
+			want:     false,
+		},
+		{
+			name:     "uppercase WARNING is invalid",
+			severity: IssueSeverity("WARNING"),
+			want:     false,
+		},
+		{
+			name:     "uppercase ERROR is invalid",
+			severity: IssueSeverity("ERROR"),
+			want:     false,
+		},
+		{
+			name:     "mixed case is invalid",
+			severity: IssueSeverity("Warning"),
+			want:     false,
+		},
+		{
+			name:     "unknown type is invalid",
+			severity: IssueSeverity("critical"),
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.severity.IsValid(); got != tt.want {
+				t.Errorf("IssueSeverity(%q).IsValid() = %v, want %v", tt.severity, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIssueType_IsValid_EdgeCases(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		issueType IssueType
+		want      bool
+	}{
+		{
+			name:      "empty string is invalid",
+			issueType: IssueType(""),
+			want:      false,
+		},
+		{
+			name:      "whitespace is invalid",
+			issueType: IssueType(" "),
+			want:      false,
+		},
+		{
+			name:      "partial match is invalid",
+			issueType: IssueType("missing"),
+			want:      false,
+		},
+		{
+			name:      "uppercase is invalid",
+			issueType: IssueType("MISSING_SOURCE_IDENTITY"),
+			want:      false,
+		},
+		{
+			name:      "unknown type is invalid",
+			issueType: IssueType("unknown_issue_type"),
+			want:      false,
+		},
+		{
+			name:      "similar but wrong is invalid",
+			issueType: IssueType("missing_sourceIdentity"),
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tt.issueType.IsValid(); got != tt.want {
+				t.Errorf("IssueType(%q).IsValid() = %v, want %v", tt.issueType, got, tt.want)
+			}
+		})
+	}
+}
+
+// SessionIssue with nil SessionInfo test
+
+func TestSessionIssue_NilSessionInfo(t *testing.T) {
+	t.Parallel()
+	// SessionIssue with nil SessionInfo should be valid
+	issue := SessionIssue{
+		Severity:    SeverityWarning,
+		Type:        IssueTypeMissingSourceIdentity,
+		SessionInfo: nil, // explicitly nil
+		Message:     "test issue without session info",
+	}
+
+	// Should not panic when accessing fields
+	if issue.SessionInfo != nil {
+		t.Error("SessionInfo should be nil")
+	}
+	if !issue.Severity.IsValid() {
+		t.Error("Severity should be valid")
+	}
+	if !issue.Type.IsValid() {
+		t.Error("Type should be valid")
+	}
+}
