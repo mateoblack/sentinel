@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 50 of 59 (Test Infrastructure Setup)
-Plan: 2 of 2 in current phase (COMPLETE)
-Status: Phase 50 complete
-Last activity: 2026-01-16 — Completed 50-02-PLAN.md (Mock Framework and Test Helpers)
+Phase: 51 of 59 (Policy Engine Testing)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-16 — Completed 51-01-PLAN.md (SSM Loader Tests)
 
-Progress: ██░░░░░░░░ 8% (v1.6 Testing & Hardening)
+Progress: ██░░░░░░░░ 12% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -153,6 +153,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Interface verification tests ensure mocks stay in sync with interfaces
 - Generic assertion helpers (AssertEqual) for any comparable type
 
+**v1.6 SSM Loader Tests decisions (Phase 51-01):**
+- Export SSMAPI interface for external test package compatibility
+- Use testutil.MockSSMClient rather than internal mock for consistency
+- NewLoaderWithClient constructor pattern for testable AWS-dependent types
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -164,9 +169,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 50-02-PLAN.md (Phase 50 complete)
+Stopped at: Completed 51-01-PLAN.md (Plan 1 of 3 in Phase 51)
 Resume file: None
-Next: Phase 51 - Resolver Package Tests
+Next: 51-02-PLAN.md (Policy authorization edge cases)
 
 ## Roadmap Evolution
 

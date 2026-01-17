@@ -234,7 +234,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 51-01: Policy evaluation unit tests
+- [x] 51-01: SSM loader tests — completed 2026-01-16
 - [ ] 51-02: Policy authorization edge cases
 - [ ] 51-03: Credential gating validation
 
