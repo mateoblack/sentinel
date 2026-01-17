@@ -810,3 +810,364 @@ func TestBreakGlassLogEntry_ReasonCodeMatchesSource(t *testing.T) {
 		}
 	}
 }
+
+// =============================================================================
+// Security Tests: Correlation and Traceability
+// =============================================================================
+// These tests verify ID formats, timestamps, and JSON serialization for audit
+// log parsing and CloudTrail correlation.
+
+func TestBreakGlassLogEntry_EventIDFormat(t *testing.T) {
+	// EventID should be 16 lowercase hex characters (matches ValidateBreakGlassID format)
+	validIDs := []string{
+		"a1b2c3d4e5f67890",
+		"0000000000000000",
+		"ffffffffffffffff",
+		"1234567890abcdef",
+		"fedcba9876543210",
+	}
+
+	for _, id := range validIDs {
+		bg := &breakglass.BreakGlassEvent{
+			ID:            id,
+			Invoker:       "alice",
+			Profile:       "production",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Test justification for EventID format",
+			Duration:      1 * time.Hour,
+			Status:        breakglass.StatusActive,
+			ExpiresAt:     time.Now().Add(1 * time.Hour),
+		}
+
+		entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+		// Verify EventID is exactly as provided
+		if entry.EventID != id {
+			t.Errorf("EventID mismatch: expected %q, got %q", id, entry.EventID)
+		}
+
+		// Verify it's 16 characters
+		if len(entry.EventID) != 16 {
+			t.Errorf("EventID should be 16 characters: got %d for %q", len(entry.EventID), entry.EventID)
+		}
+
+		// Verify it's lowercase hex using breakglass.ValidateBreakGlassID
+		if !breakglass.ValidateBreakGlassID(entry.EventID) {
+			t.Errorf("EventID should be valid break-glass ID format: %q", entry.EventID)
+		}
+	}
+}
+
+func TestBreakGlassLogEntry_RequestIDFormat(t *testing.T) {
+	// RequestID should be 16 lowercase hex characters when populated
+	validIDs := []string{
+		"fedcba0987654321",
+		"0000000000000000",
+		"ffffffffffffffff",
+		"1234567890abcdef",
+	}
+
+	for _, id := range validIDs {
+		bg := &breakglass.BreakGlassEvent{
+			ID:            "a1b2c3d4e5f67890",
+			Invoker:       "alice",
+			Profile:       "production",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Test justification for RequestID format",
+			Duration:      1 * time.Hour,
+			Status:        breakglass.StatusActive,
+			ExpiresAt:     time.Now().Add(1 * time.Hour),
+			RequestID:     id,
+		}
+
+		entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+		// Verify RequestID is exactly as provided
+		if entry.RequestID != id {
+			t.Errorf("RequestID mismatch: expected %q, got %q", id, entry.RequestID)
+		}
+
+		// Verify it's 16 characters
+		if len(entry.RequestID) != 16 {
+			t.Errorf("RequestID should be 16 characters: got %d for %q", len(entry.RequestID), entry.RequestID)
+		}
+	}
+}
+
+func TestBreakGlassLogEntry_RequestIDEmpty(t *testing.T) {
+	// RequestID can be empty (for events before credential issuance)
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Test justification for empty RequestID",
+		Duration:      1 * time.Hour,
+		Status:        breakglass.StatusActive,
+		ExpiresAt:     time.Now().Add(1 * time.Hour),
+		RequestID:     "", // Empty - not yet issued credentials
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+	// RequestID should be empty
+	if entry.RequestID != "" {
+		t.Errorf("RequestID should be empty when source is empty: got %q", entry.RequestID)
+	}
+
+	// Entry should still be valid
+	if entry.EventID == "" {
+		t.Error("Entry should still have EventID even with empty RequestID")
+	}
+}
+
+func TestBreakGlassLogEntry_TimestampIsRecent(t *testing.T) {
+	// Timestamp should be within 1 second of now (log entry created at call time)
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Test justification for recent timestamp",
+		Duration:      1 * time.Hour,
+		Status:        breakglass.StatusActive,
+		ExpiresAt:     time.Now().Add(1 * time.Hour),
+	}
+
+	beforeCall := time.Now().Add(-1 * time.Second)
+	entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+	afterCall := time.Now().Add(1 * time.Second)
+
+	// Parse the timestamp
+	ts, err := time.Parse(time.RFC3339, entry.Timestamp)
+	if err != nil {
+		t.Fatalf("Failed to parse timestamp %q: %v", entry.Timestamp, err)
+	}
+
+	// Timestamp should be between beforeCall and afterCall
+	if ts.Before(beforeCall) {
+		t.Errorf("Timestamp %v is before expected range (started %v)", ts, beforeCall)
+	}
+	if ts.After(afterCall) {
+		t.Errorf("Timestamp %v is after expected range (ended %v)", ts, afterCall)
+	}
+}
+
+func TestBreakGlassLogEntry_ExpiresAtMatchesSource(t *testing.T) {
+	// ExpiresAt in log should match ISO8601 format of bg.ExpiresAt
+	expiresAt := time.Now().Add(2 * time.Hour).UTC()
+
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Test justification for ExpiresAt matching",
+		Duration:      2 * time.Hour,
+		Status:        breakglass.StatusActive,
+		ExpiresAt:     expiresAt,
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+	// Parse the ExpiresAt from entry
+	parsedExpires, err := time.Parse(time.RFC3339, entry.ExpiresAt)
+	if err != nil {
+		t.Fatalf("Failed to parse ExpiresAt %q: %v", entry.ExpiresAt, err)
+	}
+
+	// Should be within 1 second of source (accounting for formatting precision)
+	diff := parsedExpires.Sub(expiresAt)
+	if diff < -time.Second || diff > time.Second {
+		t.Errorf("ExpiresAt mismatch: expected ~%v, got %v (diff: %v)", expiresAt, parsedExpires, diff)
+	}
+}
+
+func TestBreakGlassLogEntry_DurationAccuracy(t *testing.T) {
+	// Duration in seconds should match bg.Duration.Seconds() rounded
+	testCases := []struct {
+		duration        time.Duration
+		expectedSeconds int
+	}{
+		{30 * time.Minute, 1800},
+		{1 * time.Hour, 3600},
+		{1*time.Hour + 30*time.Minute, 5400},
+		{2 * time.Hour, 7200},
+		{4 * time.Hour, 14400},
+		// Sub-second precision should be truncated
+		{1*time.Hour + 500*time.Millisecond, 3600},
+	}
+
+	for _, tc := range testCases {
+		bg := &breakglass.BreakGlassEvent{
+			ID:            "a1b2c3d4e5f67890",
+			Invoker:       "alice",
+			Profile:       "production",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Test justification for duration accuracy",
+			Duration:      tc.duration,
+			Status:        breakglass.StatusActive,
+			ExpiresAt:     time.Now().Add(tc.duration),
+		}
+
+		entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+		if entry.Duration != tc.expectedSeconds {
+			t.Errorf("Duration for %v: expected %d seconds, got %d", tc.duration, tc.expectedSeconds, entry.Duration)
+		}
+
+		// Verify conversion matches int(duration.Seconds())
+		expected := int(tc.duration.Seconds())
+		if entry.Duration != expected {
+			t.Errorf("Duration should match int(duration.Seconds()): expected %d, got %d", expected, entry.Duration)
+		}
+	}
+}
+
+func TestBreakGlassLogEntry_JSONMarshalValid(t *testing.T) {
+	// Log entry should marshal to valid JSON
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Test justification for JSON marshal",
+		Duration:      1 * time.Hour,
+		Status:        breakglass.StatusActive,
+		ExpiresAt:     time.Now().Add(1 * time.Hour),
+		RequestID:     "fedcba0987654321",
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("Failed to marshal entry to JSON: %v", err)
+	}
+
+	// Verify it's valid JSON by unmarshaling
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("Marshaled JSON is not valid: %v", err)
+	}
+
+	// Verify key fields are present
+	expectedKeys := []string{"timestamp", "event", "event_id", "request_id", "invoker", "profile", "reason_code", "justification", "status", "duration_seconds", "expires_at"}
+	for _, key := range expectedKeys {
+		if _, ok := parsed[key]; !ok {
+			t.Errorf("Expected JSON key %q not found", key)
+		}
+	}
+}
+
+func TestBreakGlassLogEntry_JSONFieldNaming(t *testing.T) {
+	// JSON field names should use snake_case
+	entry := BreakGlassLogEntry{
+		Timestamp:     "2026-01-15T10:00:00Z",
+		Event:         BreakGlassEventInvoked,
+		EventID:       "a1b2c3d4e5f67890",
+		RequestID:     "fedcba0987654321",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    "incident",
+		Justification: "Test justification",
+		Status:        "active",
+		Duration:      3600,
+		ExpiresAt:     "2026-01-15T11:00:00Z",
+		ClosedBy:      "bob",
+		ClosedReason:  "resolved",
+	}
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("Failed to marshal entry: %v", err)
+	}
+
+	jsonStr := string(data)
+
+	// Verify snake_case field names
+	snakeCaseFields := []string{
+		`"timestamp"`,
+		`"event"`,
+		`"event_id"`,
+		`"request_id"`,
+		`"invoker"`,
+		`"profile"`,
+		`"reason_code"`,
+		`"justification"`,
+		`"status"`,
+		`"duration_seconds"`,
+		`"expires_at"`,
+		`"closed_by"`,
+		`"closed_reason"`,
+	}
+
+	for _, field := range snakeCaseFields {
+		if !strings.Contains(jsonStr, field) {
+			t.Errorf("Expected snake_case field %s in JSON", field)
+		}
+	}
+
+	// Verify NO camelCase or PascalCase leaking
+	invalidCaseFields := []string{
+		`"EventID"`,
+		`"RequestID"`,
+		`"ReasonCode"`,
+		`"ExpiresAt"`,
+		`"ClosedBy"`,
+		`"ClosedReason"`,
+		`"eventId"`,
+		`"requestId"`,
+		`"reasonCode"`,
+		`"expiresAt"`,
+		`"closedBy"`,
+		`"closedReason"`,
+	}
+
+	for _, field := range invalidCaseFields {
+		if strings.Contains(jsonStr, field) {
+			t.Errorf("Invalid case field %s should not be in JSON", field)
+		}
+	}
+}
+
+func TestBreakGlassLogEntry_JSONOmitempty(t *testing.T) {
+	// ClosedBy and ClosedReason should be omitted from JSON when empty
+	entry := BreakGlassLogEntry{
+		Timestamp:     "2026-01-15T10:00:00Z",
+		Event:         BreakGlassEventInvoked,
+		EventID:       "a1b2c3d4e5f67890",
+		RequestID:     "fedcba0987654321",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    "incident",
+		Justification: "Test justification",
+		Status:        "active",
+		Duration:      3600,
+		ExpiresAt:     "2026-01-15T11:00:00Z",
+		// ClosedBy and ClosedReason intentionally left empty
+	}
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("Failed to marshal entry: %v", err)
+	}
+
+	jsonStr := string(data)
+
+	// ClosedBy and ClosedReason should NOT appear in output
+	if strings.Contains(jsonStr, "closed_by") {
+		t.Error("closed_by should be omitted when empty (omitempty)")
+	}
+	if strings.Contains(jsonStr, "closed_reason") {
+		t.Error("closed_reason should be omitted when empty (omitempty)")
+	}
+
+	// But all other fields should be present
+	requiredFields := []string{"timestamp", "event", "event_id", "invoker", "profile"}
+	for _, field := range requiredFields {
+		if !strings.Contains(jsonStr, field) {
+			t.Errorf("Required field %s should be present", field)
+		}
+	}
+}
