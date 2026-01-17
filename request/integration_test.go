@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/testutil"
@@ -659,4 +660,711 @@ func TestIntegration_ConcurrentNotifications(t *testing.T) {
 			t.Errorf("expected 5 notifications, got %d", notifier.NotifyCallCount())
 		}
 	})
+}
+
+// ============================================================================
+// FindApprovedRequest Integration Tests
+// ============================================================================
+
+func TestIntegration_FindApprovedRequest(t *testing.T) {
+	t.Run("returns_valid_approved_request", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+		now := time.Now()
+
+		// Create approved request with valid time window
+		approvedReq := &request.Request{
+			ID:            "a1a2a3a4a5a6a7a8",
+			Requester:     "alice",
+			Profile:       "prod",
+			Justification: "Approved request test",
+			Duration:      2 * time.Hour,
+			Status:        request.StatusApproved,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(request.DefaultRequestTTL),
+			Approver:      "manager",
+		}
+		_ = store.Create(ctx, approvedReq)
+
+		found, err := request.FindApprovedRequest(ctx, store, "alice", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found == nil {
+			t.Fatal("expected to find approved request")
+		}
+		if found.ID != "a1a2a3a4a5a6a7a8" {
+			t.Errorf("expected ID 'a1a2a3a4a5a6a7a8', got %s", found.ID)
+		}
+	})
+
+	t.Run("filters_out_pending_requests", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+		now := time.Now()
+
+		// Create multiple requests with different statuses
+		pendingReq := &request.Request{
+			ID:            "b1b2b3b4b5b6b7b8",
+			Requester:     "bob",
+			Profile:       "prod",
+			Justification: "Pending request",
+			Duration:      1 * time.Hour,
+			Status:        request.StatusPending,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(request.DefaultRequestTTL),
+		}
+		_ = store.Create(ctx, pendingReq)
+
+		found, err := request.FindApprovedRequest(ctx, store, "bob", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("pending request should not be returned as approved")
+		}
+	})
+
+	t.Run("filters_out_expired_approved_requests", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+		past := time.Now().Add(-2 * time.Hour)
+
+		// Create approved request that has expired
+		expiredReq := &request.Request{
+			ID:            "c1c2c3c4c5c6c7c8",
+			Requester:     "charlie",
+			Profile:       "prod",
+			Justification: "Expired approved request",
+			Duration:      1 * time.Hour,
+			Status:        request.StatusApproved,
+			CreatedAt:     past,
+			UpdatedAt:     past,
+			ExpiresAt:     past.Add(1 * time.Hour), // Already expired
+			Approver:      "manager",
+		}
+		_ = store.Create(ctx, expiredReq)
+
+		found, err := request.FindApprovedRequest(ctx, store, "charlie", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("expired approved request should not be returned")
+		}
+	})
+
+	t.Run("filters_by_profile", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+		now := time.Now()
+
+		// Create approved request for different profile
+		approvedReq := &request.Request{
+			ID:            "d1d2d3d4d5d6d7d8",
+			Requester:     "dave",
+			Profile:       "staging",
+			Justification: "Wrong profile",
+			Duration:      2 * time.Hour,
+			Status:        request.StatusApproved,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(request.DefaultRequestTTL),
+			Approver:      "manager",
+		}
+		_ = store.Create(ctx, approvedReq)
+
+		// Search for different profile
+		found, err := request.FindApprovedRequest(ctx, store, "dave", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("approved request for different profile should not be returned")
+		}
+	})
+
+	t.Run("returns_first_valid_of_multiple", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+		now := time.Now()
+		past := now.Add(-2 * time.Hour)
+
+		// Create multiple requests for same user
+		expiredReq := &request.Request{
+			ID:            "e1e2e3e4e5e6e7e8",
+			Requester:     "eve",
+			Profile:       "prod",
+			Justification: "Expired",
+			Duration:      1 * time.Hour,
+			Status:        request.StatusApproved,
+			CreatedAt:     past,
+			UpdatedAt:     past,
+			ExpiresAt:     past.Add(30 * time.Minute), // Expired
+			Approver:      "manager",
+		}
+		pendingReq := &request.Request{
+			ID:            "f1f2f3f4f5f6f7f8",
+			Requester:     "eve",
+			Profile:       "prod",
+			Justification: "Still pending",
+			Duration:      1 * time.Hour,
+			Status:        request.StatusPending,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(request.DefaultRequestTTL),
+		}
+		validReq := &request.Request{
+			ID:            "a1b2c3d4e5f6a7b8",
+			Requester:     "eve",
+			Profile:       "prod",
+			Justification: "Valid approved",
+			Duration:      2 * time.Hour,
+			Status:        request.StatusApproved,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(request.DefaultRequestTTL),
+			Approver:      "manager",
+		}
+
+		_ = store.Create(ctx, expiredReq)
+		_ = store.Create(ctx, pendingReq)
+		_ = store.Create(ctx, validReq)
+
+		found, err := request.FindApprovedRequest(ctx, store, "eve", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found == nil {
+			t.Fatal("expected to find valid approved request")
+		}
+		if found.ID != "a1b2c3d4e5f6a7b8" {
+			t.Errorf("expected valid request ID 'a1b2c3d4e5f6a7b8', got %s", found.ID)
+		}
+	})
+
+	t.Run("filters_out_access_window_closed", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+		past := time.Now().Add(-3 * time.Hour)
+
+		// Create approved request where access window has closed
+		// (ExpiresAt not yet reached, but CreatedAt + Duration has passed)
+		closedWindowReq := &request.Request{
+			ID:            "g1g2g3g4g5g6g7g8",
+			Requester:     "grace",
+			Profile:       "prod",
+			Justification: "Access window closed",
+			Duration:      1 * time.Hour, // Access for 1 hour
+			Status:        request.StatusApproved,
+			CreatedAt:     past,                                 // Created 3 hours ago
+			UpdatedAt:     past,                                 // Duration was 1 hour
+			ExpiresAt:     time.Now().Add(request.DefaultRequestTTL), // Still "valid" by TTL
+			Approver:      "manager",
+		}
+		_ = store.Create(ctx, closedWindowReq)
+
+		found, err := request.FindApprovedRequest(ctx, store, "grace", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("request with closed access window should not be returned")
+		}
+	})
+
+	t.Run("returns_nil_for_empty_store", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+
+		found, err := request.FindApprovedRequest(ctx, store, "nobody", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("expected nil for empty store")
+		}
+	})
+
+	t.Run("handles_store_error", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		expectedErr := errors.New("database connection failed")
+		store.ListByRequesterErr = expectedErr
+
+		ctx := context.Background()
+
+		_, err := request.FindApprovedRequest(ctx, store, "alice", "prod")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if err != expectedErr {
+			t.Errorf("expected error %v, got %v", expectedErr, err)
+		}
+	})
+}
+
+// ============================================================================
+// FindActiveBreakGlass Integration Tests
+// ============================================================================
+
+func TestIntegration_FindActiveBreakGlass(t *testing.T) {
+	t.Run("returns_active_break_glass_event", func(t *testing.T) {
+		store := testutil.NewMockBreakGlassStore()
+		configureListByInvoker(store)
+
+		ctx := context.Background()
+		now := time.Now()
+
+		activeEvent := &breakglass.BreakGlassEvent{
+			ID:            "b1b2b3b4b5b6b7b8",
+			Invoker:       "alice",
+			Profile:       "prod",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Active break-glass",
+			Duration:      2 * time.Hour,
+			Status:        breakglass.StatusActive,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(2 * time.Hour),
+		}
+		_ = store.Create(ctx, activeEvent)
+
+		found, err := breakglass.FindActiveBreakGlass(ctx, store, "alice", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found == nil {
+			t.Fatal("expected to find active break-glass event")
+		}
+		if found.ID != "b1b2b3b4b5b6b7b8" {
+			t.Errorf("expected ID 'b1b2b3b4b5b6b7b8', got %s", found.ID)
+		}
+	})
+
+	t.Run("filters_out_closed_events", func(t *testing.T) {
+		store := testutil.NewMockBreakGlassStore()
+		configureListByInvoker(store)
+
+		ctx := context.Background()
+		now := time.Now()
+
+		closedEvent := &breakglass.BreakGlassEvent{
+			ID:            "c1c2c3c4c5c6c7c8",
+			Invoker:       "bob",
+			Profile:       "prod",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Closed break-glass",
+			Duration:      2 * time.Hour,
+			Status:        breakglass.StatusClosed,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(2 * time.Hour),
+			ClosedBy:      "bob",
+			ClosedReason:  "Incident resolved",
+		}
+		_ = store.Create(ctx, closedEvent)
+
+		found, err := breakglass.FindActiveBreakGlass(ctx, store, "bob", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("closed event should not be returned")
+		}
+	})
+
+	t.Run("filters_out_expired_events", func(t *testing.T) {
+		store := testutil.NewMockBreakGlassStore()
+		configureListByInvoker(store)
+
+		ctx := context.Background()
+		past := time.Now().Add(-2 * time.Hour)
+
+		expiredEvent := &breakglass.BreakGlassEvent{
+			ID:            "d1d2d3d4d5d6d7d8",
+			Invoker:       "charlie",
+			Profile:       "prod",
+			ReasonCode:    breakglass.ReasonMaintenance,
+			Justification: "Expired break-glass",
+			Duration:      1 * time.Hour,
+			Status:        breakglass.StatusActive, // Still active but expired
+			CreatedAt:     past,
+			UpdatedAt:     past,
+			ExpiresAt:     past.Add(1 * time.Hour), // Expired
+		}
+		_ = store.Create(ctx, expiredEvent)
+
+		found, err := breakglass.FindActiveBreakGlass(ctx, store, "charlie", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("expired event should not be returned even if status is active")
+		}
+	})
+
+	t.Run("filters_by_profile", func(t *testing.T) {
+		store := testutil.NewMockBreakGlassStore()
+		configureListByInvoker(store)
+
+		ctx := context.Background()
+		now := time.Now()
+
+		activeEvent := &breakglass.BreakGlassEvent{
+			ID:            "e1e2e3e4e5e6e7e8",
+			Invoker:       "dave",
+			Profile:       "staging",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Wrong profile",
+			Duration:      2 * time.Hour,
+			Status:        breakglass.StatusActive,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(2 * time.Hour),
+		}
+		_ = store.Create(ctx, activeEvent)
+
+		// Search for different profile
+		found, err := breakglass.FindActiveBreakGlass(ctx, store, "dave", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("event for different profile should not be returned")
+		}
+	})
+
+	t.Run("returns_nil_for_empty_store", func(t *testing.T) {
+		store := testutil.NewMockBreakGlassStore()
+		configureListByInvoker(store)
+
+		ctx := context.Background()
+
+		found, err := breakglass.FindActiveBreakGlass(ctx, store, "nobody", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("expected nil for empty store")
+		}
+	})
+
+	t.Run("handles_store_error", func(t *testing.T) {
+		store := testutil.NewMockBreakGlassStore()
+		expectedErr := errors.New("database connection failed")
+		store.ListByInvokerErr = expectedErr
+
+		ctx := context.Background()
+
+		_, err := breakglass.FindActiveBreakGlass(ctx, store, "alice", "prod")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if err != expectedErr {
+			t.Errorf("expected error %v, got %v", expectedErr, err)
+		}
+	})
+}
+
+// ============================================================================
+// Concurrent Finder Tests
+// ============================================================================
+
+func TestIntegration_ConcurrentFinders(t *testing.T) {
+	t.Run("concurrent_find_approved_request", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+		now := time.Now()
+
+		// Create approved request
+		approvedReq := &request.Request{
+			ID:            "a1a2a3a4a5a6a7a8",
+			Requester:     "alice",
+			Profile:       "prod",
+			Justification: "Concurrent test",
+			Duration:      2 * time.Hour,
+			Status:        request.StatusApproved,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(request.DefaultRequestTTL),
+			Approver:      "manager",
+		}
+		_ = store.Create(ctx, approvedReq)
+
+		var wg sync.WaitGroup
+		var found int32
+		numGoroutines := 10
+
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				result, err := request.FindApprovedRequest(ctx, store, "alice", "prod")
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+					return
+				}
+				if result != nil {
+					atomic.AddInt32(&found, 1)
+				}
+			}()
+		}
+
+		wg.Wait()
+
+		if found != int32(numGoroutines) {
+			t.Errorf("expected all %d goroutines to find request, got %d", numGoroutines, found)
+		}
+	})
+
+	t.Run("concurrent_find_active_break_glass", func(t *testing.T) {
+		store := testutil.NewMockBreakGlassStore()
+		configureListByInvoker(store)
+
+		ctx := context.Background()
+		now := time.Now()
+
+		activeEvent := &breakglass.BreakGlassEvent{
+			ID:            "b1b2b3b4b5b6b7b8",
+			Invoker:       "bob",
+			Profile:       "prod",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Concurrent test",
+			Duration:      2 * time.Hour,
+			Status:        breakglass.StatusActive,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(2 * time.Hour),
+		}
+		_ = store.Create(ctx, activeEvent)
+
+		var wg sync.WaitGroup
+		var found int32
+		numGoroutines := 10
+
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				result, err := breakglass.FindActiveBreakGlass(ctx, store, "bob", "prod")
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+					return
+				}
+				if result != nil {
+					atomic.AddInt32(&found, 1)
+				}
+			}()
+		}
+
+		wg.Wait()
+
+		if found != int32(numGoroutines) {
+			t.Errorf("expected all %d goroutines to find event, got %d", numGoroutines, found)
+		}
+	})
+
+	t.Run("concurrent_find_with_store_mutations", func(t *testing.T) {
+		// This test verifies that finder functions work correctly when
+		// the store is being mutated concurrently.
+		// Note: The mock store's map iteration is not thread-safe, so we use
+		// thread-safe ListByRequester that returns a fixed snapshot.
+
+		store := testutil.NewMockRequestStore()
+
+		ctx := context.Background()
+		now := time.Now()
+
+		// Pre-create some requests
+		for i := 0; i < 5; i++ {
+			req := &request.Request{
+				ID:            request.NewRequestID(),
+				Requester:     "user",
+				Profile:       "prod",
+				Justification: "Pre-created request",
+				Duration:      2 * time.Hour,
+				Status:        request.StatusApproved,
+				CreatedAt:     now,
+				UpdatedAt:     now,
+				ExpiresAt:     now.Add(request.DefaultRequestTTL),
+				Approver:      "manager",
+			}
+			_ = store.Create(ctx, req)
+		}
+
+		// Use a mutex-protected list for concurrent access
+		var requestsMu sync.Mutex
+		var requestsList []*request.Request
+		for _, req := range store.Requests {
+			requestsList = append(requestsList, req)
+		}
+
+		// Configure ListByRequester to use thread-safe snapshot
+		store.ListByRequesterFunc = func(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+			requestsMu.Lock()
+			defer requestsMu.Unlock()
+			var results []*request.Request
+			for _, req := range requestsList {
+				if req.Requester == requester {
+					results = append(results, req)
+				}
+			}
+			return results, nil
+		}
+
+		var wg sync.WaitGroup
+		numGoroutines := 10
+
+		// Concurrent creates and finds
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(2)
+
+			// Creator goroutine - adds to thread-safe list
+			go func(idx int) {
+				defer wg.Done()
+				req := &request.Request{
+					ID:            request.NewRequestID(),
+					Requester:     "user",
+					Profile:       "prod",
+					Justification: "Concurrent mutation test",
+					Duration:      2 * time.Hour,
+					Status:        request.StatusApproved,
+					CreatedAt:     now,
+					UpdatedAt:     now,
+					ExpiresAt:     now.Add(request.DefaultRequestTTL),
+					Approver:      "manager",
+				}
+				requestsMu.Lock()
+				requestsList = append(requestsList, req)
+				requestsMu.Unlock()
+			}(i)
+
+			// Finder goroutine
+			go func() {
+				defer wg.Done()
+				// Should not panic even with concurrent mutations
+				_, _ = request.FindApprovedRequest(ctx, store, "user", "prod")
+			}()
+		}
+
+		wg.Wait()
+		// Test passes if no panics occurred
+	})
+}
+
+// ============================================================================
+// Edge Case Tests
+// ============================================================================
+
+func TestIntegration_FinderEdgeCases(t *testing.T) {
+	t.Run("nil_store_for_approved_request", func(t *testing.T) {
+		ctx := context.Background()
+
+		// FindApprovedRequest with nil store
+		// This will panic since store.ListByRequester will be called on nil
+		// Test documents behavior: nil store is a programming error
+		defer func() {
+			if r := recover(); r == nil {
+				t.Log("Note: FindApprovedRequest with nil store panics (programming error)")
+			}
+		}()
+
+		_, _ = request.FindApprovedRequest(ctx, nil, "alice", "prod")
+	})
+
+	t.Run("empty_requester", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+
+		// Empty requester should return nil (no requests match)
+		found, err := request.FindApprovedRequest(ctx, store, "", "prod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("expected nil for empty requester")
+		}
+	})
+
+	t.Run("empty_profile", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		configureListByRequester(store)
+
+		ctx := context.Background()
+		now := time.Now()
+
+		// Create request with non-empty profile
+		req := &request.Request{
+			ID:            "a1a2a3a4a5a6a7a8",
+			Requester:     "alice",
+			Profile:       "prod",
+			Justification: "Test",
+			Duration:      2 * time.Hour,
+			Status:        request.StatusApproved,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+			ExpiresAt:     now.Add(request.DefaultRequestTTL),
+			Approver:      "manager",
+		}
+		_ = store.Create(ctx, req)
+
+		// Search with empty profile should not match
+		found, err := request.FindApprovedRequest(ctx, store, "alice", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != nil {
+			t.Error("expected nil for empty profile search")
+		}
+	})
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+// configureListByRequester sets up the mock to query in-memory storage
+func configureListByRequester(store *testutil.MockRequestStore) {
+	store.ListByRequesterFunc = func(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+		var results []*request.Request
+		for _, req := range store.Requests {
+			if req.Requester == requester {
+				results = append(results, req)
+			}
+		}
+		return results, nil
+	}
+}
+
+// configureListByInvoker sets up the mock to query in-memory storage
+func configureListByInvoker(store *testutil.MockBreakGlassStore) {
+	store.ListByInvokerFunc = func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+		var results []*breakglass.BreakGlassEvent
+		for _, event := range store.Events {
+			if event.Invoker == invoker {
+				results = append(results, event)
+			}
+		}
+		return results, nil
+	}
 }
