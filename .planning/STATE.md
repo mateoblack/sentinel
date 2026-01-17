@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 51 of 59 (Policy Engine Testing) - COMPLETE
+Phase: 52 of 59 (Break-Glass Security Testing) - COMPLETE
 Plan: 3 of 3 in current phase (all complete)
-Status: Ready for Phase 52
-Last activity: 2026-01-17 — Completed 51-03-PLAN.md (Security Gating Tests)
+Status: Ready for Phase 53
+Last activity: 2026-01-17 — Completed 52-03-PLAN.md (Audit Trail Integrity Tests)
 
-Progress: ███░░░░░░░ 24% (v1.6 Testing & Hardening)
+Progress: ████░░░░░░ 32% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -71,9 +71,9 @@ Progress: ███░░░░░░░ 24% (v1.6 Testing & Hardening)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 77
+- Total plans completed: 78
 - Average duration: 3.0 min
-- Total execution time: ~233 min
+- Total execution time: ~237 min
 
 **By Milestone:**
 
@@ -168,6 +168,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Test finder functions directly with mock stores rather than via CLI integration
 - External test package pattern for cross-domain testing in policy package
 
+**v1.6 Rate Limiting Security Tests decisions (Phase 52-01):**
+- Security-critical check order verified via call-tracking mock (orderTrackingStore)
+- Boundary tests confirm >= comparison for quotas, < comparison for cooldown
+- Rule matching tests verify first-match-wins and case sensitivity
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -179,9 +184,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 51-03-PLAN.md (Plan 3 of 3 in Phase 51 - Phase Complete)
+Stopped at: Completed 52-01-PLAN.md (Plan 1 of 3 in Phase 52)
 Resume file: None
-Next: Phase 52 (next testing phase)
+Next: 52-02-PLAN.md (State Machine Security Tests)
 
 ## Roadmap Evolution
 
