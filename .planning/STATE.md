@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 57 of 59 (Performance & Load Testing)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-01-17 — Completed 57-02-PLAN.md (Concurrency Testing)
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-01-17 — Completed 57-03-PLAN.md (Load Simulation)
 
-Progress: ███████░░░ 76% (v1.6 Testing & Hardening)
+Progress: ███████░░░ 80% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -238,6 +238,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - First-writer-wins via optimistic locking timestamp comparison for state machine tests
 - Mock stores clone data on Get/Create to prevent external mutation
 
+**v1.6 Load Simulation decisions (Phase 57-03):**
+- Per-worker result slices instead of shared channels to avoid contention at high rates
+- Atomic counter for work claiming prevents duplicate work assignment
+- Skip collision tracking in identity test (birthday problem ~0.07% with 25k samples)
+- Build tag 'loadtest' to skip expensive tests in normal runs
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -249,9 +255,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 57-02-PLAN.md (Plan 2 of 3 in Phase 57)
+Stopped at: Completed 57-03-PLAN.md (Plan 3 of 3 in Phase 57)
 Resume file: None
-Next: 57-03-PLAN.md (Load Simulation)
+Next: 58-01-PLAN.md (Security Regression Testing)
 
 ## Roadmap Evolution
 
