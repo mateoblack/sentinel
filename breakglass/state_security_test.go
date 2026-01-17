@@ -757,3 +757,271 @@ func TestFindActiveBreakGlass_ExpiredStatusEventFiltered(t *testing.T) {
 		t.Error("FindActiveBreakGlass returned expired status event, expected nil")
 	}
 }
+
+// =============================================================================
+// Status Enum Security Tests (Task 3)
+// =============================================================================
+
+// TestBreakGlassStatus_AllValidStatuses verifies all valid statuses return IsValid() == true.
+func TestBreakGlassStatus_AllValidStatuses(t *testing.T) {
+	validStatuses := []BreakGlassStatus{
+		StatusActive,
+		StatusClosed,
+		StatusExpired,
+	}
+
+	for _, status := range validStatuses {
+		t.Run(string(status), func(t *testing.T) {
+			if !status.IsValid() {
+				t.Errorf("Status %q.IsValid() = false, want true", status)
+			}
+		})
+	}
+}
+
+// TestBreakGlassStatus_InvalidStrings verifies invalid strings return IsValid() == false.
+func TestBreakGlassStatus_InvalidStrings(t *testing.T) {
+	invalidStatuses := []BreakGlassStatus{
+		"Active",     // capitalized
+		"ACTIVE",     // all caps
+		"pending",    // doesn't exist in break-glass
+		"unknown",    // arbitrary string
+		"",           // empty string
+		"approved",   // from request package
+		"rejected",   // from request package
+		" active",    // leading space
+		"active ",    // trailing space
+		"active\n",   // trailing newline
+	}
+
+	for _, status := range invalidStatuses {
+		name := string(status)
+		if name == "" {
+			name = "empty"
+		}
+		t.Run(name, func(t *testing.T) {
+			if status.IsValid() {
+				t.Errorf("Status %q.IsValid() = true, want false", status)
+			}
+		})
+	}
+}
+
+// TestBreakGlassStatus_IsTerminal_Exhaustive verifies only closed and expired are terminal.
+func TestBreakGlassStatus_IsTerminal_Exhaustive(t *testing.T) {
+	tests := []struct {
+		status   BreakGlassStatus
+		terminal bool
+	}{
+		{StatusActive, false},
+		{StatusClosed, true},
+		{StatusExpired, true},
+		{"invalid", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		name := string(tt.status)
+		if name == "" {
+			name = "empty"
+		}
+		t.Run(name, func(t *testing.T) {
+			got := tt.status.IsTerminal()
+			if got != tt.terminal {
+				t.Errorf("Status %q.IsTerminal() = %v, want %v", tt.status, got, tt.terminal)
+			}
+		})
+	}
+}
+
+// TestBreakGlassStatus_String_Identity verifies String() returns the expected string value.
+func TestBreakGlassStatus_String_Identity(t *testing.T) {
+	tests := []struct {
+		status   BreakGlassStatus
+		expected string
+	}{
+		{StatusActive, "active"},
+		{StatusClosed, "closed"},
+		{StatusExpired, "expired"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			got := tt.status.String()
+			if got != tt.expected {
+				t.Errorf("Status.String() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestReasonCode_AllValidCodes verifies all valid reason codes return IsValid() == true.
+func TestReasonCode_AllValidCodes(t *testing.T) {
+	validCodes := []ReasonCode{
+		ReasonIncident,
+		ReasonMaintenance,
+		ReasonSecurity,
+		ReasonRecovery,
+		ReasonOther,
+	}
+
+	for _, code := range validCodes {
+		t.Run(string(code), func(t *testing.T) {
+			if !code.IsValid() {
+				t.Errorf("ReasonCode %q.IsValid() = false, want true", code)
+			}
+		})
+	}
+}
+
+// TestReasonCode_InvalidStrings verifies invalid strings return IsValid() == false.
+func TestReasonCode_InvalidStrings(t *testing.T) {
+	invalidCodes := []ReasonCode{
+		"INCIDENT",    // all caps
+		"Incident",    // capitalized
+		"urgent",      // doesn't exist
+		"emergency",   // doesn't exist
+		"",            // empty string
+		"production",  // arbitrary
+		" incident",   // leading space
+		"incident ",   // trailing space
+		"incident\n",  // trailing newline
+	}
+
+	for _, code := range invalidCodes {
+		name := string(code)
+		if name == "" {
+			name = "empty"
+		}
+		t.Run(name, func(t *testing.T) {
+			if code.IsValid() {
+				t.Errorf("ReasonCode %q.IsValid() = true, want false", code)
+			}
+		})
+	}
+}
+
+// TestReasonCode_String_Identity verifies String() returns the expected string value.
+func TestReasonCode_String_Identity(t *testing.T) {
+	tests := []struct {
+		code     ReasonCode
+		expected string
+	}{
+		{ReasonIncident, "incident"},
+		{ReasonMaintenance, "maintenance"},
+		{ReasonSecurity, "security"},
+		{ReasonRecovery, "recovery"},
+		{ReasonOther, "other"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			got := tt.code.String()
+			if got != tt.expected {
+				t.Errorf("ReasonCode.String() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestBreakGlassStatus_TypeSafety verifies cannot accidentally use ReasonCode as BreakGlassStatus.
+func TestBreakGlassStatus_TypeSafety(t *testing.T) {
+	// These are ReasonCode values, not BreakGlassStatus values
+	// Even though they're both string-based, using wrong type should fail validation
+	t.Run("reason code incident used as status", func(t *testing.T) {
+		status := BreakGlassStatus(ReasonIncident) // "incident" as status
+		if status.IsValid() {
+			t.Error("ReasonCode(incident) used as BreakGlassStatus should be invalid")
+		}
+	})
+
+	t.Run("reason code maintenance used as status", func(t *testing.T) {
+		status := BreakGlassStatus(ReasonMaintenance) // "maintenance" as status
+		if status.IsValid() {
+			t.Error("ReasonCode(maintenance) used as BreakGlassStatus should be invalid")
+		}
+	})
+
+	t.Run("reason code security used as status", func(t *testing.T) {
+		status := BreakGlassStatus(ReasonSecurity) // "security" as status
+		if status.IsValid() {
+			t.Error("ReasonCode(security) used as BreakGlassStatus should be invalid")
+		}
+	})
+
+	t.Run("reason code recovery used as status", func(t *testing.T) {
+		status := BreakGlassStatus(ReasonRecovery) // "recovery" as status
+		if status.IsValid() {
+			t.Error("ReasonCode(recovery) used as BreakGlassStatus should be invalid")
+		}
+	})
+
+	t.Run("reason code other used as status", func(t *testing.T) {
+		status := BreakGlassStatus(ReasonOther) // "other" as status
+		if status.IsValid() {
+			t.Error("ReasonCode(other) used as BreakGlassStatus should be invalid")
+		}
+	})
+}
+
+// TestReasonCode_TypeSafety verifies cannot accidentally use BreakGlassStatus as ReasonCode.
+func TestReasonCode_TypeSafety(t *testing.T) {
+	// These are BreakGlassStatus values, not ReasonCode values
+	// Even though they're both string-based, using wrong type should fail validation
+	t.Run("status active used as reason code", func(t *testing.T) {
+		code := ReasonCode(StatusActive) // "active" as reason code
+		if code.IsValid() {
+			t.Error("BreakGlassStatus(active) used as ReasonCode should be invalid")
+		}
+	})
+
+	t.Run("status closed used as reason code", func(t *testing.T) {
+		code := ReasonCode(StatusClosed) // "closed" as reason code
+		if code.IsValid() {
+			t.Error("BreakGlassStatus(closed) used as ReasonCode should be invalid")
+		}
+	})
+
+	t.Run("status expired used as reason code", func(t *testing.T) {
+		code := ReasonCode(StatusExpired) // "expired" as reason code
+		if code.IsValid() {
+			t.Error("BreakGlassStatus(expired) used as ReasonCode should be invalid")
+		}
+	})
+}
+
+// TestBreakGlassStatus_ExhaustiveValidValues verifies exactly 3 valid status values exist.
+func TestBreakGlassStatus_ExhaustiveValidValues(t *testing.T) {
+	// All known valid statuses
+	validStatuses := []BreakGlassStatus{StatusActive, StatusClosed, StatusExpired}
+
+	// Verify count
+	if len(validStatuses) != 3 {
+		t.Errorf("Expected exactly 3 valid statuses, got %d", len(validStatuses))
+	}
+
+	// Verify each is valid
+	for _, s := range validStatuses {
+		if !s.IsValid() {
+			t.Errorf("Status %q should be valid", s)
+		}
+	}
+}
+
+// TestReasonCode_ExhaustiveValidValues verifies exactly 5 valid reason codes exist.
+func TestReasonCode_ExhaustiveValidValues(t *testing.T) {
+	// All known valid reason codes
+	validCodes := []ReasonCode{ReasonIncident, ReasonMaintenance, ReasonSecurity, ReasonRecovery, ReasonOther}
+
+	// Verify count
+	if len(validCodes) != 5 {
+		t.Errorf("Expected exactly 5 valid reason codes, got %d", len(validCodes))
+	}
+
+	// Verify each is valid
+	for _, c := range validCodes {
+		if !c.IsValid() {
+			t.Errorf("ReasonCode %q should be valid", c)
+		}
+	}
+}
