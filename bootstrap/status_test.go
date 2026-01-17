@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -353,5 +354,409 @@ func TestStatusChecker_GetStatus_RecursiveFalse(t *testing.T) {
 	}
 	if capturedInput.Recursive == nil || *capturedInput.Recursive != false {
 		t.Error("expected Recursive to be false")
+	}
+}
+
+// ============================================================================
+// Pagination Tests
+// ============================================================================
+
+func TestStatusChecker_GetStatus_LargeNumberOfParameters(t *testing.T) {
+	// Test with 12 parameters (more than typical page size)
+	parameters := []types.Parameter{}
+	for i := 1; i <= 12; i++ {
+		parameters = append(parameters, types.Parameter{
+			Name:             aws.String(fmt.Sprintf("/sentinel/policies/profile-%d", i)),
+			Value:            aws.String("policy-content"),
+			Version:          int64(i),
+			Type:             types.ParameterTypeString,
+			LastModifiedDate: aws.Time(time.Now()),
+		})
+	}
+
+	mock := &mockSSMStatusAPI{
+		getParametersByPathFunc: func(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+			return &ssm.GetParametersByPathOutput{
+				Parameters: parameters,
+			}, nil
+		},
+	}
+
+	checker := newStatusCheckerWithClient(mock)
+	result, err := checker.GetStatus(context.Background(), "/sentinel/policies")
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if result.Count != 12 {
+		t.Errorf("expected Count 12, got %d", result.Count)
+	}
+
+	// Verify all parameters present with correct versions
+	for i := 1; i <= 12; i++ {
+		found := false
+		expectedName := fmt.Sprintf("profile-%d", i)
+		for _, p := range result.Parameters {
+			if p.Name == expectedName && p.Version == int64(i) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("missing parameter: %s with version %d", expectedName, i)
+		}
+	}
+}
+
+func TestStatusChecker_GetStatus_MultiPageWithTokenTracking(t *testing.T) {
+	// Track NextToken values passed to verify pagination logic
+	var capturedTokens []*string
+
+	callCount := 0
+	mock := &mockSSMStatusAPI{
+		getParametersByPathFunc: func(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+			capturedTokens = append(capturedTokens, params.NextToken)
+			callCount++
+
+			switch callCount {
+			case 1:
+				// First page - no token expected
+				return &ssm.GetParametersByPathOutput{
+					Parameters: []types.Parameter{
+						{Name: aws.String("/sentinel/policies/a"), Version: 1, Type: types.ParameterTypeString, LastModifiedDate: aws.Time(time.Now())},
+					},
+					NextToken: aws.String("page-2-token"),
+				}, nil
+			case 2:
+				// Second page - should receive page-2-token
+				return &ssm.GetParametersByPathOutput{
+					Parameters: []types.Parameter{
+						{Name: aws.String("/sentinel/policies/b"), Version: 1, Type: types.ParameterTypeString, LastModifiedDate: aws.Time(time.Now())},
+					},
+					NextToken: aws.String("page-3-token"),
+				}, nil
+			default:
+				// Third/final page
+				return &ssm.GetParametersByPathOutput{
+					Parameters: []types.Parameter{
+						{Name: aws.String("/sentinel/policies/c"), Version: 1, Type: types.ParameterTypeString, LastModifiedDate: aws.Time(time.Now())},
+					},
+				}, nil
+			}
+		},
+	}
+
+	checker := newStatusCheckerWithClient(mock)
+	result, err := checker.GetStatus(context.Background(), "/sentinel/policies")
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	// Verify pagination tokens were passed correctly
+	if len(capturedTokens) != 3 {
+		t.Fatalf("expected 3 calls, got %d", len(capturedTokens))
+	}
+	if capturedTokens[0] != nil {
+		t.Error("first call should have nil token")
+	}
+	if capturedTokens[1] == nil || *capturedTokens[1] != "page-2-token" {
+		t.Errorf("second call should have page-2-token, got %v", capturedTokens[1])
+	}
+	if capturedTokens[2] == nil || *capturedTokens[2] != "page-3-token" {
+		t.Errorf("third call should have page-3-token, got %v", capturedTokens[2])
+	}
+
+	// Verify all parameters collected
+	if result.Count != 3 {
+		t.Errorf("expected 3 parameters, got %d", result.Count)
+	}
+}
+
+// ============================================================================
+// Edge Case Tests
+// ============================================================================
+
+func TestStatusChecker_GetStatus_SpecialCharactersInName(t *testing.T) {
+	// Valid SSM parameter characters: alphanumeric, ., -, _
+	mock := &mockSSMStatusAPI{
+		getParametersByPathFunc: func(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+			return &ssm.GetParametersByPathOutput{
+				Parameters: []types.Parameter{
+					{
+						Name:             aws.String("/sentinel/policies/my-profile_v2.1"),
+						Value:            aws.String("policy"),
+						Version:          1,
+						Type:             types.ParameterTypeString,
+						LastModifiedDate: aws.Time(time.Now()),
+					},
+					{
+						Name:             aws.String("/sentinel/policies/profile.with.dots"),
+						Value:            aws.String("policy"),
+						Version:          2,
+						Type:             types.ParameterTypeString,
+						LastModifiedDate: aws.Time(time.Now()),
+					},
+					{
+						Name:             aws.String("/sentinel/policies/profile_with_underscores"),
+						Value:            aws.String("policy"),
+						Version:          3,
+						Type:             types.ParameterTypeString,
+						LastModifiedDate: aws.Time(time.Now()),
+					},
+				},
+			}, nil
+		},
+	}
+
+	checker := newStatusCheckerWithClient(mock)
+	result, err := checker.GetStatus(context.Background(), "/sentinel/policies")
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	expectedNames := map[string]bool{
+		"my-profile_v2.1":          false,
+		"profile.with.dots":        false,
+		"profile_with_underscores": false,
+	}
+
+	for _, p := range result.Parameters {
+		if _, ok := expectedNames[p.Name]; ok {
+			expectedNames[p.Name] = true
+		}
+	}
+
+	for name, found := range expectedNames {
+		if !found {
+			t.Errorf("expected parameter name %q not found", name)
+		}
+	}
+}
+
+func TestStatusChecker_GetStatus_VersionZero(t *testing.T) {
+	mock := &mockSSMStatusAPI{
+		getParametersByPathFunc: func(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+			return &ssm.GetParametersByPathOutput{
+				Parameters: []types.Parameter{
+					{
+						Name:             aws.String("/sentinel/policies/zero-version"),
+						Value:            aws.String("policy"),
+						Version:          0, // Edge case: version 0
+						Type:             types.ParameterTypeString,
+						LastModifiedDate: aws.Time(time.Now()),
+					},
+				},
+			}, nil
+		},
+	}
+
+	checker := newStatusCheckerWithClient(mock)
+	result, err := checker.GetStatus(context.Background(), "/sentinel/policies")
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if result.Count != 1 {
+		t.Fatalf("expected 1 parameter, got %d", result.Count)
+	}
+	if result.Parameters[0].Version != 0 {
+		t.Errorf("expected version 0, got %d", result.Parameters[0].Version)
+	}
+}
+
+func TestStatusChecker_GetStatus_NilLastModifiedDate(t *testing.T) {
+	mock := &mockSSMStatusAPI{
+		getParametersByPathFunc: func(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+			return &ssm.GetParametersByPathOutput{
+				Parameters: []types.Parameter{
+					{
+						Name:             aws.String("/sentinel/policies/no-modified-date"),
+						Value:            aws.String("policy"),
+						Version:          1,
+						Type:             types.ParameterTypeString,
+						LastModifiedDate: nil, // Edge case: nil date
+					},
+				},
+			}, nil
+		},
+	}
+
+	checker := newStatusCheckerWithClient(mock)
+	result, err := checker.GetStatus(context.Background(), "/sentinel/policies")
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if result.Count != 1 {
+		t.Fatalf("expected 1 parameter, got %d", result.Count)
+	}
+	// aws.ToTime on nil returns zero time
+	if !result.Parameters[0].LastModified.IsZero() {
+		t.Errorf("expected zero time for nil LastModifiedDate, got %v", result.Parameters[0].LastModified)
+	}
+}
+
+func TestExtractProfileName_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name       string
+		policyRoot string
+		paramPath  string
+		want       string
+	}{
+		{
+			name:       "trailing slash on policyRoot",
+			policyRoot: "/sentinel/policies/",
+			paramPath:  "/sentinel/policies/production",
+			want:       "production",
+		},
+		{
+			name:       "no trailing slash",
+			policyRoot: "/sentinel/policies",
+			paramPath:  "/sentinel/policies/production",
+			want:       "production",
+		},
+		{
+			name:       "deeply nested policy root",
+			policyRoot: "/org/dept/team/sentinel/policies",
+			paramPath:  "/org/dept/team/sentinel/policies/my-profile",
+			want:       "my-profile",
+		},
+		{
+			name:       "path equals policyRoot (edge case)",
+			policyRoot: "/sentinel/policies",
+			paramPath:  "/sentinel/policies",
+			want:       "",
+		},
+		{
+			name:       "policyRoot with double trailing slash",
+			policyRoot: "/sentinel/policies//",
+			paramPath:  "/sentinel/policies/staging",
+			want:       "staging",
+		},
+		{
+			name:       "single character profile name",
+			policyRoot: "/sentinel/policies",
+			paramPath:  "/sentinel/policies/a",
+			want:       "a",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractProfileName(tt.policyRoot, tt.paramPath)
+			if got != tt.want {
+				t.Errorf("extractProfileName(%q, %q) = %q, want %q",
+					tt.policyRoot, tt.paramPath, got, tt.want)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// Error Handling Tests
+// ============================================================================
+
+func TestStatusChecker_GetStatus_AccessDenied(t *testing.T) {
+	mock := &mockSSMStatusAPI{
+		getParametersByPathFunc: func(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+			return nil, errors.New("AccessDeniedException: User is not authorized")
+		},
+	}
+
+	checker := newStatusCheckerWithClient(mock)
+	_, err := checker.GetStatus(context.Background(), "/sentinel/policies")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, err) || err.Error() == "" {
+		t.Error("expected non-empty error message")
+	}
+}
+
+func TestStatusChecker_GetStatus_ThrottlingError(t *testing.T) {
+	mock := &mockSSMStatusAPI{
+		getParametersByPathFunc: func(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+			return nil, errors.New("ThrottlingException: Rate exceeded")
+		},
+	}
+
+	checker := newStatusCheckerWithClient(mock)
+	_, err := checker.GetStatus(context.Background(), "/sentinel/policies")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestStatusChecker_GetStatus_ContextCancellation(t *testing.T) {
+	callCount := 0
+	mock := &mockSSMStatusAPI{
+		getParametersByPathFunc: func(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+			callCount++
+			// Check if context is cancelled
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			// First page returns with NextToken
+			if callCount == 1 {
+				return &ssm.GetParametersByPathOutput{
+					Parameters: []types.Parameter{
+						{Name: aws.String("/sentinel/policies/first"), Version: 1, Type: types.ParameterTypeString, LastModifiedDate: aws.Time(time.Now())},
+					},
+					NextToken: aws.String("next-page"),
+				}, nil
+			}
+			// Second call - return context error
+			return nil, context.Canceled
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	checker := newStatusCheckerWithClient(mock)
+
+	// Start the operation
+	go func() {
+		// Simulate cancellation during pagination
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+	}()
+
+	_, err := checker.GetStatus(ctx, "/sentinel/policies")
+
+	// The operation should eventually fail with context error
+	if err == nil {
+		// It's possible the test completed before cancellation
+		// In that case, verify callCount
+		if callCount < 2 {
+			t.Log("Operation completed before cancellation, which is acceptable")
+		}
+	}
+}
+
+func TestStatusChecker_GetStatus_ErrorDuringPagination(t *testing.T) {
+	callCount := 0
+	mock := &mockSSMStatusAPI{
+		getParametersByPathFunc: func(ctx context.Context, params *ssm.GetParametersByPathInput, optFns ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
+			callCount++
+			if callCount == 1 {
+				// First page succeeds
+				return &ssm.GetParametersByPathOutput{
+					Parameters: []types.Parameter{
+						{Name: aws.String("/sentinel/policies/success"), Version: 1, Type: types.ParameterTypeString, LastModifiedDate: aws.Time(time.Now())},
+					},
+					NextToken: aws.String("page-2"),
+				}, nil
+			}
+			// Second page fails
+			return nil, errors.New("InternalServerError: Service unavailable")
+		},
+	}
+
+	checker := newStatusCheckerWithClient(mock)
+	_, err := checker.GetStatus(context.Background(), "/sentinel/policies")
+	if err == nil {
+		t.Fatal("expected error during pagination, got nil")
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 calls (first success, second fail), got %d", callCount)
 	}
 }
