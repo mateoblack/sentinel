@@ -342,4 +342,250 @@ func TestBreakGlassEventConstants(t *testing.T) {
 			t.Errorf("expected BreakGlassEventExpired to be 'breakglass.expired', got %q", BreakGlassEventExpired)
 		}
 	})
+
+	t.Run("all event constants have breakglass prefix", func(t *testing.T) {
+		events := []string{
+			BreakGlassEventInvoked,
+			BreakGlassEventClosed,
+			BreakGlassEventExpired,
+		}
+
+		for _, event := range events {
+			if !strings.HasPrefix(event, "breakglass.") {
+				t.Errorf("expected event %q to have 'breakglass.' prefix", event)
+			}
+		}
+	})
+}
+
+// =============================================================================
+// Security Tests: Log Entry Completeness
+// =============================================================================
+// These tests verify that all mandatory audit fields are populated correctly
+// for different event types.
+
+func TestBreakGlassLogEntry_InvokedEvent_AllFieldsPopulated(t *testing.T) {
+	// Create a break-glass event with all fields populated
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Production database is down, need emergency access to investigate",
+		Duration:      2 * time.Hour,
+		Status:        breakglass.StatusActive,
+		CreatedAt:     time.Now(),
+		ExpiresAt:     time.Now().Add(2 * time.Hour),
+		RequestID:     "fedcba0987654321",
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+	// Verify ALL mandatory fields are populated (not empty)
+	mandatoryFields := map[string]string{
+		"Timestamp":     entry.Timestamp,
+		"Event":         entry.Event,
+		"EventID":       entry.EventID,
+		"RequestID":     entry.RequestID,
+		"Invoker":       entry.Invoker,
+		"Profile":       entry.Profile,
+		"ReasonCode":    entry.ReasonCode,
+		"Justification": entry.Justification,
+		"Status":        entry.Status,
+		"ExpiresAt":     entry.ExpiresAt,
+	}
+
+	for field, value := range mandatoryFields {
+		if value == "" {
+			t.Errorf("mandatory field %s is empty for invoked event", field)
+		}
+	}
+
+	// Duration must be positive
+	if entry.Duration <= 0 {
+		t.Errorf("Duration should be positive, got %d", entry.Duration)
+	}
+}
+
+func TestBreakGlassLogEntry_ClosedEvent_IncludesClosedFields(t *testing.T) {
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Production database is down, need emergency access to investigate",
+		Duration:      2 * time.Hour,
+		Status:        breakglass.StatusClosed,
+		CreatedAt:     time.Now().Add(-1 * time.Hour),
+		ExpiresAt:     time.Now().Add(1 * time.Hour),
+		RequestID:     "fedcba0987654321",
+		ClosedBy:      "bob",
+		ClosedReason:  "Issue resolved, no longer need access",
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventClosed, bg)
+
+	// ClosedBy and ClosedReason MUST be populated for closed events
+	if entry.ClosedBy == "" {
+		t.Error("ClosedBy should be populated for closed event")
+	}
+	if entry.ClosedReason == "" {
+		t.Error("ClosedReason should be populated for closed event")
+	}
+	if entry.ClosedBy != "bob" {
+		t.Errorf("expected ClosedBy 'bob', got %q", entry.ClosedBy)
+	}
+	if entry.ClosedReason != "Issue resolved, no longer need access" {
+		t.Errorf("expected ClosedReason 'Issue resolved, no longer need access', got %q", entry.ClosedReason)
+	}
+}
+
+func TestBreakGlassLogEntry_ExpiredEvent_NoClosedFields(t *testing.T) {
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonMaintenance,
+		Justification: "Emergency maintenance required for critical system update",
+		Duration:      4 * time.Hour,
+		Status:        breakglass.StatusExpired,
+		CreatedAt:     time.Now().Add(-5 * time.Hour),
+		ExpiresAt:     time.Now().Add(-1 * time.Hour),
+		RequestID:     "fedcba0987654321",
+		// Explicitly set ClosedBy/ClosedReason - should NOT appear in entry
+		ClosedBy:     "should-not-appear",
+		ClosedReason: "should-not-appear",
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventExpired, bg)
+
+	// Expired events should NOT have ClosedBy/ClosedReason (system expired, not user closed)
+	if entry.ClosedBy != "" {
+		t.Errorf("ClosedBy should be empty for expired event, got %q", entry.ClosedBy)
+	}
+	if entry.ClosedReason != "" {
+		t.Errorf("ClosedReason should be empty for expired event, got %q", entry.ClosedReason)
+	}
+}
+
+func TestBreakGlassLogEntry_EventIDMatchesSource(t *testing.T) {
+	testIDs := []string{
+		"a1b2c3d4e5f67890",
+		"0000000000000000",
+		"ffffffffffffffff",
+		"1234567890abcdef",
+	}
+
+	for _, id := range testIDs {
+		bg := &breakglass.BreakGlassEvent{
+			ID:            id,
+			Invoker:       "alice",
+			Profile:       "production",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Test justification for ID matching",
+			Duration:      1 * time.Hour,
+			Status:        breakglass.StatusActive,
+			ExpiresAt:     time.Now().Add(1 * time.Hour),
+		}
+
+		entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+		if entry.EventID != id {
+			t.Errorf("EventID mismatch: expected %q, got %q", id, entry.EventID)
+		}
+	}
+}
+
+func TestBreakGlassLogEntry_RequestIDMatchesSource(t *testing.T) {
+	testIDs := []string{
+		"fedcba0987654321",
+		"0000000000000000",
+		"ffffffffffffffff",
+		"abcd1234efgh5678",
+	}
+
+	for _, id := range testIDs {
+		bg := &breakglass.BreakGlassEvent{
+			ID:            "a1b2c3d4e5f67890",
+			Invoker:       "alice",
+			Profile:       "production",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Test justification for RequestID matching",
+			Duration:      1 * time.Hour,
+			Status:        breakglass.StatusActive,
+			ExpiresAt:     time.Now().Add(1 * time.Hour),
+			RequestID:     id,
+		}
+
+		entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+		if entry.RequestID != id {
+			t.Errorf("RequestID mismatch: expected %q, got %q", id, entry.RequestID)
+		}
+	}
+}
+
+func TestBreakGlassLogEntry_TimestampIsISO8601(t *testing.T) {
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Test justification for timestamp format",
+		Duration:      1 * time.Hour,
+		Status:        breakglass.StatusActive,
+		ExpiresAt:     time.Now().Add(1 * time.Hour),
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+	// Verify timestamp is valid ISO8601/RFC3339 format
+	_, err := time.Parse(time.RFC3339, entry.Timestamp)
+	if err != nil {
+		t.Errorf("Timestamp is not valid ISO8601/RFC3339: %q, error: %v", entry.Timestamp, err)
+	}
+
+	// Additional format checks
+	if !strings.Contains(entry.Timestamp, "T") {
+		t.Errorf("ISO8601 timestamp should contain 'T' separator: %q", entry.Timestamp)
+	}
+	if !strings.HasSuffix(entry.Timestamp, "Z") && !strings.Contains(entry.Timestamp, "+") && !strings.Contains(entry.Timestamp, "-") {
+		t.Errorf("ISO8601 timestamp should end with 'Z' or contain timezone offset: %q", entry.Timestamp)
+	}
+}
+
+func TestBreakGlassLogEntry_DurationInSeconds(t *testing.T) {
+	testCases := []struct {
+		duration        time.Duration
+		expectedSeconds int
+	}{
+		{15 * time.Minute, 900},
+		{30 * time.Minute, 1800},
+		{45 * time.Minute, 2700},
+		{1 * time.Hour, 3600},
+		{90 * time.Minute, 5400},
+		{2 * time.Hour, 7200},
+		{3 * time.Hour, 10800},
+		{4 * time.Hour, 14400},
+		{1*time.Hour + 30*time.Minute + 15*time.Second, 5415},
+	}
+
+	for _, tc := range testCases {
+		bg := &breakglass.BreakGlassEvent{
+			ID:            "a1b2c3d4e5f67890",
+			Invoker:       "alice",
+			Profile:       "production",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Test justification for duration test",
+			Duration:      tc.duration,
+			Status:        breakglass.StatusActive,
+			ExpiresAt:     time.Now().Add(tc.duration),
+		}
+
+		entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+		if entry.Duration != tc.expectedSeconds {
+			t.Errorf("Duration mismatch for %v: expected %d seconds, got %d", tc.duration, tc.expectedSeconds, entry.Duration)
+		}
+	}
 }
