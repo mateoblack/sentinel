@@ -280,8 +280,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 55-01: Bootstrap planner tests
-- [ ] 55-02: SSM integration tests
+- [x] 55-01: Bootstrap planner tests — completed 2026-01-17
+- [x] 55-02: SSM integration tests — completed 2026-01-17
 
 #### Phase 56: Integration Testing
 
@@ -340,6 +340,6 @@ Plans:
 | v1.3 Break-Glass | 27-34 | 15/15 | ✅ Complete | 2026-01-16 |
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
-| v1.6 Testing & Hardening | 50-59 | 12/25 | 🚧 In Progress | - |
+| v1.6 Testing & Hardening | 50-59 | 14/25 | 🚧 In Progress | - |
 
 **Totals:** 6 milestones shipped (49 phases, 76 plans), 1 milestone in progress (10 phases, 25 plans)
