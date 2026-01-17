@@ -1247,6 +1247,43 @@ func TestGoWeekdayToWeekday_InvalidDay(t *testing.T) {
 	}
 }
 
+func TestParseHourMinute_EdgeCases(t *testing.T) {
+	// parseHourMinute is a private function, so we test it indirectly via matchesHours.
+	// However, since matchesHours requires time parsing, we use a direct approach
+	// by testing parseHourMinute directly from within the same package.
+
+	tests := []struct {
+		name         string
+		input        string
+		expectedHour int
+		expectedMin  int
+	}{
+		{"Normal HH:MM", "09:00", 9, 0},
+		{"Afternoon", "17:30", 17, 30},
+		{"Midnight", "00:00", 0, 0},
+		{"End of day", "23:59", 23, 59},
+		{"Empty string", "", 0, 0},                    // len(parts) != 2
+		{"No colon", "0900", 0, 0},                    // len(parts) != 2
+		{"Multiple colons", "09:00:00", 0, 0},         // len(parts) != 2
+		{"Just hour", "09", 0, 0},                     // len(parts) != 2
+		{"Colon only", ":", 0, 0},                     // parts[0] and parts[1] empty
+		{"Leading colon", ":30", 0, 30},               // hour parse fails -> 0
+		{"Trailing colon", "09:", 9, 0},               // minute parse fails -> 0
+		{"Invalid hour chars", "ab:30", 0, 30},        // hour parse fails -> 0
+		{"Invalid minute chars", "09:cd", 9, 0},       // minute parse fails -> 0
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hour, minute := parseHourMinute(tt.input)
+			if hour != tt.expectedHour || minute != tt.expectedMin {
+				t.Errorf("parseHourMinute(%q) = (%d, %d), want (%d, %d)",
+					tt.input, hour, minute, tt.expectedHour, tt.expectedMin)
+			}
+		})
+	}
+}
+
 func TestEvaluate_EdgeCases(t *testing.T) {
 	t.Run("empty policy returns default deny", func(t *testing.T) {
 		policy := &Policy{
