@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 58 of 59 (Security Regression Suite)
-Plan: 1 of 3 in current phase (complete)
-Status: Ready for 58-02-PLAN.md
-Last activity: 2026-01-17 — Completed 58-01 (Security Regression Tests)
+Phase: 59 of 59 (Pre-Release Validation)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-17 — Completed 59-01-PLAN.md (Coverage Report & Gaps)
 
-Progress: ████████░░ 85% (v1.6 Testing & Hardening)
+Progress: █████████░ 92% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -251,6 +251,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Table-driven tests with SECURITY VIOLATION markers for critical failures
 - Tests cover case sensitivity, boundary conditions, and injection patterns
 
+**v1.6 Pre-Release Coverage decisions (Phase 59-01):**
+- All 11 Sentinel packages exceed 80% coverage target (average 94.1%)
+- GO recommendation for v1.6 release - security-critical paths fully covered
+- Uncovered code limited to AWS constructors (NewFromConfig patterns) and entry points
+- Inherited aws-vault packages excluded from target (not modified by Sentinel)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -262,9 +268,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 58-01-PLAN.md (Plan 1 of 3 in Phase 58)
+Stopped at: Completed 59-01-PLAN.md (Plan 1 of 3 in Phase 59)
 Resume file: None
-Next: 58-02-PLAN.md (Threat Model Tests)
+Next: 59-02-PLAN.md (Documentation Validation)
 
 ## Roadmap Evolution
 

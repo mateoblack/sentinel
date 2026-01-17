@@ -326,7 +326,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 59-01: Coverage report & gaps
+- [x] 59-01: Coverage report & gaps — completed 2026-01-17
 - [ ] 59-02: Documentation validation
 - [ ] 59-03: Pre-release checklist
 
@@ -340,6 +340,6 @@ Plans:
 | v1.3 Break-Glass | 27-34 | 15/15 | ✅ Complete | 2026-01-16 |
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
-| v1.6 Testing & Hardening | 50-59 | 22/25 | 🚧 In Progress | - |
+| v1.6 Testing & Hardening | 50-59 | 23/25 | 🚧 In Progress | - |
 
 **Totals:** 6 milestones shipped (49 phases, 76 plans), 1 milestone in progress (10 phases, 25 plans)
