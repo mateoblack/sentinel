@@ -1,5 +1,83 @@
 # Project Milestones: Sentinel
 
+## v1.6 Testing & Hardening (Shipped: 2026-01-17)
+
+**Delivered:** Comprehensive test coverage and validation with >80% coverage on all Sentinel packages, security regression suite, performance benchmarks, and pre-release validation confirming production readiness.
+
+**Phases completed:** 50-59 (25 plans total)
+
+**Key accomplishments:**
+- Test infrastructure with mock framework and 80% coverage enforcement on all Sentinel packages
+- Policy engine testing achieving 99% coverage with security invariant validation
+- Break-glass security testing covering rate limiting, state machine, and audit trail integrity
+- Performance benchmarks establishing baselines (policy eval ~50ns, identity gen ~64ns)
+- Security regression suite with TestSecurityRegression_ prefix for CI/CD filtering
+- Pre-release validation: 94.1% average coverage, 1,085 tests, GO recommendation
+
+**Stats:**
+- 99 files created/modified
+- 74,630 lines of Go (total codebase)
+- 10 phases, 25 plans
+- 2 days from v1.5 to v1.6
+
+**Git range:** `feat(50-01)` → `docs(59-03)`
+
+**What's next:** Production deployment ready. Consider v2.0 for UI dashboard, multi-account federation, or policy versioning.
+
+---
+
+## v1.5 Enforcement & Assurance (Shipped: 2026-01-16)
+
+**Delivered:** IAM trust policy analysis, enforcement status reporting, CloudTrail session verification, and drift detection for comprehensive security assurance.
+
+**Phases completed:** 43-49 (8 plans total)
+
+**Key accomplishments:**
+- IAM trust policy analysis with enforcement status levels (Full/Partial/None)
+- Trust policy template generation for Pattern A/B/C security postures
+- CloudTrail session verification for SourceIdentity compliance auditing
+- `sentinel audit verify` command for unmanaged session detection
+- Drift detection with --require-sentinel flag (advisory warnings)
+- Complete enforcement documentation (ENFORCEMENT.md, ASSURANCE.md)
+
+**Stats:**
+- 38 files created/modified
+- 49,588 lines of Go (total codebase)
+- 7 phases, 8 plans
+- 1 day from v1.4 to v1.5
+
+**Git range:** `feat(43-01)` → `docs(49-01)`
+
+**What's next:** v1.6 Testing & Hardening for comprehensive test coverage before production release
+
+---
+
+## v1.4 Sentinel Bootstrapping (Shipped: 2026-01-16)
+
+**Delivered:** Automated bootstrap system for SSM parameter setup, sample policy generation, and IAM policy documents for least-privilege access.
+
+**Phases completed:** 35-42 (8 plans total)
+
+**Key accomplishments:**
+- Bootstrap planner analyzing existing SSM parameters with state detection
+- Automated SSM parameter creation with String type for policy YAML
+- Sample policy generation from profile configuration
+- IAM policy document generation with least-privilege actions
+- Status command for deployment health monitoring
+- Bootstrap documentation with quick start guide
+
+**Stats:**
+- 42 files created/modified
+- 44,813 lines of Go (total codebase)
+- 8 phases, 8 plans
+- 1 day from v1.3 to v1.4
+
+**Git range:** `feat(35-01)` → `docs(42-01)`
+
+**What's next:** v1.5 Enforcement & Assurance for IAM trust policy analysis and CloudTrail verification
+
+---
+
 ## v1.3 Break-Glass (Shipped: 2026-01-16)
 
 **Delivered:** Emergency access bypass with mandatory justification, time-bounded sessions, rate limiting, and immediate security notifications for incident response.

@@ -50,10 +50,15 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ `sentinel audit verify` command for unmanaged session detection — v1.5
 - ✓ Drift detection with --require-sentinel flag — v1.5
 - ✓ Enforcement and assurance documentation (ENFORCEMENT.md, ASSURANCE.md) — v1.5
+- ✓ Comprehensive test infrastructure with mock framework — v1.6
+- ✓ >80% test coverage on all Sentinel packages (94.1% average) — v1.6
+- ✓ Security regression test suite for denial path validation — v1.6
+- ✓ Performance benchmarks for policy evaluation and identity generation — v1.6
+- ✓ Pre-release validation with GO recommendation — v1.6
 
 ### Active
 
-(None — all v1.5 requirements validated)
+(None — all v1.6 requirements validated)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -62,7 +67,7 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.5 with 49,588 LOC Go.
+Shipped v1.6 with 74,630 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -112,6 +117,14 @@ v1.5 adds enforcement and assurance:
 - `sentinel audit verify` command for detecting unmanaged sessions
 - Drift detection with --require-sentinel flag for credential requests
 - Complete enforcement documentation (ENFORCEMENT.md, ASSURANCE.md)
+
+v1.6 adds comprehensive testing and hardening:
+- Test infrastructure with mock framework and 80% coverage enforcement
+- 94.1% average coverage across all 11 Sentinel packages
+- Security regression test suite validating denial paths
+- Performance benchmarks (policy eval ~50ns, identity gen ~64ns)
+- 1,085 total tests with race detector validation
+- Pre-release validation confirming production readiness
 
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
@@ -169,4 +182,4 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Three-level assurance model | Deployment, runtime, continuous verification | ✓ Good |
 
 ---
-*Last updated: 2026-01-16 after v1.5 milestone*
+*Last updated: 2026-01-17 after v1.6 milestone*

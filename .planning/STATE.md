@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-16)
+See: .planning/PROJECT.md (updated 2026-01-17)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.6 Testing & Hardening — COMPLETE
+**Current focus:** v1.6 Testing & Hardening — SHIPPED
 
 ## Current Position
 
 Phase: 59 of 59 (Pre-Release Validation)
 Plan: 3 of 3 in current phase (complete)
-Status: v1.6 Testing & Hardening COMPLETE
-Last activity: 2026-01-17 — Completed 59-03-PLAN.md (Pre-Release Checklist)
+Status: v1.6 SHIPPED — Production ready
+Last activity: 2026-01-17 — Milestone v1.6 archived
 
-Progress: ██████████ 100% (v1.6 Testing & Hardening)
+Progress: ██████████ 100% (All milestones complete)
 
 ## Milestone Summary
 
@@ -286,9 +286,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: v1.6 milestone complete
+Stopped at: v1.6 milestone archived and tagged
 Resume file: None
-Next: v1.7 planning (future)
+Next: Production deployment or v2.0 planning (future)
 
 ## Roadmap Evolution
 
