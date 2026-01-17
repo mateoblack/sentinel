@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 50 of 59 (Test Infrastructure Setup)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-17 — Completed 50-01-PLAN.md
+Plan: 2 of 2 in current phase (COMPLETE)
+Status: Phase 50 complete
+Last activity: 2026-01-16 — Completed 50-02-PLAN.md (Mock Framework and Test Helpers)
 
-Progress: █░░░░░░░░░ 4% (v1.6 Testing & Hardening)
+Progress: ██░░░░░░░░ 8% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -146,6 +146,13 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Drift Detection section placed before Troubleshooting for operational focus
 - ASSURANCE.md structured around three verification levels: deployment, runtime, continuous
 
+**v1.6 Mock Framework decisions (Phase 50-02):**
+- Mocks use function fields (XxxFunc) for maximum flexibility over interface embedding
+- Thread-safe call tracking with sync.Mutex for concurrent test support
+- In-memory storage maps in store mocks for stateful test scenarios
+- Interface verification tests ensure mocks stay in sync with interfaces
+- Generic assertion helpers (AssertEqual) for any comparable type
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -156,9 +163,10 @@ None — clean start for v1.4.
 
 ## Session Continuity
 
-Last session: 2026-01-17
-Stopped at: Completed 50-01-PLAN.md
+Last session: 2026-01-16
+Stopped at: Completed 50-02-PLAN.md (Phase 50 complete)
 Resume file: None
+Next: Phase 51 - Resolver Package Tests
 
 ## Roadmap Evolution
 
