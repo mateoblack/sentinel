@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 55 of 59 (Bootstrap & Deployment Testing) - COMPLETE
-Plan: 2 of 2 in current phase (all complete)
-Status: Ready for Phase 56
-Last activity: 2026-01-17 — Completed 55-02-PLAN.md (SSM Integration Tests)
+Phase: 56 of 59 (Integration Testing)
+Plan: 1 of 2 in current phase
+Status: In Progress
+Last activity: 2026-01-17 — Completed 56-01-PLAN.md (Credential Flow Integration Tests)
 
-Progress: ██████░░░░ 56% (v1.6 Testing & Hardening)
+Progress: ██████░░░░ 60% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -208,6 +208,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - 96.9% coverage acceptable - uncovered code is AWS config constructors (NewFromConfig)
 - Shared putParameter function with atomic counter for parallel call counting
 
+**v1.6 Credential Flow Integration Tests decisions (Phase 56-01):**
+- Decision paths tested via component integration, not full CLI invocation (avoids AWS credential requirement)
+- Logging verification uses MockLogger from testutil package for call tracking
+- Error handling tests verify non-fatal semantics (store errors don't block credential denial)
+- Integration tests exercise decision path components rather than full credential retrieval
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -219,9 +225,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 55-02-PLAN.md (Plan 2 of 3 in Phase 55)
+Stopped at: Completed 56-01-PLAN.md (Plan 1 of 2 in Phase 56)
 Resume file: None
-Next: 55-03-PLAN.md (CLI Integration Tests)
+Next: 56-02-PLAN.md (End-to-End Bootstrap Integration Tests)
 
 ## Roadmap Evolution
 
