@@ -12,7 +12,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.3 Break-Glass** — [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) (Phases 27-34, shipped 2026-01-16)
 - ✅ **v1.4 Sentinel Bootstrapping** — [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) (Phases 35-42, shipped 2026-01-16)
 - ✅ **v1.5 Enforcement & Assurance** — [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) (Phases 43-49, shipped 2026-01-16)
-- 🚧 **v1.6 Testing & Hardening** — Phases 50-59 (in progress)
+- ✅ **v1.6 Testing & Hardening** — Phases 50-59 (shipped 2026-01-17)
 
 ## Completed Milestones
 
@@ -211,7 +211,8 @@ Plans:
 
 </details>
 
-### 🚧 v1.6 Testing & Hardening (In Progress)
+<details>
+<summary>✅ v1.6 Testing & Hardening (Phases 50-59) — SHIPPED 2026-01-17</summary>
 
 **Milestone Goal:** Comprehensive test coverage and validation before production release (>80% coverage, security validation, performance benchmarks)
 
@@ -327,8 +328,10 @@ Plans:
 
 Plans:
 - [x] 59-01: Coverage report & gaps — completed 2026-01-17
-- [ ] 59-02: Documentation validation
-- [ ] 59-03: Pre-release checklist
+- [x] 59-02: Documentation validation — completed 2026-01-17
+- [x] 59-03: Pre-release checklist — completed 2026-01-17
+
+</details>
 
 ## Progress (All Milestones)
 
@@ -340,6 +343,6 @@ Plans:
 | v1.3 Break-Glass | 27-34 | 15/15 | ✅ Complete | 2026-01-16 |
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
-| v1.6 Testing & Hardening | 50-59 | 23/25 | 🚧 In Progress | - |
+| v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
 
-**Totals:** 6 milestones shipped (49 phases, 76 plans), 1 milestone in progress (10 phases, 25 plans)
+**Totals:** 7 milestones shipped (59 phases, 101 plans)
