@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 56 of 59 (Integration Testing) - COMPLETE
-Plan: 2 of 2 in current phase (all complete)
+Plan: 3 of 3 in current phase (all complete)
 Status: Ready for Phase 57
-Last activity: 2026-01-17 — Completed 56-02-PLAN.md (Cross-Service Integration Tests)
+Last activity: 2026-01-17 — Completed 56-03-PLAN.md (Command Integration Tests)
 
-Progress: ██████░░░░ 65% (v1.6 Testing & Hardening)
+Progress: ██████░░░░ 70% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -71,9 +71,9 @@ Progress: ██████░░░░ 65% (v1.6 Testing & Hardening)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 82
+- Total plans completed: 83
 - Average duration: 3.0 min
-- Total execution time: ~250 min
+- Total execution time: ~257 min
 
 **By Milestone:**
 
@@ -220,6 +220,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Mutex-protected list snapshot for concurrent mutation tests (prevents race on map iteration)
 - Fire-and-forget notification semantics verified across all state transitions
 
+**v1.6 Command Integration Tests decisions (Phase 56-03):**
+- Use testable command versions (testableRequestCommand, testableBreakGlassCommand, testableBootstrapCommand) for profile validation bypass
+- Leverage existing MockRequestStore and MockBreakGlassStore from testutil instead of duplicating mocks
+- Added MockBreakGlassNotifier to testutil to complete notification mock coverage
+- Valid request/event IDs must be 16 lowercase hex characters
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -231,7 +237,7 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 56-02-PLAN.md (Plan 2 of 2 in Phase 56)
+Stopped at: Completed 56-03-PLAN.md (Plan 3 of 3 in Phase 56)
 Resume file: None
 Next: Phase 57 (Performance & Load Testing)
 
