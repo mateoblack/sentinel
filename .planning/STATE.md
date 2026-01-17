@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 55 of 59 (Bootstrap Deployment Testing) - IN PROGRESS
-Plan: 1 of 3 complete
-Status: Ready for 55-02-PLAN.md
-Last activity: 2026-01-17 — Completed 55-01-PLAN.md (Validation Edge Case Tests)
+Plan: 2 of 3 complete
+Status: Ready for 55-03-PLAN.md
+Last activity: 2026-01-17 — Completed 55-02-PLAN.md (SSM Integration Tests)
 
-Progress: █████░░░░░ 53% (v1.6 Testing & Hardening)
+Progress: █████░░░░░ 55% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -202,6 +202,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Validation functions isValidSSMPath and isValidProfileName at 100% coverage
 - Overall bootstrap coverage improved from 95.7% to 96.9%
 
+**v1.6 Bootstrap SSM Integration Tests decisions (Phase 55-02):**
+- Each parallel goroutine gets its own mock/executor to avoid race on calls slice
+- inMemorySSMStore implements ssmAPI, ssmWriterAPI, ssmStatusAPI for E2E testing
+- 96.9% coverage acceptable - uncovered code is AWS config constructors (NewFromConfig)
+- Shared putParameter function with atomic counter for parallel call counting
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -213,9 +219,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 55-01-PLAN.md (Plan 1 of 3 in Phase 55)
+Stopped at: Completed 55-02-PLAN.md (Plan 2 of 3 in Phase 55)
 Resume file: None
-Next: 55-02-PLAN.md (Executor and Status Command Tests)
+Next: 55-03-PLAN.md (CLI Integration Tests)
 
 ## Roadmap Evolution
 
