@@ -762,3 +762,506 @@ func (n *concurrentTrackingNotifier) Notify(ctx context.Context, event *Event) e
 	n.statuses.Store(event.Request.Status, true)
 	return nil
 }
+
+// =============================================================================
+// Task 3: Webhook and SNS Edge Case Tests
+// =============================================================================
+
+// TestWebhookURLValidation tests webhook URL validation edge cases.
+func TestWebhookURLValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		url         string
+		wantErr     bool
+		errContains string
+	}{
+		// Valid URLs
+		{"https_valid", "https://example.com/webhook", false, ""},
+		{"http_valid", "http://example.com/webhook", false, ""},
+		{"with_port", "https://example.com:8080/webhook", false, ""},
+		{"with_path", "https://example.com/api/v1/webhook", false, ""},
+		{"with_query", "https://example.com/webhook?key=value", false, ""},
+
+		// Invalid URLs
+		{"empty", "", true, "required"},
+		{"whitespace", "   ", true, "invalid"},
+		{"no_scheme", "example.com/webhook", true, "invalid"},
+		{"invalid_scheme", "ftp://example.com/webhook", false, ""}, // Note: URL parsing accepts ftp
+		{"just_host", "localhost", true, "invalid"},
+
+		// Edge cases - very long URL
+		{"long_url", "https://example.com/" + strings.Repeat("a", 1000), false, ""},
+
+		// URL with credentials (potential security concern - document behavior)
+		{"with_credentials", "https://user:pass@example.com/webhook", false, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewWebhookNotifier(WebhookConfig{URL: tt.url})
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Error %q should contain %q", err.Error(), tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestWebhookRetryEdgeCases tests retry behavior edge cases.
+func TestWebhookRetryEdgeCases(t *testing.T) {
+	t.Run("zero_max_retries", func(t *testing.T) {
+		var attempts atomic.Int32
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			attempts.Add(1)
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		// With MaxRetries=0, should not retry at all (but the default is 3, so we need special handling)
+		// Based on the implementation, MaxRetries=0 defaults to 3
+		notifier, err := NewWebhookNotifier(WebhookConfig{
+			URL:        server.URL,
+			MaxRetries: 0, // Will default to 3
+		})
+		if err != nil {
+			t.Fatalf("NewWebhookNotifier: %v", err)
+		}
+		notifier.retryDelay = time.Millisecond // Speed up test
+
+		event := &Event{
+			Type:      EventRequestCreated,
+			Request:   &request.Request{ID: "test-123"},
+			Timestamp: time.Now(),
+			Actor:     "testuser",
+		}
+
+		err = notifier.Notify(context.Background(), event)
+		if err == nil {
+			t.Error("Expected error after retries exhausted")
+		}
+
+		// Default is 3 retries, so 4 attempts total
+		if got := attempts.Load(); got != 4 {
+			t.Errorf("attempts = %d, want 4 (1 initial + 3 retries)", got)
+		}
+	})
+
+	t.Run("high_max_retries", func(t *testing.T) {
+		var attempts atomic.Int32
+		const successAfter = 5
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			count := attempts.Add(1)
+			if count >= successAfter {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		notifier, err := NewWebhookNotifier(WebhookConfig{
+			URL:        server.URL,
+			MaxRetries: 100, // Very high max retries
+		})
+		if err != nil {
+			t.Fatalf("NewWebhookNotifier: %v", err)
+		}
+		notifier.retryDelay = time.Millisecond // Speed up test
+
+		event := &Event{
+			Type:      EventRequestCreated,
+			Request:   &request.Request{ID: "test-123"},
+			Timestamp: time.Now(),
+			Actor:     "testuser",
+		}
+
+		err = notifier.Notify(context.Background(), event)
+		if err != nil {
+			t.Errorf("Expected success after %d attempts, got error: %v", successAfter, err)
+		}
+
+		if got := attempts.Load(); got != successAfter {
+			t.Errorf("attempts = %d, want %d", got, successAfter)
+		}
+	})
+
+	t.Run("network_error_mid_request", func(t *testing.T) {
+		var attempts atomic.Int32
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			attempts.Add(1)
+			// Simulate network error by closing connection
+			hj, ok := w.(http.Hijacker)
+			if ok {
+				conn, _, _ := hj.Hijack()
+				conn.Close()
+			}
+		}))
+		defer server.Close()
+
+		notifier, err := NewWebhookNotifier(WebhookConfig{
+			URL:        server.URL,
+			MaxRetries: 2,
+		})
+		if err != nil {
+			t.Fatalf("NewWebhookNotifier: %v", err)
+		}
+		notifier.retryDelay = time.Millisecond
+
+		event := &Event{
+			Type:      EventRequestCreated,
+			Request:   &request.Request{ID: "test-123"},
+			Timestamp: time.Now(),
+			Actor:     "testuser",
+		}
+
+		err = notifier.Notify(context.Background(), event)
+		if err == nil {
+			t.Error("Expected error for network failure")
+		}
+
+		// Should have retried
+		if got := attempts.Load(); got < 2 {
+			t.Errorf("attempts = %d, want at least 2 (with retries)", got)
+		}
+	})
+}
+
+// TestWebhookExponentialBackoff verifies the exponential backoff formula.
+func TestWebhookExponentialBackoff(t *testing.T) {
+	var timestamps []time.Time
+	var mu sync.Mutex
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		timestamps = append(timestamps, time.Now())
+		mu.Unlock()
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	baseDelay := 50 * time.Millisecond
+
+	notifier, err := NewWebhookNotifier(WebhookConfig{
+		URL:        server.URL,
+		MaxRetries: 3,
+	})
+	if err != nil {
+		t.Fatalf("NewWebhookNotifier: %v", err)
+	}
+	notifier.retryDelay = baseDelay
+
+	event := &Event{
+		Type:      EventRequestCreated,
+		Request:   &request.Request{ID: "test-123"},
+		Timestamp: time.Now(),
+		Actor:     "testuser",
+	}
+
+	_ = notifier.Notify(context.Background(), event)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(timestamps) < 3 {
+		t.Fatalf("Expected at least 3 timestamps, got %d", len(timestamps))
+	}
+
+	// Verify exponential backoff: delay * 2^(attempt-1)
+	// Attempt 0 -> 1: baseDelay * 1
+	// Attempt 1 -> 2: baseDelay * 2
+	// Attempt 2 -> 3: baseDelay * 4
+	expectedDelays := []time.Duration{
+		baseDelay,         // 2^0 = 1
+		baseDelay * 2,     // 2^1 = 2
+		baseDelay * 4,     // 2^2 = 4
+	}
+
+	for i := 1; i < len(timestamps) && i <= len(expectedDelays); i++ {
+		actualDelay := timestamps[i].Sub(timestamps[i-1])
+		expectedDelay := expectedDelays[i-1]
+
+		// Allow 50% variance for scheduling delays
+		minExpected := expectedDelay / 2
+		maxExpected := expectedDelay * 2
+
+		if actualDelay < minExpected || actualDelay > maxExpected {
+			t.Errorf("Delay %d: got %v, expected between %v and %v", i, actualDelay, minExpected, maxExpected)
+		}
+	}
+}
+
+// TestSNSMessageAttributeSecurity tests SNS message attribute handling.
+func TestSNSMessageAttributeSecurity(t *testing.T) {
+	tests := []struct {
+		name      string
+		eventType EventType
+	}{
+		{"normal", EventRequestCreated},
+		{"with_dot", EventRequestApproved},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var capturedAttrs map[string]interface{}
+
+			mockClient := &mockSNSClient{
+				publishFn: func(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error) {
+					capturedAttrs = make(map[string]interface{})
+					for k, v := range params.MessageAttributes {
+						if v.StringValue != nil {
+							capturedAttrs[k] = *v.StringValue
+						}
+					}
+					return &sns.PublishOutput{}, nil
+				},
+			}
+
+			notifier := newSNSNotifierWithClient(mockClient, "arn:aws:sns:us-east-1:123456789012:test")
+
+			event := &Event{
+				Type:      tt.eventType,
+				Request:   &request.Request{ID: "test-123"},
+				Timestamp: time.Now(),
+				Actor:     "testuser",
+			}
+
+			err := notifier.Notify(context.Background(), event)
+			if err != nil {
+				t.Fatalf("Notify: %v", err)
+			}
+
+			// Verify event_type attribute exists and is correct
+			if got, ok := capturedAttrs["event_type"]; !ok {
+				t.Error("Missing event_type attribute")
+			} else if got != string(tt.eventType) {
+				t.Errorf("event_type = %q, want %q", got, tt.eventType)
+			}
+		})
+	}
+}
+
+// TestSNSTopicARNValidation tests behavior with various topic ARN formats.
+func TestSNSTopicARNValidation(t *testing.T) {
+	tests := []struct {
+		name     string
+		topicARN string
+		wantErr  bool
+	}{
+		{"valid_arn", "arn:aws:sns:us-east-1:123456789012:topic-name", false},
+		{"empty_arn", "", false}, // SNS client will validate, we just pass through
+		{"malformed_arn", "not-an-arn", false}, // Client-side validation
+		{"long_arn", "arn:aws:sns:us-east-1:123456789012:" + strings.Repeat("a", 1000), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var publishCalled bool
+
+			mockClient := &mockSNSClient{
+				publishFn: func(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error) {
+					publishCalled = true
+					// Verify TopicArn is passed through
+					if params.TopicArn != nil && *params.TopicArn != tt.topicARN {
+						t.Errorf("TopicArn = %q, want %q", *params.TopicArn, tt.topicARN)
+					}
+					return &sns.PublishOutput{}, nil
+				},
+			}
+
+			notifier := newSNSNotifierWithClient(mockClient, tt.topicARN)
+
+			event := &Event{
+				Type:      EventRequestCreated,
+				Request:   &request.Request{ID: "test-123"},
+				Timestamp: time.Now(),
+				Actor:     "testuser",
+			}
+
+			err := notifier.Notify(context.Background(), event)
+			if tt.wantErr && err == nil {
+				t.Error("Expected error, got nil")
+			}
+			if !tt.wantErr && !publishCalled {
+				t.Error("Publish was not called")
+			}
+		})
+	}
+}
+
+// TestMultiNotifierErrorAggregation tests error handling in MultiNotifier.
+func TestMultiNotifierErrorAggregation(t *testing.T) {
+	t.Run("all_pass", func(t *testing.T) {
+		n1 := &notifyTestMock{}
+		n2 := &notifyTestMock{}
+
+		multi := NewMultiNotifier(n1, n2)
+
+		event := &Event{
+			Type:      EventRequestCreated,
+			Request:   &request.Request{ID: "test-123"},
+			Timestamp: time.Now(),
+			Actor:     "testuser",
+		}
+
+		err := multi.Notify(context.Background(), event)
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+
+		// Verify both were called
+		if len(n1.events) != 1 {
+			t.Errorf("n1 calls = %d, want 1", len(n1.events))
+		}
+		if len(n2.events) != 1 {
+			t.Errorf("n2 calls = %d, want 1", len(n2.events))
+		}
+	})
+
+	t.Run("first_fails", func(t *testing.T) {
+		n1 := &notifyTestMock{err: errors.New("n1 failed")}
+		n2 := &notifyTestMock{}
+
+		multi := NewMultiNotifier(n1, n2)
+
+		event := &Event{
+			Type:      EventRequestCreated,
+			Request:   &request.Request{ID: "test-123"},
+			Timestamp: time.Now(),
+			Actor:     "testuser",
+		}
+
+		err := multi.Notify(context.Background(), event)
+		if err == nil {
+			t.Error("Expected error, got nil")
+		}
+
+		// Verify both were still called
+		if len(n1.events) != 1 {
+			t.Errorf("n1 calls = %d, want 1", len(n1.events))
+		}
+		if len(n2.events) != 1 {
+			t.Errorf("n2 calls = %d, want 1", len(n2.events))
+		}
+
+		// Error should contain n1's error
+		if !strings.Contains(err.Error(), "n1 failed") {
+			t.Errorf("Error should contain 'n1 failed': %v", err)
+		}
+	})
+
+	t.Run("both_fail", func(t *testing.T) {
+		n1 := &notifyTestMock{err: errors.New("n1 failed")}
+		n2 := &notifyTestMock{err: errors.New("n2 failed")}
+
+		multi := NewMultiNotifier(n1, n2)
+
+		event := &Event{
+			Type:      EventRequestCreated,
+			Request:   &request.Request{ID: "test-123"},
+			Timestamp: time.Now(),
+			Actor:     "testuser",
+		}
+
+		err := multi.Notify(context.Background(), event)
+		if err == nil {
+			t.Error("Expected error, got nil")
+		}
+
+		// Error should contain both errors
+		if !strings.Contains(err.Error(), "n1 failed") {
+			t.Errorf("Error should contain 'n1 failed': %v", err)
+		}
+		if !strings.Contains(err.Error(), "n2 failed") {
+			t.Errorf("Error should contain 'n2 failed': %v", err)
+		}
+	})
+
+	t.Run("nil_notifiers_filtered", func(t *testing.T) {
+		n1 := &notifyTestMock{}
+
+		// Pass nil notifiers - should be filtered
+		multi := NewMultiNotifier(nil, n1, nil)
+
+		event := &Event{
+			Type:      EventRequestCreated,
+			Request:   &request.Request{ID: "test-123"},
+			Timestamp: time.Now(),
+			Actor:     "testuser",
+		}
+
+		err := multi.Notify(context.Background(), event)
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+
+		// Only n1 should be called
+		if len(n1.events) != 1 {
+			t.Errorf("n1 calls = %d, want 1", len(n1.events))
+		}
+	})
+
+	t.Run("empty_after_nil_filter", func(t *testing.T) {
+		// All nil notifiers
+		multi := NewMultiNotifier(nil, nil, nil)
+
+		event := &Event{
+			Type:      EventRequestCreated,
+			Request:   &request.Request{ID: "test-123"},
+			Timestamp: time.Now(),
+			Actor:     "testuser",
+		}
+
+		// Should not error - just does nothing
+		err := multi.Notify(context.Background(), event)
+		if err != nil {
+			t.Errorf("Expected no error for empty multi-notifier, got: %v", err)
+		}
+	})
+}
+
+// TestSNSLongAttributeValues tests SNS handling of long attribute values.
+func TestSNSLongAttributeValues(t *testing.T) {
+	// Create event with very long actor name (simulating edge case)
+	longActor := strings.Repeat("a", 1000)
+
+	mockClient := &mockSNSClient{
+		publishFn: func(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error) {
+			// Verify the message can be parsed
+			var event Event
+			if err := json.Unmarshal([]byte(*params.Message), &event); err != nil {
+				return nil, errors.New("invalid JSON in message")
+			}
+
+			// Verify actor is preserved
+			if event.Actor != longActor {
+				return nil, errors.New("actor not preserved")
+			}
+
+			return &sns.PublishOutput{}, nil
+		},
+	}
+
+	notifier := newSNSNotifierWithClient(mockClient, "arn:aws:sns:us-east-1:123456789012:test")
+
+	event := &Event{
+		Type:      EventRequestCreated,
+		Request:   &request.Request{ID: "test-123"},
+		Timestamp: time.Now(),
+		Actor:     longActor,
+	}
+
+	err := notifier.Notify(context.Background(), event)
+	if err != nil {
+		t.Errorf("Failed with long actor: %v", err)
+	}
+}
