@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -462,6 +463,369 @@ func TestSanitizeUser(t *testing.T) {
 
 			if got != tc.want {
 				t.Errorf("SanitizeUser(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Security Edge Case Tests
+// =============================================================================
+
+// TestSourceIdentity_AWSConstraintBoundary tests AWS SourceIdentity length constraints.
+func TestSourceIdentity_AWSConstraintBoundary(t *testing.T) {
+	t.Run("MaxSourceIdentityLength is never exceeded", func(t *testing.T) {
+		// Test with max-length user (20 chars) - this is the worst case
+		si := &SourceIdentity{
+			User:      "abcdefghij0123456789", // 20 chars (max)
+			RequestID: "12345678",              // 8 chars (fixed)
+		}
+
+		formatted := si.Format()
+		if len(formatted) > MaxSourceIdentityLength {
+			t.Errorf("Format() length %d exceeds AWS max %d", len(formatted), MaxSourceIdentityLength)
+		}
+
+		// Expected: sentinel:(9) + user(20) + :(1) + request-id(8) = 38
+		if len(formatted) != 38 {
+			t.Errorf("Max-length format is %d chars, expected 38", len(formatted))
+		}
+	})
+
+	t.Run("formatted length calculation for all user lengths", func(t *testing.T) {
+		// Test each valid user length (1 to 20)
+		for userLen := 1; userLen <= MaxUserLength; userLen++ {
+			user := strings.Repeat("a", userLen)
+			si := &SourceIdentity{
+				User:      user,
+				RequestID: "12345678",
+			}
+
+			formatted := si.Format()
+			expectedLen := len("sentinel:") + userLen + 1 + RequestIDLength // +1 for second separator
+
+			if len(formatted) != expectedLen {
+				t.Errorf("User length %d: format length = %d, expected %d", userLen, len(formatted), expectedLen)
+			}
+
+			if len(formatted) > MaxSourceIdentityLength {
+				t.Errorf("User length %d: format length %d exceeds AWS max %d", userLen, len(formatted), MaxSourceIdentityLength)
+			}
+		}
+	})
+
+	t.Run("unicode sanitization counts multi-byte chars correctly", func(t *testing.T) {
+		// Unicode chars should be stripped by SanitizeUser, not counted as multiple chars
+		// Input with unicode that sanitizes to exactly 20 chars
+		input := "abcdefghij0123456789" + "éàü" // 20 alphanumeric + unicode
+		sanitized, err := SanitizeUser(input)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Unicode should be stripped, leaving exactly 20 chars
+		if len(sanitized) != 20 {
+			t.Errorf("sanitized length = %d, want 20", len(sanitized))
+		}
+
+		// Result should only contain alphanumeric
+		if sanitized != "abcdefghij0123456789" {
+			t.Errorf("sanitized = %q, want alphanumeric only", sanitized)
+		}
+	})
+}
+
+// TestParse_SecurityInjection tests Parse against injection and malformed inputs.
+func TestParse_SecurityInjection(t *testing.T) {
+	testCases := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name:    "separator injection - user containing colon",
+			input:   "sentinel:alice:bob:a1b2c3d4",
+			wantErr: "invalid SourceIdentity format",
+		},
+		{
+			name:    "separator injection - empty middle part",
+			input:   "sentinel::alice:a1b2c3d4",
+			wantErr: "invalid SourceIdentity format",
+		},
+		{
+			name:    "null byte in input",
+			input:   "sentinel:alice\x00:a1b2c3d4",
+			wantErr: "alphanumeric",
+		},
+		{
+			name:    "control character - tab in user",
+			input:   "sentinel:alice\tbob:a1b2c3d4",
+			wantErr: "alphanumeric", // Tab splits parsing, user validation fails
+		},
+		{
+			name:    "control character - newline in user",
+			input:   "sentinel:alice\nbob:a1b2c3d4",
+			wantErr: "alphanumeric", // Newline in user fails validation
+		},
+		{
+			name:    "control character - carriage return in user",
+			input:   "sentinel:alice\rbob:a1b2c3d4",
+			wantErr: "alphanumeric", // CR in user fails validation
+		},
+		{
+			name:    "only separators",
+			input:   ":::",
+			wantErr: "start with 'sentinel:'",
+		},
+		{
+			name:    "just prefix with extra colons",
+			input:   "sentinel::::",
+			wantErr: "invalid SourceIdentity format",
+		},
+		{
+			name:    "unicode in user field",
+			input:   "sentinel:alicé:a1b2c3d4",
+			wantErr: "alphanumeric",
+		},
+		{
+			name:    "special chars in user field",
+			input:   "sentinel:alice@bob:a1b2c3d4",
+			wantErr: "alphanumeric",
+		},
+		{
+			name:    "request-id injection attempt with colons",
+			input:   "sentinel:alice:a1b2:c3d4",
+			wantErr: "invalid SourceIdentity format",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Parse(tc.input)
+			if err == nil {
+				t.Errorf("expected error containing %q, got nil", tc.wantErr)
+				return
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("error %q does not contain %q", err.Error(), tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestSanitizeUser_SecurityEdgeCases tests SanitizeUser with security-focused inputs.
+func TestSanitizeUser_SecurityEdgeCases(t *testing.T) {
+	testCases := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "unicode beyond BMP - emoji",
+			input:   "alice😀bob",
+			want:    "alicebob",
+			wantErr: false,
+		},
+		{
+			name:    "unicode beyond BMP - musical symbol",
+			input:   "alice𝄞bob",
+			want:    "alicebob",
+			wantErr: false,
+		},
+		{
+			name:    "mixed direction text RTL+LTR",
+			input:   "alice\u200Fbob\u200E", // RTL and LTR marks
+			want:    "alicebob",
+			wantErr: false,
+		},
+		{
+			name:    "arabic with latin",
+			input:   "aliceمرحباbob",
+			want:    "alicebob",
+			wantErr: false,
+		},
+		{
+			name:    "very long username truncation",
+			input:   strings.Repeat("a", 1000),
+			want:    strings.Repeat("a", MaxUserLength),
+			wantErr: false,
+		},
+		{
+			name:    "extremely long username",
+			input:   strings.Repeat("x", 100000),
+			want:    strings.Repeat("x", MaxUserLength),
+			wantErr: false,
+		},
+		{
+			name:    "repeated special characters only",
+			input:   strings.Repeat("!@#$%", 100),
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "null bytes only",
+			input:   "\x00\x00\x00",
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "control characters only",
+			input:   "\t\n\r",
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "zero-width characters",
+			input:   "alice\u200Bbob", // zero-width space
+			want:    "alicebob",
+			wantErr: false,
+		},
+		{
+			name:    "homoglyph attack - cyrillic a",
+			input:   "аlice", // first 'a' is cyrillic а (U+0430)
+			want:    "lice",
+			wantErr: false,
+		},
+		{
+			name:    "combining characters",
+			input:   "alice\u0301bob", // combining acute accent
+			want:    "alicebob",
+			wantErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := SanitizeUser(tc.input)
+
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if got != tc.want {
+				t.Errorf("SanitizeUser(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+
+			// Verify result doesn't exceed max length
+			if len(got) > MaxUserLength {
+				t.Errorf("result length %d exceeds MaxUserLength %d", len(got), MaxUserLength)
+			}
+		})
+	}
+}
+
+// TestValidate_ErrorOrdering tests that Validate() checks user before request-id.
+func TestValidate_ErrorOrdering(t *testing.T) {
+	t.Run("empty user error returned before invalid request-id", func(t *testing.T) {
+		si := &SourceIdentity{
+			User:      "",       // Invalid - empty
+			RequestID: "badid!", // Invalid - non-hex
+		}
+
+		err := si.Validate()
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		// User error should be reported first
+		if !errors.Is(err, ErrEmptyUser) {
+			t.Errorf("expected ErrEmptyUser first, got: %v", err)
+		}
+	})
+
+	t.Run("user too long error returned before invalid request-id", func(t *testing.T) {
+		si := &SourceIdentity{
+			User:      strings.Repeat("a", MaxUserLength+1), // Invalid - too long
+			RequestID: "badid!",                             // Invalid - non-hex
+		}
+
+		err := si.Validate()
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		// User error should be reported first
+		if !errors.Is(err, ErrUserTooLong) {
+			t.Errorf("expected ErrUserTooLong first, got: %v", err)
+		}
+	})
+
+	t.Run("invalid user chars error returned before invalid request-id", func(t *testing.T) {
+		si := &SourceIdentity{
+			User:      "alice_bob", // Invalid - underscore
+			RequestID: "badid!",    // Invalid - non-hex
+		}
+
+		err := si.Validate()
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		// User error should be reported first
+		if !errors.Is(err, ErrInvalidUserChars) {
+			t.Errorf("expected ErrInvalidUserChars first, got: %v", err)
+		}
+	})
+}
+
+// TestNew_ReturnsNilOnFirstFailure verifies New() returns nil on first validation failure.
+func TestNew_ReturnsNilOnFirstFailure(t *testing.T) {
+	testCases := []struct {
+		name      string
+		user      string
+		requestID string
+		wantErr   error
+	}{
+		{
+			name:      "empty user",
+			user:      "",
+			requestID: "a1b2c3d4",
+			wantErr:   ErrEmptyUser,
+		},
+		{
+			name:      "user too long",
+			user:      strings.Repeat("a", MaxUserLength+1),
+			requestID: "a1b2c3d4",
+			wantErr:   ErrUserTooLong,
+		},
+		{
+			name:      "invalid user chars",
+			user:      "alice_bob",
+			requestID: "a1b2c3d4",
+			wantErr:   ErrInvalidUserChars,
+		},
+		{
+			name:      "invalid request-id",
+			user:      "alice",
+			requestID: "badid",
+			wantErr:   ErrInvalidRequestID,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			si, err := New(tc.user, tc.requestID)
+
+			// New() should return nil on error
+			if si != nil {
+				t.Error("expected nil SourceIdentity on error, got non-nil")
+			}
+
+			// Error should match expected
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !errors.Is(err, tc.wantErr) {
+				t.Errorf("expected %v, got %v", tc.wantErr, err)
 			}
 		})
 	}
