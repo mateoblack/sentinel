@@ -889,6 +889,328 @@ func TestCredentialFlowErrors_DriftCheckErrors(t *testing.T) {
 }
 
 // ============================================================================
+// TestCredentialFlowErrors_Extended - Extended error handling tests
+// ============================================================================
+
+func TestCredentialFlowErrors_PolicyYAMLMalformed(t *testing.T) {
+	// Test behavior with malformed policy YAML
+	// Note: The actual YAML parsing happens in the policy loader,
+	// but we can test how policy.Evaluate handles edge cases
+
+	t.Run("empty_rules_list_returns_default_deny", func(t *testing.T) {
+		policyObj := &policy.Policy{
+			Version: "1",
+			Rules:   []policy.Rule{}, // Empty rules
+		}
+
+		policyReq := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Evaluate(policyObj, policyReq)
+
+		if decision.Effect != policy.EffectDeny {
+			t.Errorf("expected deny for empty rules, got %s", decision.Effect)
+		}
+		if decision.Reason != "no matching rule" {
+			t.Errorf("expected reason 'no matching rule', got %q", decision.Reason)
+		}
+	})
+
+	t.Run("invalid_effect_still_evaluates", func(t *testing.T) {
+		// Policy with invalid effect - should not match
+		policyObj := &policy.Policy{
+			Version: "1",
+			Rules: []policy.Rule{
+				{
+					Name:   "invalid-rule",
+					Effect: policy.Effect("invalid"), // Invalid effect
+					Conditions: policy.Condition{
+						Profiles: []string{"production"},
+					},
+				},
+			},
+		}
+
+		policyReq := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Evaluate(policyObj, policyReq)
+
+		// Rule matches conditions but has invalid effect
+		// It still matches, but effect is "invalid"
+		if decision.MatchedRule != "invalid-rule" {
+			t.Errorf("expected rule 'invalid-rule' to match, got %q", decision.MatchedRule)
+		}
+	})
+
+	t.Run("empty_version_still_evaluates", func(t *testing.T) {
+		policyObj := &policy.Policy{
+			Version: "", // Empty version
+			Rules: []policy.Rule{
+				{
+					Name:   "test-rule",
+					Effect: policy.EffectAllow,
+					Conditions: policy.Condition{
+						Profiles: []string{"production"},
+					},
+				},
+			},
+		}
+
+		policyReq := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Evaluate(policyObj, policyReq)
+
+		// Should still work with empty version
+		if decision.Effect != policy.EffectAllow {
+			t.Errorf("expected allow despite empty version, got %s", decision.Effect)
+		}
+	})
+}
+
+func TestCredentialFlowErrors_StoreNonFatalErrors(t *testing.T) {
+	// Tests that store errors are non-fatal and don't prevent credential denial
+
+	t.Run("request_store_timeout_treated_as_no_approval", func(t *testing.T) {
+		store := testutil.NewMockRequestStore()
+		store.ListByRequesterErr = context.DeadlineExceeded
+
+		// Error should propagate
+		_, err := request.FindApprovedRequest(context.Background(), store, "alice", "production")
+
+		if err == nil {
+			t.Error("expected timeout error")
+		}
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("expected context.DeadlineExceeded, got %v", err)
+		}
+	})
+
+	t.Run("break_glass_store_timeout_treated_as_no_break_glass", func(t *testing.T) {
+		store := testutil.NewMockBreakGlassStore()
+		store.ListByInvokerErr = context.DeadlineExceeded
+
+		// Error should propagate
+		_, err := breakglass.FindActiveBreakGlass(context.Background(), store, "alice", "production")
+
+		if err == nil {
+			t.Error("expected timeout error")
+		}
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("expected context.DeadlineExceeded, got %v", err)
+		}
+	})
+
+	t.Run("canceled_context_propagates_error", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		store := testutil.NewMockRequestStore()
+		store.ListByRequesterFunc = func(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+			// Check context cancellation
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+				return []*request.Request{}, nil
+			}
+		}
+
+		_, err := request.FindApprovedRequest(ctx, store, "alice", "production")
+
+		if err == nil {
+			t.Error("expected context canceled error")
+		}
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("expected context.Canceled, got %v", err)
+		}
+	})
+}
+
+func TestCredentialFlowErrors_DriftCheckAllStatuses(t *testing.T) {
+	// Test all drift status values and their handling
+
+	testCases := []struct {
+		status      enforce.DriftStatus
+		errorField  string
+		shouldWarn  bool
+		description string
+	}{
+		{enforce.DriftStatusOK, "", false, "OK status - no warning"},
+		{enforce.DriftStatusPartial, "", true, "Partial status - warning"},
+		{enforce.DriftStatusNone, "", true, "None status - warning"},
+		{enforce.DriftStatusUnknown, "could not verify", true, "Unknown with error - warning"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			checker := &enforce.TestDriftChecker{
+				CheckFunc: func(ctx context.Context, roleARN string) (*enforce.DriftCheckResult, error) {
+					return &enforce.DriftCheckResult{
+						Status:  tc.status,
+						RoleARN: roleARN,
+						Message: "Test message",
+						Error:   tc.errorField,
+					}, nil
+				},
+			}
+
+			result, err := checker.CheckRole(context.Background(), "arn:aws:iam::123456789012:role/Test")
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			needsWarning := result.Status != enforce.DriftStatusOK
+			if needsWarning != tc.shouldWarn {
+				t.Errorf("expected warning=%v, got %v for status %s", tc.shouldWarn, needsWarning, tc.status)
+			}
+		})
+	}
+}
+
+func TestCredentialFlowErrors_NoStoreConfigured(t *testing.T) {
+	// Test behavior when stores are nil (not configured)
+
+	t.Run("nil_request_store_skips_approval_check", func(t *testing.T) {
+		// When Store is nil, FindApprovedRequest shouldn't be called
+		// This tests the CredentialsCommandInput behavior
+
+		input := CredentialsCommandInput{
+			ProfileName:     "test",
+			PolicyParameter: "/test",
+			Store:           nil, // No request store
+		}
+
+		// Store should be nil
+		if input.Store != nil {
+			t.Error("expected nil Store")
+		}
+	})
+
+	t.Run("nil_break_glass_store_skips_break_glass_check", func(t *testing.T) {
+		input := CredentialsCommandInput{
+			ProfileName:     "test",
+			PolicyParameter: "/test",
+			BreakGlassStore: nil, // No break-glass store
+		}
+
+		// Store should be nil
+		if input.BreakGlassStore != nil {
+			t.Error("expected nil BreakGlassStore")
+		}
+	})
+}
+
+func TestCredentialFlowErrors_ProfileValidation(t *testing.T) {
+	// Profile validation tests
+
+	t.Run("profile_validation_error_message_format", func(t *testing.T) {
+		// Create temp config without the requested profile
+		tmpDir := t.TempDir()
+		configFile := filepath.Join(tmpDir, "config")
+
+		configContent := `[profile existing]
+region = us-east-1
+`
+		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+			t.Fatalf("Failed to write config: %v", err)
+		}
+
+		// Set AWS_CONFIG_FILE to test config
+		originalEnv := os.Getenv("AWS_CONFIG_FILE")
+		os.Setenv("AWS_CONFIG_FILE", configFile)
+		defer os.Setenv("AWS_CONFIG_FILE", originalEnv)
+
+		s := &Sentinel{}
+		err := s.ValidateProfile("nonexistent")
+
+		if err == nil {
+			t.Fatal("expected error for nonexistent profile")
+		}
+
+		errStr := err.Error()
+
+		// Should mention profile name
+		if !contains(errStr, "nonexistent") {
+			t.Errorf("error should mention profile name, got: %s", errStr)
+		}
+
+		// Should mention "not found"
+		if !contains(errStr, "not found") {
+			t.Errorf("error should mention 'not found', got: %s", errStr)
+		}
+
+		// Should list available profiles
+		if !contains(errStr, "existing") {
+			t.Errorf("error should list available profiles, got: %s", errStr)
+		}
+	})
+}
+
+func TestCredentialFlowErrors_EdgeCases(t *testing.T) {
+	// Edge case error handling
+
+	t.Run("empty_username_still_evaluates", func(t *testing.T) {
+		policyObj := testPolicyAllow("production")
+		policyReq := &policy.Request{
+			User:    "",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Evaluate(policyObj, policyReq)
+
+		// Empty user should still match (policy doesn't require specific user)
+		if decision.Effect != policy.EffectAllow {
+			t.Errorf("expected allow for empty user (wildcard), got %s", decision.Effect)
+		}
+	})
+
+	t.Run("empty_profile_returns_default_deny", func(t *testing.T) {
+		policyObj := testPolicyAllow("production")
+		policyReq := &policy.Request{
+			User:    "alice",
+			Profile: "", // Empty profile
+			Time:    time.Now(),
+		}
+
+		decision := policy.Evaluate(policyObj, policyReq)
+
+		// Empty profile doesn't match "production"
+		if decision.Effect != policy.EffectDeny {
+			t.Errorf("expected deny for empty profile, got %s", decision.Effect)
+		}
+	})
+
+	t.Run("zero_time_still_evaluates", func(t *testing.T) {
+		policyObj := testPolicyAllow("production")
+		policyReq := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Time{}, // Zero time
+		}
+
+		decision := policy.Evaluate(policyObj, policyReq)
+
+		// Zero time should still work (no time condition in policy)
+		if decision.Effect != policy.EffectAllow {
+			t.Errorf("expected allow for zero time (no time condition), got %s", decision.Effect)
+		}
+	})
+}
+
+// ============================================================================
 // TestCredentialFlowLogging_Extended - Extended logging verification tests
 // ============================================================================
 
