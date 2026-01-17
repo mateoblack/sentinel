@@ -589,3 +589,224 @@ func TestBreakGlassLogEntry_DurationInSeconds(t *testing.T) {
 		}
 	}
 }
+
+// =============================================================================
+// Security Tests: Event Type Consistency
+// =============================================================================
+// These tests verify event type handling is consistent and safe.
+
+func TestBreakGlassEventConstants_Values(t *testing.T) {
+	// Explicit value verification for security-critical constants
+	if BreakGlassEventInvoked != "breakglass.invoked" {
+		t.Errorf("BreakGlassEventInvoked value mismatch: expected 'breakglass.invoked', got %q", BreakGlassEventInvoked)
+	}
+	if BreakGlassEventClosed != "breakglass.closed" {
+		t.Errorf("BreakGlassEventClosed value mismatch: expected 'breakglass.closed', got %q", BreakGlassEventClosed)
+	}
+	if BreakGlassEventExpired != "breakglass.expired" {
+		t.Errorf("BreakGlassEventExpired value mismatch: expected 'breakglass.expired', got %q", BreakGlassEventExpired)
+	}
+}
+
+func TestBreakGlassEventConstants_Prefix(t *testing.T) {
+	// All break-glass events must have the "breakglass." namespace prefix
+	// This ensures consistent filtering in audit logs
+	events := []struct {
+		name  string
+		value string
+	}{
+		{"BreakGlassEventInvoked", BreakGlassEventInvoked},
+		{"BreakGlassEventClosed", BreakGlassEventClosed},
+		{"BreakGlassEventExpired", BreakGlassEventExpired},
+	}
+
+	for _, e := range events {
+		if !strings.HasPrefix(e.value, "breakglass.") {
+			t.Errorf("%s should have 'breakglass.' prefix for namespace consistency, got %q", e.name, e.value)
+		}
+	}
+}
+
+func TestNewBreakGlassLogEntry_EventTypePassthrough(t *testing.T) {
+	// The event parameter should be set directly on the log entry
+	// No validation, filtering, or transformation
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Test justification for event passthrough",
+		Duration:      1 * time.Hour,
+		Status:        breakglass.StatusActive,
+		ExpiresAt:     time.Now().Add(1 * time.Hour),
+	}
+
+	testEvents := []string{
+		BreakGlassEventInvoked,
+		BreakGlassEventClosed,
+		BreakGlassEventExpired,
+	}
+
+	for _, event := range testEvents {
+		entry := NewBreakGlassLogEntry(event, bg)
+
+		if entry.Event != event {
+			t.Errorf("Event passthrough failed: expected %q, got %q", event, entry.Event)
+		}
+	}
+}
+
+func TestNewBreakGlassLogEntry_InvalidEventType(t *testing.T) {
+	// Unknown event types should still create log entries
+	// Don't fail silently - audit ALL events, even unexpected ones
+	// This ensures no audit bypasses through invalid event types
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Test justification for invalid event type",
+		Duration:      1 * time.Hour,
+		Status:        breakglass.StatusActive,
+		ExpiresAt:     time.Now().Add(1 * time.Hour),
+	}
+
+	invalidEvents := []string{
+		"invalid.event",
+		"breakglass.unknown",
+		"random.string",
+		"BREAKGLASS.INVOKED", // Case matters
+		"",                   // Empty event
+	}
+
+	for _, event := range invalidEvents {
+		entry := NewBreakGlassLogEntry(event, bg)
+
+		// Entry should still be created
+		if entry.EventID == "" {
+			t.Errorf("Entry should be created even for invalid event type %q", event)
+		}
+
+		// Event type should be preserved as-is
+		if entry.Event != event {
+			t.Errorf("Invalid event should be preserved: expected %q, got %q", event, entry.Event)
+		}
+
+		// All other fields should still be populated
+		if entry.Invoker == "" || entry.Profile == "" {
+			t.Errorf("Other fields should still be populated for invalid event %q", event)
+		}
+	}
+}
+
+func TestNewBreakGlassLogEntry_EmptyEventType(t *testing.T) {
+	// Empty event type should create log entry with empty Event field
+	// Don't silently fail - audit even malformed requests
+	bg := &breakglass.BreakGlassEvent{
+		ID:            "a1b2c3d4e5f67890",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Test justification for empty event type",
+		Duration:      1 * time.Hour,
+		Status:        breakglass.StatusActive,
+		ExpiresAt:     time.Now().Add(1 * time.Hour),
+	}
+
+	entry := NewBreakGlassLogEntry("", bg)
+
+	// Entry should be created
+	if entry.EventID == "" {
+		t.Error("Entry should be created even with empty event type")
+	}
+
+	// Event field should be empty (as passed)
+	if entry.Event != "" {
+		t.Errorf("Event should be empty: expected '', got %q", entry.Event)
+	}
+
+	// All other mandatory fields should be populated
+	if entry.Invoker == "" {
+		t.Error("Invoker should still be populated")
+	}
+	if entry.Profile == "" {
+		t.Error("Profile should still be populated")
+	}
+	if entry.Timestamp == "" {
+		t.Error("Timestamp should still be populated")
+	}
+}
+
+func TestBreakGlassLogEntry_StatusMatchesSource(t *testing.T) {
+	// Status in log must exactly match bg.Status.String()
+	testCases := []struct {
+		status   breakglass.BreakGlassStatus
+		expected string
+	}{
+		{breakglass.StatusActive, "active"},
+		{breakglass.StatusClosed, "closed"},
+		{breakglass.StatusExpired, "expired"},
+	}
+
+	for _, tc := range testCases {
+		bg := &breakglass.BreakGlassEvent{
+			ID:            "a1b2c3d4e5f67890",
+			Invoker:       "alice",
+			Profile:       "production",
+			ReasonCode:    breakglass.ReasonIncident,
+			Justification: "Test justification for status matching",
+			Duration:      1 * time.Hour,
+			Status:        tc.status,
+			ExpiresAt:     time.Now().Add(1 * time.Hour),
+		}
+
+		entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+		if entry.Status != tc.expected {
+			t.Errorf("Status mismatch: expected %q, got %q", tc.expected, entry.Status)
+		}
+
+		// Verify it matches the String() method
+		if entry.Status != tc.status.String() {
+			t.Errorf("Status should match String(): expected %q, got %q", tc.status.String(), entry.Status)
+		}
+	}
+}
+
+func TestBreakGlassLogEntry_ReasonCodeMatchesSource(t *testing.T) {
+	// ReasonCode in log must exactly match string(bg.ReasonCode)
+	testCases := []struct {
+		reason   breakglass.ReasonCode
+		expected string
+	}{
+		{breakglass.ReasonIncident, "incident"},
+		{breakglass.ReasonMaintenance, "maintenance"},
+		{breakglass.ReasonSecurity, "security"},
+		{breakglass.ReasonRecovery, "recovery"},
+		{breakglass.ReasonOther, "other"},
+	}
+
+	for _, tc := range testCases {
+		bg := &breakglass.BreakGlassEvent{
+			ID:            "a1b2c3d4e5f67890",
+			Invoker:       "alice",
+			Profile:       "production",
+			ReasonCode:    tc.reason,
+			Justification: "Test justification for reason code matching",
+			Duration:      1 * time.Hour,
+			Status:        breakglass.StatusActive,
+			ExpiresAt:     time.Now().Add(1 * time.Hour),
+		}
+
+		entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+		if entry.ReasonCode != tc.expected {
+			t.Errorf("ReasonCode mismatch: expected %q, got %q", tc.expected, entry.ReasonCode)
+		}
+
+		// Verify it matches string conversion
+		if entry.ReasonCode != string(tc.reason) {
+			t.Errorf("ReasonCode should match string(): expected %q, got %q", string(tc.reason), entry.ReasonCode)
+		}
+	}
+}
