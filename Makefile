@@ -3,7 +3,7 @@ BUILD_FLAGS=-ldflags="-s -w -X main.Version=$(VERSION)" -trimpath
 CERT_ID ?= Developer ID Application: ByteNess (R)
 SRC=$(shell find . -name '*.go') go.mod
 INSTALL_DIR ?= ~/bin
-.PHONY: binaries clean release install snapshot run
+.PHONY: binaries clean release install snapshot run coverage coverage-report coverage-check test-coverage
 
 ifeq ($(shell uname), Darwin)
 aws-vault: $(SRC)
@@ -23,7 +23,7 @@ binaries: aws-vault-linux-amd64 aws-vault-linux-arm64 aws-vault-linux-ppc64le aw
 dmgs: aws-vault-darwin-amd64.dmg aws-vault-darwin-arm64.dmg
 
 clean:
-	rm -rf ./aws-vault ./aws-vault-*-* ./SHA256SUMS dist/
+	rm -rf ./aws-vault ./aws-vault-*-* ./SHA256SUMS dist/ coverage.out coverage.html
 
 snapshot: clean ## Build local snapshot
 	goreleaser build --clean --snapshot --single-target
@@ -42,6 +42,19 @@ lint:
 
 vet:
 	go vet -all ./...
+
+coverage: ## Generate coverage profile and HTML report
+	go test -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+coverage-report: ## Display per-package coverage summary
+	@go test -cover ./... 2>&1 | grep -E "^(ok|---|\?)" | sort
+
+coverage-check: ## Check coverage meets threshold (80% for Sentinel packages)
+	@./scripts/coverage.sh
+
+test-coverage: coverage coverage-check ## Run tests with coverage enforcement
 
 release: binaries SHA256SUMS
 
