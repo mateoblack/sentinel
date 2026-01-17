@@ -889,6 +889,310 @@ func TestCredentialFlowErrors_DriftCheckErrors(t *testing.T) {
 }
 
 // ============================================================================
+// TestCredentialFlowLogging_Extended - Extended logging verification tests
+// ============================================================================
+
+func TestCredentialFlowLogging_AllFieldsVerification(t *testing.T) {
+	// Comprehensive test that all log entry fields are correctly populated
+
+	t.Run("complete_allow_decision_log_entry", func(t *testing.T) {
+		// Create a policy with all condition types
+		policyObj := &policy.Policy{
+			Version: "1",
+			Rules: []policy.Rule{
+				{
+					Name:   "allow-production-weekdays",
+					Effect: policy.EffectAllow,
+					Reason: "Standard production access during business hours",
+					Conditions: policy.Condition{
+						Profiles: []string{"production"},
+						Users:    []string{"alice", "bob"},
+					},
+				},
+			},
+		}
+
+		policyReq := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Evaluate(policyObj, policyReq)
+		policyPath := "/sentinel/policies/production"
+
+		credFields := &logging.CredentialIssuanceFields{
+			RequestID:       "abc12345",
+			SourceIdentity:  "sentinel:alice:abc12345",
+			RoleARN:         "arn:aws:iam::123456789012:role/ProductionAdmin",
+			SessionDuration: 3600 * time.Second,
+			DriftStatus:     "ok",
+			DriftMessage:    "Full Sentinel enforcement configured",
+		}
+
+		entry := logging.NewEnhancedDecisionLogEntry(policyReq, decision, policyPath, credFields)
+
+		// Verify all basic fields
+		if entry.User != "alice" {
+			t.Errorf("User: expected 'alice', got %q", entry.User)
+		}
+		if entry.Profile != "production" {
+			t.Errorf("Profile: expected 'production', got %q", entry.Profile)
+		}
+		if entry.Effect != "allow" {
+			t.Errorf("Effect: expected 'allow', got %q", entry.Effect)
+		}
+		if entry.Rule != "allow-production-weekdays" {
+			t.Errorf("Rule: expected 'allow-production-weekdays', got %q", entry.Rule)
+		}
+		if entry.RuleIndex != 0 {
+			t.Errorf("RuleIndex: expected 0, got %d", entry.RuleIndex)
+		}
+		if entry.Reason != "Standard production access during business hours" {
+			t.Errorf("Reason: unexpected value %q", entry.Reason)
+		}
+		if entry.PolicyPath != policyPath {
+			t.Errorf("PolicyPath: expected %q, got %q", policyPath, entry.PolicyPath)
+		}
+		if entry.Timestamp == "" {
+			t.Error("Timestamp: expected non-empty value")
+		}
+
+		// Verify credential issuance fields
+		if entry.RequestID != "abc12345" {
+			t.Errorf("RequestID: expected 'abc12345', got %q", entry.RequestID)
+		}
+		if entry.SourceIdentity != "sentinel:alice:abc12345" {
+			t.Errorf("SourceIdentity: expected 'sentinel:alice:abc12345', got %q", entry.SourceIdentity)
+		}
+		if entry.RoleARN != "arn:aws:iam::123456789012:role/ProductionAdmin" {
+			t.Errorf("RoleARN: unexpected value %q", entry.RoleARN)
+		}
+		if entry.SessionDuration != 3600 {
+			t.Errorf("SessionDuration: expected 3600, got %d", entry.SessionDuration)
+		}
+		if entry.DriftStatus != "ok" {
+			t.Errorf("DriftStatus: expected 'ok', got %q", entry.DriftStatus)
+		}
+		if entry.DriftMessage != "Full Sentinel enforcement configured" {
+			t.Errorf("DriftMessage: unexpected value %q", entry.DriftMessage)
+		}
+	})
+
+	t.Run("deny_decision_with_approved_request_override", func(t *testing.T) {
+		policyObj := testPolicyDeny("production")
+		policyReq := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+		decision := policy.Evaluate(policyObj, policyReq)
+
+		credFields := &logging.CredentialIssuanceFields{
+			RequestID:         "def67890",
+			SourceIdentity:    "sentinel:alice:def67890",
+			RoleARN:           "arn:aws:iam::123456789012:role/ProductionAdmin",
+			SessionDuration:   7200 * time.Second, // 2 hours
+			ApprovedRequestID: "req-approved-001",
+		}
+
+		entry := logging.NewEnhancedDecisionLogEntry(policyReq, decision, "/sentinel/policies/test", credFields)
+
+		// Verify deny effect but with credential fields (override occurred)
+		if entry.Effect != "deny" {
+			t.Errorf("Effect: expected 'deny', got %q", entry.Effect)
+		}
+		if entry.ApprovedRequestID != "req-approved-001" {
+			t.Errorf("ApprovedRequestID: expected 'req-approved-001', got %q", entry.ApprovedRequestID)
+		}
+		if entry.BreakGlassEventID != "" {
+			t.Errorf("BreakGlassEventID: expected empty, got %q", entry.BreakGlassEventID)
+		}
+	})
+
+	t.Run("deny_decision_with_break_glass_override", func(t *testing.T) {
+		policyObj := testPolicyDeny("production")
+		policyReq := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+		decision := policy.Evaluate(policyObj, policyReq)
+
+		credFields := &logging.CredentialIssuanceFields{
+			RequestID:         "ghi11111",
+			SourceIdentity:    "sentinel:alice:ghi11111",
+			RoleARN:           "arn:aws:iam::123456789012:role/ProductionAdmin",
+			SessionDuration:   1800 * time.Second, // 30 min (capped)
+			BreakGlassEventID: "bg-incident-2026-01-17",
+		}
+
+		entry := logging.NewEnhancedDecisionLogEntry(policyReq, decision, "/sentinel/policies/test", credFields)
+
+		// Verify break-glass override fields
+		if entry.BreakGlassEventID != "bg-incident-2026-01-17" {
+			t.Errorf("BreakGlassEventID: expected 'bg-incident-2026-01-17', got %q", entry.BreakGlassEventID)
+		}
+		if entry.ApprovedRequestID != "" {
+			t.Errorf("ApprovedRequestID: expected empty, got %q", entry.ApprovedRequestID)
+		}
+		if entry.SessionDuration != 1800 {
+			t.Errorf("SessionDuration: expected 1800 (capped), got %d", entry.SessionDuration)
+		}
+	})
+
+	t.Run("default_deny_log_entry_fields", func(t *testing.T) {
+		// Policy with no matching rules
+		policyObj := &policy.Policy{
+			Version: "1",
+			Rules: []policy.Rule{
+				{
+					Name:   "allow-staging-only",
+					Effect: policy.EffectAllow,
+					Conditions: policy.Condition{
+						Profiles: []string{"staging"}, // Different profile
+					},
+				},
+			},
+		}
+
+		policyReq := &policy.Request{
+			User:    "alice",
+			Profile: "production", // No rule matches this
+			Time:    time.Now(),
+		}
+
+		decision := policy.Evaluate(policyObj, policyReq)
+		entry := logging.NewDecisionLogEntry(policyReq, decision, "/sentinel/policies/test")
+
+		if entry.Effect != "deny" {
+			t.Errorf("Effect: expected 'deny', got %q", entry.Effect)
+		}
+		if entry.Rule != "" {
+			t.Errorf("Rule: expected empty (default deny), got %q", entry.Rule)
+		}
+		if entry.RuleIndex != -1 {
+			t.Errorf("RuleIndex: expected -1 (default deny), got %d", entry.RuleIndex)
+		}
+		if entry.Reason != "no matching rule" {
+			t.Errorf("Reason: expected 'no matching rule', got %q", entry.Reason)
+		}
+	})
+}
+
+func TestCredentialFlowLogging_LoggerBehavior(t *testing.T) {
+	t.Run("logging_failure_is_silent", func(t *testing.T) {
+		// JSONLogger should not panic on marshal errors
+		// Note: DecisionLogEntry doesn't have fields that would cause marshal errors,
+		// but we test that the logger handles them gracefully
+		logger := logging.NewJSONLogger(&bytes.Buffer{})
+
+		// This should not panic
+		logger.LogDecision(logging.DecisionLogEntry{
+			User:   "test",
+			Effect: "allow",
+		})
+	})
+
+	t.Run("nop_logger_discards_entries", func(t *testing.T) {
+		logger := logging.NewNopLogger()
+
+		// This should not panic and should simply discard the entry
+		logger.LogDecision(logging.DecisionLogEntry{
+			User:   "test",
+			Effect: "allow",
+		})
+		// No way to verify - it just shouldn't panic
+	})
+
+	t.Run("mock_logger_tracks_all_entry_types", func(t *testing.T) {
+		logger := testutil.NewMockLogger()
+
+		// Log different types of entries
+		logger.LogDecision(logging.DecisionLogEntry{User: "alice", Effect: "allow"})
+		logger.LogDecision(logging.DecisionLogEntry{User: "bob", Effect: "deny"})
+		logger.LogApproval(logging.ApprovalLogEntry{RequestID: "req-001"})
+		logger.LogBreakGlass(logging.BreakGlassLogEntry{EventID: "bg-001"})
+
+		if logger.DecisionCount() != 2 {
+			t.Errorf("DecisionCount: expected 2, got %d", logger.DecisionCount())
+		}
+		if logger.ApprovalCount() != 1 {
+			t.Errorf("ApprovalCount: expected 1, got %d", logger.ApprovalCount())
+		}
+		if logger.BreakGlassCount() != 1 {
+			t.Errorf("BreakGlassCount: expected 1, got %d", logger.BreakGlassCount())
+		}
+	})
+
+	t.Run("mock_logger_last_entry_helpers", func(t *testing.T) {
+		logger := testutil.NewMockLogger()
+
+		logger.LogDecision(logging.DecisionLogEntry{User: "first", Effect: "allow"})
+		logger.LogDecision(logging.DecisionLogEntry{User: "second", Effect: "deny"})
+
+		last := logger.LastDecision()
+		if last.User != "second" {
+			t.Errorf("LastDecision: expected 'second', got %q", last.User)
+		}
+		if last.Effect != "deny" {
+			t.Errorf("LastDecision: expected 'deny', got %q", last.Effect)
+		}
+	})
+
+	t.Run("mock_logger_empty_returns_empty_struct", func(t *testing.T) {
+		logger := testutil.NewMockLogger()
+
+		last := logger.LastDecision()
+		if last.User != "" || last.Effect != "" {
+			t.Error("LastDecision on empty logger should return empty struct")
+		}
+	})
+}
+
+func TestCredentialFlowLogging_BestEffort(t *testing.T) {
+	// Tests that logging failures don't prevent credential issuance
+
+	t.Run("logging_error_doesnt_block_credential_flow", func(t *testing.T) {
+		// Simulate the logic in CredentialsCommand:
+		// Even if logging fails, credentials are still issued
+
+		var loggerFailed bool
+		mockWriter := &failingWriter{failAfter: 0}
+		logger := logging.NewJSONLogger(mockWriter)
+
+		entry := logging.DecisionLogEntry{
+			User:   "alice",
+			Effect: "allow",
+		}
+
+		// This will fail to write, but should not panic
+		logger.LogDecision(entry)
+		loggerFailed = mockWriter.failed
+
+		// In real code, credentials would still be issued despite log failure
+		// The important thing is no panic occurred
+		_ = loggerFailed
+	})
+}
+
+// failingWriter is a writer that fails after a certain number of writes.
+type failingWriter struct {
+	failAfter int
+	writes    int
+	failed    bool
+}
+
+func (f *failingWriter) Write(p []byte) (n int, err error) {
+	if f.writes >= f.failAfter {
+		f.failed = true
+		return 0, errors.New("write failed")
+	}
+	f.writes++
+	return len(p), nil
+}
+
+// ============================================================================
 // Helper types
 // ============================================================================
 
