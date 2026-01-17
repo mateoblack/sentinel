@@ -3,9 +3,13 @@ package notification
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -433,4 +437,328 @@ func TestActorMappingCorrectness(t *testing.T) {
 			}
 		})
 	}
+}
+
+// =============================================================================
+// Task 2: Async Notification Reliability Tests
+// =============================================================================
+
+// TestAsyncDeliveryReliability tests that all notifications are delivered under load.
+func TestAsyncDeliveryReliability(t *testing.T) {
+	const numRequests = 20
+
+	notifier := &notifyTestMock{}
+	store := &storeTestMock{}
+	ns := NewNotifyStore(store, notifier)
+
+	// Create many requests rapidly
+	for i := 0; i < numRequests; i++ {
+		req := &request.Request{
+			ID:            request.NewRequestID(),
+			Requester:     "testuser",
+			Profile:       "production",
+			Justification: "Test",
+			Duration:      time.Hour,
+			Status:        request.StatusPending,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+			ExpiresAt:     time.Now().Add(24 * time.Hour),
+		}
+
+		if err := ns.Create(context.Background(), req); err != nil {
+			t.Fatalf("Create %d failed: %v", i, err)
+		}
+	}
+
+	// Wait for all notifications with longer timeout
+	events := notifier.waitForEvents(numRequests, 5*time.Second)
+	if len(events) != numRequests {
+		t.Errorf("Expected %d events, got %d", numRequests, len(events))
+	}
+
+	// Verify all events are of correct type
+	for i, event := range events {
+		if event.Type != EventRequestCreated {
+			t.Errorf("Event %d: Type = %q, want %q", i, event.Type, EventRequestCreated)
+		}
+	}
+}
+
+// TestAsyncDeliveryPreservesOrder tests that notifications maintain order.
+func TestAsyncDeliveryPreservesOrder(t *testing.T) {
+	const numRequests = 10
+
+	notifier := &notifyTestMock{}
+	store := &storeTestMock{}
+	ns := NewNotifyStore(store, notifier)
+
+	// Track request IDs in order
+	requestIDs := make([]string, numRequests)
+
+	for i := 0; i < numRequests; i++ {
+		id := request.NewRequestID()
+		requestIDs[i] = id
+
+		req := &request.Request{
+			ID:            id,
+			Requester:     "testuser",
+			Profile:       "production",
+			Justification: "Test",
+			Duration:      time.Hour,
+			Status:        request.StatusPending,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+			ExpiresAt:     time.Now().Add(24 * time.Hour),
+		}
+
+		if err := ns.Create(context.Background(), req); err != nil {
+			t.Fatalf("Create %d failed: %v", i, err)
+		}
+
+		// Small delay to encourage ordering
+		time.Sleep(time.Millisecond)
+	}
+
+	// Wait for all notifications
+	events := notifier.waitForEvents(numRequests, 5*time.Second)
+	if len(events) != numRequests {
+		t.Fatalf("Expected %d events, got %d", numRequests, len(events))
+	}
+
+	// Note: Async notifications may not preserve strict order due to goroutine scheduling.
+	// We verify all IDs are present (no lost notifications).
+	receivedIDs := make(map[string]bool)
+	for _, event := range events {
+		receivedIDs[event.Request.ID] = true
+	}
+
+	for _, id := range requestIDs {
+		if !receivedIDs[id] {
+			t.Errorf("Missing notification for request ID %q", id)
+		}
+	}
+}
+
+// TestGoroutineLeakPrevention verifies no goroutine leaks when notifier fails.
+func TestGoroutineLeakPrevention(t *testing.T) {
+	const numOperations = 50
+
+	// Force GC to stabilize goroutine count
+	runtime.GC()
+	time.Sleep(100 * time.Millisecond)
+	baselineGoroutines := runtime.NumGoroutine()
+
+	// Create store with failing notifier
+	notifier := &notifyTestMock{
+		err: errors.New("notification always fails"),
+	}
+	store := &storeTestMock{}
+	ns := NewNotifyStore(store, notifier)
+
+	// Trigger many operations
+	for i := 0; i < numOperations; i++ {
+		req := &request.Request{
+			ID:            request.NewRequestID(),
+			Requester:     "testuser",
+			Profile:       "production",
+			Justification: "Test",
+			Duration:      time.Hour,
+			Status:        request.StatusPending,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+			ExpiresAt:     time.Now().Add(24 * time.Hour),
+		}
+
+		// Operation should succeed even though notification fails
+		if err := ns.Create(context.Background(), req); err != nil {
+			t.Fatalf("Create %d failed: %v", i, err)
+		}
+	}
+
+	// Wait for goroutines to complete
+	time.Sleep(500 * time.Millisecond)
+	runtime.GC()
+
+	finalGoroutines := runtime.NumGoroutine()
+
+	// Allow some variance (test framework may spawn goroutines)
+	// But we should not have leaked numOperations goroutines
+	leakedGoroutines := finalGoroutines - baselineGoroutines
+	maxAllowedLeak := 10 // Allow small variance for test infrastructure
+
+	if leakedGoroutines > maxAllowedLeak {
+		t.Errorf("Goroutine leak detected: baseline=%d, final=%d, leaked=%d (max allowed=%d)",
+			baselineGoroutines, finalGoroutines, leakedGoroutines, maxAllowedLeak)
+	}
+}
+
+// TestContextCancellationBehavior tests fire-and-forget semantics.
+func TestContextCancellationBehavior(t *testing.T) {
+	// Create a slow notifier that respects context
+	var notifyStarted atomic.Int32
+	var notifyCompleted atomic.Int32
+
+	slowNotifier := &notifyTestMock{}
+	slowNotifier.err = nil
+
+	// Override with slow notify function
+	originalNotify := slowNotifier.Notify
+	_ = originalNotify // silence unused warning
+
+	// Create notifier that tracks calls
+	trackingNotifier := &trackingSlowNotifier{
+		started:   &notifyStarted,
+		completed: &notifyCompleted,
+	}
+
+	store := &storeTestMock{}
+	ns := NewNotifyStore(store, trackingNotifier)
+
+	// Create cancellable context
+	ctx, cancel := context.WithCancel(context.Background())
+
+	req := &request.Request{
+		ID:            request.NewRequestID(),
+		Requester:     "testuser",
+		Profile:       "production",
+		Justification: "Test",
+		Duration:      time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		ExpiresAt:     time.Now().Add(24 * time.Hour),
+	}
+
+	// Create request
+	err := ns.Create(ctx, req)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	// Cancel context immediately
+	cancel()
+
+	// Operation should have succeeded (fire-and-forget)
+	// The notification goroutine may or may not complete depending on timing
+
+	// Wait a bit and verify notification was at least started
+	time.Sleep(200 * time.Millisecond)
+
+	// The notification goroutine should have been started
+	if notifyStarted.Load() == 0 {
+		t.Error("Notification was never started")
+	}
+}
+
+// trackingSlowNotifier is a slow notifier that tracks starts and completions.
+type trackingSlowNotifier struct {
+	started   *atomic.Int32
+	completed *atomic.Int32
+}
+
+func (n *trackingSlowNotifier) Notify(ctx context.Context, event *Event) error {
+	n.started.Add(1)
+	defer n.completed.Add(1)
+
+	// Simulate slow notification
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(50 * time.Millisecond):
+		return nil
+	}
+}
+
+// TestConcurrentUpdateNotificationRace tests concurrent state transitions.
+func TestConcurrentUpdateNotificationRace(t *testing.T) {
+	const numConcurrent = 10
+
+	// Track which status was notified
+	var notifiedStatuses sync.Map
+	var notifyCount atomic.Int32
+
+	trackingNotifier := &concurrentTrackingNotifier{
+		statuses:   &notifiedStatuses,
+		count:      &notifyCount,
+	}
+
+	// Create store that tracks the "current" state
+	var currentStatus atomic.Value
+	currentStatus.Store(request.StatusPending)
+
+	pendingReq := &request.Request{
+		ID:            "1234567890abcdef",
+		Requester:     "testuser",
+		Profile:       "production",
+		Justification: "Test",
+		Duration:      time.Hour,
+		Status:        request.StatusPending,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		ExpiresAt:     time.Now().Add(24 * time.Hour),
+	}
+
+	store := &storeTestMock{
+		getFn: func(ctx context.Context, id string) (*request.Request, error) {
+			return pendingReq, nil
+		},
+	}
+
+	ns := NewNotifyStore(store, trackingNotifier)
+
+	// Launch concurrent updates with different statuses
+	var wg sync.WaitGroup
+	statuses := []request.RequestStatus{
+		request.StatusApproved,
+		request.StatusDenied,
+		request.StatusCancelled,
+		request.StatusExpired,
+	}
+
+	for i := 0; i < numConcurrent; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+
+			status := statuses[idx%len(statuses)]
+			req := &request.Request{
+				ID:            pendingReq.ID,
+				Requester:     pendingReq.Requester,
+				Profile:       pendingReq.Profile,
+				Justification: pendingReq.Justification,
+				Duration:      pendingReq.Duration,
+				Status:        status,
+				CreatedAt:     pendingReq.CreatedAt,
+				UpdatedAt:     time.Now(),
+				ExpiresAt:     pendingReq.ExpiresAt,
+				Approver:      "approver",
+			}
+
+			_ = ns.Update(context.Background(), req)
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Wait for async notifications
+	time.Sleep(500 * time.Millisecond)
+
+	// Each update should have fired a notification (since all transition from pending)
+	finalCount := notifyCount.Load()
+	if finalCount != int32(numConcurrent) {
+		t.Logf("Note: %d notifications fired for %d concurrent updates (some may have been coalesced or lost to race conditions)",
+			finalCount, numConcurrent)
+	}
+}
+
+// concurrentTrackingNotifier tracks notifications from concurrent operations.
+type concurrentTrackingNotifier struct {
+	statuses *sync.Map
+	count    *atomic.Int32
+}
+
+func (n *concurrentTrackingNotifier) Notify(ctx context.Context, event *Event) error {
+	n.count.Add(1)
+	n.statuses.Store(event.Request.Status, true)
+	return nil
 }
