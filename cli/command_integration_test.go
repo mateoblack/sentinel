@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
@@ -623,5 +624,563 @@ func TestCommandIntegration_Approval_DenyLogsEvent(t *testing.T) {
 	entry := logger.LastApproval()
 	if entry.Event != string(notification.EventRequestDenied) {
 		t.Errorf("expected event %s, got %s", notification.EventRequestDenied, entry.Event)
+	}
+}
+
+// ============================================================================
+// Break-Glass Command Integration Tests
+// ============================================================================
+
+func TestCommandIntegration_BreakGlass_InvokeCreatesEvent(t *testing.T) {
+	// Test that BreakGlassCommand creates event with correct fields
+
+	store := testutil.NewMockBreakGlassStore()
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "production",
+		Duration:        1 * time.Hour,
+		ReasonCode:      "incident",
+		Justification:   "Production incident INC-12345: database timeout affecting user traffic",
+		BreakGlassTable: "test-breakglass-table",
+		Store:           store,
+	}
+
+	// Use testable version with profile validator
+	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify event was created
+	if len(store.CreateCalls) != 1 {
+		t.Fatalf("expected 1 Create call, got %d", len(store.CreateCalls))
+	}
+
+	createdEvent := store.CreateCalls[0]
+	if createdEvent.Profile != "production" {
+		t.Errorf("expected profile 'production', got '%s'", createdEvent.Profile)
+	}
+	if createdEvent.Duration != 1*time.Hour {
+		t.Errorf("expected duration 1h, got %v", createdEvent.Duration)
+	}
+	if createdEvent.ReasonCode != breakglass.ReasonIncident {
+		t.Errorf("expected reason code incident, got %s", createdEvent.ReasonCode)
+	}
+	if createdEvent.Status != breakglass.StatusActive {
+		t.Errorf("expected status active, got %s", createdEvent.Status)
+	}
+
+	// Verify output event matches
+	if output.Event.ID != createdEvent.ID {
+		t.Error("output event ID doesn't match created event")
+	}
+}
+
+func TestCommandIntegration_BreakGlass_ProfileNotFound(t *testing.T) {
+	// Test BreakGlassCommand with non-existent profile
+
+	store := testutil.NewMockBreakGlassStore()
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "nonexistent",
+		Duration:        1 * time.Hour,
+		ReasonCode:      "incident",
+		Justification:   "Need emergency access for incident response",
+		BreakGlassTable: "test-breakglass-table",
+		Store:           store,
+	}
+
+	// Use profile validator that rejects
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error {
+		return errors.New("profile not found in AWS config")
+	})
+	if err == nil {
+		t.Fatal("expected error for non-existent profile")
+	}
+
+	// Verify no event was created
+	if len(store.CreateCalls) != 0 {
+		t.Errorf("expected 0 Create calls, got %d", len(store.CreateCalls))
+	}
+}
+
+func TestCommandIntegration_BreakGlass_InvalidReasonCode(t *testing.T) {
+	// Test BreakGlassCommand with invalid reason code
+
+	store := testutil.NewMockBreakGlassStore()
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "production",
+		Duration:        1 * time.Hour,
+		ReasonCode:      "invalid-reason",
+		Justification:   "Need emergency access for incident response",
+		BreakGlassTable: "test-breakglass-table",
+		Store:           store,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err == nil {
+		t.Fatal("expected error for invalid reason code")
+	}
+
+	// Verify no event was created
+	if len(store.CreateCalls) != 0 {
+		t.Errorf("expected 0 Create calls, got %d", len(store.CreateCalls))
+	}
+}
+
+func TestCommandIntegration_BreakGlass_DurationCapAtMax(t *testing.T) {
+	// Test BreakGlassCommand caps duration at MaxDuration (4h)
+
+	store := testutil.NewMockBreakGlassStore()
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "production",
+		Duration:        10 * time.Hour, // Exceeds max of 4h
+		ReasonCode:      "incident",
+		Justification:   "Need extended emergency access for incident response",
+		BreakGlassTable: "test-breakglass-table",
+		Store:           store,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify duration was capped
+	createdEvent := store.CreateCalls[0]
+	if createdEvent.Duration != breakglass.MaxDuration {
+		t.Errorf("expected duration to be capped at %v, got %v", breakglass.MaxDuration, createdEvent.Duration)
+	}
+}
+
+func TestCommandIntegration_BreakGlass_DuplicateActiveEvent(t *testing.T) {
+	// Test BreakGlassCommand rejects when active event already exists
+
+	store := testutil.NewMockBreakGlassStore()
+
+	// Configure store to return an existing active event
+	currentUser, _ := user.Current()
+	existingEvent := &breakglass.BreakGlassEvent{
+		ID:        "existing1234abcd",
+		Invoker:   currentUser.Username,
+		Profile:   "production",
+		Status:    breakglass.StatusActive,
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+	}
+	store.FindActiveByInvokerAndProfileFunc = func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+		if invoker == currentUser.Username && profile == "production" {
+			return existingEvent, nil
+		}
+		return nil, nil
+	}
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "production",
+		Duration:        1 * time.Hour,
+		ReasonCode:      "incident",
+		Justification:   "Need emergency access for incident response",
+		BreakGlassTable: "test-breakglass-table",
+		Store:           store,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err == nil {
+		t.Fatal("expected error for duplicate active event")
+	}
+
+	// Verify no new event was created
+	if len(store.CreateCalls) != 0 {
+		t.Errorf("expected 0 Create calls, got %d", len(store.CreateCalls))
+	}
+}
+
+func TestCommandIntegration_BreakGlass_WithNotifier(t *testing.T) {
+	// Test BreakGlassCommand sends notification when Notifier is provided
+
+	store := testutil.NewMockBreakGlassStore()
+	notifier := &mockBreakGlassNotifier{}
+
+	input := BreakGlassCommandInput{
+		ProfileName:     "production",
+		Duration:        1 * time.Hour,
+		ReasonCode:      "incident",
+		Justification:   "Production incident: need emergency access",
+		BreakGlassTable: "test-breakglass-table",
+		Store:           store,
+		Notifier:        notifier,
+	}
+
+	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify notification was sent
+	if len(notifier.events) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(notifier.events))
+	}
+}
+
+// ============================================================================
+// BreakGlassCheckCommand Integration Tests
+// ============================================================================
+
+func TestCommandIntegration_BreakGlass_CheckRetrievesEvent(t *testing.T) {
+	// Test BreakGlassCheckCommand retrieves event by ID
+
+	store := testutil.NewMockBreakGlassStore()
+
+	// Create existing event (ID must be 16 lowercase hex characters)
+	existingEvent := &breakglass.BreakGlassEvent{
+		ID:            "abcd1234abcd5678",
+		Invoker:       "testuser",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Production incident INC-999",
+		Duration:      2 * time.Hour,
+		Status:        breakglass.StatusActive,
+		CreatedAt:     time.Now().Add(-30 * time.Minute),
+		UpdatedAt:     time.Now().Add(-30 * time.Minute),
+		ExpiresAt:     time.Now().Add(90 * time.Minute),
+	}
+	store.Events[existingEvent.ID] = existingEvent
+
+	input := BreakGlassCheckCommandInput{
+		EventID: existingEvent.ID,
+		Store:   store,
+	}
+
+	err := BreakGlassCheckCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify Get was called with correct ID
+	if len(store.GetCalls) != 1 {
+		t.Fatalf("expected 1 Get call, got %d", len(store.GetCalls))
+	}
+	if store.GetCalls[0] != existingEvent.ID {
+		t.Errorf("expected Get call with ID %s, got %s", existingEvent.ID, store.GetCalls[0])
+	}
+}
+
+func TestCommandIntegration_BreakGlass_CheckNonExistent(t *testing.T) {
+	// Test BreakGlassCheckCommand with non-existent event ID
+
+	store := testutil.NewMockBreakGlassStore()
+
+	input := BreakGlassCheckCommandInput{
+		EventID: "aaaaaaaaaaaaaaaa", // Valid format but doesn't exist
+		Store:   store,
+	}
+
+	err := BreakGlassCheckCommand(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error for non-existent event")
+	}
+
+	if !errors.Is(err, breakglass.ErrEventNotFound) {
+		t.Errorf("expected ErrEventNotFound, got %v", err)
+	}
+}
+
+// ============================================================================
+// BreakGlassCloseCommand Integration Tests
+// ============================================================================
+
+func TestCommandIntegration_BreakGlass_CloseUpdatesStatus(t *testing.T) {
+	// Test BreakGlassCloseCommand updates event status to closed
+
+	store := testutil.NewMockBreakGlassStore()
+
+	// Create an active event
+	activeEvent := &breakglass.BreakGlassEvent{
+		ID:            "1234abcd5678efab",
+		Invoker:       "testuser",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Production incident",
+		Duration:      2 * time.Hour,
+		Status:        breakglass.StatusActive,
+		CreatedAt:     time.Now().Add(-30 * time.Minute),
+		UpdatedAt:     time.Now().Add(-30 * time.Minute),
+		ExpiresAt:     time.Now().Add(90 * time.Minute),
+	}
+	store.Events[activeEvent.ID] = activeEvent
+
+	input := BreakGlassCloseCommandInput{
+		EventID: activeEvent.ID,
+		Reason:  "Incident resolved, access no longer needed",
+		Store:   store,
+	}
+
+	err := BreakGlassCloseCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify Get was called
+	if len(store.GetCalls) != 1 {
+		t.Fatalf("expected 1 Get call, got %d", len(store.GetCalls))
+	}
+
+	// Verify Update was called
+	if len(store.UpdateCalls) != 1 {
+		t.Fatalf("expected 1 Update call, got %d", len(store.UpdateCalls))
+	}
+
+	// Verify updated event has correct status
+	updatedEvent := store.UpdateCalls[0]
+	if updatedEvent.Status != breakglass.StatusClosed {
+		t.Errorf("expected status closed, got %s", updatedEvent.Status)
+	}
+	if updatedEvent.ClosedReason != "Incident resolved, access no longer needed" {
+		t.Errorf("unexpected closed reason: %s", updatedEvent.ClosedReason)
+	}
+}
+
+func TestCommandIntegration_BreakGlass_CloseRecordsCloser(t *testing.T) {
+	// Test BreakGlassCloseCommand records the closer identity
+
+	currentUser, err := user.Current()
+	if err != nil {
+		t.Skip("cannot get current user")
+	}
+
+	store := testutil.NewMockBreakGlassStore()
+
+	// Create an active event
+	activeEvent := &breakglass.BreakGlassEvent{
+		ID:            "5678efab1234abcd",
+		Invoker:       "original-invoker",
+		Profile:       "staging",
+		ReasonCode:    breakglass.ReasonMaintenance,
+		Justification: "Maintenance window",
+		Duration:      1 * time.Hour,
+		Status:        breakglass.StatusActive,
+		CreatedAt:     time.Now().Add(-20 * time.Minute),
+		UpdatedAt:     time.Now().Add(-20 * time.Minute),
+		ExpiresAt:     time.Now().Add(40 * time.Minute),
+	}
+	store.Events[activeEvent.ID] = activeEvent
+
+	input := BreakGlassCloseCommandInput{
+		EventID: activeEvent.ID,
+		Reason:  "Maintenance completed",
+		Store:   store,
+	}
+
+	err = BreakGlassCloseCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify closer is recorded
+	updatedEvent := store.UpdateCalls[0]
+	if updatedEvent.ClosedBy != currentUser.Username {
+		t.Errorf("expected closed by %s, got %s", currentUser.Username, updatedEvent.ClosedBy)
+	}
+}
+
+func TestCommandIntegration_BreakGlass_CloseAlreadyClosed(t *testing.T) {
+	// Test BreakGlassCloseCommand rejects closing already closed events
+
+	store := testutil.NewMockBreakGlassStore()
+
+	// Create a closed event
+	closedEvent := &breakglass.BreakGlassEvent{
+		ID:           "abcdabcd12341234",
+		Invoker:      "testuser",
+		Profile:      "production",
+		ReasonCode:   breakglass.ReasonIncident,
+		Duration:     2 * time.Hour,
+		Status:       breakglass.StatusClosed,
+		ClosedBy:     "admin",
+		ClosedReason: "Already closed",
+	}
+	store.Events[closedEvent.ID] = closedEvent
+
+	input := BreakGlassCloseCommandInput{
+		EventID: closedEvent.ID,
+		Reason:  "Trying to close again",
+		Store:   store,
+	}
+
+	err := BreakGlassCloseCommand(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error when closing already closed event")
+	}
+
+	// Verify Update was NOT called
+	if len(store.UpdateCalls) != 0 {
+		t.Errorf("expected 0 Update calls, got %d", len(store.UpdateCalls))
+	}
+}
+
+func TestCommandIntegration_BreakGlass_CloseLogsEvent(t *testing.T) {
+	// Test BreakGlassCloseCommand logs close event
+
+	store := testutil.NewMockBreakGlassStore()
+	logger := testutil.NewMockLogger()
+
+	// Create an active event
+	activeEvent := &breakglass.BreakGlassEvent{
+		ID:            "efab12345678abcd",
+		Invoker:       "testuser",
+		Profile:       "production",
+		ReasonCode:    breakglass.ReasonIncident,
+		Justification: "Production incident",
+		Duration:      2 * time.Hour,
+		Status:        breakglass.StatusActive,
+		CreatedAt:     time.Now().Add(-30 * time.Minute),
+		UpdatedAt:     time.Now().Add(-30 * time.Minute),
+		ExpiresAt:     time.Now().Add(90 * time.Minute),
+	}
+	store.Events[activeEvent.ID] = activeEvent
+
+	input := BreakGlassCloseCommandInput{
+		EventID: activeEvent.ID,
+		Reason:  "Incident resolved",
+		Store:   store,
+		Logger:  logger,
+	}
+
+	err := BreakGlassCloseCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify close was logged
+	if logger.BreakGlassCount() != 1 {
+		t.Fatalf("expected 1 breakglass log entry, got %d", logger.BreakGlassCount())
+	}
+}
+
+// ============================================================================
+// BreakGlassListCommand Integration Tests
+// ============================================================================
+
+func TestCommandIntegration_BreakGlass_ListByInvoker(t *testing.T) {
+	// Test BreakGlassListCommand queries by invoker
+
+	store := testutil.NewMockBreakGlassStore()
+
+	currentUser, _ := user.Current()
+
+	// Configure store to return events for current user
+	store.ListByInvokerFunc = func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+		if invoker == currentUser.Username {
+			return []*breakglass.BreakGlassEvent{
+				{
+					ID:         "event1aaaabbbb",
+					Invoker:    currentUser.Username,
+					Profile:    "production",
+					Status:     breakglass.StatusActive,
+					ReasonCode: breakglass.ReasonIncident,
+				},
+				{
+					ID:         "event2ccccdddd",
+					Invoker:    currentUser.Username,
+					Profile:    "staging",
+					Status:     breakglass.StatusClosed,
+					ReasonCode: breakglass.ReasonMaintenance,
+				},
+			}, nil
+		}
+		return nil, nil
+	}
+
+	input := BreakGlassListCommandInput{
+		// No filters - defaults to current user
+		Limit: 100,
+		Store: store,
+	}
+
+	err := BreakGlassListCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify ListByInvoker was called
+	if len(store.ListByInvokerCalls) != 1 {
+		t.Fatalf("expected 1 ListByInvoker call, got %d", len(store.ListByInvokerCalls))
+	}
+}
+
+func TestCommandIntegration_BreakGlass_ListByStatus(t *testing.T) {
+	// Test BreakGlassListCommand queries by status
+
+	store := testutil.NewMockBreakGlassStore()
+
+	// Configure store to return active events
+	store.ListByStatusFunc = func(ctx context.Context, status breakglass.BreakGlassStatus, limit int) ([]*breakglass.BreakGlassEvent, error) {
+		if status == breakglass.StatusActive {
+			return []*breakglass.BreakGlassEvent{
+				{
+					ID:         "active11111111",
+					Invoker:    "user1",
+					Profile:    "production",
+					Status:     breakglass.StatusActive,
+					ReasonCode: breakglass.ReasonIncident,
+				},
+			}, nil
+		}
+		return nil, nil
+	}
+
+	input := BreakGlassListCommandInput{
+		Status: "active",
+		Limit:  100,
+		Store:  store,
+	}
+
+	err := BreakGlassListCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify ListByStatus was called
+	if len(store.ListByStatusCalls) != 1 {
+		t.Fatalf("expected 1 ListByStatus call, got %d", len(store.ListByStatusCalls))
+	}
+}
+
+func TestCommandIntegration_BreakGlass_ListByProfile(t *testing.T) {
+	// Test BreakGlassListCommand queries by profile
+
+	store := testutil.NewMockBreakGlassStore()
+
+	// Configure store to return events for profile
+	store.ListByProfileFunc = func(ctx context.Context, profile string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+		if profile == "production" {
+			return []*breakglass.BreakGlassEvent{
+				{
+					ID:         "prod111122223",
+					Invoker:    "user1",
+					Profile:    "production",
+					Status:     breakglass.StatusActive,
+					ReasonCode: breakglass.ReasonIncident,
+				},
+			}, nil
+		}
+		return nil, nil
+	}
+
+	input := BreakGlassListCommandInput{
+		Profile: "production",
+		Limit:   100,
+		Store:   store,
+	}
+
+	err := BreakGlassListCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify ListByProfile was called
+	if len(store.ListByProfileCalls) != 1 {
+		t.Fatalf("expected 1 ListByProfile call, got %d", len(store.ListByProfileCalls))
 	}
 }

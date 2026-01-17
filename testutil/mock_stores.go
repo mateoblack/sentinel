@@ -746,3 +746,66 @@ func (m *MockLogger) LastBreakGlass() logging.BreakGlassLogEntry {
 	}
 	return m.BreakGlassEntries[len(m.BreakGlassEntries)-1]
 }
+
+// ============================================================================
+// MockBreakGlassNotifier - notification.BreakGlassNotifier interface
+// ============================================================================
+
+// MockBreakGlassNotifier implements notification.BreakGlassNotifier for testing.
+// Tracks all break-glass notification calls for assertions.
+type MockBreakGlassNotifier struct {
+	mu sync.Mutex
+
+	// Configurable behavior function
+	NotifyBreakGlassFunc func(ctx context.Context, event *notification.BreakGlassEvent) error
+
+	// Error injection
+	NotifyBreakGlassErr error
+
+	// Call tracking
+	NotifyBreakGlassCalls []*notification.BreakGlassEvent
+}
+
+// NewMockBreakGlassNotifier creates a new MockBreakGlassNotifier.
+func NewMockBreakGlassNotifier() *MockBreakGlassNotifier {
+	return &MockBreakGlassNotifier{}
+}
+
+// NotifyBreakGlass sends a break-glass notification.
+func (m *MockBreakGlassNotifier) NotifyBreakGlass(ctx context.Context, event *notification.BreakGlassEvent) error {
+	m.mu.Lock()
+	m.NotifyBreakGlassCalls = append(m.NotifyBreakGlassCalls, event)
+	m.mu.Unlock()
+
+	if m.NotifyBreakGlassFunc != nil {
+		return m.NotifyBreakGlassFunc(ctx, event)
+	}
+	if m.NotifyBreakGlassErr != nil {
+		return m.NotifyBreakGlassErr
+	}
+	return nil
+}
+
+// Reset clears all call tracking.
+func (m *MockBreakGlassNotifier) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.NotifyBreakGlassCalls = nil
+}
+
+// NotifyCount returns the number of NotifyBreakGlass calls made.
+func (m *MockBreakGlassNotifier) NotifyCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.NotifyBreakGlassCalls)
+}
+
+// LastNotification returns the last break-glass event, or nil if none.
+func (m *MockBreakGlassNotifier) LastNotification() *notification.BreakGlassEvent {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.NotifyBreakGlassCalls) == 0 {
+		return nil
+	}
+	return m.NotifyBreakGlassCalls[len(m.NotifyBreakGlassCalls)-1]
+}
