@@ -3,15 +3,11 @@ package bootstrap
 import (
 	"context"
 	"errors"
-	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/byteness/aws-vault/v7/policy"
 )
 
 // PutParameterCall records a PutParameter invocation.

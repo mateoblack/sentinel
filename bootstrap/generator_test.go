@@ -260,3 +260,133 @@ func TestGenerateSamplePolicy_OutputStructure(t *testing.T) {
 		t.Errorf("fourth line should be customization note, got: %q", lines[3])
 	}
 }
+
+// TestGenerateSamplePolicy_EdgeCases tests additional edge cases for sample policy generation.
+func TestGenerateSamplePolicy_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		profile     string
+		description string
+		wantErr     bool
+		checks      []func(t *testing.T, output string)
+	}{
+		{
+			name:        "very long profile name",
+			profile:     strings.Repeat("a", 64),
+			description: "",
+			wantErr:     false,
+			checks: []func(t *testing.T, output string){
+				func(t *testing.T, output string) {
+					if !strings.Contains(output, strings.Repeat("a", 64)) {
+						t.Error("output missing long profile name")
+					}
+				},
+			},
+		},
+		{
+			name:        "profile name with numeric characters only",
+			profile:     "12345678",
+			description: "",
+			wantErr:     false,
+			checks: []func(t *testing.T, output string){
+				func(t *testing.T, output string) {
+					if !strings.Contains(output, "- \"12345678\"") && !strings.Contains(output, "- 12345678") {
+						// YAML may quote numeric strings to avoid numeric interpretation
+						t.Error("output missing numeric profile name")
+					}
+				},
+			},
+		},
+		{
+			name:        "profile with only underscores and hyphens",
+			profile:     "_-_-_",
+			description: "",
+			wantErr:     false,
+			checks: []func(t *testing.T, output string){
+				func(t *testing.T, output string) {
+					if !strings.Contains(output, "_-_-_") {
+						t.Error("output missing special character profile name")
+					}
+				},
+			},
+		},
+		{
+			name:        "very long description",
+			profile:     "test",
+			description: strings.Repeat("Very long description. ", 20),
+			wantErr:     false,
+			checks: []func(t *testing.T, output string){
+				func(t *testing.T, output string) {
+					if !strings.Contains(output, "Very long description") {
+						t.Error("output missing long description")
+					}
+				},
+			},
+		},
+		{
+			name:        "description with special characters",
+			profile:     "test",
+			description: "Description with #hash and @at and $dollar",
+			wantErr:     false,
+			checks: []func(t *testing.T, output string){
+				func(t *testing.T, output string) {
+					// The description should be in a comment line
+					if !strings.Contains(output, "# Description with #hash") {
+						t.Error("output should contain description with special chars")
+					}
+				},
+			},
+		},
+		{
+			name:        "empty description",
+			profile:     "test",
+			description: "",
+			wantErr:     false,
+			checks: []func(t *testing.T, output string){
+				func(t *testing.T, output string) {
+					lines := strings.Split(output, "\n")
+					// Second line should be Generated (not description)
+					if len(lines) < 2 {
+						t.Fatal("too few lines")
+					}
+					// When no description, line 2 should be Generated
+					if !strings.HasPrefix(lines[1], "# Generated:") {
+						t.Errorf("expected Generated on line 2 when no description, got: %q", lines[1])
+					}
+				},
+			},
+		},
+		{
+			name:        "single character profile",
+			profile:     "a",
+			description: "",
+			wantErr:     false,
+			checks: []func(t *testing.T, output string){
+				func(t *testing.T, output string) {
+					if !strings.Contains(output, "for profile: a") {
+						t.Error("output should contain single char profile")
+					}
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output, err := GenerateSamplePolicy(tt.profile, tt.description)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error but got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			for _, check := range tt.checks {
+				check(t, output)
+			}
+		})
+	}
+}
