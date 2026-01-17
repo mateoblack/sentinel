@@ -17,9 +17,15 @@ import (
 // does not exist in SSM Parameter Store.
 var ErrPolicyNotFound = errors.New("policy not found")
 
+// SSMAPI defines the SSM operations used by Loader.
+// This interface enables testing with mock implementations.
+type SSMAPI interface {
+	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+}
+
 // Loader fetches policies from AWS SSM Parameter Store.
 type Loader struct {
-	client *ssm.Client
+	client SSMAPI
 }
 
 // NewLoader creates a new Loader using the provided AWS configuration.
@@ -28,6 +34,14 @@ type Loader struct {
 func NewLoader(cfg aws.Config) *Loader {
 	return &Loader{
 		client: ssm.NewFromConfig(cfg),
+	}
+}
+
+// NewLoaderWithClient creates a Loader with a custom SSM client.
+// This is primarily used for testing with mock clients.
+func NewLoaderWithClient(client SSMAPI) *Loader {
+	return &Loader{
+		client: client,
 	}
 }
 
