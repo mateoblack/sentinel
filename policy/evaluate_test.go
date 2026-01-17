@@ -1212,6 +1212,41 @@ func TestDecision_String(t *testing.T) {
 	})
 }
 
+func TestGoWeekdayToWeekday_AllDays(t *testing.T) {
+	tests := []struct {
+		name     string
+		goDay    time.Weekday
+		expected Weekday
+	}{
+		{"Sunday", time.Sunday, Sunday},
+		{"Monday", time.Monday, Monday},
+		{"Tuesday", time.Tuesday, Tuesday},
+		{"Wednesday", time.Wednesday, Wednesday},
+		{"Thursday", time.Thursday, Thursday},
+		{"Friday", time.Friday, Friday},
+		{"Saturday", time.Saturday, Saturday},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := goWeekdayToWeekday(tt.goDay)
+			if result != tt.expected {
+				t.Errorf("goWeekdayToWeekday(%v) = %q, want %q", tt.goDay, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGoWeekdayToWeekday_InvalidDay(t *testing.T) {
+	// Test that an invalid weekday value returns empty string (the default case)
+	// time.Weekday is an int, so we can cast an invalid value
+	invalidDay := time.Weekday(99)
+	result := goWeekdayToWeekday(invalidDay)
+	if result != "" {
+		t.Errorf("goWeekdayToWeekday(%v) = %q, want empty string", invalidDay, result)
+	}
+}
+
 func TestEvaluate_EdgeCases(t *testing.T) {
 	t.Run("empty policy returns default deny", func(t *testing.T) {
 		policy := &Policy{
