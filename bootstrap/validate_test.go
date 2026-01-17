@@ -766,3 +766,142 @@ func TestIsValidProfileName(t *testing.T) {
 		})
 	}
 }
+
+// TestIsValidSSMPath_EdgeCases tests security-relevant edge cases for SSM path validation.
+func TestIsValidSSMPath_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		// Unicode and special character attacks
+		{name: "unicode chars rejected", path: "/sentinel/polic\u00edes", expected: false},
+		{name: "zero-width char rejected (U+200B)", path: "/sentinel/\u200Bpolicies", expected: false},
+		{name: "zero-width joiner rejected (U+200D)", path: "/sentinel/pol\u200Dicies", expected: false},
+		{name: "zero-width non-joiner rejected (U+200C)", path: "/sentinel/\u200Cpolicies", expected: false},
+		{name: "left-to-right override rejected (U+202D)", path: "/sentinel/\u202Dpolicies", expected: false},
+		{name: "homoglyph latin small a with ring rejected", path: "/sentinel/p\u00e5licies", expected: false},
+		{name: "cyrillic a rejected (looks like latin a)", path: "/sentinel/p\u0430licies", expected: false},
+		{name: "full-width solidus rejected (U+FF0F)", path: "/sentinel\uFF0Fpolicies", expected: false},
+
+		// Path traversal attempts
+		{name: "path traversal ../ rejected", path: "/sentinel/../policies", expected: false},
+		{name: "double dots rejected", path: "/sentinel/..policies", expected: false},
+		{name: "encoded path traversal", path: "/sentinel/%2e%2e/policies", expected: false},
+
+		// Maximum length boundary
+		{name: "path at max length passes", path: "/" + strings.Repeat("a", MaxPolicyRootLength-1), expected: true},
+		{name: "path exceeds max length fails", path: "/" + strings.Repeat("a", MaxPolicyRootLength), expected: false},
+
+		// Empty path components (// in path) - regex allows consecutive slashes
+		// This is valid per AWS SSM, though unusual
+		{name: "double slash in path allowed", path: "/sentinel//policies", expected: true},
+		{name: "triple slash allowed", path: "/sentinel///policies", expected: true},
+		{name: "trailing double slash allowed", path: "/sentinel/policies//", expected: true},
+
+		// Path start edge cases
+		{name: "path not starting with / fails", path: "sentinel/policies", expected: false},
+		{name: "empty path fails", path: "", expected: false},
+		{name: "only slash is valid", path: "/a", expected: true},
+
+		// Whitespace variations
+		{name: "tab character rejected", path: "/sentinel/\tpolicies", expected: false},
+		{name: "newline rejected", path: "/sentinel/\npolicies", expected: false},
+		{name: "carriage return rejected", path: "/sentinel/\rpolicies", expected: false},
+		{name: "leading space rejected", path: " /sentinel/policies", expected: false},
+		{name: "trailing space rejected", path: "/sentinel/policies ", expected: false},
+
+		// Null byte injection
+		{name: "null byte rejected", path: "/sentinel/\x00policies", expected: false},
+
+		// Valid edge cases that should pass
+		{name: "numeric path component", path: "/sentinel/123", expected: true},
+		{name: "mixed case path", path: "/Sentinel/Policies", expected: true},
+		{name: "path with hyphens and underscores", path: "/my-org_prod/policies-v1", expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isValidSSMPath(tt.path)
+			if got != tt.expected {
+				t.Errorf("isValidSSMPath(%q) = %v, want %v", tt.path, got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestIsValidProfileName_EdgeCases tests security-relevant edge cases for profile name validation.
+func TestIsValidProfileName_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		profile  string
+		expected bool
+	}{
+		// Unicode and special character attacks
+		{name: "unicode char rejected", profile: "produc\u00e7ion", expected: false},
+		{name: "zero-width char rejected (U+200B)", profile: "prod\u200Buction", expected: false},
+		{name: "zero-width joiner rejected (U+200D)", profile: "prod\u200Duction", expected: false},
+		{name: "cyrillic a rejected (looks like latin a)", profile: "production", expected: true},
+		{name: "cyrillic o rejected", profile: "pr\u043educti\u043en", expected: false},
+		{name: "full-width letters rejected (A)", profile: "pro\uFF21uction", expected: false},
+		{name: "full-width hyphen rejected (U+FF0D)", profile: "prod\uFF0Deast", expected: false},
+
+		// Maximum length boundary
+		{name: "profile at max length passes", profile: strings.Repeat("a", MaxProfileNameLength), expected: true},
+		{name: "profile exceeds max length fails", profile: strings.Repeat("a", MaxProfileNameLength+1), expected: false},
+
+		// Whitespace variations
+		{name: "tab rejected", profile: "prod\tuction", expected: false},
+		{name: "newline rejected", profile: "prod\nuction", expected: false},
+		{name: "carriage return rejected", profile: "prod\ruction", expected: false},
+		{name: "leading space rejected", profile: " production", expected: false},
+		{name: "trailing space rejected", profile: "production ", expected: false},
+
+		// Special characters that should fail
+		{name: "dot rejected", profile: "prod.east", expected: false},
+		{name: "colon rejected", profile: "prod:east", expected: false},
+		{name: "semicolon rejected", profile: "prod;east", expected: false},
+		{name: "equals rejected", profile: "prod=east", expected: false},
+		{name: "plus rejected", profile: "prod+east", expected: false},
+		{name: "ampersand rejected", profile: "prod&east", expected: false},
+		{name: "hash rejected", profile: "prod#east", expected: false},
+		{name: "dollar rejected", profile: "prod$east", expected: false},
+		{name: "percent rejected", profile: "prod%east", expected: false},
+		{name: "caret rejected", profile: "prod^east", expected: false},
+		{name: "asterisk rejected", profile: "prod*east", expected: false},
+		{name: "parentheses rejected", profile: "prod(east)", expected: false},
+		{name: "brackets rejected", profile: "prod[east]", expected: false},
+		{name: "braces rejected", profile: "prod{east}", expected: false},
+		{name: "pipe rejected", profile: "prod|east", expected: false},
+		{name: "backslash rejected", profile: "prod\\east", expected: false},
+		{name: "quote rejected", profile: "prod\"east", expected: false},
+		{name: "single quote rejected", profile: "prod'east", expected: false},
+		{name: "backtick rejected", profile: "prod`east", expected: false},
+		{name: "tilde rejected", profile: "prod~east", expected: false},
+		{name: "question mark rejected", profile: "prod?east", expected: false},
+		{name: "exclamation rejected", profile: "prod!east", expected: false},
+		{name: "comma rejected", profile: "prod,east", expected: false},
+		{name: "less than rejected", profile: "prod<east", expected: false},
+		{name: "greater than rejected", profile: "prod>east", expected: false},
+
+		// Null byte injection
+		{name: "null byte rejected", profile: "prod\x00east", expected: false},
+
+		// Valid edge cases that should pass
+		{name: "numeric only", profile: "12345", expected: true},
+		{name: "single char", profile: "a", expected: true},
+		{name: "starts with number", profile: "1production", expected: true},
+		{name: "all hyphens and underscores mixed", profile: "a-b_c-d_e", expected: true},
+		{name: "upper case", profile: "PRODUCTION", expected: true},
+		{name: "mixed case", profile: "ProdEast1", expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isValidProfileName(tt.profile)
+			if got != tt.expected {
+				t.Errorf("isValidProfileName(%q) = %v, want %v", tt.profile, got, tt.expected)
+			}
+		})
+	}
+}
