@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 52 of 59 (Break-Glass Security Testing) - COMPLETE
-Plan: 3 of 3 in current phase (all complete)
-Status: Ready for Phase 53
-Last activity: 2026-01-17 — Completed 52-03-PLAN.md (Audit Trail Integrity Tests)
+Phase: 53 of 59 (Approval Workflow Testing)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-17 — Completed 53-01-PLAN.md (Approval State Machine Tests)
 
-Progress: ████░░░░░░ 32% (v1.6 Testing & Hardening)
+Progress: ████░░░░░░ 36% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -178,6 +178,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Expired events must NOT have ClosedBy/ClosedReason (system expired, not user closed)
 - All event constants must have "breakglass." namespace prefix for filtering
 
+**v1.6 Approval State Machine Tests decisions (Phase 53-01):**
+- Coverage at 84.3% for request package - core validation/state machine at 100%
+- Timestamp manipulation tests document behavior rather than enforce constraints
+- Concurrent tests use mock store with first-writer-wins for deterministic testing
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -189,9 +194,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 52-03-PLAN.md (Plan 3 of 3 in Phase 52 - Phase Complete)
+Stopped at: Completed 53-01-PLAN.md (Plan 1 of 2 in Phase 53)
 Resume file: None
-Next: Phase 53 (next testing phase)
+Next: 53-02-PLAN.md (Notification System Tests)
 
 ## Roadmap Evolution
 
