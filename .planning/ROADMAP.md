@@ -223,8 +223,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [x] 50-01: Coverage tooling & baseline metrics — completed 2026-01-17
-- [ ] 50-02: Mock framework & test helpers
+- [x] 50-01: Coverage tooling & baseline metrics — completed 2026-01-16
+- [x] 50-02: Mock framework & test helpers — completed 2026-01-16
 
 #### Phase 51: Policy Engine Testing
 
@@ -340,6 +340,6 @@ Plans:
 | v1.3 Break-Glass | 27-34 | 15/15 | ✅ Complete | 2026-01-16 |
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
-| v1.6 Testing & Hardening | 50-59 | 1/25 | 🚧 In Progress | - |
+| v1.6 Testing & Hardening | 50-59 | 2/25 | 🚧 In Progress | - |
 
 **Totals:** 6 milestones shipped (49 phases, 76 plans), 1 milestone in progress (10 phases, 25 plans)
