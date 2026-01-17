@@ -247,8 +247,8 @@ Plans:
 
 Plans:
 - [x] 52-01: Rate limiting logic tests — completed 2026-01-17
-- [ ] 52-02: State machine security tests
-- [ ] 52-03: Audit trail integrity tests
+- [x] 52-02: State machine security tests — completed 2026-01-17
+- [x] 52-03: Audit trail integrity tests — completed 2026-01-17
 
 #### Phase 53: Approval Workflow Testing
 
@@ -340,6 +340,6 @@ Plans:
 | v1.3 Break-Glass | 27-34 | 15/15 | ✅ Complete | 2026-01-16 |
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
-| v1.6 Testing & Hardening | 50-59 | 5/25 | 🚧 In Progress | - |
+| v1.6 Testing & Hardening | 50-59 | 8/25 | 🚧 In Progress | - |
 
 **Totals:** 6 milestones shipped (49 phases, 76 plans), 1 milestone in progress (10 phases, 25 plans)
