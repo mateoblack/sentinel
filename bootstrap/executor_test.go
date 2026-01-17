@@ -24,17 +24,20 @@ type PutParameterCall struct {
 
 // mockSSMWriterAPI implements ssmWriterAPI for testing.
 type mockSSMWriterAPI struct {
+	mu               sync.Mutex
 	putParameterFunc func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
 	calls            []PutParameterCall
 }
 
 func (m *mockSSMWriterAPI) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+	m.mu.Lock()
 	m.calls = append(m.calls, PutParameterCall{
 		Name:      aws.ToString(params.Name),
 		Value:     aws.ToString(params.Value),
 		Overwrite: aws.ToBool(params.Overwrite),
 		Type:      params.Type,
 	})
+	m.mu.Unlock()
 	if m.putParameterFunc != nil {
 		return m.putParameterFunc(ctx, params, optFns...)
 	}
