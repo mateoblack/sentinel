@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 56 of 59 (Integration Testing)
-Plan: 1 of 2 in current phase
-Status: In Progress
-Last activity: 2026-01-17 — Completed 56-01-PLAN.md (Credential Flow Integration Tests)
+Phase: 56 of 59 (Integration Testing) - COMPLETE
+Plan: 2 of 2 in current phase (all complete)
+Status: Ready for Phase 57
+Last activity: 2026-01-17 — Completed 56-02-PLAN.md (Cross-Service Integration Tests)
 
-Progress: ██████░░░░ 60% (v1.6 Testing & Hardening)
+Progress: ██████░░░░ 65% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -214,6 +214,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Error handling tests verify non-fatal semantics (store errors don't block credential denial)
 - Integration tests exercise decision path components rather than full credential retrieval
 
+**v1.6 Cross-Service Integration Tests decisions (Phase 56-02):**
+- Mock store ListByRequesterFunc callback enables in-memory filtering for finder tests
+- New request objects created for status updates (not in-place modification) to trigger NotifyStore transition detection
+- Mutex-protected list snapshot for concurrent mutation tests (prevents race on map iteration)
+- Fire-and-forget notification semantics verified across all state transitions
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -225,9 +231,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 56-01-PLAN.md (Plan 1 of 2 in Phase 56)
+Stopped at: Completed 56-02-PLAN.md (Plan 2 of 2 in Phase 56)
 Resume file: None
-Next: 56-02-PLAN.md (End-to-End Bootstrap Integration Tests)
+Next: Phase 57 (Performance & Load Testing)
 
 ## Roadmap Evolution
 
