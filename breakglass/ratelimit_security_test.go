@@ -305,3 +305,393 @@ func TestCheckRateLimit_Order_FullCheckSequence(t *testing.T) {
 		}
 	}
 }
+
+// ============================================================================
+// Boundary Condition Security Tests
+// ============================================================================
+
+// boundaryStore is a mock for precise boundary condition testing.
+type boundaryStore struct {
+	lastEvent    *BreakGlassEvent
+	userCount    int
+	profileCount int
+}
+
+func (m *boundaryStore) Create(ctx context.Context, event *BreakGlassEvent) error { return nil }
+func (m *boundaryStore) Get(ctx context.Context, id string) (*BreakGlassEvent, error) {
+	return nil, nil
+}
+func (m *boundaryStore) Update(ctx context.Context, event *BreakGlassEvent) error { return nil }
+func (m *boundaryStore) Delete(ctx context.Context, id string) error              { return nil }
+func (m *boundaryStore) ListByInvoker(ctx context.Context, invoker string, limit int) ([]*BreakGlassEvent, error) {
+	return []*BreakGlassEvent{}, nil
+}
+func (m *boundaryStore) ListByStatus(ctx context.Context, status BreakGlassStatus, limit int) ([]*BreakGlassEvent, error) {
+	return []*BreakGlassEvent{}, nil
+}
+func (m *boundaryStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*BreakGlassEvent, error) {
+	return []*BreakGlassEvent{}, nil
+}
+func (m *boundaryStore) FindActiveByInvokerAndProfile(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+	return nil, nil
+}
+func (m *boundaryStore) CountByInvokerSince(ctx context.Context, invoker string, since time.Time) (int, error) {
+	return m.userCount, nil
+}
+func (m *boundaryStore) CountByProfileSince(ctx context.Context, profile string, since time.Time) (int, error) {
+	return m.profileCount, nil
+}
+func (m *boundaryStore) GetLastByInvokerAndProfile(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+	return m.lastEvent, nil
+}
+
+// TestCheckRateLimit_Boundary_ExactlyAtUserLimit verifies that count == MaxPerUser
+// blocks access (>= comparison). This is security-critical: must not allow
+// count >= limit.
+func TestCheckRateLimit_Boundary_ExactlyAtUserLimit(t *testing.T) {
+	now := time.Now()
+
+	store := &boundaryStore{
+		userCount: 5, // Exactly at limit
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:        "production",
+				Profiles:    []string{"production"},
+				MaxPerUser:  5,
+				QuotaWindow: 24 * time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	if result.Allowed {
+		t.Error("CheckRateLimit() should BLOCK when count == MaxPerUser (boundary)")
+	}
+	if result.Reason != "user quota exceeded" {
+		t.Errorf("CheckRateLimit() Reason = %q, want %q", result.Reason, "user quota exceeded")
+	}
+}
+
+// TestCheckRateLimit_Boundary_OneBelowUserLimit verifies that count == MaxPerUser-1
+// allows access. This validates the >= boundary is correct.
+func TestCheckRateLimit_Boundary_OneBelowUserLimit(t *testing.T) {
+	now := time.Now()
+
+	store := &boundaryStore{
+		userCount: 4, // One below limit (MaxPerUser=5)
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:        "production",
+				Profiles:    []string{"production"},
+				MaxPerUser:  5,
+				QuotaWindow: 24 * time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	if !result.Allowed {
+		t.Errorf("CheckRateLimit() should ALLOW when count == MaxPerUser-1, got Reason=%q", result.Reason)
+	}
+}
+
+// TestCheckRateLimit_Boundary_ExactlyAtProfileLimit verifies that count == MaxPerProfile
+// blocks access (>= comparison).
+func TestCheckRateLimit_Boundary_ExactlyAtProfileLimit(t *testing.T) {
+	now := time.Now()
+
+	store := &boundaryStore{
+		userCount:    2, // Under user limit
+		profileCount: 10, // Exactly at profile limit
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:          "production",
+				Profiles:      []string{"production"},
+				MaxPerUser:    5,
+				MaxPerProfile: 10,
+				QuotaWindow:   24 * time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	if result.Allowed {
+		t.Error("CheckRateLimit() should BLOCK when count == MaxPerProfile (boundary)")
+	}
+	if result.Reason != "profile quota exceeded" {
+		t.Errorf("CheckRateLimit() Reason = %q, want %q", result.Reason, "profile quota exceeded")
+	}
+}
+
+// TestCheckRateLimit_Boundary_OneBelowProfileLimit verifies that count == MaxPerProfile-1
+// allows access.
+func TestCheckRateLimit_Boundary_OneBelowProfileLimit(t *testing.T) {
+	now := time.Now()
+
+	store := &boundaryStore{
+		userCount:    2, // Under user limit
+		profileCount: 9, // One below profile limit (MaxPerProfile=10)
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:          "production",
+				Profiles:      []string{"production"},
+				MaxPerUser:    5,
+				MaxPerProfile: 10,
+				QuotaWindow:   24 * time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	if !result.Allowed {
+		t.Errorf("CheckRateLimit() should ALLOW when count == MaxPerProfile-1, got Reason=%q", result.Reason)
+	}
+}
+
+// TestCheckRateLimit_Boundary_ExactlyAtCooldown verifies that elapsed == Cooldown
+// allows access (cooldown period has exactly elapsed).
+func TestCheckRateLimit_Boundary_ExactlyAtCooldown(t *testing.T) {
+	now := time.Now()
+	cooldown := time.Hour
+	// Last event exactly 1 hour ago (cooldown has just elapsed)
+	lastEventTime := now.Add(-cooldown)
+
+	store := &boundaryStore{
+		lastEvent: &BreakGlassEvent{
+			ID:        "last001",
+			CreatedAt: lastEventTime,
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Cooldown: cooldown,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	// elapsed == cooldown means exactly at boundary, should NOT be blocked
+	// The comparison is: if elapsed < rule.Cooldown (strict less than)
+	// So elapsed == cooldown should be ALLOWED
+	if !result.Allowed {
+		t.Errorf("CheckRateLimit() should ALLOW when elapsed == Cooldown (boundary), got Reason=%q", result.Reason)
+	}
+}
+
+// TestCheckRateLimit_Boundary_OneNanosecondBeforeCooldown verifies that elapsed == Cooldown-1ns
+// blocks access. This validates the < comparison is strict.
+func TestCheckRateLimit_Boundary_OneNanosecondBeforeCooldown(t *testing.T) {
+	now := time.Now()
+	cooldown := time.Hour
+	// Last event 1 nanosecond short of cooldown completion
+	lastEventTime := now.Add(-cooldown + time.Nanosecond)
+
+	store := &boundaryStore{
+		lastEvent: &BreakGlassEvent{
+			ID:        "last001",
+			CreatedAt: lastEventTime,
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Cooldown: cooldown,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	if result.Allowed {
+		t.Error("CheckRateLimit() should BLOCK when elapsed < Cooldown by 1ns (boundary)")
+	}
+	if result.Reason != "cooldown period not elapsed" {
+		t.Errorf("CheckRateLimit() Reason = %q, want %q", result.Reason, "cooldown period not elapsed")
+	}
+}
+
+// TestCheckRateLimit_Boundary_ZeroElapsed verifies that elapsed == 0 blocks access.
+// This is an edge case where the last event was at exactly "now".
+func TestCheckRateLimit_Boundary_ZeroElapsed(t *testing.T) {
+	now := time.Now()
+	// Last event at exactly "now" (0 elapsed time)
+	lastEventTime := now
+
+	store := &boundaryStore{
+		lastEvent: &BreakGlassEvent{
+			ID:        "last001",
+			CreatedAt: lastEventTime,
+		},
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Cooldown: time.Hour,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	if result.Allowed {
+		t.Error("CheckRateLimit() should BLOCK when elapsed == 0")
+	}
+	if result.Reason != "cooldown period not elapsed" {
+		t.Errorf("CheckRateLimit() Reason = %q, want %q", result.Reason, "cooldown period not elapsed")
+	}
+}
+
+// TestCheckRateLimit_Boundary_QuotaLimitZero verifies behavior when MaxPerUser is 0 (disabled).
+// Zero quota means no limit, not "always blocked".
+func TestCheckRateLimit_Boundary_QuotaLimitZero(t *testing.T) {
+	now := time.Now()
+
+	store := &boundaryStore{
+		userCount: 100, // Many events but no quota set
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production",
+				Profiles: []string{"production"},
+				Cooldown: time.Hour, // Cooldown set but no quota
+				// MaxPerUser: 0 (disabled)
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	// MaxPerUser=0 means quota check is skipped entirely
+	if !result.Allowed {
+		t.Errorf("CheckRateLimit() should ALLOW when MaxPerUser=0 (disabled), got Reason=%q", result.Reason)
+	}
+}
+
+// TestCheckRateLimit_Boundary_EscalationThresholdExact verifies escalation flag at exact threshold.
+func TestCheckRateLimit_Boundary_EscalationThresholdExact(t *testing.T) {
+	now := time.Now()
+
+	store := &boundaryStore{
+		userCount: 3, // Exactly at escalation threshold
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:                "production",
+				Profiles:            []string{"production"},
+				MaxPerUser:          5,
+				QuotaWindow:         24 * time.Hour,
+				EscalationThreshold: 3,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	if !result.Allowed {
+		t.Errorf("CheckRateLimit() should ALLOW at escalation threshold, got Reason=%q", result.Reason)
+	}
+	if !result.ShouldEscalate {
+		t.Error("CheckRateLimit() ShouldEscalate should be true at exact threshold (count >= threshold)")
+	}
+}
+
+// TestCheckRateLimit_Boundary_EscalationThresholdOneBelowt verifies no escalation below threshold.
+func TestCheckRateLimit_Boundary_EscalationThresholdOneBelow(t *testing.T) {
+	now := time.Now()
+
+	store := &boundaryStore{
+		userCount: 2, // One below escalation threshold
+	}
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:                "production",
+				Profiles:            []string{"production"},
+				MaxPerUser:          5,
+				QuotaWindow:         24 * time.Hour,
+				EscalationThreshold: 3,
+			},
+		},
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "production", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v, want nil", err)
+	}
+
+	if !result.Allowed {
+		t.Errorf("CheckRateLimit() should ALLOW below escalation threshold, got Reason=%q", result.Reason)
+	}
+	if result.ShouldEscalate {
+		t.Error("CheckRateLimit() ShouldEscalate should be false when below threshold")
+	}
+}
