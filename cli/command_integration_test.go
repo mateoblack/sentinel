@@ -3,10 +3,16 @@ package cli
 import (
 	"context"
 	"errors"
+	"net/url"
 	"os/user"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/byteness/aws-vault/v7/bootstrap"
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
@@ -1182,5 +1188,389 @@ func TestCommandIntegration_BreakGlass_ListByProfile(t *testing.T) {
 	// Verify ListByProfile was called
 	if len(store.ListByProfileCalls) != 1 {
 		t.Fatalf("expected 1 ListByProfile call, got %d", len(store.ListByProfileCalls))
+	}
+}
+
+// ============================================================================
+// Bootstrap Command Integration Tests
+// ============================================================================
+
+func TestCommandIntegration_Bootstrap_PlanOnly(t *testing.T) {
+	// Test BootstrapCommand in plan-only mode
+
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Create mock planner that returns a plan
+	mockPlanner := &mockPlannerImpl{
+		plan: &bootstrap.BootstrapPlan{
+			Resources: []bootstrap.ResourceSpec{
+				{
+					Type:  bootstrap.ResourceTypeSSMParameter,
+					Name:  "/sentinel/policy/production",
+					State: bootstrap.StateCreate,
+				},
+			},
+			Summary: bootstrap.PlanSummary{
+				ToCreate: 1,
+				ToUpdate: 0,
+			},
+		},
+	}
+
+	// Create mock executor (shouldn't be called in plan-only mode)
+	mockExecutor := &mockExecutorImpl{
+		result: &bootstrap.ApplyResult{},
+	}
+
+	input := BootstrapCommandInput{
+		PolicyRoot: "/sentinel/policy",
+		Profiles:   []string{"production"},
+		PlanOnly:   true,
+		Stdout:     stdout,
+		Stderr:     stderr,
+	}
+
+	err := testableBootstrapCommand(context.Background(), input, mockPlanner, mockExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Verify plan output
+	if !strings.Contains(output, "/sentinel/policy/production") {
+		t.Error("expected output to contain policy path")
+	}
+	if !strings.Contains(output, "create") || !strings.Contains(output, "+") {
+		t.Error("expected output to contain create action")
+	}
+}
+
+func TestCommandIntegration_Bootstrap_ApplyWithAutoApprove(t *testing.T) {
+	// Test BootstrapCommand with auto-approve applies changes
+
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Create mock planner
+	mockPlanner := &mockPlannerImpl{
+		plan: &bootstrap.BootstrapPlan{
+			Resources: []bootstrap.ResourceSpec{
+				{
+					Type:  bootstrap.ResourceTypeSSMParameter,
+					Name:  "/sentinel/policy/staging",
+					State: bootstrap.StateCreate,
+				},
+			},
+			Summary: bootstrap.PlanSummary{
+				ToCreate: 1,
+				ToUpdate: 0,
+			},
+		},
+	}
+
+	// Create mock executor
+	mockExecutor := &mockExecutorImpl{
+		result: &bootstrap.ApplyResult{
+			Created: []string{"/sentinel/policy/staging"},
+		},
+	}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:  "/sentinel/policy",
+		Profiles:    []string{"staging"},
+		AutoApprove: true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableBootstrapCommand(context.Background(), input, mockPlanner, mockExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Verify apply result
+	if !strings.Contains(output, "Apply complete") {
+		t.Error("expected output to contain 'Apply complete'")
+	}
+	if !strings.Contains(output, "Created: 1") {
+		t.Error("expected output to contain 'Created: 1'")
+	}
+}
+
+func TestCommandIntegration_Bootstrap_NoChanges(t *testing.T) {
+	// Test BootstrapCommand when no changes needed
+
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Create mock planner returning no changes
+	mockPlanner := &mockPlannerImpl{
+		plan: &bootstrap.BootstrapPlan{
+			Resources: []bootstrap.ResourceSpec{},
+			Summary: bootstrap.PlanSummary{
+				ToCreate: 0,
+				ToUpdate: 0,
+			},
+		},
+	}
+
+	mockExecutor := &mockExecutorImpl{}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:  "/sentinel/policy",
+		Profiles:    []string{"production"},
+		AutoApprove: true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableBootstrapCommand(context.Background(), input, mockPlanner, mockExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	if !strings.Contains(output, "No changes needed") {
+		t.Error("expected output to contain 'No changes needed'")
+	}
+}
+
+func TestCommandIntegration_Bootstrap_ProfileRequired(t *testing.T) {
+	// Test BootstrapCommand requires at least one profile
+
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	mockPlanner := &mockPlannerImpl{}
+	mockExecutor := &mockExecutorImpl{}
+
+	input := BootstrapCommandInput{
+		PolicyRoot: "/sentinel/policy",
+		Profiles:   []string{}, // No profiles
+		Stdout:     stdout,
+		Stderr:     stderr,
+	}
+
+	err := testableBootstrapCommand(context.Background(), input, mockPlanner, mockExecutor)
+	if err == nil {
+		t.Fatal("expected error for missing profiles")
+	}
+
+	stderrOutput := readFile(t, stderr)
+	if !strings.Contains(stderrOutput, "at least one --profile is required") {
+		t.Errorf("expected error message about profiles, got: %s", stderrOutput)
+	}
+}
+
+func TestCommandIntegration_Bootstrap_JSONOutput(t *testing.T) {
+	// Test BootstrapCommand JSON output mode
+
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	mockPlanner := &mockPlannerImpl{
+		plan: &bootstrap.BootstrapPlan{
+			Resources: []bootstrap.ResourceSpec{
+				{
+					Type:  bootstrap.ResourceTypeSSMParameter,
+					Name:  "/sentinel/policy/production",
+					State: bootstrap.StateCreate,
+				},
+			},
+			Summary: bootstrap.PlanSummary{
+				ToCreate: 1,
+			},
+		},
+	}
+
+	mockExecutor := &mockExecutorImpl{}
+
+	input := BootstrapCommandInput{
+		PolicyRoot: "/sentinel/policy",
+		Profiles:   []string{"production"},
+		PlanOnly:   true,
+		JSONOutput: true,
+		Stdout:     stdout,
+		Stderr:     stderr,
+	}
+
+	err := testableBootstrapCommand(context.Background(), input, mockPlanner, mockExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Verify JSON output
+	if !strings.Contains(output, `"resources"`) {
+		t.Error("expected JSON output to contain 'resources' key")
+	}
+	if !strings.Contains(output, `"summary"`) {
+		t.Error("expected JSON output to contain 'summary' key")
+	}
+}
+
+// ============================================================================
+// Enforce Plan Command Integration Tests
+// ============================================================================
+
+func TestCommandIntegration_Enforce_AnalyzesRoles(t *testing.T) {
+	// Test EnforcePlanCommand analyzes role trust policies
+
+	stdout, stderr, cleanup := createEnforceTestFiles(t)
+	defer cleanup()
+
+	// Create mock advisor that returns analysis
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+			"Action": "sts:AssumeRole",
+			"Condition": {
+				"StringLike": {
+					"sts:SourceIdentity": "sentinel:*"
+				}
+			}
+		}]
+	}`
+
+	advisor := createMockAdvisor(func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+		return &iam.GetRoleOutput{
+			Role: &types.Role{
+				RoleName:                 params.RoleName,
+				Arn:                      aws.String("arn:aws:iam::123456789012:role/" + *params.RoleName),
+				AssumeRolePolicyDocument: aws.String(url.QueryEscape(trustPolicy)),
+			},
+		}, nil
+	})
+
+	input := EnforcePlanCommandInput{
+		RoleARNs: []string{"arn:aws:iam::123456789012:role/ProductionAdmin"},
+		Advisor:  advisor,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	err := EnforcePlanCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readEnforceFile(t, stdout)
+
+	if !strings.Contains(output, "Sentinel Enforcement Analysis") {
+		t.Error("expected output to contain analysis header")
+	}
+	if !strings.Contains(output, "ProductionAdmin") {
+		t.Error("expected output to contain role name")
+	}
+}
+
+func TestCommandIntegration_Enforce_RequiresRole(t *testing.T) {
+	// Test EnforcePlanCommand requires at least one role
+
+	stdout, stderr, cleanup := createEnforceTestFiles(t)
+	defer cleanup()
+
+	input := EnforcePlanCommandInput{
+		RoleARNs: []string{}, // No roles
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	err := EnforcePlanCommand(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error for missing roles")
+	}
+
+	stderrOutput := readEnforceFile(t, stderr)
+	if !strings.Contains(stderrOutput, "at least one --role is required") {
+		t.Errorf("expected error message about roles, got: %s", stderrOutput)
+	}
+}
+
+func TestCommandIntegration_Enforce_JSONOutput(t *testing.T) {
+	// Test EnforcePlanCommand JSON output mode
+
+	stdout, stderr, cleanup := createEnforceTestFiles(t)
+	defer cleanup()
+
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+			"Action": "sts:AssumeRole"
+		}]
+	}`
+
+	advisor := createMockAdvisor(func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+		return &iam.GetRoleOutput{
+			Role: &types.Role{
+				RoleName:                 params.RoleName,
+				Arn:                      aws.String("arn:aws:iam::123456789012:role/" + *params.RoleName),
+				AssumeRolePolicyDocument: aws.String(url.QueryEscape(trustPolicy)),
+			},
+		}, nil
+	})
+
+	input := EnforcePlanCommandInput{
+		RoleARNs:   []string{"arn:aws:iam::123456789012:role/TestRole"},
+		Advisor:    advisor,
+		JSONOutput: true,
+		Stdout:     stdout,
+		Stderr:     stderr,
+	}
+
+	err := EnforcePlanCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readEnforceFile(t, stdout)
+
+	// Verify JSON output structure
+	if !strings.Contains(output, `"role_arn"`) {
+		t.Error("expected JSON output to contain 'role_arn' key")
+	}
+	if !strings.Contains(output, `"analysis"`) {
+		t.Error("expected JSON output to contain 'analysis' key")
+	}
+}
+
+func TestCommandIntegration_Enforce_HandlesErrors(t *testing.T) {
+	// Test EnforcePlanCommand handles analysis errors gracefully
+
+	stdout, stderr, cleanup := createEnforceTestFiles(t)
+	defer cleanup()
+
+	// Create mock advisor that returns an error
+	advisor := createMockAdvisor(func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+		return nil, errors.New("AccessDenied: not authorized")
+	})
+
+	input := EnforcePlanCommandInput{
+		RoleARNs: []string{"arn:aws:iam::123456789012:role/SecretRole"},
+		Advisor:  advisor,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	err := EnforcePlanCommand(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error when analysis fails")
+	}
+
+	output := readEnforceFile(t, stdout)
+
+	// Output should still contain the error in results
+	if !strings.Contains(output, "ERROR") || !strings.Contains(output, "AccessDenied") {
+		t.Error("expected output to show error status")
 	}
 }
