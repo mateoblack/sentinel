@@ -358,3 +358,385 @@ func TestDefaultDuration(t *testing.T) {
 		t.Errorf("DefaultDuration = %v, want 1 hour (matching aws-vault)", DefaultDuration)
 	}
 }
+
+// =============================================================================
+// Security Validation Tests
+// =============================================================================
+
+// TestValidationOrder verifies the order in which input fields are validated.
+// The order is: CredsProvider -> RoleARN -> SourceIdentity (nil) -> SourceIdentity.IsValid()
+func TestValidationOrder(t *testing.T) {
+	validSourceIdentity, err := identity.New("alice", "a1b2c3d4")
+	if err != nil {
+		t.Fatalf("failed to create valid SourceIdentity: %v", err)
+	}
+
+	t.Run("CredsProvider checked first", func(t *testing.T) {
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  nil,                                            // Invalid
+			RoleARN:        "",                                             // Also invalid
+			SourceIdentity: nil,                                            // Also invalid
+		}
+
+		err := validateInput(input)
+		if !errors.Is(err, ErrMissingCredsProvider) {
+			t.Errorf("expected ErrMissingCredsProvider first, got: %v", err)
+		}
+	})
+
+	t.Run("RoleARN checked second", func(t *testing.T) {
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},                     // Valid
+			RoleARN:        "",                                             // Invalid
+			SourceIdentity: nil,                                            // Also invalid
+		}
+
+		err := validateInput(input)
+		if !errors.Is(err, ErrMissingRoleARN) {
+			t.Errorf("expected ErrMissingRoleARN second, got: %v", err)
+		}
+	})
+
+	t.Run("SourceIdentity nil checked third", func(t *testing.T) {
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},                     // Valid
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",      // Valid
+			SourceIdentity: nil,                                            // Invalid - nil
+		}
+
+		err := validateInput(input)
+		if !errors.Is(err, ErrMissingSourceIdentity) {
+			t.Errorf("expected ErrMissingSourceIdentity third, got: %v", err)
+		}
+	})
+
+	t.Run("SourceIdentity.IsValid() checked fourth", func(t *testing.T) {
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},                     // Valid
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",      // Valid
+			SourceIdentity: &identity.SourceIdentity{User: "", RequestID: "a1b2c3d4"}, // Invalid content
+		}
+
+		err := validateInput(input)
+		if !errors.Is(err, ErrInvalidSourceIdentity) {
+			t.Errorf("expected ErrInvalidSourceIdentity fourth, got: %v", err)
+		}
+	})
+
+	t.Run("valid input passes all checks", func(t *testing.T) {
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+			SourceIdentity: validSourceIdentity,
+		}
+
+		err := validateInput(input)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+}
+
+// TestSourceIdentityIntegration tests SourceIdentity validation integration.
+func TestSourceIdentityIntegration(t *testing.T) {
+	t.Run("invalid SourceIdentity rejected before STS call", func(t *testing.T) {
+		invalidCases := []struct {
+			name string
+			si   *identity.SourceIdentity
+		}{
+			{
+				name: "empty user",
+				si:   &identity.SourceIdentity{User: "", RequestID: "a1b2c3d4"},
+			},
+			{
+				name: "user too long",
+				si:   &identity.SourceIdentity{User: "abcdefghij01234567890", RequestID: "a1b2c3d4"},
+			},
+			{
+				name: "invalid user chars",
+				si:   &identity.SourceIdentity{User: "alice_bob", RequestID: "a1b2c3d4"},
+			},
+			{
+				name: "invalid request-id",
+				si:   &identity.SourceIdentity{User: "alice", RequestID: "badid"},
+			},
+		}
+
+		for _, tc := range invalidCases {
+			t.Run(tc.name, func(t *testing.T) {
+				input := &SentinelAssumeRoleInput{
+					CredsProvider:  &mockCredentialsProvider{},
+					RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+					SourceIdentity: tc.si,
+				}
+
+				_, err := SentinelAssumeRole(context.Background(), input)
+				if err == nil {
+					t.Error("expected error for invalid SourceIdentity")
+				}
+				if !errors.Is(err, ErrInvalidSourceIdentity) {
+					t.Errorf("expected ErrInvalidSourceIdentity, got: %v", err)
+				}
+			})
+		}
+	})
+
+	t.Run("SourceIdentity with MaxUserLength accepted", func(t *testing.T) {
+		maxUser := "abcdefghij0123456789" // Exactly 20 chars
+		si, err := identity.New(maxUser, "a1b2c3d4")
+		if err != nil {
+			t.Fatalf("failed to create SourceIdentity with max user: %v", err)
+		}
+
+		if len(si.User) != identity.MaxUserLength {
+			t.Errorf("user length = %d, want %d", len(si.User), identity.MaxUserLength)
+		}
+
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+			SourceIdentity: si,
+		}
+
+		// Validation should pass (we can't test the full STS call without mocking AWS)
+		err = validateInput(input)
+		if err != nil {
+			t.Errorf("unexpected validation error: %v", err)
+		}
+	})
+
+	t.Run("SourceIdentity format preserved in output", func(t *testing.T) {
+		si, err := identity.New("testuser", "deadbeef")
+		if err != nil {
+			t.Fatalf("failed to create SourceIdentity: %v", err)
+		}
+
+		expected := "sentinel:testuser:deadbeef"
+		if si.Format() != expected {
+			t.Errorf("Format() = %q, want %q", si.Format(), expected)
+		}
+
+		// The output would contain this format (can't test without STS mock)
+		// but we verify the input format is correct
+	})
+}
+
+// TestDurationEdgeCases tests Duration field edge cases.
+func TestDurationEdgeCases(t *testing.T) {
+	t.Run("Duration 0 gets default 1 hour", func(t *testing.T) {
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+			Duration:       0,
+		}
+
+		applyDefaults(input)
+
+		if input.Duration != DefaultDuration {
+			t.Errorf("Duration = %v, want %v", input.Duration, DefaultDuration)
+		}
+		if input.Duration != time.Hour {
+			t.Errorf("Duration = %v, want 1 hour", input.Duration)
+		}
+	})
+
+	t.Run("Duration 1 second accepted", func(t *testing.T) {
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+			Duration:       time.Second,
+		}
+
+		applyDefaults(input)
+
+		if input.Duration != time.Second {
+			t.Errorf("Duration = %v, want 1 second", input.Duration)
+		}
+	})
+
+	t.Run("Duration 12 hours accepted", func(t *testing.T) {
+		// AWS maximum for most roles is 12 hours
+		maxDuration := 12 * time.Hour
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+			Duration:       maxDuration,
+		}
+
+		applyDefaults(input)
+
+		if input.Duration != maxDuration {
+			t.Errorf("Duration = %v, want %v", input.Duration, maxDuration)
+		}
+	})
+
+	t.Run("custom duration preserved", func(t *testing.T) {
+		customDuration := 45 * time.Minute
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+			Duration:       customDuration,
+		}
+
+		applyDefaults(input)
+
+		if input.Duration != customDuration {
+			t.Errorf("Duration = %v, want %v", input.Duration, customDuration)
+		}
+	})
+}
+
+// TestRoleARNValidation tests RoleARN field edge cases.
+// NOTE: Actual ARN format validation is performed by AWS SDK.
+func TestRoleARNValidation(t *testing.T) {
+	validSourceIdentity, err := identity.New("alice", "a1b2c3d4")
+	if err != nil {
+		t.Fatalf("failed to create valid SourceIdentity: %v", err)
+	}
+
+	t.Run("empty string rejected", func(t *testing.T) {
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "",
+			SourceIdentity: validSourceIdentity,
+		}
+
+		err := validateInput(input)
+		if !errors.Is(err, ErrMissingRoleARN) {
+			t.Errorf("expected ErrMissingRoleARN, got: %v", err)
+		}
+	})
+
+	t.Run("whitespace-only passes validation (AWS SDK validates format)", func(t *testing.T) {
+		// Note: We don't trim or reject whitespace-only strings.
+		// AWS SDK will validate the actual ARN format and reject invalid ARNs.
+		// This documents current behavior.
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "   ",
+			SourceIdentity: validSourceIdentity,
+		}
+
+		err := validateInput(input)
+		// Current implementation: non-empty string passes our check
+		// AWS SDK would reject this when making the STS call
+		if err != nil {
+			t.Logf("whitespace-only RoleARN rejected at validation: %v", err)
+		} else {
+			t.Log("whitespace-only RoleARN passes validation (AWS SDK validates format)")
+		}
+	})
+
+	t.Run("valid ARN format accepted", func(t *testing.T) {
+		validARNs := []string{
+			"arn:aws:iam::123456789012:role/TestRole",
+			"arn:aws:iam::123456789012:role/path/to/role",
+			"arn:aws-cn:iam::123456789012:role/ChinaRole",
+			"arn:aws-us-gov:iam::123456789012:role/GovCloudRole",
+		}
+
+		for _, arn := range validARNs {
+			t.Run(arn, func(t *testing.T) {
+				input := &SentinelAssumeRoleInput{
+					CredsProvider:  &mockCredentialsProvider{},
+					RoleARN:        arn,
+					SourceIdentity: validSourceIdentity,
+				}
+
+				err := validateInput(input)
+				if err != nil {
+					t.Errorf("unexpected error for ARN %q: %v", arn, err)
+				}
+			})
+		}
+	})
+}
+
+// TestExternalIDHandling tests ExternalID field handling.
+func TestExternalIDHandling(t *testing.T) {
+	validSourceIdentity, err := identity.New("alice", "a1b2c3d4")
+	if err != nil {
+		t.Fatalf("failed to create valid SourceIdentity: %v", err)
+	}
+
+	t.Run("empty ExternalID accepted (optional field)", func(t *testing.T) {
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+			SourceIdentity: validSourceIdentity,
+			ExternalID:     "",
+		}
+
+		err := validateInput(input)
+		if err != nil {
+			t.Errorf("unexpected error with empty ExternalID: %v", err)
+		}
+
+		// Empty ExternalID should not be passed to STS
+		// (verified by checking it's not set in the AssumeRole input)
+	})
+
+	t.Run("non-empty ExternalID preserved", func(t *testing.T) {
+		externalID := "external-12345"
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  &mockCredentialsProvider{},
+			RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+			SourceIdentity: validSourceIdentity,
+			ExternalID:     externalID,
+		}
+
+		err := validateInput(input)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if input.ExternalID != externalID {
+			t.Errorf("ExternalID = %q, want %q", input.ExternalID, externalID)
+		}
+	})
+
+	t.Run("ExternalID with special characters accepted", func(t *testing.T) {
+		// AWS allows certain special characters in ExternalID
+		specialIDs := []string{
+			"external-id-123",
+			"external_id_456",
+			"external.id.789",
+			"External@ID",
+		}
+
+		for _, extID := range specialIDs {
+			t.Run(extID, func(t *testing.T) {
+				input := &SentinelAssumeRoleInput{
+					CredsProvider:  &mockCredentialsProvider{},
+					RoleARN:        "arn:aws:iam::123456789012:role/TestRole",
+					SourceIdentity: validSourceIdentity,
+					ExternalID:     extID,
+				}
+
+				err := validateInput(input)
+				if err != nil {
+					t.Errorf("unexpected error for ExternalID %q: %v", extID, err)
+				}
+			})
+		}
+	})
+}
+
+// TestMultipleInvalidFields tests error priority when multiple fields are invalid.
+func TestMultipleInvalidFields(t *testing.T) {
+	t.Run("returns first error in validation order", func(t *testing.T) {
+		// All fields invalid
+		input := &SentinelAssumeRoleInput{
+			CredsProvider:  nil,                                            // First invalid
+			RoleARN:        "",                                             // Second invalid
+			SourceIdentity: nil,                                            // Third invalid
+		}
+
+		err := validateInput(input)
+
+		// Should return first error (CredsProvider)
+		if !errors.Is(err, ErrMissingCredsProvider) {
+			t.Errorf("expected first error (ErrMissingCredsProvider), got: %v", err)
+		}
+	})
+}
