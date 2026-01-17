@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 
 ## Current Position
 
-Phase: 56 of 59 (Integration Testing) - COMPLETE
-Plan: 3 of 3 in current phase (all complete)
-Status: Ready for Phase 57
-Last activity: 2026-01-17 — Completed 56-03-PLAN.md (Command Integration Tests)
+Phase: 57 of 59 (Performance & Load Testing)
+Plan: 2 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-17 — Completed 57-02-PLAN.md (Concurrency Testing)
 
-Progress: ██████░░░░ 70% (v1.6 Testing & Hardening)
+Progress: ███████░░░ 76% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -226,6 +226,18 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Added MockBreakGlassNotifier to testutil to complete notification mock coverage
 - Valid request/event IDs must be 16 lowercase hex characters
 
+**v1.6 Performance Benchmarks decisions (Phase 57-01):**
+- Used time.Date() for deterministic time in benchmarks (not time.Now())
+- Created fixture functions (smallPolicy, mediumPolicy, largePolicy) for reusable test data
+- Used b.Run() for table-driven sub-benchmarks for better organization
+- Pre-generated keys for cache miss benchmark to avoid allocation in hot path
+
+**v1.6 Concurrency Testing decisions (Phase 57-02):**
+- Use atomic.Int64 for thread-safe call counters instead of mutex-protected int
+- Barrier pattern (channel close) for synchronized goroutine start maximizes contention
+- First-writer-wins via optimistic locking timestamp comparison for state machine tests
+- Mock stores clone data on Get/Create to prevent external mutation
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -237,9 +249,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 56-03-PLAN.md (Plan 3 of 3 in Phase 56)
+Stopped at: Completed 57-01-PLAN.md (Plan 1 of 3 in Phase 57)
 Resume file: None
-Next: Phase 57 (Performance & Load Testing)
+Next: 57-02-PLAN.md (Concurrency Testing)
 
 ## Roadmap Evolution
 
