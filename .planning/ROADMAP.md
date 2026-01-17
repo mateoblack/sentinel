@@ -235,7 +235,7 @@ Plans:
 
 Plans:
 - [x] 51-01: SSM loader tests — completed 2026-01-16
-- [ ] 51-02: Policy authorization edge cases
+- [x] 51-02: Policy authorization edge cases — completed 2026-01-17
 - [ ] 51-03: Credential gating validation
 
 #### Phase 52: Break-Glass Security Testing
@@ -340,6 +340,6 @@ Plans:
 | v1.3 Break-Glass | 27-34 | 15/15 | ✅ Complete | 2026-01-16 |
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
-| v1.6 Testing & Hardening | 50-59 | 2/25 | 🚧 In Progress | - |
+| v1.6 Testing & Hardening | 50-59 | 4/25 | 🚧 In Progress | - |
 
 **Totals:** 6 milestones shipped (49 phases, 76 plans), 1 milestone in progress (10 phases, 25 plans)

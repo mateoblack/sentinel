@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 51 of 59 (Policy Engine Testing)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-16 — Completed 51-01-PLAN.md (SSM Loader Tests)
+Last activity: 2026-01-17 — Completed 51-02-PLAN.md (Coverage Gap Tests)
 
-Progress: ██░░░░░░░░ 12% (v1.6 Testing & Hardening)
+Progress: ██░░░░░░░░ 16% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -158,6 +158,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Use testutil.MockSSMClient rather than internal mock for consistency
 - NewLoaderWithClient constructor pattern for testable AWS-dependent types
 
+**v1.6 Coverage Gap Tests decisions (Phase 51-02):**
+- Double-check locking path is defensive code, tested via concurrent access patterns
+- 98.6% coverage exceeds 95% target despite untested race condition guard
+- Table-driven tests for exhaustive weekday/time edge cases
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -168,10 +173,10 @@ None — clean start for v1.4.
 
 ## Session Continuity
 
-Last session: 2026-01-16
-Stopped at: Completed 51-01-PLAN.md (Plan 1 of 3 in Phase 51)
+Last session: 2026-01-17
+Stopped at: Completed 51-02-PLAN.md (Plan 2 of 3 in Phase 51)
 Resume file: None
-Next: 51-02-PLAN.md (Policy authorization edge cases)
+Next: 51-03-PLAN.md (Remaining policy tests)
 
 ## Roadmap Evolution
 
