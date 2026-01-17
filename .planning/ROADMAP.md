@@ -12,6 +12,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.3 Break-Glass** — [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) (Phases 27-34, shipped 2026-01-16)
 - ✅ **v1.4 Sentinel Bootstrapping** — [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) (Phases 35-42, shipped 2026-01-16)
 - ✅ **v1.5 Enforcement & Assurance** — [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) (Phases 43-49, shipped 2026-01-16)
+- 🚧 **v1.6 Testing & Hardening** — Phases 50-59 (in progress)
 
 ## Completed Milestones
 
@@ -210,6 +211,125 @@ Plans:
 
 </details>
 
+### 🚧 v1.6 Testing & Hardening (In Progress)
+
+**Milestone Goal:** Comprehensive test coverage and validation before production release (>80% coverage, security validation, performance benchmarks)
+
+#### Phase 50: Test Infrastructure Setup
+
+**Goal**: Set up coverage tooling and reusable test infrastructure
+**Depends on**: v1.5 complete
+**Research**: Unlikely (established Go testing patterns)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 50-01: Coverage tooling & baseline metrics
+- [ ] 50-02: Mock framework & test helpers
+
+#### Phase 51: Policy Engine Testing
+
+**Goal**: Security-critical policy evaluation test coverage (>90%)
+**Depends on**: Phase 50
+**Research**: Unlikely (internal patterns)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 51-01: Policy evaluation unit tests
+- [ ] 51-02: Policy authorization edge cases
+- [ ] 51-03: Credential gating validation
+
+#### Phase 52: Break-Glass Security Testing
+
+**Goal**: Rate limiting, state machine, and audit trail security tests
+**Depends on**: Phase 51
+**Research**: Unlikely (internal patterns)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 52-01: Rate limiting logic tests
+- [ ] 52-02: State machine security tests
+- [ ] 52-03: Audit trail integrity tests
+
+#### Phase 53: Approval Workflow Testing
+
+**Goal**: Approval state machine and notification system tests
+**Depends on**: Phase 52
+**Research**: Unlikely (internal patterns)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 53-01: Approval state machine tests
+- [ ] 53-02: Notification system tests
+
+#### Phase 54: SourceIdentity & Fingerprinting Tests
+
+**Goal**: Fingerprint generation and CloudTrail query tests (>90%)
+**Depends on**: Phase 53
+**Research**: Unlikely (internal patterns)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 54-01: Fingerprint generation tests
+- [ ] 54-02: CloudTrail query tests
+
+#### Phase 55: Bootstrap & Deployment Testing
+
+**Goal**: Bootstrap planner and SSM integration tests
+**Depends on**: Phase 54
+**Research**: Unlikely (internal patterns)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 55-01: Bootstrap planner tests
+- [ ] 55-02: SSM integration tests
+
+#### Phase 56: Integration Testing
+
+**Goal**: End-to-end credential flow and multi-service integration tests
+**Depends on**: Phase 55
+**Research**: Unlikely (internal patterns)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 56-01: End-to-end credential flow tests
+- [ ] 56-02: Multi-service integration tests
+- [ ] 56-03: CLI command integration tests
+
+#### Phase 57: Performance & Load Testing
+
+**Goal**: Performance benchmarks, concurrency testing, and load simulation
+**Depends on**: Phase 56
+**Research**: Unlikely (established patterns)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 57-01: Performance benchmarks
+- [ ] 57-02: Concurrency testing
+- [ ] 57-03: Load simulation
+
+#### Phase 58: Security Regression Suite
+
+**Goal**: Security test cases and threat model validation
+**Depends on**: Phase 57
+**Research**: Unlikely (internal patterns)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 58-01: Security test cases
+- [ ] 58-02: Threat model validation
+
+#### Phase 59: Pre-Release Validation
+
+**Goal**: Coverage report, documentation validation, and release readiness
+**Depends on**: Phase 58
+**Research**: Unlikely (documentation review)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 59-01: Coverage report & gaps
+- [ ] 59-02: Documentation validation
+- [ ] 59-03: Pre-release checklist
+
 ## Progress (All Milestones)
 
 | Milestone | Phases | Plans | Status | Shipped |
@@ -220,5 +340,6 @@ Plans:
 | v1.3 Break-Glass | 27-34 | 15/15 | ✅ Complete | 2026-01-16 |
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
+| v1.6 Testing & Hardening | 50-59 | 0/25 | 🚧 In Progress | - |
 
-**Totals:** 6 milestones, 49 phases, 76 plans shipped
+**Totals:** 6 milestones shipped (49 phases, 76 plans), 1 milestone in progress (10 phases, 25 plans)

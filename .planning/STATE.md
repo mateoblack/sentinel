@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-16)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Planning next milestone
+**Current focus:** v1.6 Testing & Hardening — comprehensive test coverage before production
 
 ## Current Position
 
-Phase: 49 of 49 complete
-Plan: All plans complete
-Status: v1.5 shipped — ready for next milestone
-Last activity: 2026-01-16 — v1.5 Enforcement & Assurance complete
+Phase: 50 of 59 (Test Infrastructure Setup)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-16 — Milestone v1.6 created
 
-Progress: ██████████ 100% (all milestones through v1.5 shipped)
+Progress: ░░░░░░░░░░ 0% (v1.6 Testing & Hardening)
 
 ## Milestone Summary
 
@@ -157,7 +157,7 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: v1.5 milestone complete
+Stopped at: Milestone v1.6 initialization
 Resume file: None
 
 ## Roadmap Evolution
@@ -168,3 +168,4 @@ Resume file: None
 - Milestone v1.3 shipped: 2026-01-16 — Break-Glass (Phases 27-34)
 - Milestone v1.4 shipped: 2026-01-16 — Sentinel Bootstrapping (Phases 35-42)
 - Milestone v1.5 shipped: 2026-01-16 — Enforcement & Assurance (Phases 43-49)
+- Milestone v1.6 created: 2026-01-16 — Testing & Hardening (Phases 50-59, 25 plans)
