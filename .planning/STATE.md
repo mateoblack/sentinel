@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 58 of 59 (Security Regression Suite)
-Plan: 2 of 3 in current phase (complete)
-Status: Ready for 58-03-PLAN.md
-Last activity: 2026-01-17 — Completed 58-02 (Threat Model Tests)
+Plan: 1 of 3 in current phase (complete)
+Status: Ready for 58-02-PLAN.md
+Last activity: 2026-01-17 — Completed 58-01 (Security Regression Tests)
 
 Progress: ████████░░ 85% (v1.6 Testing & Hardening)
 
@@ -244,12 +244,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Skip collision tracking in identity test (birthday problem ~0.07% with 25k samples)
 - Build tag 'loadtest' to skip expensive tests in normal runs
 
-**v1.6 Threat Model Tests decisions (Phase 58-02):**
-- Used TestThreat_ prefix for threat model tests to enable selective runs (-run "TestThreat")
-- STRIDE test organization: group by threat category with section headers in comments
-- Test names encode: Threat category + specific attack vector
-- Each test documents Threat/Mitigation in comments for security review reference
-- Focused on validation path tests without AWS mocking (STS calls tested in integration)
+**v1.6 Security Regression Tests decisions (Phase 58-01):**
+- Used TestSecurityRegression_ prefix for easy CI/CD filtering across all packages
+- Tests verify denial paths, not just happy paths
+- Boundary tests use nanosecond precision for time-based controls
+- Table-driven tests with SECURITY VIOLATION markers for critical failures
+- Tests cover case sensitivity, boundary conditions, and injection patterns
 
 ### Deferred Issues
 
@@ -262,9 +262,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 58-02-PLAN.md (Plan 2 of 3 in Phase 58)
+Stopped at: Completed 58-01-PLAN.md (Plan 1 of 3 in Phase 58)
 Resume file: None
-Next: 58-03-PLAN.md (Integration Security Tests)
+Next: 58-02-PLAN.md (Threat Model Tests)
 
 ## Roadmap Evolution
 
