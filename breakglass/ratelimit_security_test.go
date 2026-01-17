@@ -695,3 +695,398 @@ func TestCheckRateLimit_Boundary_EscalationThresholdOneBelow(t *testing.T) {
 		t.Error("CheckRateLimit() ShouldEscalate should be false when below threshold")
 	}
 }
+
+// ============================================================================
+// Rule Matching Security Tests
+// ============================================================================
+
+// TestFindRateLimitRule_FirstMatchWins_Strict verifies that when multiple rules
+// could match, the first one wins. This tests specific-before-wildcard ordering.
+func TestFindRateLimitRule_FirstMatchWins_Strict(t *testing.T) {
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production-strict",
+				Profiles: []string{"production"}, // Specific rule first
+				Cooldown: time.Hour,
+			},
+			{
+				Name:     "default-wildcard",
+				Profiles: []string{}, // Wildcard after specific
+				Cooldown: 30 * time.Minute,
+			},
+		},
+	}
+
+	rule := FindRateLimitRule(policy, "production")
+	if rule == nil {
+		t.Fatal("FindRateLimitRule() returned nil")
+	}
+	if rule.Name != "production-strict" {
+		t.Errorf("FindRateLimitRule() = %q, want %q (first match should win)", rule.Name, "production-strict")
+	}
+	// Verify the rule's cooldown to ensure we got the right one
+	if rule.Cooldown != time.Hour {
+		t.Errorf("FindRateLimitRule().Cooldown = %v, want %v", rule.Cooldown, time.Hour)
+	}
+}
+
+// TestFindRateLimitRule_FirstMatchWins_WildcardFirst verifies that if wildcard
+// comes first, it applies even when a more specific rule exists later.
+// This is a security design decision: rule order determines precedence.
+func TestFindRateLimitRule_FirstMatchWins_WildcardFirst(t *testing.T) {
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "default-wildcard",
+				Profiles: []string{}, // Wildcard first
+				Cooldown: 30 * time.Minute,
+			},
+			{
+				Name:     "production-strict",
+				Profiles: []string{"production"}, // Specific rule after wildcard
+				Cooldown: time.Hour,
+			},
+		},
+	}
+
+	rule := FindRateLimitRule(policy, "production")
+	if rule == nil {
+		t.Fatal("FindRateLimitRule() returned nil")
+	}
+	// Wildcard should match first, even though production-strict exists
+	if rule.Name != "default-wildcard" {
+		t.Errorf("FindRateLimitRule() = %q, want %q (wildcard came first)", rule.Name, "default-wildcard")
+	}
+	if rule.Cooldown != 30*time.Minute {
+		t.Errorf("FindRateLimitRule().Cooldown = %v, want %v", rule.Cooldown, 30*time.Minute)
+	}
+}
+
+// TestFindRateLimitRule_ProfileCaseSensitive verifies that profile matching
+// is case-sensitive. "Production" and "production" are different profiles.
+func TestFindRateLimitRule_ProfileCaseSensitive(t *testing.T) {
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production-lower",
+				Profiles: []string{"production"},
+				Cooldown: time.Hour,
+			},
+		},
+	}
+
+	tests := []struct {
+		profile   string
+		wantMatch bool
+	}{
+		{"production", true},
+		{"Production", false}, // Different case
+		{"PRODUCTION", false}, // Different case
+		{"prod", false},       // Different string
+		{"production ", false}, // Trailing space
+		{" production", false}, // Leading space
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.profile, func(t *testing.T) {
+			rule := FindRateLimitRule(policy, tt.profile)
+			if tt.wantMatch {
+				if rule == nil {
+					t.Errorf("FindRateLimitRule(%q) = nil, want match", tt.profile)
+				}
+			} else {
+				if rule != nil {
+					t.Errorf("FindRateLimitRule(%q) = %q, want nil (case sensitive)", tt.profile, rule.Name)
+				}
+			}
+		})
+	}
+}
+
+// TestFindRateLimitRule_EmptyProfile verifies that empty profile string
+// only matches wildcard rules (empty Profiles list).
+func TestFindRateLimitRule_EmptyProfile(t *testing.T) {
+	t.Run("no match without wildcard", func(t *testing.T) {
+		policy := &RateLimitPolicy{
+			Version: "1",
+			Rules: []RateLimitRule{
+				{
+					Name:     "production-only",
+					Profiles: []string{"production"},
+					Cooldown: time.Hour,
+				},
+			},
+		}
+
+		rule := FindRateLimitRule(policy, "")
+		if rule != nil {
+			t.Errorf("FindRateLimitRule(\"\") = %q, want nil (no wildcard)", rule.Name)
+		}
+	})
+
+	t.Run("matches wildcard", func(t *testing.T) {
+		policy := &RateLimitPolicy{
+			Version: "1",
+			Rules: []RateLimitRule{
+				{
+					Name:     "wildcard-all",
+					Profiles: []string{}, // Wildcard
+					Cooldown: time.Hour,
+				},
+			},
+		}
+
+		rule := FindRateLimitRule(policy, "")
+		if rule == nil {
+			t.Fatal("FindRateLimitRule(\"\") = nil, want wildcard match")
+		}
+		if rule.Name != "wildcard-all" {
+			t.Errorf("FindRateLimitRule(\"\") = %q, want %q", rule.Name, "wildcard-all")
+		}
+	})
+}
+
+// TestFindRateLimitRule_MultipleWildcards verifies that when multiple wildcard
+// rules exist, the first one wins.
+func TestFindRateLimitRule_MultipleWildcards(t *testing.T) {
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "first-wildcard",
+				Profiles: []string{}, // First wildcard
+				Cooldown: time.Hour,
+			},
+			{
+				Name:     "second-wildcard",
+				Profiles: []string{}, // Second wildcard
+				Cooldown: 2 * time.Hour,
+			},
+			{
+				Name:     "third-wildcard",
+				Profiles: []string{}, // Third wildcard
+				Cooldown: 3 * time.Hour,
+			},
+		},
+	}
+
+	rule := FindRateLimitRule(policy, "any-profile")
+	if rule == nil {
+		t.Fatal("FindRateLimitRule() = nil")
+	}
+	if rule.Name != "first-wildcard" {
+		t.Errorf("FindRateLimitRule() = %q, want %q (first wildcard wins)", rule.Name, "first-wildcard")
+	}
+}
+
+// ruleMatchTrackingStore is a mock that tracks which rules were evaluated.
+type ruleMatchTrackingStore struct {
+	lastEvent    *BreakGlassEvent
+	userCount    int
+	profileCount int
+}
+
+func (m *ruleMatchTrackingStore) Create(ctx context.Context, event *BreakGlassEvent) error {
+	return nil
+}
+func (m *ruleMatchTrackingStore) Get(ctx context.Context, id string) (*BreakGlassEvent, error) {
+	return nil, nil
+}
+func (m *ruleMatchTrackingStore) Update(ctx context.Context, event *BreakGlassEvent) error {
+	return nil
+}
+func (m *ruleMatchTrackingStore) Delete(ctx context.Context, id string) error { return nil }
+func (m *ruleMatchTrackingStore) ListByInvoker(ctx context.Context, invoker string, limit int) ([]*BreakGlassEvent, error) {
+	return []*BreakGlassEvent{}, nil
+}
+func (m *ruleMatchTrackingStore) ListByStatus(ctx context.Context, status BreakGlassStatus, limit int) ([]*BreakGlassEvent, error) {
+	return []*BreakGlassEvent{}, nil
+}
+func (m *ruleMatchTrackingStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*BreakGlassEvent, error) {
+	return []*BreakGlassEvent{}, nil
+}
+func (m *ruleMatchTrackingStore) FindActiveByInvokerAndProfile(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+	return nil, nil
+}
+func (m *ruleMatchTrackingStore) CountByInvokerSince(ctx context.Context, invoker string, since time.Time) (int, error) {
+	return m.userCount, nil
+}
+func (m *ruleMatchTrackingStore) CountByProfileSince(ctx context.Context, profile string, since time.Time) (int, error) {
+	return m.profileCount, nil
+}
+func (m *ruleMatchTrackingStore) GetLastByInvokerAndProfile(ctx context.Context, invoker, profile string) (*BreakGlassEvent, error) {
+	return m.lastEvent, nil
+}
+
+// TestCheckRateLimit_DifferentRulesForDifferentProfiles verifies that different
+// profiles get different rules applied, demonstrating rule isolation.
+func TestCheckRateLimit_DifferentRulesForDifferentProfiles(t *testing.T) {
+	now := time.Now()
+
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:        "production-strict",
+				Profiles:    []string{"production"},
+				MaxPerUser:  2, // Strict limit for production
+				QuotaWindow: 24 * time.Hour,
+			},
+			{
+				Name:        "staging-lenient",
+				Profiles:    []string{"staging"},
+				MaxPerUser:  10, // Lenient limit for staging
+				QuotaWindow: 24 * time.Hour,
+			},
+		},
+	}
+
+	tests := []struct {
+		profile   string
+		userCount int
+		wantAllow bool
+		wantRule  string
+	}{
+		// Production with 2 events should block (MaxPerUser=2)
+		{"production", 2, false, "production-strict"},
+		// Production with 1 event should allow
+		{"production", 1, true, "production-strict"},
+		// Staging with 5 events should allow (MaxPerUser=10)
+		{"staging", 5, true, "staging-lenient"},
+		// Staging with 10 events should block
+		{"staging", 10, false, "staging-lenient"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.profile+"_count_"+string(rune('0'+tt.userCount)), func(t *testing.T) {
+			store := &ruleMatchTrackingStore{
+				userCount: tt.userCount,
+			}
+
+			result, err := CheckRateLimit(context.Background(), store, policy, "alice", tt.profile, now)
+			if err != nil {
+				t.Fatalf("CheckRateLimit() error = %v", err)
+			}
+
+			if result.Allowed != tt.wantAllow {
+				t.Errorf("CheckRateLimit() Allowed = %v, want %v (profile=%s, count=%d)",
+					result.Allowed, tt.wantAllow, tt.profile, tt.userCount)
+			}
+		})
+	}
+}
+
+// TestCheckRateLimit_RateLimitNotAppliedWhenNoMatch verifies that when no rule
+// matches the profile, rate limiting is not applied (allowed by default).
+// This is a security design decision: no matching rule = no rate limit.
+func TestCheckRateLimit_RateLimitNotAppliedWhenNoMatch(t *testing.T) {
+	now := time.Now()
+
+	// Very restrictive policy that only applies to "production"
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:        "production-only",
+				Profiles:    []string{"production"},
+				MaxPerUser:  1, // Very restrictive
+				QuotaWindow: 24 * time.Hour,
+			},
+		},
+	}
+
+	// Simulate 100 events for a profile that doesn't match
+	store := &ruleMatchTrackingStore{
+		userCount: 100,
+	}
+
+	result, err := CheckRateLimit(context.Background(), store, policy, "alice", "development", now)
+	if err != nil {
+		t.Fatalf("CheckRateLimit() error = %v", err)
+	}
+
+	// Should be allowed because "development" doesn't match any rule
+	if !result.Allowed {
+		t.Errorf("CheckRateLimit() Allowed = false, want true (no matching rule)")
+	}
+}
+
+// TestFindRateLimitRule_MultiProfileMatch verifies that rules with multiple
+// profiles correctly match any of them.
+func TestFindRateLimitRule_MultiProfileMatch(t *testing.T) {
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "prod-environments",
+				Profiles: []string{"production", "production-dr", "production-eu"},
+				Cooldown: time.Hour,
+			},
+			{
+				Name:     "non-prod",
+				Profiles: []string{}, // Wildcard for others
+				Cooldown: 15 * time.Minute,
+			},
+		},
+	}
+
+	tests := []struct {
+		profile  string
+		wantRule string
+	}{
+		{"production", "prod-environments"},
+		{"production-dr", "prod-environments"},
+		{"production-eu", "prod-environments"},
+		{"staging", "non-prod"},       // Falls to wildcard
+		{"development", "non-prod"},   // Falls to wildcard
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.profile, func(t *testing.T) {
+			rule := FindRateLimitRule(policy, tt.profile)
+			if rule == nil {
+				t.Fatalf("FindRateLimitRule(%q) = nil, want %q", tt.profile, tt.wantRule)
+			}
+			if rule.Name != tt.wantRule {
+				t.Errorf("FindRateLimitRule(%q) = %q, want %q", tt.profile, rule.Name, tt.wantRule)
+			}
+		})
+	}
+}
+
+// TestFindRateLimitRule_ExactMatchRequired verifies that partial matches don't work.
+// "prod" should not match "production".
+func TestFindRateLimitRule_ExactMatchRequired(t *testing.T) {
+	policy := &RateLimitPolicy{
+		Version: "1",
+		Rules: []RateLimitRule{
+			{
+				Name:     "production-rule",
+				Profiles: []string{"production"},
+				Cooldown: time.Hour,
+			},
+		},
+	}
+
+	partialMatches := []string{
+		"prod",           // Prefix
+		"duction",        // Suffix
+		"oductio",        // Middle
+		"production1",    // Extra chars
+		"my-production",  // Prefix addition
+		"production-new", // Suffix addition
+	}
+
+	for _, partial := range partialMatches {
+		t.Run(partial, func(t *testing.T) {
+			rule := FindRateLimitRule(policy, partial)
+			if rule != nil {
+				t.Errorf("FindRateLimitRule(%q) = %q, want nil (exact match required)", partial, rule.Name)
+			}
+		})
+	}
+}
