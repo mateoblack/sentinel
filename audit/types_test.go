@@ -97,6 +97,131 @@ func TestParseSourceIdentity(t *testing.T) {
 			wantRequestID:  "abc:def:ghi",
 			wantIsSentinel: true,
 		},
+		// Security edge cases: prefix case sensitivity
+		{
+			name:           "wrong case - uppercase SENTINEL",
+			sourceIdentity: "SENTINEL:alice:abc123",
+			wantUser:       "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
+		},
+		{
+			name:           "wrong case - mixed case Sentinel",
+			sourceIdentity: "Sentinel:alice:abc123",
+			wantUser:       "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
+		},
+		{
+			name:           "wrong case - alternating sEnTiNeL",
+			sourceIdentity: "sEnTiNeL:alice:abc123",
+			wantUser:       "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
+		},
+		// Security edge cases: prefix with whitespace
+		{
+			name:           "prefix with leading whitespace",
+			sourceIdentity: " sentinel:alice:abc123",
+			wantUser:       "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
+		},
+		{
+			name:           "prefix with trailing whitespace after colon",
+			sourceIdentity: "sentinel: alice:abc123",
+			wantUser:       " alice",
+			wantRequestID:  "abc123",
+			wantIsSentinel: true,
+		},
+		// Security edge cases: similar-looking prefix attacks
+		{
+			name:           "similar prefix with zero-width space",
+			sourceIdentity: "sentinel\u200B:alice:abc123",
+			wantUser:       "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
+		},
+		{
+			name:           "similar prefix with zero-width joiner",
+			sourceIdentity: "sentinel\u200D:alice:abc123",
+			wantUser:       "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
+		},
+		{
+			name:           "similar prefix with soft hyphen",
+			sourceIdentity: "sentinel\u00AD:alice:abc123",
+			wantUser:       "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
+		},
+		// Request-ID extraction edge cases
+		{
+			name:           "very long request-id (100+ chars)",
+			sourceIdentity: "sentinel:alice:abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz01234567890123456789",
+			wantUser:       "alice",
+			wantRequestID:  "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz01234567890123456789",
+			wantIsSentinel: true,
+		},
+		{
+			name:           "request-id with special characters",
+			sourceIdentity: "sentinel:alice:abc!@#$%^&*()_+-={}[]|\\;'\"<>,.?/",
+			wantUser:       "alice",
+			wantRequestID:  "abc!@#$%^&*()_+-={}[]|\\;'\"<>,.?/",
+			wantIsSentinel: true,
+		},
+		{
+			name:           "request-id with only colons",
+			sourceIdentity: "sentinel:alice::::",
+			wantUser:       "alice",
+			wantRequestID:  ":::",
+			wantIsSentinel: true,
+		},
+		// User field security edge cases
+		{
+			name:           "user with only whitespace",
+			sourceIdentity: "sentinel:   :abc123",
+			wantUser:       "   ",
+			wantRequestID:  "abc123",
+			wantIsSentinel: true,
+		},
+		{
+			name:           "user with null byte",
+			sourceIdentity: "sentinel:alice\x00bob:abc123",
+			wantUser:       "alice\x00bob",
+			wantRequestID:  "abc123",
+			wantIsSentinel: true,
+		},
+		{
+			name:           "user with newline",
+			sourceIdentity: "sentinel:alice\nbob:abc123",
+			wantUser:       "alice\nbob",
+			wantRequestID:  "abc123",
+			wantIsSentinel: true,
+		},
+		// Format boundary tests
+		{
+			name:           "exactly 64 char SourceIdentity (AWS limit)",
+			sourceIdentity: "sentinel:user123:abcdefghijklmnopqrstuvwxyz0123456789abcdef",
+			wantUser:       "user123",
+			wantRequestID:  "abcdefghijklmnopqrstuvwxyz0123456789abcdef",
+			wantIsSentinel: true,
+		},
+		{
+			name:           "beyond 64 char AWS limit (should still parse)",
+			sourceIdentity: "sentinel:verylongusername:abcdefghijklmnopqrstuvwxyz0123456789abcdefghij",
+			wantUser:       "verylongusername",
+			wantRequestID:  "abcdefghijklmnopqrstuvwxyz0123456789abcdefghij",
+			wantIsSentinel: true,
+		},
+		{
+			name:           "minimal valid format",
+			sourceIdentity: "sentinel:a:b",
+			wantUser:       "a",
+			wantRequestID:  "b",
+			wantIsSentinel: true,
+		},
 	}
 
 	for _, tt := range tests {
