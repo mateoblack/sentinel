@@ -394,10 +394,11 @@ Plans:
 **Goal**: Better error messages for permission failures with specific fix suggestions
 **Depends on**: Phase 64
 **Research**: Unlikely (internal patterns)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 65-01: TBD
+- [x] 65-01: Structured error types and AWS error classifiers — completed 2026-01-18
+- [ ] 65-02: CLI integration with error enhancement
 
 #### Phase 66: Config Validation
 
@@ -440,6 +441,6 @@ Plans:
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
-| v1.7 Permissions Discovery | 60-68 | 2/? | 🚧 In Progress | - |
+| v1.7 Permissions Discovery | 60-68 | 5/? | 🚧 In Progress | - |
 
-**Totals:** 7 milestones shipped, 1 in progress (68 phases, 103+ plans)
+**Totals:** 7 milestones shipped, 1 in progress (68 phases, 106+ plans)
