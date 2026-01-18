@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-17)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.6 Testing & Hardening — SHIPPED
+**Current focus:** v1.7 Permissions Discovery — In Progress
 
 ## Current Position
 
-Phase: 59 of 59 (Pre-Release Validation)
-Plan: 3 of 3 in current phase (complete)
-Status: v1.6 SHIPPED — Production ready
-Last activity: 2026-01-17 — Milestone v1.6 archived
+Phase: 60 of 68 (Permissions Schema)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-18 — Milestone v1.7 created
 
-Progress: ██████████ 100% (All milestones complete)
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone Summary
 
@@ -285,10 +285,10 @@ None — clean start for v1.4.
 
 ## Session Continuity
 
-Last session: 2026-01-17
-Stopped at: v1.6 milestone archived and tagged
+Last session: 2026-01-18
+Stopped at: Milestone v1.7 initialization
 Resume file: None
-Next: Production deployment or v2.0 planning (future)
+Next: Plan Phase 60 (Permissions Schema)
 
 ## Roadmap Evolution
 
@@ -299,3 +299,4 @@ Next: Production deployment or v2.0 planning (future)
 - Milestone v1.4 shipped: 2026-01-16 — Sentinel Bootstrapping (Phases 35-42)
 - Milestone v1.5 shipped: 2026-01-16 — Enforcement & Assurance (Phases 43-49)
 - Milestone v1.6 shipped: 2026-01-17 — Testing & Hardening (Phases 50-59, 25 plans)
+- Milestone v1.7 created: 2026-01-18 — Permissions Discovery (Phases 60-68, 9 phases)
