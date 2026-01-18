@@ -363,10 +363,10 @@ Plans:
 **Goal**: Auto-detect which subsystems are configured, suggest minimal permissions
 **Depends on**: Phase 61
 **Research**: Unlikely (internal patterns)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 62-01: TBD
+- [ ] 62-01: Detection types, detector logic, --detect CLI flag
 
 #### Phase 63: Permission Validation
 
