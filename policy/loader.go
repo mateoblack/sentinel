@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 )
 
 // ErrPolicyNotFound is returned when the requested policy parameter
@@ -48,6 +49,7 @@ func NewLoaderWithClient(client SSMAPI) *Loader {
 // Load fetches a policy from SSM Parameter Store by parameter name.
 // It returns ErrPolicyNotFound (wrapped) if the parameter does not exist.
 // The parameter is fetched with decryption enabled to support SecureString parameters.
+// Returns a SentinelError with actionable suggestions for common SSM failures.
 func (l *Loader) Load(ctx context.Context, parameterName string) (*Policy, error) {
 	output, err := l.client.GetParameter(ctx, &ssm.GetParameterInput{
 		Name:           aws.String(parameterName),
@@ -58,7 +60,8 @@ func (l *Loader) Load(ctx context.Context, parameterName string) (*Policy, error
 		if errors.As(err, &notFound) {
 			return nil, fmt.Errorf("%s: %w", parameterName, ErrPolicyNotFound)
 		}
-		return nil, fmt.Errorf("ssm GetParameter: %w", err)
+		// Wrap SSM error with context and actionable suggestion
+		return nil, sentinelerrors.WrapSSMError(err, parameterName)
 	}
 
 	return ParsePolicy([]byte(*output.Parameter.Value))

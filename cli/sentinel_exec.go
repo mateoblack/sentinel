@@ -12,12 +12,38 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
+
+// formatErrorWithSuggestion writes error to stderr with suggestion if available.
+// Returns the original error for chaining.
+func formatErrorWithSuggestion(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	sentErr, ok := sentinelerrors.IsSentinelError(err)
+	if ok {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", sentErr.Error())
+		if suggestion := sentErr.Suggestion(); suggestion != "" {
+			fmt.Fprintf(os.Stderr, "\nSuggestion: %s\n", suggestion)
+		}
+		if ctx := sentErr.Context(); len(ctx) > 0 {
+			fmt.Fprintf(os.Stderr, "\nDetails:\n")
+			for k, v := range ctx {
+				fmt.Fprintf(os.Stderr, "  %s: %s\n", k, v)
+			}
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	}
+	return err
+}
 
 // SentinelExecCommandInput contains the input for the sentinel exec command.
 type SentinelExecCommandInput struct {
@@ -130,8 +156,14 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	}
 	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
-		return 1, err
+		configErr := sentinelerrors.New(
+			sentinelerrors.ErrCodeConfigMissingCredentials,
+			fmt.Sprintf("Failed to load AWS config: %v", err),
+			sentinelerrors.GetSuggestion(sentinelerrors.ErrCodeConfigMissingCredentials),
+			err,
+		)
+		formatErrorWithSuggestion(configErr)
+		return 1, configErr
 	}
 
 	// 4. Create policy loader chain
@@ -141,7 +173,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	// 5. Load policy
 	loadedPolicy, err := cachedLoader.Load(ctx, input.PolicyParameter)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load policy: %v\n", err)
+		formatErrorWithSuggestion(err)
 		return 1, err
 	}
 
@@ -184,8 +216,24 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
 				logger.LogDecision(entry)
 			}
-			fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
-			return 1, fmt.Errorf("access denied: %s", decision.String())
+			// Create structured error with context
+			var matchedRule *sentinelerrors.PolicyRule
+			if decision.MatchedRule != "" {
+				matchedRule = &sentinelerrors.PolicyRule{
+					Name:        decision.MatchedRule,
+					Effect:      string(decision.Effect),
+					Description: decision.Reason,
+				}
+			}
+			policyErr := sentinelerrors.NewPolicyDeniedError(
+				username,
+				input.ProfileName,
+				matchedRule,
+				input.Store != nil,           // hasApprovalWorkflow
+				input.BreakGlassStore != nil, // hasBreakGlass
+			)
+			formatErrorWithSuggestion(policyErr)
+			return 1, policyErr
 		}
 		// Approved request or active break-glass found - continue to credential issuance
 	}
