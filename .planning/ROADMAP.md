@@ -343,10 +343,10 @@ Plans:
 **Goal**: Define permission requirements per subsystem, map features to IAM actions
 **Depends on**: v1.6 complete
 **Research**: Unlikely (internal patterns)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 60-01: TBD (run /gsd:plan-phase 60 to break down)
+- [x] 60-01: Permission types and registry — completed 2026-01-18
 
 #### Phase 61: Permissions Command
 
@@ -440,6 +440,6 @@ Plans:
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
-| v1.7 Permissions Discovery | 60-68 | 0/? | 🚧 In Progress | - |
+| v1.7 Permissions Discovery | 60-68 | 1/? | 🚧 In Progress | - |
 
-**Totals:** 7 milestones shipped, 1 in progress (68 phases, 101+ plans)
+**Totals:** 7 milestones shipped, 1 in progress (68 phases, 102+ plans)
