@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 
 ## Current Position
 
-Phase: 62 of 68 (Feature Detection)
-Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-18 — Completed 62-01-PLAN.md
+Phase: 63 of 68 (Permission Validation)
+Plan: 1 of 1 complete in current phase
+Status: Plan 63-01 complete
+Last activity: 2026-01-18 — Completed 63-01-PLAN.md
 
-Progress: ███░░░░░░░ 33%
+Progress: ████░░░░░░ 44%
 
 ## Milestone Summary
 
@@ -81,9 +81,9 @@ Progress: ███░░░░░░░ 33%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 101
+- Total plans completed: 102
 - Average duration: 3.0 min
-- Total execution time: ~311 min
+- Total execution time: ~336 min
 
 **By Milestone:**
 
@@ -283,6 +283,13 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Best-effort detection: API errors collected but don't stop other feature checks
 - Detection summary to stderr (human format only), permissions to stdout
 
+**v1.7 Permission Validation decisions (Phase 63-01):**
+- Renamed check subcommand flags to avoid kingpin inheritance conflict (--auto-detect, --features, --output, --aws-region)
+- Exit code 0 for all passed, 1 for any failures or errors (CI/CD friendly)
+- Cache caller ARN from STS GetCallerIdentity to avoid repeated calls
+- Human output uses # (pass), X (fail), ? (error) markers for visual scanning
+- JSON output includes results array and summary counts for machine parsing
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -294,9 +301,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-18
-Stopped at: Completed 62-01-PLAN.md (Feature Detection)
+Stopped at: Completed 63-01-PLAN.md (Permission Validation)
 Resume file: None
-Next: Phase 63 (Permission Validation)
+Next: Phase 64 (Permissions Output IaC) or continue 63 if more plans
 
 ## Roadmap Evolution
 
