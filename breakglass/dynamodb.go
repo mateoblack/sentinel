@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 )
 
 // GSI name constants for DynamoDB Global Secondary Indexes.
@@ -154,7 +155,7 @@ func (s *DynamoDBStore) Create(ctx context.Context, event *BreakGlassEvent) erro
 		if errors.As(err, &ccf) {
 			return fmt.Errorf("%s: %w", event.ID, ErrEventExists)
 		}
-		return fmt.Errorf("dynamodb PutItem: %w", err)
+		return sentinelerrors.WrapDynamoDBError(err, s.tableName, "PutItem")
 	}
 
 	return nil
@@ -169,7 +170,7 @@ func (s *DynamoDBStore) Get(ctx context.Context, id string) (*BreakGlassEvent, e
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("dynamodb GetItem: %w", err)
+		return nil, sentinelerrors.WrapDynamoDBError(err, s.tableName, "GetItem")
 	}
 
 	if output.Item == nil {
@@ -219,7 +220,7 @@ func (s *DynamoDBStore) Update(ctx context.Context, event *BreakGlassEvent) erro
 			}
 			return fmt.Errorf("%s: %w", event.ID, ErrConcurrentModification)
 		}
-		return fmt.Errorf("dynamodb PutItem: %w", err)
+		return sentinelerrors.WrapDynamoDBError(err, s.tableName, "PutItem")
 	}
 
 	return nil
@@ -234,7 +235,7 @@ func (s *DynamoDBStore) Delete(ctx context.Context, id string) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("dynamodb DeleteItem: %w", err)
+		return sentinelerrors.WrapDynamoDBError(err, s.tableName, "DeleteItem")
 	}
 
 	return nil
@@ -296,7 +297,7 @@ func (s *DynamoDBStore) FindActiveByInvokerAndProfile(ctx context.Context, invok
 		Limit:            aws.Int32(1),    // We only need one
 	})
 	if err != nil {
-		return nil, fmt.Errorf("dynamodb Query: %w", err)
+		return nil, sentinelerrors.WrapDynamoDBError(err, s.tableName, "Query:FindActive")
 	}
 
 	if len(output.Items) == 0 {
@@ -341,7 +342,7 @@ func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, ke
 		Limit:            aws.Int32(int32(effectiveLimit)),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("dynamodb Query %s: %w", indexName, err)
+		return nil, sentinelerrors.WrapDynamoDBError(err, s.tableName, fmt.Sprintf("Query:%s", indexName))
 	}
 
 	// Convert items to events
@@ -389,7 +390,7 @@ func (s *DynamoDBStore) GetLastByInvokerAndProfile(ctx context.Context, invoker,
 		Limit:            aws.Int32(1),    // Only need the most recent
 	})
 	if err != nil {
-		return nil, fmt.Errorf("dynamodb Query: %w", err)
+		return nil, sentinelerrors.WrapDynamoDBError(err, s.tableName, "Query:GetLast")
 	}
 
 	if len(output.Items) == 0 {
@@ -425,7 +426,7 @@ func (s *DynamoDBStore) countByIndexSince(ctx context.Context, indexName, keyAtt
 		Select: types.SelectCount, // Only return count, not items
 	})
 	if err != nil {
-		return 0, fmt.Errorf("dynamodb Query %s: %w", indexName, err)
+		return 0, sentinelerrors.WrapDynamoDBError(err, s.tableName, fmt.Sprintf("Query:Count:%s", indexName))
 	}
 
 	return int(output.Count), nil

@@ -3,6 +3,7 @@ package permissions
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -207,10 +208,10 @@ func TestChecker_Check_SimulateAccessDenied(t *testing.T) {
 		t.Error("expected at least one error")
 	}
 
-	// Check error message
+	// Check error message - should contain SimulatePrincipalPolicy suggestion
 	for _, result := range summary.Results {
 		if result.Status == StatusError {
-			if result.Message != "cannot simulate - requires iam:SimulatePrincipalPolicy permission" {
+			if !strings.Contains(result.Message, "SimulatePrincipalPolicy") {
 				t.Errorf("expected SimulatePrincipalPolicy permission error message, got: %s", result.Message)
 			}
 		}
@@ -261,8 +262,9 @@ func TestChecker_Check_GetCallerIdentityFails(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when GetCallerIdentity fails")
 	}
-	if !errors.Is(err, ErrCallerIdentityFailed) && err.Error() != "failed to get caller identity: failed to get identity" {
-		t.Errorf("expected caller identity error, got: %v", err)
+	// Error should be wrapped as SentinelError with STS error context
+	if !strings.Contains(err.Error(), "GetCallerIdentity") {
+		t.Errorf("expected GetCallerIdentity in error, got: %v", err)
 	}
 }
 

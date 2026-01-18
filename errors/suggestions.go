@@ -273,3 +273,28 @@ func isConditionalCheckFailed(errStr string) bool {
 		strings.Contains(errStr, "conditional check failed") ||
 		strings.Contains(errStr, "condition expression")
 }
+
+// WrapSTSError examines an STS error and returns a SentinelError.
+func WrapSTSError(err error, action string) SentinelError {
+	if err == nil {
+		return nil
+	}
+
+	errStr := strings.ToLower(err.Error())
+
+	if isAccessDenied(errStr) {
+		return New(
+			ErrCodeConfigMissingCredentials,
+			fmt.Sprintf("STS %s failed: %v", action, err),
+			"Ensure AWS credentials are configured. Check environment variables or ~/.aws/credentials",
+			err,
+		)
+	}
+
+	return New(
+		"STS_ERROR",
+		fmt.Sprintf("STS %s failed: %v", action, err),
+		"",
+		err,
+	)
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 )
 
 // GSI name constants for DynamoDB Global Secondary Indexes.
@@ -146,7 +147,7 @@ func (s *DynamoDBStore) Create(ctx context.Context, req *Request) error {
 		if errors.As(err, &ccf) {
 			return fmt.Errorf("%s: %w", req.ID, ErrRequestExists)
 		}
-		return fmt.Errorf("dynamodb PutItem: %w", err)
+		return sentinelerrors.WrapDynamoDBError(err, s.tableName, "PutItem")
 	}
 
 	return nil
@@ -161,7 +162,7 @@ func (s *DynamoDBStore) Get(ctx context.Context, id string) (*Request, error) {
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("dynamodb GetItem: %w", err)
+		return nil, sentinelerrors.WrapDynamoDBError(err, s.tableName, "GetItem")
 	}
 
 	if output.Item == nil {
@@ -211,7 +212,7 @@ func (s *DynamoDBStore) Update(ctx context.Context, req *Request) error {
 			}
 			return fmt.Errorf("%s: %w", req.ID, ErrConcurrentModification)
 		}
-		return fmt.Errorf("dynamodb PutItem: %w", err)
+		return sentinelerrors.WrapDynamoDBError(err, s.tableName, "PutItem")
 	}
 
 	return nil
@@ -226,7 +227,7 @@ func (s *DynamoDBStore) Delete(ctx context.Context, id string) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("dynamodb DeleteItem: %w", err)
+		return sentinelerrors.WrapDynamoDBError(err, s.tableName, "DeleteItem")
 	}
 
 	return nil
@@ -307,7 +308,7 @@ func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, ke
 		Limit:            aws.Int32(int32(effectiveLimit)),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("dynamodb Query %s: %w", indexName, err)
+		return nil, sentinelerrors.WrapDynamoDBError(err, s.tableName, fmt.Sprintf("Query:%s", indexName))
 	}
 
 	// Convert items to requests

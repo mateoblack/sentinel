@@ -3,13 +3,13 @@ package permissions
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 )
 
 // CheckStatus represents the result of a permission check.
@@ -100,7 +100,7 @@ func (c *Checker) Check(ctx context.Context, features []Feature) (*CheckSummary,
 	if c.callerArn == "" {
 		identity, err := c.iamClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to get caller identity: %w", err)
+			return nil, sentinelerrors.WrapSTSError(err, "GetCallerIdentity")
 		}
 		c.callerArn = aws.ToString(identity.Arn)
 	}
@@ -157,7 +157,7 @@ func (c *Checker) checkPermission(ctx context.Context, feature Feature, action, 
 		// Check if it's an access denied error for SimulatePrincipalPolicy itself
 		if isAccessDeniedError(err) {
 			result.Status = StatusError
-			result.Message = "cannot simulate - requires iam:SimulatePrincipalPolicy permission"
+			result.Message = sentinelerrors.GetSuggestion(sentinelerrors.ErrCodeIAMSimulateAccessDenied)
 			return result
 		}
 		result.Status = StatusError
