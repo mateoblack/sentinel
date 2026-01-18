@@ -366,7 +366,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 62-01: Detection types, detector logic, --detect CLI flag
+- [x] 62-01: Detection types, detector logic, --detect CLI flag — completed 2026-01-18
 
 #### Phase 63: Permission Validation
 

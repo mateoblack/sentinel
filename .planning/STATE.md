@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 
 ## Current Position
 
-Phase: 61 of 68 (Permissions Command)
+Phase: 62 of 68 (Feature Detection)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-18 — Completed 61-01-PLAN.md
+Last activity: 2026-01-18 — Completed 62-01-PLAN.md
 
-Progress: ██░░░░░░░░ 22%
+Progress: ███░░░░░░░ 33%
 
 ## Milestone Summary
 
@@ -275,6 +275,14 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Issues categorized by severity: 0 critical, 4 minor, 6 cosmetic
 - macOS-specific date syntax in docs noted as cosmetic (script examples non-portable)
 
+**v1.7 Feature Detection decisions (Phase 62-01):**
+- Always-detected features: credential_issue (base), audit_verify (CloudTrail), enforce_analyze (IAM)
+- SSM detection: /sentinel/policies/* for policy_load and bootstrap_plan
+- DynamoDB detection: sentinel-requests (approval_workflow), sentinel-breakglass (breakglass)
+- Not auto-detected: notify_sns, notify_webhook, bootstrap_apply (optional features)
+- Best-effort detection: API errors collected but don't stop other feature checks
+- Detection summary to stderr (human format only), permissions to stdout
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -286,9 +294,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-18
-Stopped at: Completed 61-01-PLAN.md (Permissions Command)
+Stopped at: Completed 62-01-PLAN.md (Feature Detection)
 Resume file: None
-Next: Phase 62 (Permissions Check)
+Next: Phase 63 (Permission Validation)
 
 ## Roadmap Evolution
 
