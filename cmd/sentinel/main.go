@@ -40,5 +40,8 @@ func main() {
 	// Audit commands
 	cli.ConfigureAuditVerifyCommand(app, s)
 
+	// Permissions command
+	cli.ConfigurePermissionsCommand(app, s)
+
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
