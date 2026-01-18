@@ -23,8 +23,8 @@ In the morning, you check CloudTrail:
 **She has admin permissions. She's a senior dev. She's SUPPOSED to have this access.**
 
 **But you still can't answer basic questions:**
-- Did she go through proper channels, or bypass controls?
 - What was the business justification?
+- Did she follow proper process or bypass controls?
 - Was this an emergency, or did she fat-finger prod instead of dev?
 - How did she get the credentials - SSO? Stored keys? Assumed role directly?
 

@@ -6,10 +6,10 @@ Policy-based credential gateway for AWS. Know not just *what* happened, but *why
 
 ## The Problem
 
-CloudTrail tells you Alice deleted the prod database at 2am. It doesn't tell you:
-- Was she supposed to have access?
+CloudTrail tells you Alice deleted the prod database at 2am. She's a senior dev - she's *supposed* to have access. But CloudTrail doesn't tell you:
 - What was the business justification?
 - Did she follow proper process or bypass controls?
+- Was this an emergency, or did she fat-finger prod instead of dev?
 
 **[Read the full story &rarr;](docs/WHY.md)**
 
