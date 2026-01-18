@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/alecthomas/kingpin/v2"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/permissions"
 )
 
@@ -19,6 +21,10 @@ type PermissionsCommandInput struct {
 	Feature string
 	// RequiredOnly excludes optional features.
 	RequiredOnly bool
+	// Detect auto-detects configured features and shows only required permissions.
+	Detect bool
+	// Region specifies the AWS region for detection (only used with --detect).
+	Region string
 
 	// Stdout is an optional writer for output (for testing).
 	// If nil, os.Stdout will be used.
@@ -27,6 +33,10 @@ type PermissionsCommandInput struct {
 	// Stderr is an optional writer for errors (for testing).
 	// If nil, os.Stderr will be used.
 	Stderr *os.File
+
+	// Detector is an optional custom detector (for testing).
+	// If nil, a new detector will be created using AWS config.
+	Detector permissions.DetectorInterface
 }
 
 // ConfigurePermissionsCommand sets up the permissions command.
@@ -48,6 +58,12 @@ func ConfigurePermissionsCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("required-only", "Exclude optional features (notify_sns, notify_webhook)").
 		BoolVar(&input.RequiredOnly)
 
+	cmd.Flag("detect", "Auto-detect configured features and show only required permissions").
+		BoolVar(&input.Detect)
+
+	cmd.Flag("region", "AWS region for detection (only used with --detect)").
+		StringVar(&input.Region)
+
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := PermissionsCommand(input)
 		app.FatalIfError(err, "permissions")
@@ -68,11 +84,24 @@ func PermissionsCommand(input PermissionsCommandInput) error {
 		stderr = os.Stderr
 	}
 
+	// Check for mutual exclusivity: --detect cannot combine with --subsystem or --feature
+	if input.Detect && (input.Subsystem != "" || input.Feature != "") {
+		err := fmt.Errorf("--detect cannot be combined with --subsystem or --feature")
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return err
+	}
+
 	// Get permissions based on filters
 	var perms []permissions.FeaturePermissions
 	var err error
 
-	if input.Feature != "" {
+	if input.Detect {
+		// Auto-detect configured features
+		perms, err = detectPermissions(input, stderr)
+		if err != nil {
+			return err
+		}
+	} else if input.Feature != "" {
 		// Filter by specific feature
 		perms, err = getFeaturePermissions(input.Feature)
 		if err != nil {
@@ -119,6 +148,59 @@ func PermissionsCommand(input PermissionsCommandInput) error {
 	}
 
 	return nil
+}
+
+// detectPermissions runs feature detection and returns permissions for detected features.
+func detectPermissions(input PermissionsCommandInput, stderr *os.File) ([]permissions.FeaturePermissions, error) {
+	ctx := context.Background()
+
+	// Create or use provided detector
+	detector := input.Detector
+	if detector == nil {
+		// Load AWS config
+		var opts []func(*config.LoadOptions) error
+		if input.Region != "" {
+			opts = append(opts, config.WithRegion(input.Region))
+		}
+		awsCfg, err := config.LoadDefaultConfig(ctx, opts...)
+		if err != nil {
+			fmt.Fprintf(stderr, "Error: failed to load AWS config for detection: %v\n", err)
+			return nil, fmt.Errorf("failed to load AWS config for detection: %w", err)
+		}
+		detector = permissions.NewDetector(awsCfg)
+	}
+
+	// Run detection
+	result, err := detector.Detect(ctx)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: detection failed: %v\n", err)
+		return nil, fmt.Errorf("detection failed: %w", err)
+	}
+
+	// Show detection summary to stderr (human format only)
+	if strings.ToLower(input.Format) == "human" {
+		fmt.Fprintf(stderr, "Detected features:\n")
+		for _, f := range result.Features {
+			fmt.Fprintf(stderr, "  - %s: %s\n", f, result.FeatureDetails[f])
+		}
+		if len(result.Errors) > 0 {
+			fmt.Fprintf(stderr, "\nDetection warnings:\n")
+			for _, e := range result.Errors {
+				fmt.Fprintf(stderr, "  - %s: %s\n", e.Feature, e.Message)
+			}
+		}
+		fmt.Fprintf(stderr, "\n")
+	}
+
+	// Get permissions for detected features
+	var perms []permissions.FeaturePermissions
+	for _, f := range result.Features {
+		if fp, ok := permissions.GetFeaturePermissions(f); ok {
+			perms = append(perms, fp)
+		}
+	}
+
+	return perms, nil
 }
 
 // getFeaturePermissions returns permissions for a specific feature.

@@ -1,13 +1,31 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/byteness/aws-vault/v7/permissions"
 )
+
+// mockDetector implements permissions.DetectorInterface for testing.
+type mockDetector struct {
+	DetectFunc func(ctx context.Context) (*permissions.DetectionResult, error)
+}
+
+func (m *mockDetector) Detect(ctx context.Context) (*permissions.DetectionResult, error) {
+	if m.DetectFunc != nil {
+		return m.DetectFunc(ctx)
+	}
+	return &permissions.DetectionResult{
+		Features:       []permissions.Feature{permissions.FeatureCredentialIssue},
+		FeatureDetails: map[permissions.Feature]string{permissions.FeatureCredentialIssue: "test"},
+		Errors:         []permissions.DetectionError{},
+	}, nil
+}
 
 func TestPermissionsCommand_DefaultFormat(t *testing.T) {
 	// Create temp files for output capture
@@ -460,4 +478,350 @@ func TestGetSubsystemPermissions(t *testing.T) {
 			t.Error("expected error for invalid subsystem")
 		}
 	})
+}
+
+func TestPermissionsCommand_Detect_HumanFormat(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	detector := &mockDetector{
+		DetectFunc: func(ctx context.Context) (*permissions.DetectionResult, error) {
+			return &permissions.DetectionResult{
+				Features: []permissions.Feature{
+					permissions.FeatureCredentialIssue,
+					permissions.FeaturePolicyLoad,
+				},
+				FeatureDetails: map[permissions.Feature]string{
+					permissions.FeatureCredentialIssue: "base feature",
+					permissions.FeaturePolicyLoad:      "SSM parameter exists",
+				},
+				Errors: []permissions.DetectionError{},
+			}, nil
+		},
+	}
+
+	input := PermissionsCommandInput{
+		Format:   "human",
+		Detect:   true,
+		Detector: detector,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	err := PermissionsCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Read stdout (permissions output)
+	stdout.Seek(0, 0)
+	output, _ := os.ReadFile(stdout.Name())
+	result := string(output)
+
+	// Should contain detected features
+	if !strings.Contains(result, "credential_issue") {
+		t.Error("expected credential_issue in output")
+	}
+	if !strings.Contains(result, "policy_load") {
+		t.Error("expected policy_load in output")
+	}
+
+	// Read stderr (detection summary)
+	stderr.Seek(0, 0)
+	stderrOutput, _ := os.ReadFile(stderr.Name())
+	stderrResult := string(stderrOutput)
+
+	// Should show detection summary on stderr
+	if !strings.Contains(stderrResult, "Detected features:") {
+		t.Error("expected detection summary on stderr")
+	}
+	if !strings.Contains(stderrResult, "base feature") {
+		t.Error("expected feature detail in detection summary")
+	}
+}
+
+func TestPermissionsCommand_Detect_JSONFormat(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	detector := &mockDetector{
+		DetectFunc: func(ctx context.Context) (*permissions.DetectionResult, error) {
+			return &permissions.DetectionResult{
+				Features: []permissions.Feature{
+					permissions.FeatureCredentialIssue,
+				},
+				FeatureDetails: map[permissions.Feature]string{
+					permissions.FeatureCredentialIssue: "base feature",
+				},
+				Errors: []permissions.DetectionError{},
+			}, nil
+		},
+	}
+
+	input := PermissionsCommandInput{
+		Format:   "json",
+		Detect:   true,
+		Detector: detector,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	err := PermissionsCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Read stdout (JSON output)
+	stdout.Seek(0, 0)
+	output, _ := os.ReadFile(stdout.Name())
+
+	// Should be valid JSON
+	var doc permissions.IAMPolicyDocument
+	if err := json.Unmarshal(output, &doc); err != nil {
+		t.Fatalf("invalid JSON output: %v", err)
+	}
+
+	// Read stderr - should NOT have detection summary for non-human formats
+	stderr.Seek(0, 0)
+	stderrOutput, _ := os.ReadFile(stderr.Name())
+
+	if strings.Contains(string(stderrOutput), "Detected features:") {
+		t.Error("did not expect detection summary on stderr for JSON format")
+	}
+}
+
+func TestPermissionsCommand_Detect_WithWarnings(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	detector := &mockDetector{
+		DetectFunc: func(ctx context.Context) (*permissions.DetectionResult, error) {
+			return &permissions.DetectionResult{
+				Features: []permissions.Feature{
+					permissions.FeatureCredentialIssue,
+				},
+				FeatureDetails: map[permissions.Feature]string{
+					permissions.FeatureCredentialIssue: "base feature",
+				},
+				Errors: []permissions.DetectionError{
+					{Feature: permissions.FeaturePolicyLoad, Message: "access denied"},
+					{Feature: permissions.FeatureApprovalWorkflow, Message: "network error"},
+				},
+			}, nil
+		},
+	}
+
+	input := PermissionsCommandInput{
+		Format:   "human",
+		Detect:   true,
+		Detector: detector,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	err := PermissionsCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Read stderr (should show warnings)
+	stderr.Seek(0, 0)
+	stderrOutput, _ := os.ReadFile(stderr.Name())
+	stderrResult := string(stderrOutput)
+
+	if !strings.Contains(stderrResult, "Detection warnings:") {
+		t.Error("expected detection warnings on stderr")
+	}
+	if !strings.Contains(stderrResult, "access denied") {
+		t.Error("expected warning message in output")
+	}
+}
+
+func TestPermissionsCommand_Detect_Error(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	detector := &mockDetector{
+		DetectFunc: func(ctx context.Context) (*permissions.DetectionResult, error) {
+			return nil, errors.New("fatal detection error")
+		},
+	}
+
+	input := PermissionsCommandInput{
+		Format:   "human",
+		Detect:   true,
+		Detector: detector,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	err := PermissionsCommand(input)
+	if err == nil {
+		t.Error("expected error when detection fails")
+	}
+
+	if !strings.Contains(err.Error(), "detection failed") {
+		t.Errorf("expected 'detection failed' error, got: %v", err)
+	}
+}
+
+func TestPermissionsCommand_Detect_MutualExclusivity_Subsystem(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	input := PermissionsCommandInput{
+		Format:    "human",
+		Detect:    true,
+		Subsystem: "core",
+		Stdout:    stdout,
+		Stderr:    stderr,
+	}
+
+	err := PermissionsCommand(input)
+	if err == nil {
+		t.Error("expected error when --detect combined with --subsystem")
+	}
+
+	if !strings.Contains(err.Error(), "--detect cannot be combined") {
+		t.Errorf("expected mutual exclusivity error, got: %v", err)
+	}
+}
+
+func TestPermissionsCommand_Detect_MutualExclusivity_Feature(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	input := PermissionsCommandInput{
+		Format:  "human",
+		Detect:  true,
+		Feature: "policy_load",
+		Stdout:  stdout,
+		Stderr:  stderr,
+	}
+
+	err := PermissionsCommand(input)
+	if err == nil {
+		t.Error("expected error when --detect combined with --feature")
+	}
+
+	if !strings.Contains(err.Error(), "--detect cannot be combined") {
+		t.Errorf("expected mutual exclusivity error, got: %v", err)
+	}
+}
+
+func TestPermissionsCommand_Detect_AllFormats(t *testing.T) {
+	formats := []string{"human", "json", "terraform", "cloudformation", "cf"}
+
+	detector := &mockDetector{
+		DetectFunc: func(ctx context.Context) (*permissions.DetectionResult, error) {
+			return &permissions.DetectionResult{
+				Features: []permissions.Feature{
+					permissions.FeatureCredentialIssue,
+					permissions.FeaturePolicyLoad,
+				},
+				FeatureDetails: map[permissions.Feature]string{
+					permissions.FeatureCredentialIssue: "base feature",
+					permissions.FeaturePolicyLoad:      "SSM parameter exists",
+				},
+				Errors: []permissions.DetectionError{},
+			}, nil
+		},
+	}
+
+	for _, format := range formats {
+		t.Run(format, func(t *testing.T) {
+			stdout, _ := os.CreateTemp("", "stdout")
+			stderr, _ := os.CreateTemp("", "stderr")
+			defer os.Remove(stdout.Name())
+			defer os.Remove(stderr.Name())
+
+			input := PermissionsCommandInput{
+				Format:   format,
+				Detect:   true,
+				Detector: detector,
+				Stdout:   stdout,
+				Stderr:   stderr,
+			}
+
+			err := PermissionsCommand(input)
+			if err != nil {
+				t.Fatalf("unexpected error for format %s: %v", format, err)
+			}
+
+			// Read stdout
+			stdout.Seek(0, 0)
+			output, _ := os.ReadFile(stdout.Name())
+
+			if len(output) == 0 {
+				t.Errorf("expected non-empty output for format %s", format)
+			}
+		})
+	}
+}
+
+func TestPermissionsCommand_Detect_MultipleFeatures(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	detector := &mockDetector{
+		DetectFunc: func(ctx context.Context) (*permissions.DetectionResult, error) {
+			return &permissions.DetectionResult{
+				Features: []permissions.Feature{
+					permissions.FeatureCredentialIssue,
+					permissions.FeaturePolicyLoad,
+					permissions.FeatureAuditVerify,
+					permissions.FeatureEnforceAnalyze,
+					permissions.FeatureApprovalWorkflow,
+				},
+				FeatureDetails: map[permissions.Feature]string{
+					permissions.FeatureCredentialIssue:  "base feature",
+					permissions.FeaturePolicyLoad:       "SSM parameter exists",
+					permissions.FeatureAuditVerify:      "CloudTrail available",
+					permissions.FeatureEnforceAnalyze:   "IAM available",
+					permissions.FeatureApprovalWorkflow: "DynamoDB table exists",
+				},
+				Errors: []permissions.DetectionError{},
+			}, nil
+		},
+	}
+
+	input := PermissionsCommandInput{
+		Format:   "human",
+		Detect:   true,
+		Detector: detector,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	err := PermissionsCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Read stdout
+	stdout.Seek(0, 0)
+	output, _ := os.ReadFile(stdout.Name())
+	result := string(output)
+
+	// Should contain all detected features
+	expectedFeatures := []string{"credential_issue", "policy_load", "audit_verify", "enforce_analyze", "approval_workflow"}
+	for _, feature := range expectedFeatures {
+		if !strings.Contains(result, feature) {
+			t.Errorf("expected feature %s in output", feature)
+		}
+	}
 }
