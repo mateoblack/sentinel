@@ -356,7 +356,8 @@ func runWizardInteractive(ctx context.Context, input InitWizardCommandInput, sta
 	// Step 3: Feature Selection
 	fmt.Fprintf(stdout, "Step 3/%d: Feature Selection\n", totalSteps)
 	fmt.Fprintln(stdout, strings.Repeat("=", 54))
-	fmt.Fprintln(stdout, "Which features do you need?\n")
+	fmt.Fprintln(stdout, "Which features do you need?")
+	fmt.Fprintln(stdout, "")
 
 	if len(input.Features) > 0 {
 		// Pre-selected via flags
@@ -422,7 +423,8 @@ func runWizardInteractive(ctx context.Context, input InitWizardCommandInput, sta
 	// Step 6: Summary
 	fmt.Fprintf(stdout, "Step 6/%d: Summary\n", totalSteps)
 	fmt.Fprintln(stdout, strings.Repeat("=", 54))
-	fmt.Fprintln(stdout, "Configuration Summary:\n")
+	fmt.Fprintln(stdout, "Configuration Summary:")
+	fmt.Fprintln(stdout, "")
 	fmt.Fprintf(stdout, "Profiles: %s\n", strings.Join(state.Profiles, ", "))
 	featureNames := make([]string, len(state.Features))
 	for i, f := range state.Features {
