@@ -353,10 +353,10 @@ Plans:
 **Goal**: `sentinel permissions` CLI with JSON/Terraform/CloudFormation output formats
 **Depends on**: Phase 60
 **Research**: Unlikely (extends existing CLI patterns)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 61-01: TBD
+- [x] 61-01: Permission formatters and CLI command — completed 2026-01-18
 
 #### Phase 62: Feature Detection
 
@@ -440,6 +440,6 @@ Plans:
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
-| v1.7 Permissions Discovery | 60-68 | 1/? | 🚧 In Progress | - |
+| v1.7 Permissions Discovery | 60-68 | 2/? | 🚧 In Progress | - |
 
-**Totals:** 7 milestones shipped, 1 in progress (68 phases, 102+ plans)
+**Totals:** 7 milestones shipped, 1 in progress (68 phases, 103+ plans)
