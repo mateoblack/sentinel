@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 
 ## Current Position
 
-Phase: 63 of 68 (Permission Validation)
+Phase: 64 of 68 (Guided Setup)
 Plan: 1 of 1 complete in current phase
-Status: Plan 63-01 complete
-Last activity: 2026-01-18 — Completed 63-01-PLAN.md
+Status: Plan 64-01 complete
+Last activity: 2026-01-18 — Completed 64-01-PLAN.md
 
-Progress: ████░░░░░░ 44%
+Progress: █████░░░░░ 47%
 
 ## Milestone Summary
 
@@ -290,6 +290,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Human output uses # (pass), X (fail), ? (error) markers for visual scanning
 - JSON output includes results array and summary counts for machine parsing
 
+**v1.7 Guided Setup decisions (Phase 64-01):**
+- Wizard is subcommand (sentinel init wizard) rather than parent action due to kingpin limitations
+- Non-interactive mode triggered when both --profile and --feature flags provided
+- Uses existing vault.LoadConfigFromEnv() for profile discovery from ~/.aws/config
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -301,9 +306,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-18
-Stopped at: Completed 63-01-PLAN.md (Permission Validation)
+Stopped at: Completed 64-01-PLAN.md (Guided Setup)
 Resume file: None
-Next: Phase 64 (Permissions Output IaC) or continue 63 if more plans
+Next: Phase 65 (Getting Started Doc) or continue 64 if more plans
 
 ## Roadmap Evolution
 
