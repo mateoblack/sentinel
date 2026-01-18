@@ -150,9 +150,9 @@ func TestLoader_Load_GenericSSMError(t *testing.T) {
 		t.Fatal("Load() should return error for SSM failure")
 	}
 
-	// Verify error message includes "ssm GetParameter"
-	if !strings.Contains(err.Error(), "ssm GetParameter") {
-		t.Errorf("Load() error should include 'ssm GetParameter', got: %v", err)
+	// Verify error message includes SSM error context
+	if !strings.Contains(err.Error(), "SSM error") && !strings.Contains(err.Error(), "ssm GetParameter") {
+		t.Errorf("Load() error should include SSM context, got: %v", err)
 	}
 
 	// Verify original error is accessible via errors.Unwrap

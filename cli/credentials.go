@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/enforce"
+	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
@@ -35,6 +36,7 @@ type CredentialsCommandInput struct {
 	BreakGlassStore breakglass.Store // Optional: for break-glass checking (nil = no checking)
 	RequireSentinel bool             // Check role enforcement before issuing credentials
 	DriftChecker    enforce.DriftChecker // Optional: for testing (nil = create from AWS config)
+	Stderr          io.Writer            // Optional: for error output (nil = os.Stderr)
 }
 
 // CredentialProcessOutput represents the JSON output format for AWS credential_process.
@@ -92,6 +94,12 @@ func ConfigureCredentialsCommand(app *kingpin.Application, s *Sentinel) {
 // It evaluates policy before retrieving credentials.
 // On success, outputs JSON to stdout. On failure, outputs error to stderr and returns non-zero.
 func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *Sentinel) error {
+	// Get stderr writer (defaults to os.Stderr)
+	stderr := input.Stderr
+	if stderr == nil {
+		stderr = os.Stderr
+	}
+
 	// 0. Create logger based on configuration
 	if input.LogFile != "" || input.LogStderr {
 		writers := []io.Writer{}
@@ -131,8 +139,14 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	}
 	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
-		return err
+		configErr := sentinelerrors.New(
+			sentinelerrors.ErrCodeConfigMissingCredentials,
+			fmt.Sprintf("Failed to load AWS config: %v", err),
+			sentinelerrors.GetSuggestion(sentinelerrors.ErrCodeConfigMissingCredentials),
+			err,
+		)
+		FormatErrorWithSuggestionTo(stderr, configErr)
+		return configErr
 	}
 
 	// 3. Create policy loader chain
@@ -142,7 +156,7 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	// 4. Load policy
 	loadedPolicy, err := cachedLoader.Load(ctx, input.PolicyParameter)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load policy: %v\n", err)
+		FormatErrorWithSuggestionTo(stderr, err)
 		return err
 	}
 
@@ -185,8 +199,24 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
 				input.Logger.LogDecision(entry)
 			}
-			fmt.Fprintf(os.Stderr, "Access denied: %s\n", decision.String())
-			return fmt.Errorf("access denied")
+			// Create structured error with context
+			var matchedRule *sentinelerrors.PolicyRule
+			if decision.MatchedRule != "" {
+				matchedRule = &sentinelerrors.PolicyRule{
+					Name:        decision.MatchedRule,
+					Effect:      string(decision.Effect),
+					Description: decision.Reason,
+				}
+			}
+			policyErr := sentinelerrors.NewPolicyDeniedError(
+				username,
+				input.ProfileName,
+				matchedRule,
+				input.Store != nil,           // hasApprovalWorkflow
+				input.BreakGlassStore != nil, // hasBreakGlass
+			)
+			FormatErrorWithSuggestionTo(stderr, policyErr)
+			return policyErr
 		}
 		// Approved request or active break-glass found - continue to credential issuance
 	}

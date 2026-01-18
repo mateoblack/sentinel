@@ -20,31 +20,6 @@ import (
 	"github.com/byteness/aws-vault/v7/request"
 )
 
-// formatErrorWithSuggestion writes error to stderr with suggestion if available.
-// Returns the original error for chaining.
-func formatErrorWithSuggestion(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	sentErr, ok := sentinelerrors.IsSentinelError(err)
-	if ok {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", sentErr.Error())
-		if suggestion := sentErr.Suggestion(); suggestion != "" {
-			fmt.Fprintf(os.Stderr, "\nSuggestion: %s\n", suggestion)
-		}
-		if ctx := sentErr.Context(); len(ctx) > 0 {
-			fmt.Fprintf(os.Stderr, "\nDetails:\n")
-			for k, v := range ctx {
-				fmt.Fprintf(os.Stderr, "  %s: %s\n", k, v)
-			}
-		}
-	} else {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-	}
-	return err
-}
-
 // SentinelExecCommandInput contains the input for the sentinel exec command.
 type SentinelExecCommandInput struct {
 	ProfileName     string
@@ -162,7 +137,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 			sentinelerrors.GetSuggestion(sentinelerrors.ErrCodeConfigMissingCredentials),
 			err,
 		)
-		formatErrorWithSuggestion(configErr)
+		FormatErrorWithSuggestion(configErr)
 		return 1, configErr
 	}
 
@@ -173,7 +148,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	// 5. Load policy
 	loadedPolicy, err := cachedLoader.Load(ctx, input.PolicyParameter)
 	if err != nil {
-		formatErrorWithSuggestion(err)
+		FormatErrorWithSuggestion(err)
 		return 1, err
 	}
 
@@ -232,7 +207,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 				input.Store != nil,           // hasApprovalWorkflow
 				input.BreakGlassStore != nil, // hasBreakGlass
 			)
-			formatErrorWithSuggestion(policyErr)
+			FormatErrorWithSuggestion(policyErr)
 			return 1, policyErr
 		}
 		// Approved request or active break-glass found - continue to credential issuance
