@@ -42,6 +42,7 @@ func main() {
 
 	// Permissions command
 	cli.ConfigurePermissionsCommand(app, s)
+	cli.ConfigurePermissionsCheckCommand(app, s)
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }

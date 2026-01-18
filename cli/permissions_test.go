@@ -11,6 +11,22 @@ import (
 	"github.com/byteness/aws-vault/v7/permissions"
 )
 
+// mockChecker implements permissions.CheckerInterface for testing.
+type mockChecker struct {
+	CheckFunc func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error)
+}
+
+func (m *mockChecker) Check(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+	if m.CheckFunc != nil {
+		return m.CheckFunc(ctx, features)
+	}
+	return &permissions.CheckSummary{
+		Results:   []permissions.CheckResult{},
+		PassCount: 0,
+		FailCount: 0,
+	}, nil
+}
+
 // mockDetector implements permissions.DetectorInterface for testing.
 type mockDetector struct {
 	DetectFunc func(ctx context.Context) (*permissions.DetectionResult, error)
@@ -823,5 +839,538 @@ func TestPermissionsCommand_Detect_MultipleFeatures(t *testing.T) {
 		if !strings.Contains(result, feature) {
 			t.Errorf("expected feature %s in output", feature)
 		}
+	}
+}
+
+// Tests for permissions check command
+
+func TestPermissionsCheckCommand_AllPassed(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	checker := &mockChecker{
+		CheckFunc: func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+			results := []permissions.CheckResult{}
+			for _, f := range features {
+				results = append(results, permissions.CheckResult{
+					Feature:  f,
+					Action:   "sts:AssumeRole",
+					Resource: "arn:aws:iam::*:role/*",
+					Status:   permissions.StatusAllowed,
+					Message:  "allowed",
+				})
+			}
+			return &permissions.CheckSummary{
+				Results:   results,
+				PassCount: len(results),
+				FailCount: 0,
+			}, nil
+		},
+	}
+
+	input := PermissionsCheckCommandInput{
+		Format:   "human",
+		Features: "credential_issue",
+		Checker:  checker,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := PermissionsCheckCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", exitCode)
+	}
+
+	// Read output
+	stdout.Seek(0, 0)
+	output, _ := os.ReadFile(stdout.Name())
+	result := string(output)
+
+	if !strings.Contains(result, "# credential_issue") {
+		t.Error("expected passed feature marker in output")
+	}
+	if !strings.Contains(result, "passed") {
+		t.Error("expected 'passed' in summary")
+	}
+}
+
+func TestPermissionsCheckCommand_SomeFailed(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	checker := &mockChecker{
+		CheckFunc: func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+			return &permissions.CheckSummary{
+				Results: []permissions.CheckResult{
+					{
+						Feature:  permissions.FeaturePolicyLoad,
+						Action:   "ssm:GetParameter",
+						Resource: "arn:aws:ssm:*:*:parameter/sentinel/*",
+						Status:   permissions.StatusDenied,
+						Message:  "implicitly denied",
+					},
+				},
+				PassCount: 0,
+				FailCount: 1,
+			}, nil
+		},
+	}
+
+	input := PermissionsCheckCommandInput{
+		Format:   "human",
+		Features: "policy_load",
+		Checker:  checker,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := PermissionsCheckCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1 for failures, got %d", exitCode)
+	}
+
+	// Read output
+	stdout.Seek(0, 0)
+	output, _ := os.ReadFile(stdout.Name())
+	result := string(output)
+
+	if !strings.Contains(result, "X policy_load") {
+		t.Error("expected failed feature marker in output")
+	}
+	if !strings.Contains(result, "failed") {
+		t.Error("expected 'failed' in summary")
+	}
+}
+
+func TestPermissionsCheckCommand_SomeErrors(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	checker := &mockChecker{
+		CheckFunc: func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+			return &permissions.CheckSummary{
+				Results: []permissions.CheckResult{
+					{
+						Feature:  permissions.FeaturePolicyLoad,
+						Action:   "ssm:GetParameter",
+						Resource: "arn:aws:ssm:*:*:parameter/sentinel/*",
+						Status:   permissions.StatusError,
+						Message:  "cannot simulate - requires iam:SimulatePrincipalPolicy permission",
+					},
+				},
+				PassCount:  0,
+				FailCount:  0,
+				ErrorCount: 1,
+			}, nil
+		},
+	}
+
+	input := PermissionsCheckCommandInput{
+		Format:   "human",
+		Features: "policy_load",
+		Checker:  checker,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := PermissionsCheckCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1 for errors, got %d", exitCode)
+	}
+
+	// Read output
+	stdout.Seek(0, 0)
+	output, _ := os.ReadFile(stdout.Name())
+	result := string(output)
+
+	if !strings.Contains(result, "? policy_load") {
+		t.Error("expected error feature marker in output")
+	}
+	if !strings.Contains(result, "error") {
+		t.Error("expected 'error' in summary")
+	}
+}
+
+func TestPermissionsCheckCommand_JSONFormat(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	checker := &mockChecker{
+		CheckFunc: func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+			return &permissions.CheckSummary{
+				Results: []permissions.CheckResult{
+					{
+						Feature:  permissions.FeatureCredentialIssue,
+						Action:   "sts:AssumeRole",
+						Resource: "arn:aws:iam::*:role/*",
+						Status:   permissions.StatusAllowed,
+						Message:  "allowed",
+					},
+				},
+				PassCount: 1,
+				FailCount: 0,
+			}, nil
+		},
+	}
+
+	input := PermissionsCheckCommandInput{
+		Format:   "json",
+		Features: "credential_issue",
+		Checker:  checker,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := PermissionsCheckCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", exitCode)
+	}
+
+	// Read output
+	stdout.Seek(0, 0)
+	output, _ := os.ReadFile(stdout.Name())
+
+	// Should be valid JSON
+	var doc PermissionsCheckOutput
+	if err := json.Unmarshal(output, &doc); err != nil {
+		t.Fatalf("invalid JSON output: %v", err)
+	}
+
+	if len(doc.Results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(doc.Results))
+	}
+	if doc.Summary.Passed != 1 {
+		t.Errorf("expected 1 passed, got %d", doc.Summary.Passed)
+	}
+}
+
+func TestPermissionsCheckCommand_DetectFlag(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	detector := &mockDetector{
+		DetectFunc: func(ctx context.Context) (*permissions.DetectionResult, error) {
+			return &permissions.DetectionResult{
+				Features: []permissions.Feature{
+					permissions.FeatureCredentialIssue,
+					permissions.FeaturePolicyLoad,
+				},
+				FeatureDetails: map[permissions.Feature]string{},
+				Errors:         []permissions.DetectionError{},
+			}, nil
+		},
+	}
+
+	checker := &mockChecker{
+		CheckFunc: func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+			// Verify we got the detected features
+			if len(features) != 2 {
+				t.Errorf("expected 2 detected features, got %d", len(features))
+			}
+			results := []permissions.CheckResult{}
+			for _, f := range features {
+				results = append(results, permissions.CheckResult{
+					Feature:  f,
+					Action:   "test:Action",
+					Resource: "*",
+					Status:   permissions.StatusAllowed,
+				})
+			}
+			return &permissions.CheckSummary{
+				Results:   results,
+				PassCount: len(results),
+			}, nil
+		},
+	}
+
+	input := PermissionsCheckCommandInput{
+		Format:   "human",
+		Detect:   true,
+		Detector: detector,
+		Checker:  checker,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := PermissionsCheckCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", exitCode)
+	}
+}
+
+func TestPermissionsCheckCommand_MutualExclusivity(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	input := PermissionsCheckCommandInput{
+		Format:   "human",
+		Detect:   true,
+		Features: "policy_load",
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := PermissionsCheckCommand(input)
+	if err == nil {
+		t.Error("expected error for mutual exclusivity")
+	}
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1, got %d", exitCode)
+	}
+
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("expected mutual exclusivity error, got: %v", err)
+	}
+}
+
+func TestPermissionsCheckCommand_InvalidFeature(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	input := PermissionsCheckCommandInput{
+		Format:   "human",
+		Features: "invalid_feature",
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := PermissionsCheckCommand(input)
+	if err == nil {
+		t.Error("expected error for invalid feature")
+	}
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1, got %d", exitCode)
+	}
+
+	if !strings.Contains(err.Error(), "invalid feature") {
+		t.Errorf("expected 'invalid feature' error, got: %v", err)
+	}
+}
+
+func TestPermissionsCheckCommand_CommaSeperatedFeatures(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	var checkedFeatures []permissions.Feature
+	checker := &mockChecker{
+		CheckFunc: func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+			checkedFeatures = features
+			return &permissions.CheckSummary{
+				Results:   []permissions.CheckResult{},
+				PassCount: 0,
+			}, nil
+		},
+	}
+
+	input := PermissionsCheckCommandInput{
+		Format:   "human",
+		Features: "policy_load, credential_issue, audit_verify",
+		Checker:  checker,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	_, err := PermissionsCheckCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(checkedFeatures) != 3 {
+		t.Errorf("expected 3 features, got %d", len(checkedFeatures))
+	}
+}
+
+func TestPermissionsCheckCommand_CheckerError(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	checker := &mockChecker{
+		CheckFunc: func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+			return nil, errors.New("failed to get caller identity")
+		},
+	}
+
+	input := PermissionsCheckCommandInput{
+		Format:   "human",
+		Features: "policy_load",
+		Checker:  checker,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := PermissionsCheckCommand(input)
+	if err == nil {
+		t.Error("expected error when checker fails")
+	}
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1, got %d", exitCode)
+	}
+
+	if !strings.Contains(err.Error(), "check failed") {
+		t.Errorf("expected 'check failed' error, got: %v", err)
+	}
+}
+
+func TestPermissionsCheckCommand_NoFeatures(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	var checkedFeatures []permissions.Feature
+	checker := &mockChecker{
+		CheckFunc: func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+			checkedFeatures = features
+			return &permissions.CheckSummary{
+				Results:   []permissions.CheckResult{},
+				PassCount: 0,
+			}, nil
+		},
+	}
+
+	input := PermissionsCheckCommandInput{
+		Format:  "human",
+		Checker: checker,
+		Stdout:  stdout,
+		Stderr:  stderr,
+	}
+
+	_, err := PermissionsCheckCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should check all features when none specified
+	if len(checkedFeatures) != len(permissions.AllFeatures()) {
+		t.Errorf("expected all %d features, got %d", len(permissions.AllFeatures()), len(checkedFeatures))
+	}
+}
+
+func TestParseFeatureList(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+		wantErr  bool
+	}{
+		{"single feature", "policy_load", 1, false},
+		{"multiple features", "policy_load,credential_issue", 2, false},
+		{"with spaces", "policy_load, credential_issue , audit_verify", 3, false},
+		{"empty string", "", 0, true},
+		{"invalid feature", "invalid_feature", 0, true},
+		{"mixed valid/invalid", "policy_load,invalid", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseFeatureList(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if len(result) != tt.expected {
+				t.Errorf("expected %d features, got %d", tt.expected, len(result))
+			}
+		})
+	}
+}
+
+func TestPermissionsCheckCommand_HumanOutputFormat(t *testing.T) {
+	stdout, _ := os.CreateTemp("", "stdout")
+	stderr, _ := os.CreateTemp("", "stderr")
+	defer os.Remove(stdout.Name())
+	defer os.Remove(stderr.Name())
+
+	checker := &mockChecker{
+		CheckFunc: func(ctx context.Context, features []permissions.Feature) (*permissions.CheckSummary, error) {
+			return &permissions.CheckSummary{
+				Results: []permissions.CheckResult{
+					{
+						Feature:  permissions.FeaturePolicyLoad,
+						Action:   "ssm:GetParameter",
+						Resource: "arn:aws:ssm:*:*:parameter/sentinel/policies/*",
+						Status:   permissions.StatusAllowed,
+						Message:  "allowed",
+					},
+					{
+						Feature:  permissions.FeaturePolicyLoad,
+						Action:   "ssm:GetParameters",
+						Resource: "arn:aws:ssm:*:*:parameter/sentinel/policies/*",
+						Status:   permissions.StatusDenied,
+						Message:  "implicitly denied",
+					},
+				},
+				PassCount: 1,
+				FailCount: 1,
+			}, nil
+		},
+	}
+
+	input := PermissionsCheckCommandInput{
+		Format:   "human",
+		Features: "policy_load",
+		Checker:  checker,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	_, err := PermissionsCheckCommand(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Read output
+	stdout.Seek(0, 0)
+	output, _ := os.ReadFile(stdout.Name())
+	result := string(output)
+
+	// Should have proper structure
+	if !strings.Contains(result, "Checking permissions") {
+		t.Error("expected header")
+	}
+	if !strings.Contains(result, "ssm:GetParameter") {
+		t.Error("expected action name")
+	}
+	if !strings.Contains(result, "Summary:") {
+		t.Error("expected summary")
 	}
 }
