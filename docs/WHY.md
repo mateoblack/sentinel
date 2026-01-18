@@ -33,7 +33,9 @@ In the morning, you check CloudTrail:
 ## The Gap in AWS Security
 
 **AWS IAM:** Defines what you *can* do
+
 **AWS SSO:** Proves who you are
+
 **CloudTrail:** Records what you did
 
 **What's missing:** Intent, justification, and process.
