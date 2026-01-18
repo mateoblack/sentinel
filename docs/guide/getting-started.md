@@ -8,12 +8,101 @@ This guide walks you through installing Sentinel, creating your first policy, an
 
 - **Go 1.21+** - For building from source
 - **AWS Account** - With permissions to create SSM parameters
-- **AWS Credentials** - For initial setup (environment variables, credentials file, or IAM role)
+- **AWS Credentials** - For initial setup (see [Configuring AWS Credentials](#configuring-aws-credentials) below)
 
 ### Optional
 
 - **aws-vault** - Sentinel shares the same keyring backend
 - **DynamoDB tables** - For approval workflows and break-glass features
+
+## Configuring AWS Credentials
+
+Sentinel needs AWS credentials to read policies from SSM and assume roles. Choose the method that matches your organization's setup.
+
+### Option 1: AWS IAM Identity Center (SSO) - Recommended
+
+Most organizations use SSO. Configure your profile in `~/.aws/config`:
+
+```ini
+[profile dev-sso]
+sso_start_url = https://your-org.awsapps.com/start
+sso_region = us-east-1
+sso_account_id = 123456789012
+sso_role_name = DeveloperAccess
+region = us-west-2
+```
+
+Then just run Sentinel - it handles SSO login automatically:
+
+```bash
+sentinel init bootstrap --profile dev-sso --plan
+```
+
+Sentinel opens your browser for SSO authentication when needed, caches the token, and refreshes it automatically. No separate `aws sso login` required.
+
+### Option 2: IAM User Credentials
+
+For IAM users with access keys, configure `~/.aws/credentials`:
+
+```ini
+[default]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+
+### Option 3: Environment Variables
+
+Export credentials directly:
+
+```bash
+export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+export AWS_REGION=us-west-2
+```
+
+### Option 4: IAM Role (EC2/ECS/Lambda)
+
+When running on AWS infrastructure, Sentinel automatically uses the attached IAM role. No configuration needed.
+
+### Required IAM Permissions
+
+Sentinel needs these minimum permissions to operate:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SentinelReadPolicies",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
+      "Resource": "arn:aws:ssm:*:*:parameter/sentinel/policies/*"
+    },
+    {
+      "Sid": "SentinelIdentity",
+      "Effect": "Allow",
+      "Action": "iam:GetUser",
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+For bootstrapping (creating policies), also add:
+
+```json
+{
+  "Sid": "SentinelBootstrap",
+  "Effect": "Allow",
+  "Action": "ssm:PutParameter",
+  "Resource": "arn:aws:ssm:*:*:parameter/sentinel/policies/*"
+}
+```
+
+See [Deployment](deployment.md) for complete IAM policies including approval workflows and break-glass.
 
 ## Installation
 

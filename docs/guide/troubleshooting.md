@@ -50,6 +50,70 @@ Debug output includes:
 
 ---
 
+### "The security token included in the request is invalid"
+
+**Symptom:** Sentinel fails with invalid security token error.
+
+**Cause:** AWS credentials are expired, invalid, or not configured.
+
+**Solutions:**
+
+1. **For SSO users - re-authenticate:**
+   ```bash
+   aws sso login --profile your-profile
+   ```
+
+2. **Check if credentials are expired:**
+   ```bash
+   aws sts get-caller-identity
+   ```
+
+3. **Verify your profile exists in ~/.aws/config:**
+   ```bash
+   cat ~/.aws/config | grep -A5 "\[profile your-profile\]"
+   ```
+
+4. **For SSO - verify your session:**
+   ```bash
+   aws sts get-caller-identity --profile your-sso-profile
+   ```
+   If this fails, your SSO session has expired.
+
+---
+
+### SSO Login Issues
+
+**Symptom:** Sentinel's automatic SSO login fails or browser doesn't open.
+
+**Cause:** SSO configuration issues or cached token problems.
+
+**Solutions:**
+
+1. **Verify SSO config in ~/.aws/config:**
+   ```ini
+   [profile my-sso-profile]
+   sso_start_url = https://your-org.awsapps.com/start
+   sso_region = us-east-1
+   sso_account_id = 123456789012
+   sso_role_name = YourRoleName
+   region = us-west-2
+   ```
+
+2. **Clear cached SSO tokens:**
+   ```bash
+   rm -rf ~/.aws/sso/cache/*
+   ```
+   Then run your Sentinel command again - it will re-open the browser.
+
+3. **Browser not opening?**
+   - Check if a browser is set as default on your system
+   - Try running from a terminal that has GUI access (not a headless SSH session)
+
+4. **Check SSO session expiry:**
+   SSO sessions typically expire after 8-12 hours. Sentinel automatically prompts for re-authentication when needed.
+
+---
+
 ### "AccessDeniedException" on SSM GetParameter
 
 **Symptom:** Sentinel reports access denied when loading policy.
