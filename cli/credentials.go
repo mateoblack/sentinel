@@ -20,6 +20,8 @@ import (
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
+	"github.com/byteness/aws-vault/v7/sso"
+	"github.com/byteness/aws-vault/v7/vault"
 )
 
 // CredentialsCommandInput contains the input for the credentials command.
@@ -38,6 +40,9 @@ type CredentialsCommandInput struct {
 	DriftChecker    enforce.DriftChecker // Optional: for testing (nil = create from AWS config)
 	Stderr          io.Writer            // Optional: for error output (nil = os.Stderr)
 	STSClient       identity.STSAPI      // Optional: for testing (nil = create from AWS config)
+	AutoLogin       bool                 // Enable automatic SSO login on credential errors
+	UseStdout       bool                 // Print SSO URL instead of opening browser (for --auto-login)
+	ConfigFile      *vault.ConfigFile    // Optional: for auto-login SSO config lookup (nil = load from env)
 }
 
 // CredentialProcessOutput represents the JSON output format for AWS credential_process.
@@ -84,6 +89,12 @@ func ConfigureCredentialsCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("require-sentinel", "Warn if target role lacks Sentinel trust policy enforcement").
 		BoolVar(&input.RequireSentinel)
 
+	cmd.Flag("auto-login", "Automatically trigger SSO login when credentials are expired or missing").
+		BoolVar(&input.AutoLogin)
+
+	cmd.Flag("stdout", "Print SSO URL instead of opening browser (used with --auto-login)").
+		BoolVar(&input.UseStdout)
+
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := CredentialsCommand(context.Background(), input, s)
 		app.FatalIfError(err, "credentials")
@@ -125,6 +136,17 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		return err
 	}
 
+	// 1.5. Load AWS config file for auto-login SSO lookup (if needed)
+	configFile := input.ConfigFile
+	if input.AutoLogin && configFile == nil {
+		var loadErr error
+		configFile, loadErr = vault.LoadConfigFromEnv()
+		if loadErr != nil {
+			log.Printf("Warning: failed to load AWS config file for auto-login: %v", loadErr)
+			// Continue without auto-login capability
+		}
+	}
+
 	// 2. Create AWS config for SSM and STS
 	awsCfgOpts := []func(*config.LoadOptions) error{}
 	if input.Region != "" {
@@ -142,12 +164,29 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		return configErr
 	}
 
-	// 3. Get AWS identity for policy evaluation
+	// 3. Get AWS identity for policy evaluation (with optional auto-login retry)
 	stsClient := input.STSClient
 	if stsClient == nil {
 		stsClient = sts.NewFromConfig(awsCfg)
 	}
-	username, err := identity.GetAWSUsername(ctx, stsClient)
+
+	var username string
+	if input.AutoLogin && configFile != nil {
+		// Wrap identity retrieval with auto-login retry for SSO errors
+		autoConfig := sso.AutoLoginConfig{
+			ProfileName: input.ProfileName,
+			ConfigFile:  configFile,
+			Keyring:     nil, // Keyring managed by AWS SDK
+			UseStdout:   input.UseStdout,
+			Stderr:      stderr,
+		}
+		username, err = sso.WithAutoLogin(ctx, autoConfig, func() (string, error) {
+			return identity.GetAWSUsername(ctx, stsClient)
+		})
+	} else {
+		username, err = identity.GetAWSUsername(ctx, stsClient)
+	}
+
 	if err != nil {
 		identityErr := sentinelerrors.New(
 			sentinelerrors.ErrCodeSTSError,

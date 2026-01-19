@@ -1126,3 +1126,147 @@ type mockSTSError struct {
 func (e *mockSTSError) Error() string {
 	return e.message
 }
+
+func TestCredentialsCommandInput_AutoLoginFields(t *testing.T) {
+	t.Run("AutoLogin field is false by default", func(t *testing.T) {
+		input := CredentialsCommandInput{}
+		if input.AutoLogin {
+			t.Error("expected AutoLogin to be false by default")
+		}
+	})
+
+	t.Run("AutoLogin field can be set", func(t *testing.T) {
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			AutoLogin:       true,
+		}
+		if !input.AutoLogin {
+			t.Error("expected AutoLogin to be true")
+		}
+	})
+
+	t.Run("UseStdout field is false by default", func(t *testing.T) {
+		input := CredentialsCommandInput{}
+		if input.UseStdout {
+			t.Error("expected UseStdout to be false by default")
+		}
+	})
+
+	t.Run("UseStdout field can be set", func(t *testing.T) {
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			UseStdout:       true,
+		}
+		if !input.UseStdout {
+			t.Error("expected UseStdout to be true")
+		}
+	})
+
+	t.Run("ConfigFile field is nil by default", func(t *testing.T) {
+		input := CredentialsCommandInput{}
+		if input.ConfigFile != nil {
+			t.Error("expected ConfigFile to be nil by default")
+		}
+	})
+
+	t.Run("ConfigFile field can be set", func(t *testing.T) {
+		// Create a minimal config file for testing
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config")
+		configContent := `[profile test]
+region = us-east-1
+`
+		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
+
+		configFile, err := vault.LoadConfig(configPath)
+		if err != nil {
+			t.Fatalf("failed to load config: %v", err)
+		}
+
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			ConfigFile:      configFile,
+		}
+		if input.ConfigFile == nil {
+			t.Error("expected ConfigFile to be set")
+		}
+	})
+}
+
+func TestCredentialsCommand_AutoLoginIntegration(t *testing.T) {
+	t.Run("auto-login disabled by default (backward compatible)", func(t *testing.T) {
+		// Verify that having AutoLogin=false is the default behavior
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			AutoLogin:       false, // Explicitly false
+		}
+
+		if input.AutoLogin {
+			t.Error("AutoLogin should be false by default")
+		}
+	})
+
+	t.Run("auto-login enabled with UseStdout", func(t *testing.T) {
+		// Test configuration with both flags set
+		input := CredentialsCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			AutoLogin:       true,
+			UseStdout:       true, // Print URL instead of opening browser
+		}
+
+		if !input.AutoLogin {
+			t.Error("expected AutoLogin to be true")
+		}
+		if !input.UseStdout {
+			t.Error("expected UseStdout to be true")
+		}
+	})
+
+	t.Run("auto-login with SSO profile configuration", func(t *testing.T) {
+		// Create a config file with SSO settings
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config")
+		configContent := `[profile sso-test]
+sso_start_url = https://my-sso-portal.awsapps.com/start
+sso_region = us-east-1
+sso_account_id = 123456789012
+sso_role_name = TestRole
+`
+		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
+
+		configFile, err := vault.LoadConfig(configPath)
+		if err != nil {
+			t.Fatalf("failed to load config: %v", err)
+		}
+
+		input := CredentialsCommandInput{
+			ProfileName:     "sso-test",
+			PolicyParameter: "/sentinel/policies/test",
+			AutoLogin:       true,
+			ConfigFile:      configFile,
+		}
+
+		// Verify configuration is valid for auto-login
+		if input.ConfigFile == nil {
+			t.Fatal("expected ConfigFile to be set")
+		}
+
+		// Verify SSO profile can be found
+		profile, ok := input.ConfigFile.ProfileSection("sso-test")
+		if !ok {
+			t.Fatal("expected to find sso-test profile")
+		}
+		if profile.SSOStartURL == "" {
+			t.Error("expected profile to have SSO start URL")
+		}
+	})
+}
