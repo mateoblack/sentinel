@@ -18,6 +18,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.8 Credential Flow UX** — [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) (Phases 73-75, shipped 2026-01-19)
 - ✅ **v1.9 SSO Profile Support** — [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) (Phases 76-77, shipped 2026-01-19)
 - 🚧 **v1.10 Real-time Revocation** — Phases 78-83 (in progress)
+- 🚧 **v1.10.1 SSO Credential Fixes** — Phase 78.1 (urgent patch, in progress)
 
 ## Completed Milestones
 
@@ -400,6 +401,17 @@ Plans:
 - [x] 78-01: SentinelServer type with policy-aware credential serving — completed 2026-01-19
 - [x] 78-02: --server flag CLI integration for sentinel exec command — completed 2026-01-19
 
+#### Phase 78.1: SSO Credential Fixes (INSERTED - v1.10.1)
+
+**Goal**: Fix SSO credential loading for init bootstrap and whoami commands
+**Depends on**: Phase 78
+**Research**: Unlikely (same pattern as v1.9 Phase 76)
+**Plans**: 2
+
+Plans:
+- [ ] 78.1-01: Fix init bootstrap SSO credential loading with --aws-profile flag
+- [ ] 78.1-02: Fix whoami --profile SSO credential loading
+
 #### Phase 79: Server Policy Integration
 
 **Goal**: Hook policy evaluation into credential server requests
@@ -466,6 +478,7 @@ Plans:
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
-| v1.10 Real-time Revocation | 78-83 | 0/? | 🚧 In Progress | - |
+| v1.10 Real-time Revocation | 78-83 | 2/? | 🚧 In Progress | - |
+| v1.10.1 SSO Credential Fixes | 78.1 | 0/2 | 🚧 In Progress | - |
 
-**Totals:** 11 milestones shipped (77 phases, 128 plans), 1 in progress (6 phases)
+**Totals:** 11 milestones shipped (77 phases, 128 plans), 2 in progress (v1.10 + v1.10.1 patch)

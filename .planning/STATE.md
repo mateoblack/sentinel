@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.10 Real-time Revocation
+**Current focus:** v1.10.1 SSO Credential Fixes (urgent patch)
 
 ## Current Position
 
-Phase: 78 of 83 (Server Infrastructure)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-01-19 — Completed 78-02-PLAN.md
+Phase: 78.1 (SSO Credential Fixes - INSERTED)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-19 — Created v1.10.1 patch milestone
 
-Progress: █░░░░░░░░░ 11% (v1.10 Real-time Revocation - 0/6 phases, 2/18 plans)
+Progress: ░░░░░░░░░░ 0% (v1.10.1 SSO Credential Fixes - 0/1 phase, 0/2 plans)
 
 ## Milestone Summary
 
@@ -432,9 +432,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 78-02-PLAN.md (--server flag for sentinel exec)
+Stopped at: Created v1.10.1 patch milestone
 Resume file: None
-Next: /gsd:execute-plan 78-03 or /gsd:plan-phase 78
+Next: /gsd:plan-phase 78.1
 
 ## Roadmap Evolution
 
@@ -450,3 +450,4 @@ Next: /gsd:execute-plan 78-03 or /gsd:plan-phase 78
 - Milestone v1.8 shipped: 2026-01-19 — Credential Flow UX (Phases 73-75) - SSO profile resolution and auto-login
 - Milestone v1.9 shipped: 2026-01-19 — SSO Profile Support (Phases 76-77) - Fix --profile SSO credential loading
 - Milestone v1.10 created: 2026-01-19 — Real-time Revocation (Phases 78-83) - Server mode for instant credential revocation
+- Milestone v1.10.1 created: 2026-01-19 — SSO Credential Fixes (Phase 78.1) - Fix init bootstrap and whoami --profile SSO loading
