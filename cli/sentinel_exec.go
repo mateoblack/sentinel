@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
+	"github.com/byteness/aws-vault/v7/sentinel"
 	"github.com/byteness/aws-vault/v7/sso"
 	"github.com/byteness/aws-vault/v7/vault"
 )
@@ -31,14 +33,17 @@ type SentinelExecCommandInput struct {
 	Region          string
 	NoSession       bool
 	SessionDuration time.Duration
-	LogFile         string           // Path to log file (empty = no file logging)
-	LogStderr       bool             // Log to stderr (default: false)
-	Store           request.Store    // Optional: for approved request checking (nil = no checking)
-	BreakGlassStore breakglass.Store // Optional: for break-glass checking (nil = no checking)
-	STSClient       identity.STSAPI  // Optional: for testing (nil = create from AWS config)
-	AutoLogin       bool             // Enable automatic SSO login on credential errors
-	UseStdout       bool             // Print SSO URL instead of opening browser (for --auto-login)
+	LogFile         string            // Path to log file (empty = no file logging)
+	LogStderr       bool              // Log to stderr (default: false)
+	Store           request.Store     // Optional: for approved request checking (nil = no checking)
+	BreakGlassStore breakglass.Store  // Optional: for break-glass checking (nil = no checking)
+	STSClient       identity.STSAPI   // Optional: for testing (nil = create from AWS config)
+	AutoLogin       bool              // Enable automatic SSO login on credential errors
+	UseStdout       bool              // Print SSO URL instead of opening browser (for --auto-login)
 	ConfigFile      *vault.ConfigFile // Optional: for auto-login SSO config lookup (nil = load from env)
+	StartServer     bool              // Run credential server instead of env var injection
+	ServerPort      int               // Port for server (0 = auto-assign)
+	Lazy            bool              // Lazily fetch credentials in server mode
 }
 
 // ConfigureSentinelExecCommand sets up the sentinel exec command with kingpin.
@@ -78,6 +83,17 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("stdout", "Print SSO URL instead of opening browser (used with --auto-login)").
 		BoolVar(&input.UseStdout)
 
+	cmd.Flag("server", "Run a credential server in the background for per-request policy evaluation (the SDK or app must support AWS_CONTAINER_CREDENTIALS_FULL_URI)").
+		Short('s').
+		BoolVar(&input.StartServer)
+
+	cmd.Flag("server-port", "Port for credential server (0 for auto-assign)").
+		Default("0").
+		IntVar(&input.ServerPort)
+
+	cmd.Flag("lazy", "When using --server, lazily fetch credentials").
+		BoolVar(&input.Lazy)
+
 	cmd.Arg("cmd", "Command to execute, defaults to $SHELL").
 		StringVar(&input.Command)
 
@@ -107,6 +123,11 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	if err := s.ValidateProfile(input.ProfileName); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1, err
+	}
+
+	// 0.7. Validate server mode flag combinations
+	if input.StartServer && input.NoSession {
+		return 0, fmt.Errorf("Can't use --server with --no-session")
 	}
 
 	// 0.6. Load AWS config file for auto-login SSO lookup (if needed)
@@ -275,7 +296,60 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		}
 	}
 
-	// 9. EffectAllow (or approved request): generate request-id and retrieve credentials
+	// 8.6. Server mode: start SentinelServer for per-request policy evaluation
+	if input.StartServer {
+		// Create credential provider adapter that wraps Sentinel.GetCredentialsWithSourceIdentity
+		credProvider := &sentinelCredentialProviderAdapter{sentinel: s}
+
+		serverConfig := sentinel.SentinelServerConfig{
+			ProfileName:        input.ProfileName,
+			PolicyParameter:    input.PolicyParameter,
+			Region:             input.Region,
+			NoSession:          input.NoSession,
+			SessionDuration:    sessionDuration,
+			User:               username,
+			Logger:             logger,
+			Store:              input.Store,
+			BreakGlassStore:    input.BreakGlassStore,
+			PolicyLoader:       cachedLoader,
+			CredentialProvider: credProvider,
+			LazyLoad:           input.Lazy,
+		}
+
+		sentinelServer, err := sentinel.NewSentinelServer(ctx, serverConfig, "", input.ServerPort)
+		if err != nil {
+			return 0, fmt.Errorf("Failed to start credential server: %w", err)
+		}
+
+		go func() {
+			if err := sentinelServer.Serve(); err != http.ErrServerClosed {
+				log.Fatalf("credential server: %s", err.Error())
+			}
+		}()
+
+		// Default to shell if no command specified
+		command := input.Command
+		if command == "" {
+			command = getDefaultShell()
+		}
+
+		// Prepare subprocess environment
+		cmdEnv := createEnv(input.ProfileName, input.Region, "")
+
+		// Set environment for subprocess - credentials come from server, not env vars
+		cmdEnv.Set("AWS_CONTAINER_CREDENTIALS_FULL_URI", sentinelServer.BaseURL())
+		cmdEnv.Set("AWS_CONTAINER_AUTHORIZATION_TOKEN", sentinelServer.AuthToken())
+
+		log.Printf("Starting Sentinel credential server at %s", sentinelServer.BaseURL())
+
+		// Remove AWS_SENTINEL since credentials come from server, not env
+		// (don't set it - subprocess won't have the "subshell" indicator)
+
+		// Run subprocess (can't use exec syscall with server - need to keep server running)
+		return runSubProcess(command, input.Args, cmdEnv)
+	}
+
+	// 9. EffectAllow (or approved request): generate request-id and retrieve credentials (env var mode)
 	requestID := identity.NewRequestID()
 
 	// Create credential request with User for SourceIdentity stamping
@@ -284,8 +358,8 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		Region:          input.Region,
 		NoSession:       input.NoSession,
 		SessionDuration: sessionDuration, // May be capped to break-glass remaining time
-		User:            username,         // For SourceIdentity stamping on role assumption
-		RequestID:       requestID,        // For CloudTrail correlation
+		User:            username,        // For SourceIdentity stamping on role assumption
+		RequestID:       requestID,       // For CloudTrail correlation
 	}
 
 	// Retrieve credentials with SourceIdentity stamping (if profile has role_arn)
@@ -349,4 +423,40 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 
 	// 16. Fall back to subprocess execution
 	return runSubProcess(command, input.Args, cmdEnv)
+}
+
+// sentinelCredentialProviderAdapter adapts Sentinel.GetCredentialsWithSourceIdentity
+// to the sentinel.CredentialProvider interface used by SentinelServer.
+type sentinelCredentialProviderAdapter struct {
+	sentinel *Sentinel
+}
+
+// GetCredentialsWithSourceIdentity implements sentinel.CredentialProvider.
+func (a *sentinelCredentialProviderAdapter) GetCredentialsWithSourceIdentity(ctx context.Context, req sentinel.CredentialRequest) (*sentinel.CredentialResult, error) {
+	// Convert sentinel.CredentialRequest to SentinelCredentialRequest
+	cliReq := SentinelCredentialRequest{
+		ProfileName:     req.ProfileName,
+		NoSession:       req.NoSession,
+		SessionDuration: req.SessionDuration,
+		Region:          req.Region,
+		User:            req.User,
+		RequestID:       req.RequestID,
+	}
+
+	// Call the CLI's credential retrieval
+	result, err := a.sentinel.GetCredentialsWithSourceIdentity(ctx, cliReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert SentinelCredentialResult to sentinel.CredentialResult
+	return &sentinel.CredentialResult{
+		AccessKeyID:     result.AccessKeyID,
+		SecretAccessKey: result.SecretAccessKey,
+		SessionToken:    result.SessionToken,
+		Expiration:      result.Expiration,
+		CanExpire:       result.CanExpire,
+		SourceIdentity:  result.SourceIdentity,
+		RoleARN:         result.RoleARN,
+	}, nil
 }
