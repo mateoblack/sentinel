@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-18)
 
 ## Current Position
 
-Phase: 69 of 72 (AWS Identity Core)
+Phase: 70 of 72 (Identity Integration)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-19 — Completed 69-01-PLAN.md
+Last activity: 2026-01-19 — Completed 70-01-PLAN.md
 
-Progress: ██░░░░░░░░ 25% (v1.7.1 Security Patch)
+Progress: ████░░░░░░ 50% (v1.7.1 Security Patch)
 
 ## Milestone Summary
 
@@ -333,6 +333,14 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Full template includes all 4 reason codes for break-glass authorization
 - Generated configs pass validation via `sentinel config validate`
 
+**v1.7.1 AWS Identity Integration decisions (Phase 70-01):**
+- STSAPI interface enables mock injection for tests without AWS credentials
+- GetAWSUsername returns sanitized username matching existing 20-char truncation logic
+- STSClient field added to command input structs for dependency injection
+- Initialization order: AWS config loaded first, then STS identity, then policy load
+- ErrCodeSTSError/ErrCodeSTSAccessDenied added for STS-specific error handling
+- Username extraction uses existing ParseARN sanitization (removes @, ., -, _, truncates)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -344,9 +352,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 69-01-PLAN.md (Phase 69 complete)
+Stopped at: Completed 70-01-PLAN.md (Phase 70 complete)
 Resume file: None
-Next: Plan Phase 70 (`/gsd:plan-phase 70`)
+Next: Plan Phase 71 (`/gsd:plan-phase 71`)
 
 ## Roadmap Evolution
 
