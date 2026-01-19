@@ -105,7 +105,9 @@ func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel)
 	}
 
 	// 3. Load AWS config (needed for STS and DynamoDB)
-	awsCfgOpts := []func(*config.LoadOptions) error{}
+	awsCfgOpts := []func(*config.LoadOptions) error{
+		config.WithSharedConfigProfile(input.ProfileName),
+	}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 	}
