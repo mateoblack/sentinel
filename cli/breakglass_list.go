@@ -22,6 +22,7 @@ type BreakGlassListCommandInput struct {
 	Limit           int
 	BreakGlassTable string
 	Region          string
+	AWSProfile      string // Optional AWS profile for credentials
 
 	// Store is an optional Store implementation for testing.
 	// If nil, a DynamoDB store will be created using the BreakGlassTable and Region.
@@ -74,6 +75,9 @@ func ConfigureBreakGlassListCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("region", "AWS region for DynamoDB").
 		StringVar(&input.Region)
 
+	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
+		StringVar(&input.AWSProfile)
+
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := BreakGlassListCommand(context.Background(), input)
 		app.FatalIfError(err, "breakglass-list")
@@ -87,6 +91,9 @@ func ConfigureBreakGlassListCommand(app *kingpin.Application, s *Sentinel) {
 func BreakGlassListCommand(ctx context.Context, input BreakGlassListCommandInput) error {
 	// 1. Load AWS config (needed for STS and DynamoDB)
 	awsCfgOpts := []func(*config.LoadOptions) error{}
+	if input.AWSProfile != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+	}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 	}
