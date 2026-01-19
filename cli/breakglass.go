@@ -108,7 +108,10 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 	}
 
 	// 2. Load AWS config (needed for STS and DynamoDB)
-	awsCfgOpts := []func(*config.LoadOptions) error{}
+	// Use the profile for AWS credential loading (enables SSO profiles)
+	awsCfgOpts := []func(*config.LoadOptions) error{
+		config.WithSharedConfigProfile(input.ProfileName),
+	}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 	}
