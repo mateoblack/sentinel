@@ -1,5 +1,32 @@
 # Project Milestones: Sentinel
 
+## v1.7.1 Security Patch (Shipped: 2026-01-19)
+
+**Delivered:** Critical security fix replacing OS username (`os/user.Current()`) with AWS-authenticated identity (STS GetCallerIdentity) for policy evaluation across all CLI commands.
+
+**Phases completed:** 69-72 (7 plans total)
+
+**Key accomplishments:**
+- AWS identity core with ARN parsing for all identity types (IAM user, SSO, assumed-role, federated-user, root)
+- Replaced `user.Current()` with AWS STS GetCallerIdentity in credential flow
+- Added `sentinel whoami` command for identity debugging
+- Updated all approval workflow commands (approve, deny, request, list) to use AWS identity
+- Updated all break-glass commands (breakglass, breakglass-close, breakglass-list) to use AWS identity
+- Created 1,072 lines of security regression tests with attack scenario demonstrations
+- Published CHANGELOG.md and SECURITY.md with vulnerability advisory (SENTINEL-2026-001)
+
+**Stats:**
+- 28 files created/modified
+- 90,540 lines of Go (total codebase, +3,649 from v1.7)
+- 4 phases, 7 plans
+- 2 days from v1.7 to v1.7.1
+
+**Git range:** `feat(69-01)` -> `docs(72-04)`
+
+**What's next:** Production deployment ready. v1.7.1 addresses critical security vulnerability - all users should upgrade immediately.
+
+---
+
 ## v1.7 Permissions Discovery (Shipped: 2026-01-18)
 
 **Delivered:** Self-service permissions discovery with IAM policy generation, permission validation via SimulatePrincipalPolicy, interactive setup wizard, structured error messages with actionable suggestions, and streamlined onboarding documentation.

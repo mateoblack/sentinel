@@ -62,10 +62,14 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ `sentinel config validate` for pre-runtime configuration validation — v1.7
 - ✓ Quick start templates (basic, approvals, full) for rapid deployment — v1.7
 - ✓ Streamlined onboarding documentation (QUICKSTART.md, PERMISSIONS.md) — v1.7
+- ✓ AWS identity-based policy evaluation (STS GetCallerIdentity) — v1.7.1
+- ✓ `sentinel whoami` command for identity debugging — v1.7.1
+- ✓ Security regression tests for identity extraction — v1.7.1
+- ✓ CHANGELOG.md and SECURITY.md with vulnerability advisory — v1.7.1
 
 ### Active
 
-(None — all v1.7 requirements validated)
+(None — all v1.7.1 requirements validated)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -74,7 +78,7 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.7 with 86,891 LOC Go.
+Shipped v1.7.1 with 90,540 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -144,6 +148,14 @@ v1.7 adds permissions discovery and onboarding:
 - Quick start templates for rapid deployment via `sentinel config generate`
 - Streamlined onboarding: QUICKSTART.md, PERMISSIONS.md, updated commands.md
 
+v1.7.1 adds critical security fix:
+- CRITICAL: Fixed policy evaluation using OS username instead of AWS identity
+- AWS identity extraction via STS GetCallerIdentity for all CLI commands
+- ARN parsing for all identity types (IAM user, SSO, assumed-role, federated-user, root)
+- `sentinel whoami` command for identity debugging
+- 1,072 lines of security regression tests
+- CHANGELOG.md and SECURITY.md with vulnerability advisory (SENTINEL-2026-001)
+
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
 ## Constraints
@@ -208,6 +220,10 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Warnings don't fail validation | Valid with warnings returns exit 0 for CI friendliness | ✓ Good |
 | Config type auto-detection | Check distinctive fields in first rule to determine type | ✓ Good |
 | No explicit default-deny in templates | Policy engine already denies on no match | ✓ Good |
+| STSAPI interface for identity extraction | Enables mock injection for unit tests without AWS credentials | ✓ Good |
+| Username from AWS ARN, not OS user | Prevents policy bypass via local user impersonation | ✓ Good |
+| TestSecurityRegression_ prefix | CI/CD filtering of security tests | ✓ Good |
+| Attack scenario demonstration tests | Explicitly show vulnerability and verify fix | ✓ Good |
 
 ---
-*Last updated: 2026-01-18 after v1.7 milestone*
+*Last updated: 2026-01-19 after v1.7.1 milestone*

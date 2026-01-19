@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-18)
+See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.7.1 Security Patch — Fix critical OS username bug
+**Current focus:** v1.7.1 Security Patch — SHIPPED
 
 ## Current Position
 
 Phase: 72 of 72 (Security Validation)
 Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-01-19 — Completed 72-04-PLAN.md
+Status: Milestone v1.7.1 complete
+Last activity: 2026-01-19 — v1.7.1 Security Patch shipped
 
-Progress: ██████████ 100% (v1.7.1 Security Patch)
+Progress: ██████████ 100% (v1.7.1 Security Patch - SHIPPED)
 
 ## Milestone Summary
 
@@ -91,12 +91,22 @@ Progress: ██████████ 100% (v1.7.1 Security Patch)
 - Quick start templates (basic, approvals, full)
 - Streamlined onboarding docs (QUICKSTART.md, PERMISSIONS.md)
 
+**v1.7.1 Security Patch shipped:** 2026-01-19
+- 4 phases, 7 plans
+- +3,649 lines of Go (90,540 total)
+- CRITICAL: Fixed policy evaluation using OS username instead of AWS identity
+- AWS identity extraction via STS GetCallerIdentity for all CLI commands
+- ARN parsing for all identity types (IAM user, SSO, assumed-role, federated-user, root)
+- `sentinel whoami` command for identity debugging
+- 1,072 lines of security regression tests
+- CHANGELOG.md and SECURITY.md with vulnerability advisory (SENTINEL-2026-001)
+
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 112
-- Average duration: 3.1 min
-- Total execution time: ~409 min
+- Total plans completed: 119
+- Average duration: 3.0 min
+- Total execution time: ~495 min
 
 **By Milestone:**
 
@@ -110,6 +120,7 @@ Progress: ██████████ 100% (v1.7.1 Security Patch)
 | v1.5 Enforcement & Assurance | 7 | 8 | ~20 min |
 | v1.6 Testing & Hardening | 10 | 25 | ~48 min |
 | v1.7 Permissions Discovery | 9 | 10 | ~66 min |
+| v1.7.1 Security Patch | 4 | 7 | ~86 min |
 
 ## Accumulated Context
 
@@ -377,9 +388,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 72-04-PLAN.md (Phase 72 complete, v1.7.1 milestone complete)
+Stopped at: v1.7.1 Security Patch shipped
 Resume file: None
-Next: Complete milestone (`/gsd:complete-milestone`)
+Next: Plan next milestone (`/gsd:discuss-milestone`)
 
 ## Roadmap Evolution
 
@@ -391,4 +402,4 @@ Next: Complete milestone (`/gsd:complete-milestone`)
 - Milestone v1.5 shipped: 2026-01-16 — Enforcement & Assurance (Phases 43-49)
 - Milestone v1.6 shipped: 2026-01-17 — Testing & Hardening (Phases 50-59)
 - Milestone v1.7 shipped: 2026-01-18 — Permissions Discovery (Phases 60-68)
-- Milestone v1.7.1 created: 2026-01-18 — Security Patch (Phases 69-72) - Fix OS username bug
+- Milestone v1.7.1 shipped: 2026-01-19 — Security Patch (Phases 69-72) - Fix OS username bug

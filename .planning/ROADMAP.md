@@ -14,54 +14,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.5 Enforcement & Assurance** — [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) (Phases 43-49, shipped 2026-01-16)
 - ✅ **v1.6 Testing & Hardening** — [milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md) (Phases 50-59, shipped 2026-01-17)
 - ✅ **v1.7 Permissions Discovery** — [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) (Phases 60-68, shipped 2026-01-18)
-- 🚧 **v1.7.1 Security Patch** — Phases 69-72 (in progress)
-
-### 🚧 v1.7.1 Security Patch (In Progress)
-
-**Milestone Goal:** Fix critical security bug where policy evaluation uses OS username instead of AWS identity
-
-#### Phase 69: AWS Identity Core
-
-**Goal**: Extract username from AWS ARN for all identity types (IAM user, SSO, assumed-role)
-**Depends on**: v1.7 complete
-**Research**: Unlikely (using existing STS patterns)
-**Plans**: 1
-
-Plans:
-- [x] 69-01: ARN parsing and username extraction — completed 2026-01-19
-
-#### Phase 70: Identity Integration
-
-**Goal**: Replace `user.Current()` with AWS identity extraction in credential flow
-**Depends on**: Phase 69
-**Research**: Unlikely (internal refactoring)
-**Plans**: 1
-
-Plans:
-- [x] 70-01: AWS identity integration in credential flow — completed 2026-01-19
-
-#### Phase 71: Whoami Command
-
-**Goal**: Add `sentinel whoami` command showing AWS identity and extracted policy username
-**Depends on**: Phase 70
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 1
-
-Plans:
-- [x] 71-01: Whoami command with human and JSON output — completed 2026-01-19
-
-#### Phase 72: Security Validation
-
-**Goal**: Complete identity fix across all commands, security validation tests, documentation
-**Depends on**: Phase 71
-**Research**: Unlikely (testing and documentation)
-**Plans**: 4
-
-Plans:
-- [x] 72-01: Fix approval workflow commands (approve, deny, request, list) — completed 2026-01-19
-- [x] 72-02: Fix break-glass commands (breakglass, breakglass-close, breakglass-list) — completed 2026-01-19
-- [x] 72-03: Security regression tests for identity extraction — completed 2026-01-19
-- [x] 72-04: Changelog and security advisory documentation — completed 2026-01-19
+- ✅ **v1.7.1 Security Patch** — [milestones/v1.7.1-ROADMAP.md](milestones/v1.7.1-ROADMAP.md) (Phases 69-72, shipped 2026-01-19)
 
 ## Completed Milestones
 
@@ -76,6 +29,16 @@ Plans:
 - [x] Phase 6: Decision Logging (2/2 plans) — completed 2026-01-14
 - [x] Phase 7: Exec Command (2/2 plans) — completed 2026-01-14
 - [x] Phase 8: Profile Compatibility (2/2 plans) — completed 2026-01-14
+
+</details>
+
+<details>
+<summary>✅ v1.7.1 Security Patch (Phases 69-72) — SHIPPED 2026-01-19</summary>
+
+- [x] Phase 69: AWS Identity Core (1/1 plans) — completed 2026-01-19
+- [x] Phase 70: Identity Integration (1/1 plans) — completed 2026-01-19
+- [x] Phase 71: Whoami Command (1/1 plans) — completed 2026-01-19
+- [x] Phase 72: Security Validation (4/4 plans) — completed 2026-01-19
 
 </details>
 
@@ -411,4 +374,4 @@ Plans:
 | v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 
-**Totals:** 8 milestones shipped + 1 in progress (72 phases, 112+ plans)
+**Totals:** 9 milestones shipped (72 phases, 119 plans)
