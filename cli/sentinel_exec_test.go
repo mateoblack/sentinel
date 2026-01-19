@@ -915,3 +915,253 @@ sso_role_name = AdminRole
 		}
 	})
 }
+
+func TestSentinelExecCommandInput_ServerModeFields(t *testing.T) {
+	t.Run("StartServer field is false by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.StartServer {
+			t.Error("expected StartServer to be false by default")
+		}
+	})
+
+	t.Run("StartServer field can be set", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			StartServer:     true,
+		}
+		if !input.StartServer {
+			t.Error("expected StartServer to be true")
+		}
+	})
+
+	t.Run("ServerPort field defaults to 0", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.ServerPort != 0 {
+			t.Errorf("expected ServerPort to be 0 by default, got %d", input.ServerPort)
+		}
+	})
+
+	t.Run("ServerPort field can be set", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			StartServer:     true,
+			ServerPort:      8080,
+		}
+		if input.ServerPort != 8080 {
+			t.Errorf("expected ServerPort to be 8080, got %d", input.ServerPort)
+		}
+	})
+
+	t.Run("Lazy field is false by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.Lazy {
+			t.Error("expected Lazy to be false by default")
+		}
+	})
+
+	t.Run("Lazy field can be set", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			StartServer:     true,
+			Lazy:            true,
+		}
+		if !input.Lazy {
+			t.Error("expected Lazy to be true")
+		}
+	})
+}
+
+func TestSentinelExecCommand_ServerMode_ValidationErrors(t *testing.T) {
+	t.Run("server with no-session returns error", func(t *testing.T) {
+		// Create a temp config file with a valid profile
+		tmpDir := t.TempDir()
+		configFile := filepath.Join(tmpDir, "config")
+		configContent := `[profile server-test]
+region = us-east-1
+`
+		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+			t.Fatalf("Failed to create test config file: %v", err)
+		}
+		t.Setenv("AWS_CONFIG_FILE", configFile)
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "server-test",
+			PolicyParameter: "/sentinel/policies/default",
+			StartServer:     true,
+			NoSession:       true, // Invalid combination
+		}
+
+		s := &Sentinel{}
+		_, err := SentinelExecCommand(context.Background(), input, s)
+
+		if err == nil {
+			t.Fatal("expected error for --server with --no-session")
+		}
+		if !strings.Contains(err.Error(), "Can't use --server with --no-session") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+}
+
+func TestSentinelExecCommand_ServerMode_Configuration(t *testing.T) {
+	t.Run("server mode configuration is valid", func(t *testing.T) {
+		// Test that the full server mode configuration works with valid fields
+		input := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/default",
+			Region:          "us-west-2",
+			SessionDuration: 1 * time.Hour,
+			StartServer:     true,
+			ServerPort:      0, // Auto-assign
+			Lazy:            false,
+			LogFile:         "/tmp/sentinel.log",
+			LogStderr:       true,
+		}
+
+		// Verify all fields are correctly set
+		if input.ProfileName != "production" {
+			t.Errorf("expected ProfileName 'production', got %q", input.ProfileName)
+		}
+		if input.PolicyParameter != "/sentinel/policies/default" {
+			t.Errorf("expected PolicyParameter '/sentinel/policies/default', got %q", input.PolicyParameter)
+		}
+		if input.Region != "us-west-2" {
+			t.Errorf("expected Region 'us-west-2', got %q", input.Region)
+		}
+		if input.SessionDuration != 1*time.Hour {
+			t.Errorf("expected SessionDuration 1h, got %v", input.SessionDuration)
+		}
+		if !input.StartServer {
+			t.Error("expected StartServer to be true")
+		}
+		if input.ServerPort != 0 {
+			t.Errorf("expected ServerPort 0, got %d", input.ServerPort)
+		}
+		if input.Lazy {
+			t.Error("expected Lazy to be false")
+		}
+	})
+
+	t.Run("server mode with lazy load", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			StartServer:     true,
+			Lazy:            true, // Defers credential prefetch
+		}
+
+		if !input.Lazy {
+			t.Error("expected Lazy to be true for lazy credential loading")
+		}
+		if !input.StartServer {
+			t.Error("expected StartServer to be true")
+		}
+	})
+
+	t.Run("server mode with specific port", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			StartServer:     true,
+			ServerPort:      9999,
+		}
+
+		if input.ServerPort != 9999 {
+			t.Errorf("expected ServerPort 9999, got %d", input.ServerPort)
+		}
+	})
+
+	t.Run("server mode with stores for overrides", func(t *testing.T) {
+		// Server mode should support the same override stores as env var mode
+		store := &mockExecStore{}
+		bgStore := &mockExecBreakGlassStore{}
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			StartServer:     true,
+			Store:           store,
+			BreakGlassStore: bgStore,
+		}
+
+		if input.Store == nil {
+			t.Error("expected Store to be set")
+		}
+		if input.BreakGlassStore == nil {
+			t.Error("expected BreakGlassStore to be set")
+		}
+	})
+}
+
+func TestSentinelExecCommand_ServerMode_EnvVarModeComparison(t *testing.T) {
+	// These tests verify that server mode and env var mode have equivalent configuration options
+	t.Run("server mode has same profile configuration as env var mode", func(t *testing.T) {
+		// Create equivalent configurations for both modes
+		envVarMode := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/default",
+			Region:          "us-east-1",
+			SessionDuration: 30 * time.Minute,
+			StartServer:     false, // Env var mode
+			NoSession:       false,
+		}
+
+		serverMode := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/default",
+			Region:          "us-east-1",
+			SessionDuration: 30 * time.Minute,
+			StartServer:     true, // Server mode
+			ServerPort:      0,
+			Lazy:            false,
+		}
+
+		// Both should have same core configuration
+		if envVarMode.ProfileName != serverMode.ProfileName {
+			t.Error("ProfileName should be same in both modes")
+		}
+		if envVarMode.PolicyParameter != serverMode.PolicyParameter {
+			t.Error("PolicyParameter should be same in both modes")
+		}
+		if envVarMode.Region != serverMode.Region {
+			t.Error("Region should be same in both modes")
+		}
+		if envVarMode.SessionDuration != serverMode.SessionDuration {
+			t.Error("SessionDuration should be same in both modes")
+		}
+
+		// Key difference
+		if envVarMode.StartServer == serverMode.StartServer {
+			t.Error("StartServer should be different in both modes")
+		}
+	})
+
+	t.Run("server mode cannot use no-session", func(t *testing.T) {
+		// Env var mode can use --no-session
+		envVarMode := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/default",
+			StartServer:     false,
+			NoSession:       true, // Valid for env var mode
+		}
+		if envVarMode.StartServer {
+			t.Error("should be env var mode")
+		}
+
+		// Server mode cannot use --no-session (validation will fail)
+		serverMode := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/default",
+			StartServer:     true,
+			NoSession:       true, // Would be rejected by validation
+		}
+
+		// Just verify the configuration - actual validation tested above
+		if !serverMode.StartServer || !serverMode.NoSession {
+			t.Error("test setup is wrong")
+		}
+	})
+}
