@@ -148,7 +148,10 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	}
 
 	// 2. Create AWS config for SSM and STS
-	awsCfgOpts := []func(*config.LoadOptions) error{}
+	// Include profile to enable SSO credential loading from the specified profile
+	awsCfgOpts := []func(*config.LoadOptions) error{
+		config.WithSharedConfigProfile(input.ProfileName),
+	}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 	}
