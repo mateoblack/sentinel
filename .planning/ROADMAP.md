@@ -403,14 +403,14 @@ Plans:
 
 #### Phase 78.1: SSO Credential Fixes (INSERTED - v1.10.1)
 
-**Goal**: Fix SSO credential loading for init bootstrap and whoami commands
+**Goal**: Add test coverage for SSO credential loading (fixes already in place from v1.9)
 **Depends on**: Phase 78
 **Research**: Unlikely (same pattern as v1.9 Phase 76)
 **Plans**: 2
 
 Plans:
-- [ ] 78.1-01: Fix init bootstrap SSO credential loading with --aws-profile flag
-- [ ] 78.1-02: Fix whoami --profile SSO credential loading
+- [ ] 78.1-01: Add bootstrap command SSO profile test coverage
+- [ ] 78.1-02: Add whoami command SSO profile test coverage
 
 #### Phase 79: Server Policy Integration
 
