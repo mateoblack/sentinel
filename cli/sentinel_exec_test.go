@@ -8,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/request"
 )
@@ -495,4 +498,130 @@ func TestSentinelExecCommand_BreakGlassIntegration(t *testing.T) {
 			t.Errorf("expected BreakGlassEventID bg789012bg789012, got %s", credFields.BreakGlassEventID)
 		}
 	})
+}
+
+// mockExecSTSClient implements identity.STSAPI for testing.
+type mockExecSTSClient struct {
+	GetCallerIdentityFunc func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+func (m *mockExecSTSClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	if m.GetCallerIdentityFunc != nil {
+		return m.GetCallerIdentityFunc(ctx, params, optFns...)
+	}
+	return &sts.GetCallerIdentityOutput{
+		Arn:     aws.String("arn:aws:iam::123456789012:user/testuser"),
+		Account: aws.String("123456789012"),
+		UserId:  aws.String("AIDAEXAMPLE"),
+	}, nil
+}
+
+func TestSentinelExecCommandInput_STSClientField(t *testing.T) {
+	t.Run("STSClient field is nil by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.STSClient != nil {
+			t.Error("expected STSClient to be nil by default")
+		}
+	})
+
+	t.Run("STSClient field can be set", func(t *testing.T) {
+		client := &mockExecSTSClient{}
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			STSClient:       client,
+		}
+		if input.STSClient == nil {
+			t.Error("expected STSClient to be set")
+		}
+	})
+}
+
+func TestSentinelExecCommand_AWSIdentityIntegration(t *testing.T) {
+	t.Run("STSClient extracts username from IAM user ARN", func(t *testing.T) {
+		client := &mockExecSTSClient{
+			GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+				return &sts.GetCallerIdentityOutput{
+					Arn:     aws.String("arn:aws:iam::123456789012:user/bob"),
+					Account: aws.String("123456789012"),
+					UserId:  aws.String("AIDABOB"),
+				}, nil
+			},
+		}
+
+		username, err := identity.GetAWSUsername(context.Background(), client)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if username != "bob" {
+			t.Errorf("expected username 'bob', got %q", username)
+		}
+	})
+
+	t.Run("STSClient extracts sanitized username from SSO assumed-role ARN", func(t *testing.T) {
+		client := &mockExecSTSClient{
+			GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+				return &sts.GetCallerIdentityOutput{
+					Arn:     aws.String("arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_Developer_xyz/bob.smith@company.org"),
+					Account: aws.String("123456789012"),
+					UserId:  aws.String("AROA456789:bob.smith@company.org"),
+				}, nil
+			},
+		}
+
+		username, err := identity.GetAWSUsername(context.Background(), client)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Email sanitized: @ and . removed, truncated to 20 chars
+		if username != "bobsmithcompanyorg" {
+			t.Errorf("expected sanitized username 'bobsmithcompanyorg', got %q", username)
+		}
+	})
+
+	t.Run("STSClient extracts username from regular assumed-role ARN", func(t *testing.T) {
+		client := &mockExecSTSClient{
+			GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+				return &sts.GetCallerIdentityOutput{
+					Arn:     aws.String("arn:aws:sts::123456789012:assumed-role/AdminRole/admin-session"),
+					Account: aws.String("123456789012"),
+					UserId:  aws.String("AROA789012:admin-session"),
+				}, nil
+			},
+		}
+
+		username, err := identity.GetAWSUsername(context.Background(), client)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Hyphen removed from session name
+		if username != "adminsession" {
+			t.Errorf("expected username 'adminsession', got %q", username)
+		}
+	})
+
+	t.Run("STSClient error propagates", func(t *testing.T) {
+		client := &mockExecSTSClient{
+			GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+				return nil, &mockExecError{message: "AccessDenied: User is not authorized"}
+			},
+		}
+
+		_, err := identity.GetAWSUsername(context.Background(), client)
+		if err == nil {
+			t.Fatal("expected error for access denied")
+		}
+		if !strings.Contains(err.Error(), "failed to get caller identity") {
+			t.Errorf("expected error to mention 'failed to get caller identity', got: %v", err)
+		}
+	})
+}
+
+// mockExecError is a simple error type for testing.
+type mockExecError struct {
+	message string
+}
+
+func (e *mockExecError) Error() string {
+	return e.message
 }

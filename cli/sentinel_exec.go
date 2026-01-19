@@ -6,11 +6,11 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
 	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 	"github.com/byteness/aws-vault/v7/identity"
@@ -33,6 +33,7 @@ type SentinelExecCommandInput struct {
 	LogStderr       bool             // Log to stderr (default: false)
 	Store           request.Store    // Optional: for approved request checking (nil = no checking)
 	BreakGlassStore breakglass.Store // Optional: for break-glass checking (nil = no checking)
+	STSClient       identity.STSAPI  // Optional: for testing (nil = create from AWS config)
 }
 
 // ConfigureSentinelExecCommand sets up the sentinel exec command with kingpin.
@@ -116,15 +117,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		logger = logging.NewJSONLogger(io.MultiWriter(writers...))
 	}
 
-	// 2. Get current user
-	currentUser, err := user.Current()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to get current user: %v\n", err)
-		return 1, err
-	}
-	username := currentUser.Username
-
-	// 3. Create AWS config for SSM
+	// 2. Create AWS config for SSM and STS
 	awsCfgOpts := []func(*config.LoadOptions) error{}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
@@ -139,6 +132,23 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		)
 		FormatErrorWithSuggestion(configErr)
 		return 1, configErr
+	}
+
+	// 3. Get AWS identity for policy evaluation
+	stsClient := input.STSClient
+	if stsClient == nil {
+		stsClient = sts.NewFromConfig(awsCfg)
+	}
+	username, err := identity.GetAWSUsername(ctx, stsClient)
+	if err != nil {
+		identityErr := sentinelerrors.New(
+			sentinelerrors.ErrCodeSTSError,
+			fmt.Sprintf("Failed to get AWS identity: %v", err),
+			"Ensure your AWS credentials are valid and have sts:GetCallerIdentity permission",
+			err,
+		)
+		FormatErrorWithSuggestion(identityErr)
+		return 1, identityErr
 	}
 
 	// 4. Create policy loader chain
