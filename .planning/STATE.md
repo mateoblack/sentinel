@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 76 of 77 (SSO Credential Loading)
-Plan: 2 of 5 in current phase
+Plan: 4 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-19 — Completed 76-02-PLAN.md
+Last activity: 2026-01-19 — Completed 76-04-PLAN.md (infrastructure command SSO support)
 
-Progress: █░░░░░░░░░ 10% (v1.9 SSO Profile Support - Phase 76 in progress)
+Progress: ████░░░░░░ 40% (v1.9 SSO Profile Support - Phase 76: 4/5 plans)
 
 ## Milestone Summary
 
@@ -401,6 +401,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - breakglass-check, breakglass-close, breakglass-list: Add separate --aws-profile flag for credentials
 - Pattern: WithSharedConfigProfile(profile) enables SSO credential loading for break-glass commands
 
+**v1.9 Infrastructure Command SSO Credential Loading decisions (Phase 76-04):**
+- bootstrap command: Use separate --aws-profile (for credentials) vs --profile (for profiles to bootstrap)
+- status and config validate commands: Add --aws-profile for SSO credential loading
+- Pattern: Consistent WithSharedConfigProfile pattern across all infrastructure commands
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -412,9 +417,9 @@ None — clean start for v1.8.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 76-02-PLAN.md (approval workflow SSO credential loading)
+Stopped at: Completed 76-04-PLAN.md (infrastructure command SSO support)
 Resume file: None
-Next: Execute 76-03-PLAN.md (break-glass SSO credential loading)
+Next: Execute 76-05-PLAN.md (final plan for Phase 76)
 
 ## Roadmap Evolution
 
