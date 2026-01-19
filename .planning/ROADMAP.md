@@ -394,12 +394,11 @@ Plans:
 **Depends on**: v1.9 complete
 **Research**: Likely (porting aws-vault server package patterns)
 **Research topics**: ECS metadata endpoint, credential provider chain, HTTP server patterns
-**Plans**: 3
+**Plans**: 2
 
 Plans:
-- [x] 78-01: SentinelServer type with policy-aware credential serving
-- [x] 78-02: --server flag CLI integration for sentinel exec command
-- [ ] 78-03: TBD (run /gsd:plan-phase 78 to continue)
+- [x] 78-01: SentinelServer type with policy-aware credential serving — completed 2026-01-19
+- [x] 78-02: --server flag CLI integration for sentinel exec command — completed 2026-01-19
 
 #### Phase 79: Server Policy Integration
 
