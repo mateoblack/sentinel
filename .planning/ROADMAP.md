@@ -409,7 +409,7 @@ Plans:
 **Plans**: 2
 
 Plans:
-- [ ] 78.1-01: Add bootstrap command SSO profile test coverage
+- [x] 78.1-01: Add bootstrap command SSO profile test coverage — completed 2026-01-19
 - [ ] 78.1-02: Add whoami command SSO profile test coverage
 
 #### Phase 79: Server Policy Integration
