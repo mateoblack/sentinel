@@ -58,10 +58,10 @@ Plans:
 **Plans**: 4
 
 Plans:
-- [ ] 72-01: Fix approval workflow commands (approve, deny, request, list)
-- [ ] 72-02: Fix break-glass commands (breakglass, breakglass-close, breakglass-list)
-- [ ] 72-03: Security regression tests for identity extraction
-- [ ] 72-04: Changelog and security advisory documentation
+- [x] 72-01: Fix approval workflow commands (approve, deny, request, list) — completed 2026-01-19
+- [x] 72-02: Fix break-glass commands (breakglass, breakglass-close, breakglass-list) — completed 2026-01-19
+- [x] 72-03: Security regression tests for identity extraction — completed 2026-01-19
+- [x] 72-04: Changelog and security advisory documentation — completed 2026-01-19
 
 ## Completed Milestones
 
@@ -409,6 +409,6 @@ Plans:
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
 | v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
-| v1.7.1 Security Patch | 69-72 | 0/? | 🚧 In Progress | - |
+| v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 
 **Totals:** 8 milestones shipped + 1 in progress (72 phases, 112+ plans)

@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-18)
 ## Current Position
 
 Phase: 72 of 72 (Security Validation)
-Plan: 3 of 4 in current phase
-Status: Plan 03 complete
-Last activity: 2026-01-19 — Completed 72-03-PLAN.md
+Plan: 4 of 4 in current phase
+Status: Phase complete
+Last activity: 2026-01-19 — Completed 72-04-PLAN.md
 
-Progress: █████████░ 95% (v1.7.1 Security Patch)
+Progress: ██████████ 100% (v1.7.1 Security Patch)
 
 ## Milestone Summary
 
@@ -360,6 +360,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Policy bypass prevention tests verify AWS identity used for credentials, break-glass, and approval authorization
 - Username sanitization tests verify special characters removed and length truncated to 20 chars
 
+**v1.7.1 Security Documentation decisions (Phase 72-04):**
+- CHANGELOG.md follows Keep a Changelog format with Security section prominently placed
+- SECURITY.md includes full vulnerability disclosure with SENTINEL-2026-001 identifier
+- Advisory includes remediation steps and verification command (sentinel whoami)
+- Added security best practices section for ongoing guidance
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -371,9 +377,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 72-03-PLAN.md (Security Validation Plan 3 complete)
+Stopped at: Completed 72-04-PLAN.md (Phase 72 complete, v1.7.1 milestone complete)
 Resume file: None
-Next: Execute Plan 72-04 (`/gsd:execute-plan 72-04`)
+Next: Complete milestone (`/gsd:complete-milestone`)
 
 ## Roadmap Evolution
 
