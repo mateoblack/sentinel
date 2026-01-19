@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-18)
 ## Current Position
 
 Phase: 72 of 72 (Security Validation)
-Plan: 1 of 4 in current phase
-Status: Plan 01 complete
-Last activity: 2026-01-18 — Completed 72-01-PLAN.md
+Plan: 2 of 4 in current phase
+Status: Plan 02 complete
+Last activity: 2026-01-19 — Completed 72-02-PLAN.md
 
-Progress: ████████░░ 85% (v1.7.1 Security Patch)
+Progress: █████████░ 90% (v1.7.1 Security Patch)
 
 ## Milestone Summary
 
@@ -347,6 +347,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - AWS config loading reordered to occur before identity extraction (needed for STS client)
 - Mock STS client pattern established for test isolation (same as credentials/whoami tests)
 
+**v1.7.1 Break-Glass Security Validation decisions (Phase 72-02):**
+- Removed os/user dependency from all break-glass commands (breakglass, breakglass-close, breakglass-list)
+- Added STSClient field to all break-glass command input structs for dependency injection
+- breakglass_list.go only calls identity.GetAWSUsername when no filter flags provided (optimization)
+- testableBreakGlassListCommand signature changed to use STSClient instead of mockUsername parameter
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -357,10 +363,10 @@ None — clean start for v1.4.
 
 ## Session Continuity
 
-Last session: 2026-01-18
-Stopped at: Completed 72-01-PLAN.md (Security Validation Plan 1 complete)
+Last session: 2026-01-19
+Stopped at: Completed 72-02-PLAN.md (Security Validation Plan 2 complete)
 Resume file: None
-Next: Execute Plan 72-02 (`/gsd:execute-plan 72-02`)
+Next: Execute Plan 72-03 (`/gsd:execute-plan 72-03`)
 
 ## Roadmap Evolution
 
