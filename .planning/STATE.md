@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.7.1 Security Patch — SHIPPED
+**Current focus:** v1.8 Credential Flow UX — IN PROGRESS
 
 ## Current Position
 
-Phase: 72 of 72 (Security Validation)
-Plan: 4 of 4 in current phase
-Status: Milestone v1.7.1 complete
-Last activity: 2026-01-19 — v1.7.1 Security Patch shipped
+Phase: 73 of 75 (SSO Profile Resolution)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-19 — Milestone v1.8 created
 
-Progress: ██████████ 100% (v1.7.1 Security Patch - SHIPPED)
+Progress: ░░░░░░░░░░ 0% (v1.8 Credential Flow UX)
 
 ## Milestone Summary
 
@@ -383,14 +383,14 @@ None — clean implementation across all milestones.
 
 ### Blockers/Concerns Carried Forward
 
-None — clean start for v1.4.
+None — clean start for v1.8.
 
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: v1.7.1 Security Patch shipped
+Stopped at: Milestone v1.8 initialization
 Resume file: None
-Next: Plan next milestone (`/gsd:discuss-milestone`)
+Next: Plan Phase 73 (`/gsd:plan-phase 73`)
 
 ## Roadmap Evolution
 
@@ -403,3 +403,4 @@ Next: Plan next milestone (`/gsd:discuss-milestone`)
 - Milestone v1.6 shipped: 2026-01-17 — Testing & Hardening (Phases 50-59)
 - Milestone v1.7 shipped: 2026-01-18 — Permissions Discovery (Phases 60-68)
 - Milestone v1.7.1 shipped: 2026-01-19 — Security Patch (Phases 69-72) - Fix OS username bug
+- Milestone v1.8 created: 2026-01-19 — Credential Flow UX (Phases 73-75) - SSO profile resolution and auto-login

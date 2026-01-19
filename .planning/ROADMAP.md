@@ -15,6 +15,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.6 Testing & Hardening** — [milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md) (Phases 50-59, shipped 2026-01-17)
 - ✅ **v1.7 Permissions Discovery** — [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) (Phases 60-68, shipped 2026-01-18)
 - ✅ **v1.7.1 Security Patch** — [milestones/v1.7.1-ROADMAP.md](milestones/v1.7.1-ROADMAP.md) (Phases 69-72, shipped 2026-01-19)
+- 🚧 **v1.8 Credential Flow UX** — Phases 73-75 (in progress)
 
 ## Completed Milestones
 
@@ -360,6 +361,42 @@ Plans:
 
 </details>
 
+### 🚧 v1.8 Credential Flow UX (In Progress)
+
+**Milestone Goal:** Developer experience improvements for credential handling — automatic SSO profile resolution and login triggering, plus clear error messages for authentication failures.
+
+#### Phase 73: SSO Profile Resolution
+
+**Goal**: Read AWS profile config, detect SSO configuration, use cached SSO credentials automatically without manual export
+**Depends on**: v1.7.1 complete
+**Research**: Likely (aws-sdk-go-v2 SSO credential provider patterns)
+**Research topics**: AWS SDK SSO credential resolution, ~/.aws/config parsing, SSO token cache location
+**Plans**: TBD
+
+Plans:
+- [ ] 73-01: TBD (run /gsd:plan-phase 73 to break down)
+
+#### Phase 74: Auto SSO Login
+
+**Goal**: Automatically trigger SSO login flow when credentials are missing or expired, instead of failing with "invalid token"
+**Depends on**: Phase 73
+**Research**: Likely (SSO OIDC device authorization flow)
+**Research topics**: SSO OIDC device authorization, aws sso login implementation, browser launch patterns
+**Plans**: TBD
+
+Plans:
+- [ ] 74-01: TBD (run /gsd:plan-phase 74 to break down)
+
+#### Phase 75: AWS Auth Error Enhancement
+
+**Goal**: Clear error messages with actionable suggestions for AWS authentication failures (SSO expired, no credentials, permission denied)
+**Depends on**: Phase 74
+**Research**: Unlikely (internal patterns, extends v1.7 error infrastructure)
+**Plans**: TBD
+
+Plans:
+- [ ] 75-01: TBD (run /gsd:plan-phase 75 to break down)
+
 ## Progress (All Milestones)
 
 | Milestone | Phases | Plans | Status | Shipped |
@@ -373,5 +410,6 @@ Plans:
 | v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
 | v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
+| v1.8 Credential Flow UX | 73-75 | 0/? | 🚧 In Progress | - |
 
-**Totals:** 9 milestones shipped (72 phases, 119 plans)
+**Totals:** 9 milestones shipped (72 phases, 119 plans), 1 in progress
