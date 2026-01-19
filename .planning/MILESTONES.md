@@ -1,5 +1,29 @@
 # Project Milestones: Sentinel
 
+## v1.10.1 SSO Credential Fixes (Shipped: 2026-01-19)
+
+**Delivered:** Test coverage for SSO credential loading patterns in bootstrap and whoami commands, verifying the --aws-profile and --profile flags correctly flow to WithSharedConfigProfile.
+
+**Phases completed:** 78.1 (2 plans total)
+
+**Key accomplishments:**
+- Added TestBootstrapCommand_UsesAWSProfileForCredentials with three sub-tests verifying SSO profile handling
+- Added TestWhoamiCommand_UsesProfileForAWSConfig with three sub-tests verifying SSO profile handling
+- Verified vault.LoadConfig recognizes SSO settings (SSOStartURL, SSORegion, SSOAccountID, SSORoleName)
+- Established SSO profile test patterns for future credential testing
+
+**Stats:**
+- 8 files created/modified
+- 94,537 lines of Go (total codebase, +186 test lines)
+- 1 phase, 2 plans
+- Same day as v1.9
+
+**Git range:** `test(78.1-01)` → `docs(78.1-02)`
+
+**What's next:** Continue v1.10 Real-time Revocation (Phase 79: Server Policy Integration).
+
+---
+
 ## v1.9 SSO Profile Support (Shipped: 2026-01-19)
 
 **Delivered:** Fixed systemic bug where --profile flag didn't load SSO credentials, ensuring all Sentinel commands work seamlessly with SSO profiles like AWS CLI does.

@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.10.1 SSO Credential Fixes (urgent patch)
+**Current focus:** v1.10 Real-time Revocation (Phase 79: Server Policy Integration)
 
 ## Current Position
 
-Phase: 78.1 (SSO Credential Fixes - INSERTED)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-19 — Completed 78.1-02-PLAN.md
+Phase: 79 (Server Policy Integration)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-19 — v1.10.1 milestone complete
 
-Progress: ██████████ 100% (v1.10.1 SSO Credential Fixes - 1/1 phase, 2/2 plans)
+Progress: ██░░░░░░░░ 25% (v1.10 Real-time Revocation - 1/6 phases, 2/? plans)
 
 ## Milestone Summary
 
@@ -101,12 +101,20 @@ Progress: ██████████ 100% (v1.10.1 SSO Credential Fixes - 1/
 - 1,072 lines of security regression tests
 - CHANGELOG.md and SECURITY.md with vulnerability advisory (SENTINEL-2026-001)
 
+**v1.10.1 SSO Credential Fixes shipped:** 2026-01-19
+- 1 phase, 2 plans
+- +186 lines of Go tests (94,537 total)
+- Test coverage for bootstrap command SSO credential loading via --aws-profile
+- Test coverage for whoami command SSO credential loading via --profile
+- Verified vault.LoadConfig recognizes SSO settings
+- Established SSO profile test patterns for future credential testing
+
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 122
+- Total plans completed: 132
 - Average duration: 3.0 min
-- Total execution time: ~513 min
+- Total execution time: ~525 min
 
 **By Milestone:**
 
@@ -123,6 +131,7 @@ Progress: ██████████ 100% (v1.10.1 SSO Credential Fixes - 1/
 | v1.7.1 Security Patch | 4 | 7 | ~86 min |
 | v1.8 Credential Flow UX | 3 | 3 | ~16 min |
 | v1.9 SSO Profile Support | 2 | 6 | ~6 min |
+| v1.10.1 SSO Credential Fixes | 1 | 2 | ~6 min |
 
 ## Accumulated Context
 
@@ -432,9 +441,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 78.1-02-PLAN.md (phase 78.1 complete)
+Stopped at: v1.10.1 milestone complete
 Resume file: None
-Next: /gsd:complete-milestone (v1.10.1 SSO Credential Fixes)
+Next: /gsd:plan-phase 79
 
 ## Roadmap Evolution
 
@@ -450,4 +459,4 @@ Next: /gsd:complete-milestone (v1.10.1 SSO Credential Fixes)
 - Milestone v1.8 shipped: 2026-01-19 — Credential Flow UX (Phases 73-75) - SSO profile resolution and auto-login
 - Milestone v1.9 shipped: 2026-01-19 — SSO Profile Support (Phases 76-77) - Fix --profile SSO credential loading
 - Milestone v1.10 created: 2026-01-19 — Real-time Revocation (Phases 78-83) - Server mode for instant credential revocation
-- Milestone v1.10.1 created: 2026-01-19 — SSO Credential Fixes (Phase 78.1) - Fix init bootstrap and whoami --profile SSO loading
+- Milestone v1.10.1 shipped: 2026-01-19 — SSO Credential Fixes (Phase 78.1) - Test coverage for bootstrap and whoami SSO profile handling
