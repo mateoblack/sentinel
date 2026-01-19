@@ -16,6 +16,7 @@ import (
 type StatusCommandInput struct {
 	PolicyRoot string
 	Region     string
+	AWSProfile string // Optional AWS profile for credentials
 	JSONOutput bool
 
 	// StatusChecker is an optional StatusChecker implementation for testing.
@@ -52,6 +53,9 @@ func ConfigureStatusCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("region", "AWS region for SSM operations").
 		StringVar(&input.Region)
 
+	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
+		StringVar(&input.AWSProfile)
+
 	cmd.Flag("json", "Output in JSON format").
 		BoolVar(&input.JSONOutput)
 
@@ -81,6 +85,9 @@ func StatusCommand(ctx context.Context, input StatusCommandInput) error {
 	if checker == nil {
 		// Load AWS config
 		awsCfgOpts := []func(*config.LoadOptions) error{}
+		if input.AWSProfile != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+		}
 		if input.Region != "" {
 			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 		}
