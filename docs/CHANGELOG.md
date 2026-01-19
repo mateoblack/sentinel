@@ -1,0 +1,119 @@
+# Changelog
+
+All notable changes to Sentinel will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.7.1] - 2026-01-19
+
+### Security
+
+- **CRITICAL**: Fixed policy evaluation using OS username instead of AWS identity
+  - Prior to this fix, policy rules matching on `users` would evaluate against the local OS username, not the AWS-authenticated identity
+  - An attacker could bypass user-based policy restrictions by running Sentinel as a different local user
+  - All commands now extract username from AWS STS GetCallerIdentity ARN
+  - Affects: credential issuance, break-glass authorization, approval workflows, request submission
+
+### Added
+
+- `sentinel whoami` command to display AWS identity and policy username
+- `GetAWSUsername()` and `GetAWSIdentity()` helpers in identity package
+- `STSAPI` interface for testability of AWS identity operations
+
+### Changed
+
+- All CLI commands now use AWS identity instead of OS username
+- Policy evaluation uses sanitized username from AWS ARN
+- Break-glass and approval authorization use AWS identity
+
+### Fixed
+
+- Policy bypass via OS user impersonation (security-critical)
+
+## [1.7.0] - 2026-01-18
+
+### Added
+
+- Permission schema mapping 10 features to required IAM actions
+- `sentinel permissions` CLI with Terraform/CloudFormation/JSON output formats
+- Feature auto-detection probing SSM and DynamoDB for minimal permissions
+- `sentinel permissions check` for validating credentials via IAM SimulatePrincipalPolicy
+- `sentinel init wizard` for interactive first-time setup
+- Structured error types with 17 error codes and actionable suggestions
+- `sentinel config validate` for pre-runtime configuration validation
+- Quick start templates (basic, approvals, full) via `sentinel config generate`
+- Streamlined onboarding documentation (QUICKSTART.md, PERMISSIONS.md)
+
+## [1.6.0] - 2026-01-17
+
+### Added
+
+- Comprehensive test infrastructure with mock framework
+- >80% test coverage on all Sentinel packages (94.1% average)
+- Security regression test suite for denial path validation
+- Performance benchmarks for policy evaluation and identity generation
+- Pre-release validation with GO recommendation
+
+## [1.5.0] - 2026-01-16
+
+### Added
+
+- IAM trust policy analysis and enforcement status reporting
+- Trust policy template generation (Pattern A/B/C)
+- CloudTrail session verification for SourceIdentity compliance
+- `sentinel audit verify` command for unmanaged session detection
+- Drift detection with `--require-sentinel` flag
+- Enforcement documentation (ENFORCEMENT.md, ASSURANCE.md)
+
+## [1.4.0] - 2026-01-16
+
+### Added
+
+- Bootstrap planner to analyze existing SSM parameters
+- Automated SSM parameter creation for policy storage
+- Sample policy generation based on profile configuration
+- IAM policy document generation for least-privilege access
+- `sentinel bootstrap` command for deployment automation
+- `sentinel status` command for deployment health monitoring
+
+## [1.3.0] - 2026-01-16
+
+### Added
+
+- Break-glass emergency access with mandatory justification
+- Time-bounded break-glass sessions with automatic duration capping
+- Break-glass rate limiting with cooldowns and quotas
+- Break-glass notifications for immediate security awareness
+- Break-glass policies for authorization control
+- Post-incident review commands: `breakglass-list`, `breakglass-check`, `breakglass-close`
+
+## [1.2.0] - 2026-01-15
+
+### Added
+
+- Request/approve workflow with DynamoDB state machine
+- SNS and Webhook notification hooks for request lifecycle events
+- Approval policies with auto-approve conditions and approver routing
+- Approval audit trail logging for compliance
+- CLI commands: `request`, `list`, `check`, `approve`, `deny`
+
+## [1.1.0] - 2026-01-15
+
+### Added
+
+- SourceIdentity stamping on all role assumptions
+- CloudTrail correlation via request-id in decision logs
+- IAM trust policy enforcement patterns documented
+- SCP enforcement patterns for organization-wide control
+
+## [1.0.0] - 2026-01-14
+
+### Added
+
+- Policy evaluation before credential issuance
+- AWS-native policy store (SSM Parameter Store)
+- `credential_process` integration (`sentinel credentials --profile X`)
+- Decision logging (user, profile, allow/deny, rule matched)
+- `sentinel exec` command for direct invocation
+- Compatibility with existing aws-vault profiles
