@@ -52,13 +52,16 @@ Plans:
 
 #### Phase 72: Security Validation
 
-**Goal**: Test all identity types, verify fix, update documentation
+**Goal**: Complete identity fix across all commands, security validation tests, documentation
 **Depends on**: Phase 71
 **Research**: Unlikely (testing and documentation)
-**Plans**: TBD
+**Plans**: 4
 
 Plans:
-- [ ] 72-01: TBD
+- [ ] 72-01: Fix approval workflow commands (approve, deny, request, list)
+- [ ] 72-02: Fix break-glass commands (breakglass, breakglass-close, breakglass-list)
+- [ ] 72-03: Security regression tests for identity extraction
+- [ ] 72-04: Changelog and security advisory documentation
 
 ## Completed Milestones
 
