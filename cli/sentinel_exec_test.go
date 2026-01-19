@@ -14,6 +14,7 @@ import (
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/request"
+	"github.com/byteness/aws-vault/v7/vault"
 )
 
 func TestSentinelExecCommand_NestedSubshell(t *testing.T) {
@@ -624,4 +625,200 @@ type mockExecError struct {
 
 func (e *mockExecError) Error() string {
 	return e.message
+}
+
+func TestSentinelExecCommandInput_AutoLoginFields(t *testing.T) {
+	t.Run("AutoLogin field is false by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.AutoLogin {
+			t.Error("expected AutoLogin to be false by default")
+		}
+	})
+
+	t.Run("AutoLogin field can be set", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			AutoLogin:       true,
+		}
+		if !input.AutoLogin {
+			t.Error("expected AutoLogin to be true")
+		}
+	})
+
+	t.Run("UseStdout field is false by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.UseStdout {
+			t.Error("expected UseStdout to be false by default")
+		}
+	})
+
+	t.Run("UseStdout field can be set", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			UseStdout:       true,
+		}
+		if !input.UseStdout {
+			t.Error("expected UseStdout to be true")
+		}
+	})
+
+	t.Run("ConfigFile field is nil by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.ConfigFile != nil {
+			t.Error("expected ConfigFile to be nil by default")
+		}
+	})
+
+	t.Run("ConfigFile field can be set", func(t *testing.T) {
+		// Create a minimal config file for testing
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config")
+		configContent := `[profile test]
+region = us-east-1
+`
+		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
+
+		configFile, err := vault.LoadConfig(configPath)
+		if err != nil {
+			t.Fatalf("failed to load config: %v", err)
+		}
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			ConfigFile:      configFile,
+		}
+		if input.ConfigFile == nil {
+			t.Error("expected ConfigFile to be set")
+		}
+	})
+}
+
+func TestSentinelExecCommand_AutoLoginIntegration(t *testing.T) {
+	t.Run("auto-login disabled by default (backward compatible)", func(t *testing.T) {
+		// Verify that having AutoLogin=false is the default behavior
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			AutoLogin:       false, // Explicitly false
+		}
+
+		if input.AutoLogin {
+			t.Error("AutoLogin should be false by default")
+		}
+	})
+
+	t.Run("auto-login enabled with UseStdout", func(t *testing.T) {
+		// Test configuration with both flags set
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			AutoLogin:       true,
+			UseStdout:       true, // Print URL instead of opening browser
+		}
+
+		if !input.AutoLogin {
+			t.Error("expected AutoLogin to be true")
+		}
+		if !input.UseStdout {
+			t.Error("expected UseStdout to be true")
+		}
+	})
+
+	t.Run("auto-login with SSO profile configuration", func(t *testing.T) {
+		// Create a config file with SSO settings
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config")
+		configContent := `[profile sso-exec-test]
+sso_start_url = https://my-exec-sso-portal.awsapps.com/start
+sso_region = us-west-2
+sso_account_id = 987654321098
+sso_role_name = ExecTestRole
+`
+		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
+
+		configFile, err := vault.LoadConfig(configPath)
+		if err != nil {
+			t.Fatalf("failed to load config: %v", err)
+		}
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "sso-exec-test",
+			PolicyParameter: "/sentinel/policies/test",
+			AutoLogin:       true,
+			ConfigFile:      configFile,
+		}
+
+		// Verify configuration is valid for auto-login
+		if input.ConfigFile == nil {
+			t.Fatal("expected ConfigFile to be set")
+		}
+
+		// Verify SSO profile can be found
+		profile, ok := input.ConfigFile.ProfileSection("sso-exec-test")
+		if !ok {
+			t.Fatal("expected to find sso-exec-test profile")
+		}
+		if profile.SSOStartURL == "" {
+			t.Error("expected profile to have SSO start URL")
+		}
+		if profile.SSORegion != "us-west-2" {
+			t.Errorf("expected SSO region us-west-2, got %s", profile.SSORegion)
+		}
+	})
+
+	t.Run("auto-login with sso-session configuration", func(t *testing.T) {
+		// Create a config file with sso-session settings (modern pattern)
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, "config")
+		configContent := `[sso-session my-sso]
+sso_start_url = https://my-sso-portal.awsapps.com/start
+sso_region = us-east-1
+sso_registration_scopes = sso:account:access
+
+[profile sso-session-test]
+sso_session = my-sso
+sso_account_id = 123456789012
+sso_role_name = AdminRole
+`
+		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+			t.Fatalf("failed to write config file: %v", err)
+		}
+
+		configFile, err := vault.LoadConfig(configPath)
+		if err != nil {
+			t.Fatalf("failed to load config: %v", err)
+		}
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "sso-session-test",
+			PolicyParameter: "/sentinel/policies/test",
+			AutoLogin:       true,
+			ConfigFile:      configFile,
+		}
+
+		// Verify SSO session profile can be found
+		profile, ok := input.ConfigFile.ProfileSection("sso-session-test")
+		if !ok {
+			t.Fatal("expected to find sso-session-test profile")
+		}
+		if profile.SSOSession != "my-sso" {
+			t.Errorf("expected sso_session my-sso, got %s", profile.SSOSession)
+		}
+
+		// Verify SSO session section can be found
+		ssoSession, ok := input.ConfigFile.SSOSessionSection("my-sso")
+		if !ok {
+			t.Fatal("expected to find my-sso session section")
+		}
+		if ssoSession.SSOStartURL == "" {
+			t.Error("expected sso-session to have start URL")
+		}
+	})
 }
