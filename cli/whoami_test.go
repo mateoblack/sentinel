@@ -659,6 +659,47 @@ func TestWhoamiCommand_CustomRegion(t *testing.T) {
 }
 
 // ============================================================================
+// TestWhoamiCommand - Profile Flag
+// ============================================================================
+
+func TestWhoamiCommand_ProfileFlag(t *testing.T) {
+	stdout, stderr, cleanup := createWhoamiTestFiles(t)
+	defer cleanup()
+
+	// When STSClient is provided, profile flag is ignored (client already configured)
+	// This test verifies the command works with the profile flag set and doesn't error
+	mockSTS := &mockSTSClient{
+		GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+			return &sts.GetCallerIdentityOutput{
+				Arn:     aws.String("arn:aws:iam::123456789012:user/alice"),
+				Account: aws.String("123456789012"),
+				UserId:  aws.String("AIDAEXAMPLE"),
+			}, nil
+		},
+	}
+
+	input := WhoamiCommandInput{
+		Profile:   "my-sso-profile",
+		STSClient: mockSTS,
+		Stdout:    stdout,
+		Stderr:    stderr,
+	}
+
+	err := WhoamiCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readWhoamiFile(t, stdout)
+	if !strings.Contains(output, "AWS Identity") {
+		t.Error("expected output to contain header")
+	}
+	if !strings.Contains(output, "alice") {
+		t.Error("expected output to contain username 'alice'")
+	}
+}
+
+// ============================================================================
 // TestWhoamiCommand - Output Format Verification
 // ============================================================================
 
