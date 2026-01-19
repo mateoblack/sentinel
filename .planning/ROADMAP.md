@@ -383,10 +383,14 @@ Plans:
 **Depends on**: v1.8 complete
 **Research**: Likely (AWS SDK SSO credential provider patterns)
 **Research topics**: AWS SDK SSO credential provider chain, ~/.aws/sso/cache/ integration, credential resolution order
-**Plans**: TBD
+**Plans**: 5
 
 Plans:
-- [ ] 76-01: TBD (run /gsd:plan-phase 76 to break down)
+- [x] 76-01: Core command SSO credential loading (credentials, exec) — completed 2026-01-19
+- [x] 76-02: Approval workflow command SSO credential loading — completed 2026-01-19
+- [x] 76-03: Break-glass command SSO credential loading — completed 2026-01-19
+- [x] 76-04: Infrastructure command SSO credential loading — completed 2026-01-19
+- [x] 76-05: Permissions and audit command SSO credential loading — completed 2026-01-19
 
 #### Phase 77: Whoami Profile Flag
 
@@ -412,6 +416,6 @@ Plans:
 | v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
-| v1.9 SSO Profile Support | 76-77 | 0/? | 🚧 In Progress | - |
+| v1.9 SSO Profile Support | 76-77 | 5/? | 🚧 In Progress | - |
 
 **Totals:** 10 milestones shipped (75 phases, 123 plans), 1 in progress
