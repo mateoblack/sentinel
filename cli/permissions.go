@@ -26,6 +26,8 @@ type PermissionsCommandInput struct {
 	Detect bool
 	// Region specifies the AWS region for detection (only used with --detect).
 	Region string
+	// AWSProfile specifies the AWS profile for credentials (optional, uses default chain if not specified).
+	AWSProfile string
 
 	// Stdout is an optional writer for output (for testing).
 	// If nil, os.Stdout will be used.
@@ -79,6 +81,9 @@ func configurePermissionsListCommand(app *kingpin.Application, s *Sentinel) {
 
 	listCmd.Flag("region", "AWS region for detection (only used with --detect)").
 		StringVar(&input.Region)
+
+	listCmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
+		StringVar(&input.AWSProfile)
 
 	listCmd.Action(func(c *kingpin.ParseContext) error {
 		err := PermissionsCommand(input)
@@ -175,6 +180,9 @@ func detectPermissions(input PermissionsCommandInput, stderr *os.File) ([]permis
 	if detector == nil {
 		// Load AWS config
 		var opts []func(*config.LoadOptions) error
+		if input.AWSProfile != "" {
+			opts = append(opts, config.WithSharedConfigProfile(input.AWSProfile))
+		}
 		if input.Region != "" {
 			opts = append(opts, config.WithRegion(input.Region))
 		}
@@ -273,6 +281,8 @@ type PermissionsCheckCommandInput struct {
 	Detect bool
 	// Region specifies the AWS region for API calls.
 	Region string
+	// AWSProfile specifies the AWS profile for credentials (optional, uses default chain if not specified).
+	AWSProfile string
 
 	// Stdout is an optional writer for output (for testing).
 	// If nil, os.Stdout will be used.
@@ -339,6 +349,9 @@ func ConfigurePermissionsCheckCommand(app *kingpin.Application, s *Sentinel) {
 	checkCmd.Flag("aws-region", "AWS region for API calls").
 		StringVar(&input.Region)
 
+	checkCmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
+		StringVar(&input.AWSProfile)
+
 	checkCmd.Action(func(c *kingpin.ParseContext) error {
 		exitCode, err := PermissionsCheckCommand(input)
 		if err != nil {
@@ -399,6 +412,9 @@ func PermissionsCheckCommand(input PermissionsCheckCommandInput) (int, error) {
 	checker := input.Checker
 	if checker == nil {
 		var opts []func(*config.LoadOptions) error
+		if input.AWSProfile != "" {
+			opts = append(opts, config.WithSharedConfigProfile(input.AWSProfile))
+		}
 		if input.Region != "" {
 			opts = append(opts, config.WithRegion(input.Region))
 		}
@@ -441,6 +457,9 @@ func detectFeaturesForCheck(ctx context.Context, input PermissionsCheckCommandIn
 	detector := input.Detector
 	if detector == nil {
 		var opts []func(*config.LoadOptions) error
+		if input.AWSProfile != "" {
+			opts = append(opts, config.WithSharedConfigProfile(input.AWSProfile))
+		}
 		if input.Region != "" {
 			opts = append(opts, config.WithRegion(input.Region))
 		}
