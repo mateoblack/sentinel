@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 )
@@ -44,6 +45,10 @@ type BreakGlassCommandInput struct {
 	// BreakGlassPolicy is an optional policy for authorization control.
 	// If nil, any user can invoke break-glass (no policy enforcement).
 	BreakGlassPolicy *breakglass.BreakGlassPolicy
+
+	// STSClient is an optional STS client for AWS identity extraction.
+	// If nil, a new client will be created from AWS config.
+	STSClient identity.STSAPI
 }
 
 // BreakGlassCommandOutput represents the JSON output from the breakglass command.
@@ -96,21 +101,35 @@ func ConfigureBreakGlassCommand(app *kingpin.Application, s *Sentinel) {
 // It creates a break-glass emergency access event and stores it in DynamoDB.
 // On success, outputs JSON to stdout. On failure, outputs error to stderr and returns error.
 func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sentinel) error {
-	// 1. Get current user (invoker)
-	currentUser, err := user.Current()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to get current user: %v\n", err)
-		return err
-	}
-	username := currentUser.Username
-
-	// 2. Validate profile exists in AWS config
+	// 1. Validate profile exists in AWS config
 	if err := s.ValidateProfile(input.ProfileName); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return err
 	}
 
-	// 3. Parse and validate reason code
+	// 2. Load AWS config (needed for STS and DynamoDB)
+	awsCfgOpts := []func(*config.LoadOptions) error{}
+	if input.Region != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	}
+	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
+		return err
+	}
+
+	// 3. Get AWS identity for invoker
+	stsClient := input.STSClient
+	if stsClient == nil {
+		stsClient = sts.NewFromConfig(awsCfg)
+	}
+	username, err := identity.GetAWSUsername(ctx, stsClient)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to get AWS identity: %v\n", err)
+		return err
+	}
+
+	// 4. Parse and validate reason code
 	reasonCode := breakglass.ReasonCode(input.ReasonCode)
 	if !reasonCode.IsValid() {
 		errMsg := fmt.Sprintf("Invalid reason code: %q (must be one of: incident, maintenance, security, recovery, other)", input.ReasonCode)
@@ -118,7 +137,7 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 		return errors.New(errMsg)
 	}
 
-	// 3.5 Check break-glass policy authorization if policy is provided
+	// 4.5 Check break-glass policy authorization if policy is provided
 	if input.BreakGlassPolicy != nil {
 		rule := breakglass.FindBreakGlassPolicyRule(input.BreakGlassPolicy, input.ProfileName)
 		if rule == nil {
@@ -166,32 +185,21 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 		}
 	}
 
-	// 4. Cap duration at MaxDuration (4h)
+	// 5. Cap duration at MaxDuration (4h)
 	duration := input.Duration
 	if duration > breakglass.MaxDuration {
 		fmt.Fprintf(os.Stderr, "Warning: duration %v exceeds maximum, capping at %v\n", duration, breakglass.MaxDuration)
 		duration = breakglass.MaxDuration
 	}
 
-	// 5. Get or create store
+	// 6. Get or create store
 	store := input.Store
 	if store == nil {
-		// Load AWS config
-		awsCfgOpts := []func(*config.LoadOptions) error{}
-		if input.Region != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
-		}
-		awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
-			return err
-		}
-
-		// Create DynamoDB store
+		// Create DynamoDB store using already-loaded AWS config
 		store = breakglass.NewDynamoDBStore(awsCfg, input.BreakGlassTable)
 	}
 
-	// 6. Check for existing active break-glass for same user+profile
+	// 7. Check for existing active break-glass for same user+profile
 	existingEvent, err := store.FindActiveByInvokerAndProfile(ctx, username, input.ProfileName)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to check for active break-glass: %v\n", err)
@@ -204,7 +212,7 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 		return errors.New("active break-glass already exists for this profile")
 	}
 
-	// 6.5 Check rate limits if policy is provided
+	// 7.5 Check rate limits if policy is provided
 	if input.RateLimitPolicy != nil {
 		result, err := breakglass.CheckRateLimit(ctx, store, input.RateLimitPolicy, username, input.ProfileName, time.Now())
 		if err != nil {
@@ -225,7 +233,7 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 		}
 	}
 
-	// 7. Build BreakGlassEvent struct
+	// 8. Build BreakGlassEvent struct
 	now := time.Now()
 	requestID := breakglass.NewBreakGlassID() // Generate unique request ID for CloudTrail correlation
 	event := &breakglass.BreakGlassEvent{
@@ -242,25 +250,25 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 		RequestID:     requestID,
 	}
 
-	// 8. Validate event
+	// 9. Validate event
 	if err := event.Validate(); err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid break-glass event: %v\n", err)
 		return err
 	}
 
-	// 9. Store event
+	// 10. Store event
 	if err := store.Create(ctx, event); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create break-glass event: %v\n", err)
 		return err
 	}
 
-	// 10. Log break-glass invocation if Logger is provided
+	// 11. Log break-glass invocation if Logger is provided
 	if input.Logger != nil {
 		entry := logging.NewBreakGlassLogEntry(logging.BreakGlassEventInvoked, event)
 		input.Logger.LogBreakGlass(entry)
 	}
 
-	// 11. Fire notification if Notifier is provided
+	// 12. Fire notification if Notifier is provided
 	// Notification errors are logged but don't fail the command (security alerts are best-effort)
 	if input.Notifier != nil {
 		bgEvent := notification.NewBreakGlassEvent(notification.EventBreakGlassInvoked, event, username)
@@ -269,7 +277,7 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 		}
 	}
 
-	// 12. Output success JSON
+	// 13. Output success JSON
 	output := BreakGlassCommandOutput{
 		EventID:    event.ID,
 		Profile:    event.Profile,

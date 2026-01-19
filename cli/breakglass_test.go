@@ -3,12 +3,14 @@ package cli
 import (
 	"context"
 	"errors"
-	"os/user"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
@@ -155,22 +157,64 @@ func (m *mockBreakGlassNotifier) NotifyBreakGlass(ctx context.Context, event *no
 	return nil
 }
 
+// mockBreakGlassSTSClient implements identity.STSAPI for testing break-glass commands.
+type mockBreakGlassSTSClient struct {
+	GetCallerIdentityFunc func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+func (m *mockBreakGlassSTSClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	if m.GetCallerIdentityFunc != nil {
+		return m.GetCallerIdentityFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("GetCallerIdentityFunc not set")
+}
+
+// defaultMockUsername returns the mock username used in tests.
+const defaultMockUsername = "testuser"
+
+// defaultMockARN returns the mock ARN used in tests.
+const defaultMockARN = "arn:aws:iam::123456789012:user/testuser"
+
+// defaultMockAccountID returns the mock account ID used in tests.
+const defaultMockAccountID = "123456789012"
+
+// newMockBreakGlassSTSClient creates a mock STS client that returns the given username in the ARN.
+func newMockBreakGlassSTSClient(username string) identity.STSAPI {
+	return &mockBreakGlassSTSClient{
+		GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+			return &sts.GetCallerIdentityOutput{
+				Arn:     aws.String("arn:aws:iam::123456789012:user/" + username),
+				Account: aws.String("123456789012"),
+				UserId:  aws.String("AIDAEXAMPLE"),
+			}, nil
+		},
+	}
+}
+
+// defaultMockSTSClient returns a mock STS client for the default test user.
+func defaultMockSTSClient() identity.STSAPI {
+	return newMockBreakGlassSTSClient(defaultMockUsername)
+}
+
 // testableBreakGlassCommandOutput contains test output for break-glass command.
 type testableBreakGlassCommandOutput struct {
 	Event *breakglass.BreakGlassEvent
 }
 
-// testableBreakGlassCommand is a testable version that accepts a profile validator.
+// testableBreakGlassCommand is a testable version that accepts a profile validator and mock STS client.
 func testableBreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, validateProfile func(string) error) (*testableBreakGlassCommandOutput, error) {
-	// 1. Get current user (invoker)
-	currentUser, err := user.Current()
-	if err != nil {
+	// 1. Validate profile exists in AWS config
+	if err := validateProfile(input.ProfileName); err != nil {
 		return nil, err
 	}
-	username := currentUser.Username
 
-	// 2. Validate profile exists in AWS config
-	if err := validateProfile(input.ProfileName); err != nil {
+	// 2. Get AWS identity for invoker (use STSClient from input)
+	stsClient := input.STSClient
+	if stsClient == nil {
+		return nil, errors.New("STSClient is required for testing")
+	}
+	username, err := identity.GetAWSUsername(ctx, stsClient)
+	if err != nil {
 		return nil, err
 	}
 
@@ -319,6 +363,7 @@ func TestBreakGlassCommand_Success(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "Production database outage requiring immediate investigation and remediation",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -373,6 +418,7 @@ func TestBreakGlassCommand_AllReasonCodes(t *testing.T) {
 				ReasonCode:    rc,
 				Justification: "Valid justification for testing break-glass with reason code " + rc,
 				Store:         store,
+				STSClient:     defaultMockSTSClient(),
 			}
 
 			output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -409,6 +455,7 @@ func TestBreakGlassCommand_DurationCappedAtMax(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "Testing duration capping at maximum allowed time limit",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -438,6 +485,7 @@ func TestBreakGlassCommand_InvalidProfile(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "Testing break-glass with invalid profile name",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	validateProfile := func(string) error {
@@ -470,6 +518,7 @@ func TestBreakGlassCommand_InvalidReasonCode(t *testing.T) {
 				ReasonCode:    rc,
 				Justification: "Testing break-glass with invalid reason code",
 				Store:         store,
+				STSClient:     defaultMockSTSClient(),
 			}
 
 			_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -496,6 +545,7 @@ func TestBreakGlassCommand_JustificationTooShort(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "too short", // Only 9 chars, minimum is 20
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -526,6 +576,7 @@ func TestBreakGlassCommand_JustificationTooLong(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: string(longJustification),
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -542,10 +593,9 @@ func TestBreakGlassCommand_JustificationTooLong(t *testing.T) {
 // ============================================================================
 
 func TestBreakGlassCommand_ActiveBreakGlassExists(t *testing.T) {
-	currentUser, _ := user.Current()
 	existingEvent := &breakglass.BreakGlassEvent{
 		ID:        "existing1234567",
-		Invoker:   currentUser.Username,
+		Invoker:   defaultMockUsername,
 		Profile:   "production",
 		Status:    breakglass.StatusActive,
 		ExpiresAt: time.Now().Add(1 * time.Hour),
@@ -553,7 +603,7 @@ func TestBreakGlassCommand_ActiveBreakGlassExists(t *testing.T) {
 
 	store := &mockBreakGlassStore{
 		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
-			if invoker == currentUser.Username && profile == "production" {
+			if invoker == defaultMockUsername && profile == "production" {
 				return existingEvent, nil
 			}
 			return nil, nil
@@ -566,6 +616,7 @@ func TestBreakGlassCommand_ActiveBreakGlassExists(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "Attempting to create duplicate break-glass event",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -595,6 +646,7 @@ func TestBreakGlassCommand_NoActiveBreakGlassExists(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "Testing that break-glass succeeds when none exists",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -607,10 +659,9 @@ func TestBreakGlassCommand_NoActiveBreakGlassExists(t *testing.T) {
 }
 
 func TestBreakGlassCommand_DifferentProfileAllowed(t *testing.T) {
-	currentUser, _ := user.Current()
 	existingEvent := &breakglass.BreakGlassEvent{
 		ID:        "existing1234567",
-		Invoker:   currentUser.Username,
+		Invoker:   defaultMockUsername,
 		Profile:   "staging", // Different profile
 		Status:    breakglass.StatusActive,
 		ExpiresAt: time.Now().Add(1 * time.Hour),
@@ -624,7 +675,7 @@ func TestBreakGlassCommand_DifferentProfileAllowed(t *testing.T) {
 		},
 		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
 			// Only return existing event for staging, not production
-			if invoker == currentUser.Username && profile == "staging" {
+			if invoker == defaultMockUsername && profile == "staging" {
 				return existingEvent, nil
 			}
 			return nil, nil
@@ -637,6 +688,7 @@ func TestBreakGlassCommand_DifferentProfileAllowed(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "Break-glass for production while staging active is allowed",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -668,6 +720,7 @@ func TestBreakGlassCommand_StoreCreateError(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "Testing break-glass command store error handling",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -692,6 +745,7 @@ func TestBreakGlassCommand_FindActiveError(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "Testing break-glass command find active error",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -725,6 +779,7 @@ func TestBreakGlassCommand_OutputFields(t *testing.T) {
 		ReasonCode:    "security",
 		Justification: "Security incident response requiring immediate access for forensics",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -765,10 +820,9 @@ func TestBreakGlassCommand_OutputFields(t *testing.T) {
 		t.Errorf("invalid RequestID format: %s", output.Event.RequestID)
 	}
 
-	// Verify invoker is current user
-	currentUser, _ := user.Current()
-	if output.Event.Invoker != currentUser.Username {
-		t.Errorf("expected invoker '%s', got '%s'", currentUser.Username, output.Event.Invoker)
+	// Verify invoker is using AWS identity (mock username)
+	if output.Event.Invoker != defaultMockUsername {
+		t.Errorf("expected invoker '%s', got '%s'", defaultMockUsername, output.Event.Invoker)
 	}
 
 	// Verify timestamps are set
@@ -809,6 +863,7 @@ func TestBreakGlassCommand_MinimumValidJustification(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "exactly20characters!", // 20 chars
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -844,6 +899,7 @@ func TestBreakGlassCommand_MaximumValidJustification(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: string(maxJustification),
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -873,6 +929,7 @@ func TestBreakGlassCommand_MinimumValidDuration(t *testing.T) {
 		ReasonCode:    "incident",
 		Justification: "Quick check requiring minimal access time",
 		Store:         store,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -912,6 +969,7 @@ func TestBreakGlassCommand_LogsInvocation(t *testing.T) {
 		Justification: "Production database outage requiring immediate investigation",
 		Store:         store,
 		Logger:        logger,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -941,10 +999,9 @@ func TestBreakGlassCommand_LogsInvocation(t *testing.T) {
 		t.Errorf("expected request_id %q, got %q", output.Event.RequestID, entry.RequestID)
 	}
 
-	// Verify invoker is current user
-	currentUser, _ := user.Current()
-	if entry.Invoker != currentUser.Username {
-		t.Errorf("expected invoker %q, got %q", currentUser.Username, entry.Invoker)
+	// Verify invoker is using AWS identity (mock username)
+	if entry.Invoker != defaultMockUsername {
+		t.Errorf("expected invoker %q, got %q", defaultMockUsername, entry.Invoker)
 	}
 
 	// Verify profile
@@ -1014,6 +1071,7 @@ func TestBreakGlassCommand_NoLoggingWhenLoggerNil(t *testing.T) {
 		Justification: "Testing break-glass succeeds without logger",
 		Store:         store,
 		Logger:        nil, // Explicitly nil
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1066,6 +1124,7 @@ func TestBreakGlassCommand_NotifiesOnInvocation(t *testing.T) {
 		Justification: "Production incident requiring emergency access",
 		Store:         store,
 		Notifier:      notifier,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1093,10 +1152,9 @@ func TestBreakGlassCommand_NotifiesOnInvocation(t *testing.T) {
 		t.Errorf("expected profile %q, got %q", "production", event.BreakGlass.Profile)
 	}
 
-	// Verify actor is current user
-	currentUser, _ := user.Current()
-	if event.Actor != currentUser.Username {
-		t.Errorf("expected actor %q, got %q", currentUser.Username, event.Actor)
+	// Verify actor is using AWS identity (mock username)
+	if event.Actor != defaultMockUsername {
+		t.Errorf("expected actor %q, got %q", defaultMockUsername, event.Actor)
 	}
 
 	// Verify timestamp is set
@@ -1132,6 +1190,7 @@ func TestBreakGlassCommand_NotificationErrorDoesNotFail(t *testing.T) {
 		Justification: "Security incident requiring immediate access",
 		Store:         store,
 		Notifier:      notifier,
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	// Command should succeed even when notification fails
@@ -1173,6 +1232,7 @@ func TestBreakGlassCommand_NilNotifierDoesNotPanic(t *testing.T) {
 		Justification: "Testing break-glass without notifier",
 		Store:         store,
 		Notifier:      nil, // Explicitly nil
+		STSClient:     defaultMockSTSClient(),
 	}
 
 	// Should not panic with nil notifier
@@ -1230,6 +1290,7 @@ func TestBreakGlassCommand_RateLimitBlocked_Cooldown(t *testing.T) {
 		Justification:   "Testing rate limit cooldown blocking",
 		Store:           store,
 		RateLimitPolicy: policy,
+		STSClient:       defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1273,6 +1334,7 @@ func TestBreakGlassCommand_RateLimitBlocked_Quota(t *testing.T) {
 		Justification:   "Testing rate limit quota blocking",
 		Store:           store,
 		RateLimitPolicy: policy,
+		STSClient:       defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1337,6 +1399,7 @@ func TestBreakGlassCommand_RateLimitAllowed(t *testing.T) {
 		Justification:   "Testing rate limit allowed with all checks passing",
 		Store:           store,
 		RateLimitPolicy: policy,
+		STSClient:       defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1375,6 +1438,7 @@ func TestBreakGlassCommand_NilRateLimitPolicy(t *testing.T) {
 		Justification:   "Testing break-glass without rate limit policy",
 		Store:           store,
 		RateLimitPolicy: nil, // Explicitly nil
+		STSClient:       defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1396,8 +1460,6 @@ func TestBreakGlassCommand_NilRateLimitPolicy(t *testing.T) {
 // ============================================================================
 
 func TestBreakGlassCommand_PolicyAuthorized(t *testing.T) {
-	currentUser, _ := user.Current()
-
 	var storedEvent *breakglass.BreakGlassEvent
 	store := &mockBreakGlassStore{
 		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
@@ -1415,7 +1477,7 @@ func TestBreakGlassCommand_PolicyAuthorized(t *testing.T) {
 			{
 				Name:     "production",
 				Profiles: []string{"production"},
-				Users:    []string{currentUser.Username},
+				Users:    []string{defaultMockUsername},
 			},
 		},
 	}
@@ -1427,6 +1489,7 @@ func TestBreakGlassCommand_PolicyAuthorized(t *testing.T) {
 		Justification:    "Testing policy authorized break-glass invocation",
 		Store:            store,
 		BreakGlassPolicy: bgPolicy,
+		STSClient:        defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1471,6 +1534,7 @@ func TestBreakGlassCommand_PolicyUserNotAuthorized(t *testing.T) {
 		Justification:    "Testing policy user not authorized",
 		Store:            store,
 		BreakGlassPolicy: bgPolicy,
+		STSClient:        defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1483,8 +1547,6 @@ func TestBreakGlassCommand_PolicyUserNotAuthorized(t *testing.T) {
 }
 
 func TestBreakGlassCommand_PolicyReasonCodeNotAllowed(t *testing.T) {
-	currentUser, _ := user.Current()
-
 	store := &mockBreakGlassStore{
 		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
 			return nil, nil
@@ -1497,7 +1559,7 @@ func TestBreakGlassCommand_PolicyReasonCodeNotAllowed(t *testing.T) {
 			{
 				Name:               "production",
 				Profiles:           []string{"production"},
-				Users:              []string{currentUser.Username},
+				Users:              []string{defaultMockUsername},
 				AllowedReasonCodes: []breakglass.ReasonCode{breakglass.ReasonIncident, breakglass.ReasonSecurity}, // maintenance not allowed
 			},
 		},
@@ -1510,6 +1572,7 @@ func TestBreakGlassCommand_PolicyReasonCodeNotAllowed(t *testing.T) {
 		Justification:    "Testing policy reason code not allowed",
 		Store:            store,
 		BreakGlassPolicy: bgPolicy,
+		STSClient:        defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1522,8 +1585,6 @@ func TestBreakGlassCommand_PolicyReasonCodeNotAllowed(t *testing.T) {
 }
 
 func TestBreakGlassCommand_PolicyTimeWindowBlocked(t *testing.T) {
-	currentUser, _ := user.Current()
-
 	store := &mockBreakGlassStore{
 		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
 			return nil, nil
@@ -1557,7 +1618,7 @@ func TestBreakGlassCommand_PolicyTimeWindowBlocked(t *testing.T) {
 			{
 				Name:     "production",
 				Profiles: []string{"production"},
-				Users:    []string{currentUser.Username},
+				Users:    []string{defaultMockUsername},
 				Time: &policy.TimeWindow{
 					Days: []policy.Weekday{blockedDay}, // A day that is not today
 				},
@@ -1572,6 +1633,7 @@ func TestBreakGlassCommand_PolicyTimeWindowBlocked(t *testing.T) {
 		Justification:    "Testing policy time window blocked",
 		Store:            store,
 		BreakGlassPolicy: bgPolicy,
+		STSClient:        defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1584,8 +1646,6 @@ func TestBreakGlassCommand_PolicyTimeWindowBlocked(t *testing.T) {
 }
 
 func TestBreakGlassCommand_PolicyDurationExceedsMaximum(t *testing.T) {
-	currentUser, _ := user.Current()
-
 	store := &mockBreakGlassStore{
 		findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
 			return nil, nil
@@ -1598,7 +1658,7 @@ func TestBreakGlassCommand_PolicyDurationExceedsMaximum(t *testing.T) {
 			{
 				Name:        "production",
 				Profiles:    []string{"production"},
-				Users:       []string{currentUser.Username},
+				Users:       []string{defaultMockUsername},
 				MaxDuration: 30 * time.Minute, // Cap at 30 minutes
 			},
 		},
@@ -1611,6 +1671,7 @@ func TestBreakGlassCommand_PolicyDurationExceedsMaximum(t *testing.T) {
 		Justification:    "Testing policy duration exceeds maximum",
 		Store:            store,
 		BreakGlassPolicy: bgPolicy,
+		STSClient:        defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1647,6 +1708,7 @@ func TestBreakGlassCommand_PolicyNoMatchingRule(t *testing.T) {
 		Justification:    "Testing policy no matching rule",
 		Store:            store,
 		BreakGlassPolicy: bgPolicy,
+		STSClient:        defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1677,6 +1739,7 @@ func TestBreakGlassCommand_NilPolicyAllows(t *testing.T) {
 		Justification:    "Testing nil policy allows any user (backward compatible)",
 		Store:            store,
 		BreakGlassPolicy: nil, // Explicitly nil - no policy enforcement
+		STSClient:        defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1694,8 +1757,6 @@ func TestBreakGlassCommand_NilPolicyAllows(t *testing.T) {
 }
 
 func TestBreakGlassCommand_PolicyWildcardProfile(t *testing.T) {
-	currentUser, _ := user.Current()
-
 	var storedEvent *breakglass.BreakGlassEvent
 	store := &mockBreakGlassStore{
 		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
@@ -1713,7 +1774,7 @@ func TestBreakGlassCommand_PolicyWildcardProfile(t *testing.T) {
 			{
 				Name:     "all-profiles",
 				Profiles: []string{}, // Empty = wildcard, matches all profiles
-				Users:    []string{currentUser.Username},
+				Users:    []string{defaultMockUsername},
 			},
 		},
 	}
@@ -1725,6 +1786,7 @@ func TestBreakGlassCommand_PolicyWildcardProfile(t *testing.T) {
 		Justification:    "Testing wildcard profile matches any profile",
 		Store:            store,
 		BreakGlassPolicy: bgPolicy,
+		STSClient:        defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1742,8 +1804,6 @@ func TestBreakGlassCommand_PolicyWildcardProfile(t *testing.T) {
 }
 
 func TestBreakGlassCommand_PolicyEmptyReasonCodesAllowsAll(t *testing.T) {
-	currentUser, _ := user.Current()
-
 	var storedEvent *breakglass.BreakGlassEvent
 	store := &mockBreakGlassStore{
 		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
@@ -1761,7 +1821,7 @@ func TestBreakGlassCommand_PolicyEmptyReasonCodesAllowsAll(t *testing.T) {
 			{
 				Name:               "production",
 				Profiles:           []string{"production"},
-				Users:              []string{currentUser.Username},
+				Users:              []string{defaultMockUsername},
 				AllowedReasonCodes: []breakglass.ReasonCode{}, // Empty = all allowed
 			},
 		},
@@ -1779,6 +1839,7 @@ func TestBreakGlassCommand_PolicyEmptyReasonCodesAllowsAll(t *testing.T) {
 				Justification:    "Testing empty reason codes allows all",
 				Store:            store,
 				BreakGlassPolicy: bgPolicy,
+				STSClient:        defaultMockSTSClient(),
 			}
 
 			output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
@@ -1796,8 +1857,6 @@ func TestBreakGlassCommand_PolicyEmptyReasonCodesAllowsAll(t *testing.T) {
 }
 
 func TestBreakGlassCommand_PolicyZeroMaxDurationNoLimit(t *testing.T) {
-	currentUser, _ := user.Current()
-
 	var storedEvent *breakglass.BreakGlassEvent
 	store := &mockBreakGlassStore{
 		createFn: func(ctx context.Context, event *breakglass.BreakGlassEvent) error {
@@ -1815,7 +1874,7 @@ func TestBreakGlassCommand_PolicyZeroMaxDurationNoLimit(t *testing.T) {
 			{
 				Name:        "production",
 				Profiles:    []string{"production"},
-				Users:       []string{currentUser.Username},
+				Users:       []string{defaultMockUsername},
 				MaxDuration: 0, // Zero = no duration cap (system default applies)
 			},
 		},
@@ -1828,6 +1887,7 @@ func TestBreakGlassCommand_PolicyZeroMaxDurationNoLimit(t *testing.T) {
 		Justification:    "Testing zero max duration allows any duration up to system max",
 		Store:            store,
 		BreakGlassPolicy: bgPolicy,
+		STSClient:        defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCommand(context.Background(), input, func(string) error { return nil })
