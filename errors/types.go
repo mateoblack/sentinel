@@ -56,6 +56,16 @@ const (
 	ErrCodeConfigProfileNotFound    = "CONFIG_PROFILE_NOT_FOUND"
 )
 
+// SSO error codes
+const (
+	ErrCodeSSOExpiredToken   = "SSO_EXPIRED_TOKEN"
+	ErrCodeSSONoCredentials  = "SSO_NO_CREDENTIALS"
+	ErrCodeSSOInvalidToken   = "SSO_INVALID_TOKEN"
+	ErrCodeSSONetworkError   = "SSO_NETWORK_ERROR"
+	ErrCodeSSOLoginFailed    = "SSO_LOGIN_FAILED"
+	ErrCodeSSOLoginTimeout   = "SSO_LOGIN_TIMEOUT"
+)
+
 // sentinelError implements the SentinelError interface.
 type sentinelError struct {
 	code       string
