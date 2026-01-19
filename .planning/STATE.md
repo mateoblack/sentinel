@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-18)
 ## Current Position
 
 Phase: 72 of 72 (Security Validation)
-Plan: 2 of 4 in current phase
-Status: Plan 02 complete
-Last activity: 2026-01-19 — Completed 72-02-PLAN.md
+Plan: 3 of 4 in current phase
+Status: Plan 03 complete
+Last activity: 2026-01-19 — Completed 72-03-PLAN.md
 
-Progress: █████████░ 90% (v1.7.1 Security Patch)
+Progress: █████████░ 95% (v1.7.1 Security Patch)
 
 ## Milestone Summary
 
@@ -353,6 +353,13 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - breakglass_list.go only calls identity.GetAWSUsername when no filter flags provided (optimization)
 - testableBreakGlassListCommand signature changed to use STSClient instead of mockUsername parameter
 
+**v1.7.1 Security Regression Tests decisions (Phase 72-03):**
+- TestSecurityRegression_ prefix for CI/CD filtering of security tests
+- Attack scenario demonstration tests explicitly show pre-v1.7.1 vulnerability and verify fix
+- Tests cover all identity types: IAM user, SSO assumed-role, regular assumed-role, federated-user, root, GovCloud, China partition
+- Policy bypass prevention tests verify AWS identity used for credentials, break-glass, and approval authorization
+- Username sanitization tests verify special characters removed and length truncated to 20 chars
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -364,9 +371,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 72-02-PLAN.md (Security Validation Plan 2 complete)
+Stopped at: Completed 72-03-PLAN.md (Security Validation Plan 3 complete)
 Resume file: None
-Next: Execute Plan 72-03 (`/gsd:execute-plan 72-03`)
+Next: Execute Plan 72-04 (`/gsd:execute-plan 72-04`)
 
 ## Roadmap Evolution
 
