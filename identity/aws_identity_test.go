@@ -1,9 +1,13 @@
 package identity
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 func TestParseARN(t *testing.T) {
@@ -601,5 +605,247 @@ func BenchmarkExtractUsername(b *testing.B) {
 	arn := "arn:aws:sts::123456789012:assumed-role/Role/user@company.com"
 	for i := 0; i < b.N; i++ {
 		_, _ = ExtractUsername(arn)
+	}
+}
+
+// mockSTSClient implements STSAPI for testing.
+type mockSTSClient struct {
+	GetCallerIdentityFunc func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+func (m *mockSTSClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	if m.GetCallerIdentityFunc != nil {
+		return m.GetCallerIdentityFunc(ctx, params, optFns...)
+	}
+	return &sts.GetCallerIdentityOutput{}, nil
+}
+
+func TestGetAWSUsername(t *testing.T) {
+	tests := []struct {
+		name         string
+		arnReturned  string
+		stsError     error
+		wantUsername string
+		wantErr      bool
+		wantErrMsg   string
+	}{
+		{
+			name:         "IAM user ARN returns sanitized username",
+			arnReturned:  "arn:aws:iam::123456789012:user/alice",
+			wantUsername: "alice",
+		},
+		{
+			name:         "SSO assumed-role ARN returns sanitized email",
+			arnReturned:  "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_Admin_abc/alice@company.com",
+			wantUsername: "alicecompanycom",
+		},
+		{
+			name:         "Regular assumed-role ARN returns session name",
+			arnReturned:  "arn:aws:sts::123456789012:assumed-role/AdminRole/session123",
+			wantUsername: "session123",
+		},
+		{
+			name:        "Empty ARN returns error",
+			arnReturned: "",
+			wantErr:     true,
+			wantErrMsg:  "empty ARN",
+		},
+		{
+			name:       "GetCallerIdentity error propagates",
+			stsError:   errors.New("STS service unavailable"),
+			wantErr:    true,
+			wantErrMsg: "failed to get caller identity",
+		},
+		{
+			name:         "Federated user ARN",
+			arnReturned:  "arn:aws:sts::123456789012:federated-user/bob",
+			wantUsername: "bob",
+		},
+		{
+			name:         "Root user ARN",
+			arnReturned:  "arn:aws:iam::123456789012:root",
+			wantUsername: "root",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &mockSTSClient{
+				GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+					if tt.stsError != nil {
+						return nil, tt.stsError
+					}
+					return &sts.GetCallerIdentityOutput{
+						Arn:     aws.String(tt.arnReturned),
+						Account: aws.String("123456789012"),
+						UserId:  aws.String("AIDAEXAMPLE"),
+					}, nil
+				},
+			}
+
+			username, err := GetAWSUsername(context.Background(), client)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("GetAWSUsername() expected error, got nil")
+					return
+				}
+				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("GetAWSUsername() error = %v, want error containing %q", err, tt.wantErrMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("GetAWSUsername() unexpected error = %v", err)
+				return
+			}
+
+			if username != tt.wantUsername {
+				t.Errorf("GetAWSUsername() = %v, want %v", username, tt.wantUsername)
+			}
+		})
+	}
+}
+
+func TestGetAWSIdentity(t *testing.T) {
+	tests := []struct {
+		name            string
+		arnReturned     string
+		stsError        error
+		wantType        IdentityType
+		wantUsername    string
+		wantRawUsername string
+		wantAccountID   string
+		wantErr         bool
+		wantErrMsg      string
+	}{
+		{
+			name:            "IAM user ARN returns full identity",
+			arnReturned:     "arn:aws:iam::123456789012:user/alice",
+			wantType:        IdentityTypeUser,
+			wantUsername:    "alice",
+			wantRawUsername: "alice",
+			wantAccountID:   "123456789012",
+		},
+		{
+			name:            "SSO assumed-role ARN returns full identity",
+			arnReturned:     "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_Admin_abc/alice@company.com",
+			wantType:        IdentityTypeAssumedRole,
+			wantUsername:    "alicecompanycom",
+			wantRawUsername: "alice@company.com",
+			wantAccountID:   "123456789012",
+		},
+		{
+			name:            "Regular assumed-role ARN",
+			arnReturned:     "arn:aws:sts::123456789012:assumed-role/AdminRole/session123",
+			wantType:        IdentityTypeAssumedRole,
+			wantUsername:    "session123",
+			wantRawUsername: "session123",
+			wantAccountID:   "123456789012",
+		},
+		{
+			name:       "Empty ARN returns error",
+			wantErr:    true,
+			wantErrMsg: "empty ARN",
+		},
+		{
+			name:       "GetCallerIdentity error propagates",
+			stsError:   errors.New("access denied"),
+			wantErr:    true,
+			wantErrMsg: "failed to get caller identity",
+		},
+		{
+			name:            "Federated user ARN",
+			arnReturned:     "arn:aws:sts::123456789012:federated-user/bob",
+			wantType:        IdentityTypeFederatedUser,
+			wantUsername:    "bob",
+			wantRawUsername: "bob",
+			wantAccountID:   "123456789012",
+		},
+		{
+			name:            "Root user ARN",
+			arnReturned:     "arn:aws:iam::123456789012:root",
+			wantType:        IdentityTypeRoot,
+			wantUsername:    "root",
+			wantRawUsername: "root",
+			wantAccountID:   "123456789012",
+		},
+		{
+			name:            "GovCloud ARN",
+			arnReturned:     "arn:aws-us-gov:iam::123456789012:user/alice",
+			wantType:        IdentityTypeUser,
+			wantUsername:    "alice",
+			wantRawUsername: "alice",
+			wantAccountID:   "123456789012",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &mockSTSClient{
+				GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+					if tt.stsError != nil {
+						return nil, tt.stsError
+					}
+					return &sts.GetCallerIdentityOutput{
+						Arn:     aws.String(tt.arnReturned),
+						Account: aws.String("123456789012"),
+						UserId:  aws.String("AIDAEXAMPLE"),
+					}, nil
+				},
+			}
+
+			identity, err := GetAWSIdentity(context.Background(), client)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("GetAWSIdentity() expected error, got nil")
+					return
+				}
+				if tt.wantErrMsg != "" && !strings.Contains(err.Error(), tt.wantErrMsg) {
+					t.Errorf("GetAWSIdentity() error = %v, want error containing %q", err, tt.wantErrMsg)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("GetAWSIdentity() unexpected error = %v", err)
+				return
+			}
+
+			if identity.Type != tt.wantType {
+				t.Errorf("GetAWSIdentity() Type = %v, want %v", identity.Type, tt.wantType)
+			}
+			if identity.Username != tt.wantUsername {
+				t.Errorf("GetAWSIdentity() Username = %v, want %v", identity.Username, tt.wantUsername)
+			}
+			if identity.RawUsername != tt.wantRawUsername {
+				t.Errorf("GetAWSIdentity() RawUsername = %v, want %v", identity.RawUsername, tt.wantRawUsername)
+			}
+			if identity.AccountID != tt.wantAccountID {
+				t.Errorf("GetAWSIdentity() AccountID = %v, want %v", identity.AccountID, tt.wantAccountID)
+			}
+			if identity.ARN != tt.arnReturned {
+				t.Errorf("GetAWSIdentity() ARN = %v, want %v", identity.ARN, tt.arnReturned)
+			}
+		})
+	}
+}
+
+// Benchmark for GetAWSUsername with mock client
+func BenchmarkGetAWSUsername(b *testing.B) {
+	client := &mockSTSClient{
+		GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+			return &sts.GetCallerIdentityOutput{
+				Arn:     aws.String("arn:aws:sts::123456789012:assumed-role/Role/user@company.com"),
+				Account: aws.String("123456789012"),
+				UserId:  aws.String("AIDAEXAMPLE"),
+			}, nil
+		},
+	}
+
+	for i := 0; i < b.N; i++ {
+		_, _ = GetAWSUsername(context.Background(), client)
 	}
 }

@@ -1,9 +1,13 @@
 package identity
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // IdentityType represents the type of AWS identity extracted from an ARN.
@@ -36,6 +40,12 @@ var validPartitions = map[string]bool{
 	"aws":        true, // Commercial
 	"aws-cn":     true, // China
 	"aws-us-gov": true, // GovCloud
+}
+
+// STSAPI defines the STS operations needed for identity extraction.
+// This interface enables testing with mock implementations.
+type STSAPI interface {
+	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
 }
 
 // AWSIdentity contains the parsed identity information from an AWS ARN.
@@ -206,4 +216,37 @@ func (t IdentityType) IsValid() bool {
 // String returns the string representation of the identity type.
 func (t IdentityType) String() string {
 	return string(t)
+}
+
+// GetAWSUsername retrieves the AWS-authenticated username for policy evaluation.
+// It calls STS GetCallerIdentity and extracts the username from the ARN.
+// Returns the sanitized username suitable for policy matching.
+func GetAWSUsername(ctx context.Context, stsClient STSAPI) (string, error) {
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get caller identity: %w", err)
+	}
+
+	arn := aws.ToString(identity.Arn)
+	if arn == "" {
+		return "", errors.New("GetCallerIdentity returned empty ARN")
+	}
+
+	return ExtractUsername(arn)
+}
+
+// GetAWSIdentity retrieves the full AWS identity information.
+// It calls STS GetCallerIdentity and parses the ARN.
+func GetAWSIdentity(ctx context.Context, stsClient STSAPI) (*AWSIdentity, error) {
+	identity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get caller identity: %w", err)
+	}
+
+	arn := aws.ToString(identity.Arn)
+	if arn == "" {
+		return nil, errors.New("GetCallerIdentity returned empty ARN")
+	}
+
+	return ParseARN(arn)
 }
