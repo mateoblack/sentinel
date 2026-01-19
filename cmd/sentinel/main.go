@@ -48,5 +48,8 @@ func main() {
 	// Config commands
 	cli.ConfigureConfigCommand(app, s)
 
+	// Identity commands
+	cli.ConfigureWhoamiCommand(app, s)
+
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
