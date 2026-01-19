@@ -18,7 +18,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.8 Credential Flow UX** — [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) (Phases 73-75, shipped 2026-01-19)
 - ✅ **v1.9 SSO Profile Support** — [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) (Phases 76-77, shipped 2026-01-19)
 - 🚧 **v1.10 Real-time Revocation** — Phases 78-83 (in progress)
-- 🚧 **v1.10.1 SSO Credential Fixes** — Phase 78.1 (urgent patch, in progress)
+- ✅ **v1.10.1 SSO Credential Fixes** — [milestones/v1.10.1-ROADMAP.md](milestones/v1.10.1-ROADMAP.md) (Phase 78.1, shipped 2026-01-19)
 
 ## Completed Milestones
 
@@ -410,7 +410,7 @@ Plans:
 
 Plans:
 - [x] 78.1-01: Add bootstrap command SSO profile test coverage — completed 2026-01-19
-- [ ] 78.1-02: Add whoami command SSO profile test coverage
+- [x] 78.1-02: Add whoami command SSO profile test coverage — completed 2026-01-19
 
 #### Phase 79: Server Policy Integration
 
@@ -479,6 +479,6 @@ Plans:
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
 | v1.10 Real-time Revocation | 78-83 | 2/? | 🚧 In Progress | - |
-| v1.10.1 SSO Credential Fixes | 78.1 | 0/2 | 🚧 In Progress | - |
+| v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 
-**Totals:** 11 milestones shipped (77 phases, 128 plans), 2 in progress (v1.10 + v1.10.1 patch)
+**Totals:** 12 milestones shipped (78.1 phases, 130 plans), 1 in progress (v1.10)
