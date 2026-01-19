@@ -794,6 +794,238 @@ func TestSecurityRegression_UsernameSanitization(t *testing.T) {
 	}
 }
 
+// ============================================================================
+// Attack Scenario Demonstration Tests
+// ============================================================================
+//
+// These tests explicitly demonstrate the attack scenario that was possible
+// prior to v1.7.1 and verify it is now prevented.
+
+// TestSecurityRegression_AttackScenario_OSUserBypass demonstrates the
+// vulnerability that existed in v1.7.0 where an attacker could bypass
+// policies by changing their local OS username.
+//
+// Attack scenario (pre-fix):
+//  1. Alice has AWS credentials for role AdminRole
+//  2. Policy allows "admin" to access production profile
+//  3. Alice's OS username is "alice", so policy denies access
+//  4. Alice creates a local user named "admin" and runs aws-vault as that user
+//  5. Policy now allows access because os/user.Current() returns "admin"
+//
+// Fix (v1.7.1+):
+//  - Policy evaluation uses AWS STS GetCallerIdentity to extract username
+//  - OS username is never used for policy decisions
+//  - Attack fails because ARN still shows alice, not admin
+func TestSecurityRegression_AttackScenario_OSUserBypass(t *testing.T) {
+	// Create a policy that allows "admin" to access production
+	testPolicy := &policy.Policy{
+		Version: "1",
+		Rules: []policy.Rule{
+			{
+				Name:     "allow-admin-production",
+				Effect:   policy.EffectAllow,
+				Users:    []string{"admin"},
+				Profiles: []string{"production"},
+			},
+			{
+				Name:     "deny-all",
+				Effect:   policy.EffectDeny,
+				Users:    []string{"*"},
+				Profiles: []string{"*"},
+			},
+		},
+	}
+
+	// Scenario 1: Attacker tries to impersonate admin via OS username
+	// AWS credentials still belong to alice
+	t.Run("attacker_alice_impersonates_admin", func(t *testing.T) {
+		// Attacker's AWS identity is still "alice" (from their credentials)
+		mockClient := newSecurityMockSTSClient("arn:aws:iam::123456789012:user/alice")
+
+		// Extract username using AWS identity (the fix)
+		username, err := identity.GetAWSUsername(context.Background(), mockClient)
+		if err != nil {
+			t.Fatalf("GetAWSUsername() error = %v", err)
+		}
+
+		// Verify AWS identity is used, not OS username
+		if username != "alice" {
+			t.Errorf("Expected AWS username 'alice', got %q", username)
+		}
+
+		// Policy evaluation should deny because AWS identity is "alice", not "admin"
+		policyRequest := &policy.Request{
+			User:    username, // Uses AWS identity, not OS username
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Evaluate(testPolicy, policyRequest)
+
+		if decision.Effect != policy.EffectDeny {
+			t.Errorf("SECURITY VIOLATION: Attacker 'alice' with AWS creds could bypass policy by impersonating 'admin' OS user. Expected deny, got %v", decision.Effect)
+		}
+	})
+
+	// Scenario 2: Legitimate admin user with admin AWS credentials should be allowed
+	t.Run("legitimate_admin", func(t *testing.T) {
+		// Admin's AWS identity is "admin"
+		mockClient := newSecurityMockSTSClient("arn:aws:iam::123456789012:user/admin")
+
+		username, err := identity.GetAWSUsername(context.Background(), mockClient)
+		if err != nil {
+			t.Fatalf("GetAWSUsername() error = %v", err)
+		}
+
+		if username != "admin" {
+			t.Errorf("Expected AWS username 'admin', got %q", username)
+		}
+
+		policyRequest := &policy.Request{
+			User:    username,
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Evaluate(testPolicy, policyRequest)
+
+		if decision.Effect != policy.EffectAllow {
+			t.Errorf("Legitimate admin should be allowed. Expected allow, got %v", decision.Effect)
+		}
+	})
+}
+
+// TestSecurityRegression_AttackScenario_BreakGlassImpersonation demonstrates
+// the break-glass impersonation attack that was possible pre-fix.
+//
+// Attack scenario (pre-fix):
+//  1. Break-glass policy allows "oncall" to invoke for production
+//  2. Attacker alice is not in oncall rotation
+//  3. Alice creates local user "oncall" and runs breakglass command
+//  4. Break-glass is allowed because os/user.Current() returns "oncall"
+//
+// Fix: Break-glass uses AWS identity, so alice's ARN is always used
+func TestSecurityRegression_AttackScenario_BreakGlassImpersonation(t *testing.T) {
+	bgPolicy := &breakglass.BreakGlassPolicy{
+		Version: "1",
+		Rules: []breakglass.BreakGlassPolicyRule{
+			{
+				Name:     "oncall-production",
+				Profiles: []string{"production"},
+				Users:    []string{"oncall"},
+			},
+		},
+	}
+
+	t.Run("attacker_alice_impersonates_oncall", func(t *testing.T) {
+		// Attacker's AWS identity is "alice"
+		mockClient := newSecurityMockSTSClient("arn:aws:iam::123456789012:user/alice")
+
+		username, err := identity.GetAWSUsername(context.Background(), mockClient)
+		if err != nil {
+			t.Fatalf("GetAWSUsername() error = %v", err)
+		}
+
+		if username != "alice" {
+			t.Errorf("Expected AWS username 'alice', got %q", username)
+		}
+
+		// Check if alice can invoke break-glass (should be denied)
+		rule := breakglass.FindBreakGlassPolicyRule(bgPolicy, "production")
+		if rule == nil {
+			t.Fatal("expected to find break-glass rule")
+		}
+
+		canInvoke := breakglass.CanInvokeBreakGlass(rule, username)
+
+		if canInvoke {
+			t.Errorf("SECURITY VIOLATION: Attacker 'alice' could invoke break-glass by impersonating 'oncall' OS user")
+		}
+	})
+
+	t.Run("legitimate_oncall", func(t *testing.T) {
+		// Oncall's AWS identity is "oncall"
+		mockClient := newSecurityMockSTSClient("arn:aws:iam::123456789012:user/oncall")
+
+		username, err := identity.GetAWSUsername(context.Background(), mockClient)
+		if err != nil {
+			t.Fatalf("GetAWSUsername() error = %v", err)
+		}
+
+		rule := breakglass.FindBreakGlassPolicyRule(bgPolicy, "production")
+		canInvoke := breakglass.CanInvokeBreakGlass(rule, username)
+
+		if !canInvoke {
+			t.Errorf("Legitimate oncall should be allowed to invoke break-glass")
+		}
+	})
+}
+
+// TestSecurityRegression_AttackScenario_ApproverImpersonation demonstrates
+// the approval impersonation attack that was possible pre-fix.
+//
+// Attack scenario (pre-fix):
+//  1. Approval policy requires "manager" to approve production requests
+//  2. Attacker alice requests access, needs manager approval
+//  3. Alice creates local user "manager" and approves her own request
+//  4. Approval succeeds because os/user.Current() returns "manager"
+//
+// Fix: Approval uses AWS identity, so alice's ARN is always used
+func TestSecurityRegression_AttackScenario_ApproverImpersonation(t *testing.T) {
+	approvalPolicy := &policy.ApprovalPolicy{
+		Version: "1",
+		Rules: []policy.ApprovalRule{
+			{
+				Name:      "production-approval",
+				Profiles:  []string{"production"},
+				Approvers: []string{"manager"},
+			},
+		},
+	}
+
+	t.Run("attacker_alice_self_approves_as_manager", func(t *testing.T) {
+		// Attacker's AWS identity is "alice"
+		mockClient := newSecurityMockSTSClient("arn:aws:iam::123456789012:user/alice")
+
+		username, err := identity.GetAWSUsername(context.Background(), mockClient)
+		if err != nil {
+			t.Fatalf("GetAWSUsername() error = %v", err)
+		}
+
+		rule := policy.FindApprovalRule(approvalPolicy, "production")
+		if rule == nil {
+			t.Fatal("expected to find approval rule")
+		}
+
+		canApprove := policy.CanApprove(rule, username)
+
+		if canApprove {
+			t.Errorf("SECURITY VIOLATION: Attacker 'alice' could self-approve by impersonating 'manager' OS user")
+		}
+	})
+
+	t.Run("legitimate_manager_approves", func(t *testing.T) {
+		// Manager's AWS identity is "manager"
+		mockClient := newSecurityMockSTSClient("arn:aws:iam::123456789012:user/manager")
+
+		username, err := identity.GetAWSUsername(context.Background(), mockClient)
+		if err != nil {
+			t.Fatalf("GetAWSUsername() error = %v", err)
+		}
+
+		rule := policy.FindApprovalRule(approvalPolicy, "production")
+		canApprove := policy.CanApprove(rule, username)
+
+		if !canApprove {
+			t.Errorf("Legitimate manager should be allowed to approve")
+		}
+	})
+}
+
+// ============================================================================
+// Username Sanitization and Injection Prevention Tests
+// ============================================================================
+
 // TestSecurityRegression_InjectionPrevention verifies that potentially
 // malicious ARN inputs are properly sanitized.
 func TestSecurityRegression_InjectionPrevention(t *testing.T) {
