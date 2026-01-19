@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-18)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.7 Complete — Planning next milestone
+**Current focus:** v1.7.1 Security Patch — Fix critical OS username bug
 
 ## Current Position
 
-Phase: 68 of 68 (Onboarding Docs)
-Plan: Complete
-Status: Milestone Complete
-Last activity: 2026-01-18 — v1.7 milestone complete
+Phase: 69 of 72 (AWS Identity Core)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-18 — Milestone v1.7.1 created
 
-Progress: ██████████ 100% (8 milestones shipped)
+Progress: ░░░░░░░░░░ 0% (v1.7.1 Security Patch)
 
 ## Milestone Summary
 
@@ -344,9 +344,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-18
-Stopped at: v1.7 milestone complete
+Stopped at: Milestone v1.7.1 initialization
 Resume file: None
-Next: Plan next milestone (`/gsd:discuss-milestone`) or project complete
+Next: Plan Phase 69 (`/gsd:plan-phase 69`)
 
 ## Roadmap Evolution
 
@@ -358,3 +358,4 @@ Next: Plan next milestone (`/gsd:discuss-milestone`) or project complete
 - Milestone v1.5 shipped: 2026-01-16 — Enforcement & Assurance (Phases 43-49)
 - Milestone v1.6 shipped: 2026-01-17 — Testing & Hardening (Phases 50-59)
 - Milestone v1.7 shipped: 2026-01-18 — Permissions Discovery (Phases 60-68)
+- Milestone v1.7.1 created: 2026-01-18 — Security Patch (Phases 69-72) - Fix OS username bug

@@ -14,6 +14,51 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.5 Enforcement & Assurance** — [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) (Phases 43-49, shipped 2026-01-16)
 - ✅ **v1.6 Testing & Hardening** — [milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md) (Phases 50-59, shipped 2026-01-17)
 - ✅ **v1.7 Permissions Discovery** — [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) (Phases 60-68, shipped 2026-01-18)
+- 🚧 **v1.7.1 Security Patch** — Phases 69-72 (in progress)
+
+### 🚧 v1.7.1 Security Patch (In Progress)
+
+**Milestone Goal:** Fix critical security bug where policy evaluation uses OS username instead of AWS identity
+
+#### Phase 69: AWS Identity Core
+
+**Goal**: Extract username from AWS ARN for all identity types (IAM user, SSO, assumed-role)
+**Depends on**: v1.7 complete
+**Research**: Unlikely (using existing STS patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 69-01: TBD (run /gsd:plan-phase 69 to break down)
+
+#### Phase 70: Identity Integration
+
+**Goal**: Replace `user.Current()` with AWS identity extraction in credential flow
+**Depends on**: Phase 69
+**Research**: Unlikely (internal refactoring)
+**Plans**: TBD
+
+Plans:
+- [ ] 70-01: TBD
+
+#### Phase 71: Whoami Command
+
+**Goal**: Add `sentinel whoami` command showing AWS identity and extracted policy username
+**Depends on**: Phase 70
+**Research**: Unlikely (extends existing CLI patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 71-01: TBD
+
+#### Phase 72: Security Validation
+
+**Goal**: Test all identity types, verify fix, update documentation
+**Depends on**: Phase 71
+**Research**: Unlikely (testing and documentation)
+**Plans**: TBD
+
+Plans:
+- [ ] 72-01: TBD
 
 ## Completed Milestones
 
@@ -361,5 +406,6 @@ Plans:
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
 | v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
+| v1.7.1 Security Patch | 69-72 | 0/? | 🚧 In Progress | - |
 
-**Totals:** 8 milestones shipped (68 phases, 112 plans)
+**Totals:** 8 milestones shipped + 1 in progress (72 phases, 112+ plans)
