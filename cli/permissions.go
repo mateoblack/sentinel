@@ -45,32 +45,44 @@ var permissionsCmd *kingpin.CmdClause
 
 // ConfigurePermissionsCommand sets up the permissions command.
 func ConfigurePermissionsCommand(app *kingpin.Application, s *Sentinel) {
+	permissionsCmd = app.Command("permissions", "IAM permissions discovery and validation")
+
+	// Add 'list' subcommand (shows permissions)
+	configurePermissionsListCommand(app, s)
+}
+
+// configurePermissionsListCommand sets up the permissions list subcommand.
+func configurePermissionsListCommand(app *kingpin.Application, s *Sentinel) {
+	if permissionsCmd == nil {
+		return
+	}
+
 	input := PermissionsCommandInput{}
 
-	permissionsCmd = app.Command("permissions", "Show IAM permissions required by Sentinel features")
+	listCmd := permissionsCmd.Command("list", "Show IAM permissions required by Sentinel features").Default()
 
-	permissionsCmd.Flag("format", "Output format: human, json, terraform, cloudformation (or cf)").
+	listCmd.Flag("format", "Output format: human, json, terraform, cloudformation (or cf)").
 		Default("human").
 		EnumVar(&input.Format, "human", "json", "terraform", "cloudformation", "cf")
 
-	permissionsCmd.Flag("subsystem", "Filter by subsystem (core, credentials, approvals, breakglass, notifications, audit, enforce, bootstrap)").
+	listCmd.Flag("subsystem", "Filter by subsystem (core, credentials, approvals, breakglass, notifications, audit, enforce, bootstrap)").
 		StringVar(&input.Subsystem)
 
-	permissionsCmd.Flag("feature", "Filter by specific feature").
+	listCmd.Flag("feature", "Filter by specific feature").
 		StringVar(&input.Feature)
 
-	permissionsCmd.Flag("required-only", "Exclude optional features (notify_sns, notify_webhook)").
+	listCmd.Flag("required-only", "Exclude optional features (notify_sns, notify_webhook)").
 		BoolVar(&input.RequiredOnly)
 
-	permissionsCmd.Flag("detect", "Auto-detect configured features and show only required permissions").
+	listCmd.Flag("detect", "Auto-detect configured features and show only required permissions").
 		BoolVar(&input.Detect)
 
-	permissionsCmd.Flag("region", "AWS region for detection (only used with --detect)").
+	listCmd.Flag("region", "AWS region for detection (only used with --detect)").
 		StringVar(&input.Region)
 
-	permissionsCmd.Action(func(c *kingpin.ParseContext) error {
+	listCmd.Action(func(c *kingpin.ParseContext) error {
 		err := PermissionsCommand(input)
-		app.FatalIfError(err, "permissions")
+		app.FatalIfError(err, "permissions list")
 		return nil
 	})
 }

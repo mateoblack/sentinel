@@ -792,13 +792,14 @@ Result: 4 issue(s) found
 
 ## Permissions Commands
 
-### permissions
+### permissions / permissions list
 
-Show IAM permissions required by Sentinel features.
+Show IAM permissions required by Sentinel features. Running `sentinel permissions` without a subcommand defaults to `permissions list`.
 
 **Usage:**
 ```bash
 sentinel permissions [flags]
+sentinel permissions list [flags]
 ```
 
 **Flags:**

@@ -140,12 +140,14 @@ For all features including approval workflows, break-glass, and audit verificati
 
 ## Using the Permissions Command
 
-Sentinel includes a `permissions` command that generates IAM policies based on your feature selection.
+Sentinel includes a `permissions` command that generates IAM policies based on your feature selection. Running `sentinel permissions` defaults to `sentinel permissions list`.
 
 ### Human-Readable Output
 
 ```bash
 sentinel permissions
+# or explicitly:
+sentinel permissions list
 ```
 
 Shows all features and their required IAM actions in a readable format.
