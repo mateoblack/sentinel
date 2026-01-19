@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 76 of 77 (SSO Credential Loading)
-Plan: 4 of 5 in current phase
-Status: In progress
-Last activity: 2026-01-19 — Completed 76-04-PLAN.md (infrastructure command SSO support)
+Plan: 5 of 5 in current phase
+Status: Phase complete
+Last activity: 2026-01-19 — Completed 76-05-PLAN.md (permissions/audit SSO support)
 
-Progress: ████░░░░░░ 40% (v1.9 SSO Profile Support - Phase 76: 4/5 plans)
+Progress: █████░░░░░ 50% (v1.9 SSO Profile Support - 1/2 phases)
 
 ## Milestone Summary
 
@@ -122,7 +122,7 @@ Progress: ████░░░░░░ 40% (v1.9 SSO Profile Support - Phase 7
 | v1.7 Permissions Discovery | 9 | 10 | ~66 min |
 | v1.7.1 Security Patch | 4 | 7 | ~86 min |
 | v1.8 Credential Flow UX | 3 | 3 | ~16 min |
-| v1.9 SSO Profile Support (in progress) | 1 | 1 | ~3 min |
+| v1.9 SSO Profile Support (in progress) | 1 | 5 | ~35 min |
 
 ## Accumulated Context
 
@@ -391,6 +391,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - AWS config file loaded early when auto-login enabled for SSO config lookup
 - Keyring field in AutoLoginConfig unused - AWS SDK handles token caching internally
 
+**v1.9 Core Credential Loading decisions (Phase 76-01):**
+- config.WithSharedConfigProfile added to awsCfgOpts initialization for credentials and exec commands
+- Profile is always passed to AWS SDK (even for non-SSO profiles) - SDK handles both correctly
+- Enables SSO credential provider chain resolution via ~/.aws/sso/cache/
+
 **v1.9 Approval Workflow SSO Credential Loading decisions (Phase 76-02):**
 - request command: Use existing --profile flag for both target profile and AWS credential loading
 - approve, deny, list commands: Add separate --aws-profile flag for credentials (optional)
@@ -406,6 +411,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - status and config validate commands: Add --aws-profile for SSO credential loading
 - Pattern: Consistent WithSharedConfigProfile pattern across all infrastructure commands
 
+**v1.9 Permissions/Audit SSO Credential Loading decisions (Phase 76-05):**
+- permissions list and permissions check commands: Add --aws-profile for SSO credential loading
+- check command (request status): Add --aws-profile for SSO credential loading
+- enforce plan and audit verify commands: Add --aws-profile for SSO credential loading
+- All commands follow same WithSharedConfigProfile pattern
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -417,9 +428,9 @@ None — clean start for v1.8.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 76-04-PLAN.md (infrastructure command SSO support)
+Stopped at: Completed 76-05-PLAN.md (permissions/audit SSO support)
 Resume file: None
-Next: Execute 76-05-PLAN.md (final plan for Phase 76)
+Next: Ready for Phase 77 (Whoami Profile Flag)
 
 ## Roadmap Evolution
 
