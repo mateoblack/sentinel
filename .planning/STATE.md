@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-18)
 
 ## Current Position
 
-Phase: 71 of 72 (Whoami Command)
-Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-19 — Completed 71-01-PLAN.md
+Phase: 72 of 72 (Security Validation)
+Plan: 1 of 4 in current phase
+Status: Plan 01 complete
+Last activity: 2026-01-18 — Completed 72-01-PLAN.md
 
-Progress: ██████░░░░ 75% (v1.7.1 Security Patch)
+Progress: ████████░░ 85% (v1.7.1 Security Patch)
 
 ## Milestone Summary
 
@@ -341,6 +341,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - ErrCodeSTSError/ErrCodeSTSAccessDenied added for STS-specific error handling
 - Username extraction uses existing ParseARN sanitization (removes @, ., -, _, truncates)
 
+**v1.7.1 Security Validation decisions (Phase 72-01):**
+- Removed os/user dependency from all approval workflow commands (approve, deny, request, list)
+- All commands use identity.GetAWSUsername via STS GetCallerIdentity
+- AWS config loading reordered to occur before identity extraction (needed for STS client)
+- Mock STS client pattern established for test isolation (same as credentials/whoami tests)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -351,10 +357,10 @@ None — clean start for v1.4.
 
 ## Session Continuity
 
-Last session: 2026-01-19
-Stopped at: Completed 71-01-PLAN.md (Phase 71 complete)
+Last session: 2026-01-18
+Stopped at: Completed 72-01-PLAN.md (Security Validation Plan 1 complete)
 Resume file: None
-Next: Plan Phase 72 (`/gsd:plan-phase 72`)
+Next: Execute Plan 72-02 (`/gsd:execute-plan 72-02`)
 
 ## Roadmap Evolution
 
