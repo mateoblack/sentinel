@@ -15,6 +15,7 @@ import (
 // WhoamiCommandInput contains the input for the whoami command.
 type WhoamiCommandInput struct {
 	Region     string
+	Profile    string
 	JSONOutput bool
 
 	// STSClient is an optional STS client for testing.
@@ -48,6 +49,9 @@ func ConfigureWhoamiCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("region", "AWS region for STS operations").
 		StringVar(&input.Region)
 
+	cmd.Flag("profile", "AWS profile for credentials (uses SSO credential provider if profile is SSO-configured)").
+		StringVar(&input.Profile)
+
 	cmd.Flag("json", "Output in JSON format").
 		BoolVar(&input.JSONOutput)
 
@@ -78,6 +82,9 @@ func WhoamiCommand(ctx context.Context, input WhoamiCommandInput) error {
 	if stsClient == nil {
 		// Load AWS config
 		awsCfgOpts := []func(*config.LoadOptions) error{}
+		if input.Profile != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.Profile))
+		}
 		if input.Region != "" {
 			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 		}
