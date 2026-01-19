@@ -2,8 +2,6 @@
 
 Policy-based credential gateway for AWS. Know not just *what* happened, but *why* it was allowed.
 
-![Sentinel](image.png)
-
 ## The Problem
 
 CloudTrail tells you Alice deleted the prod database at 2am. She's a senior dev - she's *supposed* to have access. But CloudTrail doesn't tell you:

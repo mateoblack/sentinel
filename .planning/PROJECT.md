@@ -1,7 +1,5 @@
 # Sentinel
 
-![alt text](image.png)
-
 ## What This Is
 
 Sentinel is an intent-aware access control layer for AWS credentials, built on top of aws-vault. It evaluates policy rules before issuing credentials, allowing teams to use powerful AWS tooling without handing out unchecked access. Sentinel integrates at the credential boundary via `credential_process` and `exec` commands, making it invisible to downstream tools. Includes approval workflows for sensitive access, break-glass emergency bypass for incident response, and self-service tooling for permissions discovery and configuration validation.
