@@ -787,3 +787,397 @@ Result: 4 issue(s) found
 |------|---------|
 | 0 | All sessions verified |
 | 1 | Issues found |
+
+---
+
+## Permissions Commands
+
+### permissions
+
+Show IAM permissions required by Sentinel features.
+
+**Usage:**
+```bash
+sentinel permissions [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--format` | Output format: human, json, terraform, cloudformation (or cf) | human |
+| `--subsystem` | Filter by subsystem (core, credentials, approvals, breakglass, notifications, audit, enforce, bootstrap) | - |
+| `--feature` | Filter by specific feature | - |
+| `--required-only` | Exclude optional features (notify_sns, notify_webhook) | false |
+| `--detect` | Auto-detect configured features and show only required permissions | false |
+| `--region` | AWS region for detection (only with --detect) | - |
+
+**Examples:**
+
+```bash
+# Show all permissions (human readable)
+sentinel permissions
+
+# Output as JSON IAM policy
+sentinel permissions --format json
+
+# Output as Terraform data source
+sentinel permissions --format terraform
+
+# Output as CloudFormation
+sentinel permissions --format cloudformation
+
+# Filter by subsystem
+sentinel permissions --subsystem approvals
+
+# Filter by feature
+sentinel permissions --feature policy_load
+
+# Auto-detect configured features
+sentinel permissions --detect
+
+# Exclude optional features
+sentinel permissions --required-only
+```
+
+**Output (human format):**
+
+```
+Sentinel IAM Permissions
+========================
+
+Feature: policy_load (core)
+  Service: ssm
+  Actions:
+    - ssm:GetParameter
+    - ssm:GetParameters
+    - ssm:GetParametersByPath
+  Resource: arn:aws:ssm:*:*:parameter/sentinel/policies/*
+
+Feature: credential_issue (credentials)
+  Service: sts
+  Actions:
+    - sts:AssumeRole
+  Resource: arn:aws:iam::*:role/*
+...
+```
+
+---
+
+### permissions check
+
+Validate AWS credentials have required permissions.
+
+**Usage:**
+```bash
+sentinel permissions check [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--auto-detect` | Auto-detect configured features and check only those | false |
+| `--features` | Check specific feature(s), comma-separated | - |
+| `--output` | Output format: human, json | human |
+| `--aws-region` | AWS region for API calls | - |
+
+**Examples:**
+
+```bash
+# Check all features
+sentinel permissions check
+
+# Auto-detect and check
+sentinel permissions check --auto-detect
+
+# Check specific features
+sentinel permissions check --features policy_load,credential_issue
+
+# JSON output
+sentinel permissions check --output json
+```
+
+**Output (human format):**
+
+```
+Checking permissions for 3 features...
+
+# policy_load
+  # ssm:GetParameter on arn:aws:ssm:*:*:parameter/sentinel/policies/*
+  # ssm:GetParameters on arn:aws:ssm:*:*:parameter/sentinel/policies/*
+
+# credential_issue
+  # sts:AssumeRole on arn:aws:iam::*:role/*
+
+X approval_workflow
+  X dynamodb:PutItem on arn:aws:dynamodb:*:*:table/sentinel-requests - Access Denied
+
+Summary: 2 passed, 1 failed, 0 error
+```
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | All permission checks passed |
+| 1 | One or more checks failed or errored |
+
+---
+
+## Config Commands
+
+### config validate
+
+Validate Sentinel configuration files.
+
+**Usage:**
+```bash
+sentinel config validate [paths...] [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--path` / `-p` | Local file to validate (repeatable) | - |
+| `--ssm` | SSM parameter to load and validate (repeatable) | - |
+| `--type` | Config type: policy, approval, breakglass, ratelimit, bootstrap (auto-detect if not specified) | - |
+| `--output` | Output format: human, json | human |
+| `--region` | AWS region for SSM operations | - |
+
+**Examples:**
+
+```bash
+# Validate local file
+sentinel config validate policy.yaml
+
+# Validate multiple files
+sentinel config validate policy.yaml approval.yaml breakglass.yaml
+
+# Validate with explicit type
+sentinel config validate --path policy.yaml --type policy
+
+# Validate SSM parameter
+sentinel config validate --ssm /sentinel/policies/dev
+
+# Validate both local and SSM
+sentinel config validate policy.yaml --ssm /sentinel/policies/prod
+
+# JSON output
+sentinel config validate policy.yaml --output json
+```
+
+**Output (human format):**
+
+```
+Validating 2 configurations...
+
+# policy.yaml (policy)
+  Valid
+
+X approval.yaml (approval)
+  Errors:
+    - rules[0].conditions: missing required field 'profiles'
+  Suggestions:
+    - add profiles field to specify which AWS profiles this rule applies to
+
+Summary: 1 valid, 1 invalid (1 errors, 0 warnings)
+```
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | All configurations valid (warnings don't affect exit code) |
+| 1 | One or more configurations have errors |
+
+---
+
+### config generate
+
+Generate Sentinel configuration templates.
+
+**Usage:**
+```bash
+sentinel config generate --template TEMPLATE --profile PROFILE [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--template` / `-t` | Template type: basic, approvals, full | Yes |
+| `--profile` / `-p` | AWS profile to include (repeatable) | Yes |
+| `--user` / `-u` | User for approvers/break-glass (repeatable) | For approvals/full |
+| `--output-dir` / `-o` | Directory to write config files (omit for stdout) | No |
+| `--json` | Output as JSON instead of YAML | No |
+
+**Templates:**
+
+| Template | Includes |
+|----------|----------|
+| `basic` | Access policy only |
+| `approvals` | Access policy + approval policy |
+| `full` | Access policy + approval + break-glass + rate limit |
+
+**Examples:**
+
+```bash
+# Generate basic config for dev profile
+sentinel config generate --template basic --profile dev
+
+# Generate full config with users
+sentinel config generate --template full --profile dev --profile prod --user alice --user bob
+
+# Write to directory
+sentinel config generate --template full --profile dev --user alice --output-dir ./sentinel-config
+
+# JSON output
+sentinel config generate --template basic --profile dev --json
+```
+
+**Output (stdout):**
+
+```yaml
+# Access Policy (policy.yaml)
+# ===========================
+version: "1"
+rules:
+  - name: allow-dev-access
+    effect: allow
+    conditions:
+      profiles:
+        - dev
+    reason: Allowed by Sentinel policy
+
+  - name: default-deny
+    effect: deny
+    conditions: {}
+    reason: No matching allow rule
+```
+
+**Output (--output-dir):**
+
+```
+Generated 4 config files in ./sentinel-config:
+  + policy.yaml
+  + approval.yaml
+  + breakglass.yaml
+  + ratelimit.yaml
+```
+
+---
+
+## Init Wizard
+
+### init wizard
+
+Interactive setup wizard for Sentinel configuration.
+
+**Usage:**
+```bash
+sentinel init wizard [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--profile` | Pre-select profiles (repeatable) | - |
+| `--feature` | Pre-select features (repeatable) | - |
+| `--region` | AWS region | - |
+| `--skip-detection` | Skip auto-detection step | false |
+| `--format` | Output format: human, json | human |
+
+**Interactive Mode:**
+
+When run without `--profile` and `--feature` flags, the wizard runs interactively:
+
+```bash
+sentinel init wizard
+```
+
+**Output:**
+
+```
+Step 1/6: Welcome
+======================================================
+Welcome to Sentinel!
+
+This wizard will help you configure Sentinel for your AWS environment.
+
+Step 2/6: Profile Selection
+======================================================
+Found 3 AWS profiles in ~/.aws/config:
+
+  [1] dev
+  [2] staging
+  [3] prod
+
+Which profiles should Sentinel manage? (comma-separated, e.g., 1,2,3 or 'all'): 1,3
+
+Selected: dev, prod
+
+Step 3/6: Feature Selection
+======================================================
+Which features do you need?
+
+  [1] policy_load        - Load policies from SSM (required)
+  [2] credential_issue   - Issue credentials with SourceIdentity (required)
+  [3] approval_workflow  - Request/approve access flow
+  [4] breakglass         - Emergency access bypass
+  [5] audit_verify       - CloudTrail session verification
+  [6] enforce_analyze    - IAM trust policy analysis
+  [7] bootstrap_plan     - Bootstrap planning
+  [8] bootstrap_apply    - Bootstrap SSM parameter creation
+  [9] notify_sns         - SNS notifications (optional)
+
+Select features (comma-separated, e.g., 1,2,3 or 'all'): 1,2,3,4
+...
+```
+
+**Non-Interactive Mode:**
+
+For scripting, provide both `--profile` and `--feature`:
+
+```bash
+sentinel init wizard \
+  --profile dev \
+  --profile prod \
+  --feature policy_load \
+  --feature credential_issue \
+  --feature approval_workflow \
+  --region us-west-2
+```
+
+**JSON Output:**
+
+```bash
+sentinel init wizard \
+  --profile dev \
+  --feature policy_load \
+  --feature credential_issue \
+  --format json
+```
+
+```json
+{
+  "profiles": ["dev"],
+  "features": ["policy_load", "credential_issue"],
+  "region": "us-west-2",
+  "iam_policy": {
+    "Version": "2012-10-17",
+    "Statement": [...]
+  },
+  "sample_policies": {
+    "dev": "version: \"1\"\nrules:\n  ..."
+  },
+  "next_steps": [
+    "1. Create the IAM policy and attach to your Sentinel user/role",
+    "2. Save the sample policies to SSM:\n   sentinel init bootstrap --profile dev --region us-west-2",
+    "3. Verify permissions:\n   sentinel permissions check --auto-detect",
+    "4. Configure credential_process in ~/.aws/config:..."
+  ]
+}
+```
