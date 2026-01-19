@@ -25,10 +25,10 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 **Goal**: Extract username from AWS ARN for all identity types (IAM user, SSO, assumed-role)
 **Depends on**: v1.7 complete
 **Research**: Unlikely (using existing STS patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 69-01: TBD (run /gsd:plan-phase 69 to break down)
+- [x] 69-01: ARN parsing and username extraction — completed 2026-01-19
 
 #### Phase 70: Identity Integration
 
