@@ -37,6 +37,12 @@ const (
 	ErrCodeIAMAccessDenied         = "IAM_ACCESS_DENIED"
 )
 
+// STS error codes
+const (
+	ErrCodeSTSError        = "STS_ERROR"
+	ErrCodeSTSAccessDenied = "STS_ACCESS_DENIED"
+)
+
 // Policy error codes
 const (
 	ErrCodePolicyDenied        = "POLICY_DENIED"

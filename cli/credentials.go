@@ -7,11 +7,11 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/enforce"
 	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
@@ -37,6 +37,7 @@ type CredentialsCommandInput struct {
 	RequireSentinel bool             // Check role enforcement before issuing credentials
 	DriftChecker    enforce.DriftChecker // Optional: for testing (nil = create from AWS config)
 	Stderr          io.Writer            // Optional: for error output (nil = os.Stderr)
+	STSClient       identity.STSAPI      // Optional: for testing (nil = create from AWS config)
 }
 
 // CredentialProcessOutput represents the JSON output format for AWS credential_process.
@@ -118,21 +119,13 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		input.Logger = logging.NewJSONLogger(io.MultiWriter(writers...))
 	}
 
-	// 1. Get current user
-	currentUser, err := user.Current()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to get current user: %v\n", err)
-		return err
-	}
-	username := currentUser.Username
-
-	// 1.5. Validate profile exists in AWS config
+	// 1. Validate profile exists in AWS config
 	if err := s.ValidateProfile(input.ProfileName); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return err
 	}
 
-	// 2. Create AWS config for SSM
+	// 2. Create AWS config for SSM and STS
 	awsCfgOpts := []func(*config.LoadOptions) error{}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
@@ -149,28 +142,45 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		return configErr
 	}
 
-	// 3. Create policy loader chain
+	// 3. Get AWS identity for policy evaluation
+	stsClient := input.STSClient
+	if stsClient == nil {
+		stsClient = sts.NewFromConfig(awsCfg)
+	}
+	username, err := identity.GetAWSUsername(ctx, stsClient)
+	if err != nil {
+		identityErr := sentinelerrors.New(
+			sentinelerrors.ErrCodeSTSError,
+			fmt.Sprintf("Failed to get AWS identity: %v", err),
+			"Ensure your AWS credentials are valid and have sts:GetCallerIdentity permission",
+			err,
+		)
+		FormatErrorWithSuggestionTo(stderr, identityErr)
+		return identityErr
+	}
+
+	// 4. Create policy loader chain
 	loader := policy.NewLoader(awsCfg)
 	cachedLoader := policy.NewCachedLoader(loader, 5*time.Minute)
 
-	// 4. Load policy
+	// 5. Load policy
 	loadedPolicy, err := cachedLoader.Load(ctx, input.PolicyParameter)
 	if err != nil {
 		FormatErrorWithSuggestionTo(stderr, err)
 		return err
 	}
 
-	// 5. Build policy.Request
+	// 6. Build policy.Request
 	policyRequest := &policy.Request{
 		User:    username,
 		Profile: input.ProfileName,
 		Time:    time.Now(),
 	}
 
-	// 6. Evaluate policy
+	// 7. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 7. Handle deny decision - check for approved request or break-glass first
+	// 8. Handle deny decision - check for approved request or break-glass first
 	var approvedReq *request.Request
 	var activeBreakGlass *breakglass.BreakGlassEvent
 	if decision.Effect == policy.EffectDeny {
@@ -221,7 +231,7 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		// Approved request or active break-glass found - continue to credential issuance
 	}
 
-	// 7.5. Cap session duration to remaining break-glass time if applicable
+	// 8.5. Cap session duration to remaining break-glass time if applicable
 	sessionDuration := input.SessionDuration
 	if activeBreakGlass != nil {
 		remainingTime := breakglass.RemainingDuration(activeBreakGlass)
@@ -231,7 +241,7 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		}
 	}
 
-	// 8. EffectAllow (or approved request): generate request-id and retrieve credentials
+	// 9. EffectAllow (or approved request): generate request-id and retrieve credentials
 	requestID := identity.NewRequestID()
 
 	// Create credential request with User for SourceIdentity stamping
@@ -251,7 +261,7 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		return err
 	}
 
-	// 8.5. Check drift status if --require-sentinel is enabled
+	// 9.5. Check drift status if --require-sentinel is enabled
 	var driftResult *enforce.DriftCheckResult
 	if input.RequireSentinel && creds.RoleARN != "" {
 		// Get or create drift checker
@@ -283,7 +293,7 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		}
 	}
 
-	// 9. Log allow decision with credential context for CloudTrail correlation
+	// 10. Log allow decision with credential context for CloudTrail correlation
 	if input.Logger != nil {
 		credFields := &logging.CredentialIssuanceFields{
 			RequestID:       requestID,
