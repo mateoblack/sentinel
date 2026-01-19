@@ -16,6 +16,7 @@ type EnforcePlanCommandInput struct {
 	RoleARNs   []string
 	Region     string
 	JSONOutput bool
+	AWSProfile string // Optional AWS profile for credentials
 
 	// Advisor is an optional Advisor implementation for testing.
 	// If nil, a new Advisor will be created using AWS config.
@@ -50,6 +51,9 @@ func ConfigureEnforcePlanCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("json", "Output in JSON format").
 		BoolVar(&input.JSONOutput)
 
+	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
+		StringVar(&input.AWSProfile)
+
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := EnforcePlanCommand(context.Background(), input)
 		app.FatalIfError(err, "enforce plan")
@@ -81,6 +85,9 @@ func EnforcePlanCommand(ctx context.Context, input EnforcePlanCommandInput) erro
 	if advisor == nil {
 		// Load AWS config
 		awsCfgOpts := []func(*config.LoadOptions) error{}
+		if input.AWSProfile != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+		}
 		if input.Region != "" {
 			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 		}

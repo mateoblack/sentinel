@@ -21,6 +21,7 @@ type AuditVerifyCommandInput struct {
 	Username   string
 	Region     string
 	JSONOutput bool
+	AWSProfile string // Optional AWS profile for credentials
 
 	// Verifier is an optional SessionVerifier implementation for testing.
 	// If nil, a new Verifier will be created using AWS config.
@@ -66,6 +67,9 @@ func ConfigureAuditVerifyCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("json", "Output in JSON format").
 		BoolVar(&input.JSONOutput)
+
+	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
+		StringVar(&input.AWSProfile)
 
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		// Parse time strings
@@ -116,6 +120,9 @@ func AuditVerifyCommand(ctx context.Context, input AuditVerifyCommandInput) erro
 	if verifier == nil {
 		// Load AWS config
 		awsCfgOpts := []func(*config.LoadOptions) error{}
+		if input.AWSProfile != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+		}
 		if input.Region != "" {
 			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 		}
