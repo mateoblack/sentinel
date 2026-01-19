@@ -140,7 +140,10 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	}
 
 	// 2. Create AWS config for SSM and STS
-	awsCfgOpts := []func(*config.LoadOptions) error{}
+	// Include profile to enable SSO credential loading from the specified profile
+	awsCfgOpts := []func(*config.LoadOptions) error{
+		config.WithSharedConfigProfile(input.ProfileName),
+	}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 	}
