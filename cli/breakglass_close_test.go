@@ -3,12 +3,12 @@ package cli
 import (
 	"context"
 	"errors"
-	"os/user"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 )
@@ -30,12 +30,15 @@ func testableBreakGlassCloseCommand(ctx context.Context, input BreakGlassCloseCo
 		return nil, errors.New("reason is required")
 	}
 
-	// 3. Get current user as closer identity
-	currentUser, err := user.Current()
+	// 3. Get AWS identity for closer (use STSClient from input)
+	stsClient := input.STSClient
+	if stsClient == nil {
+		return nil, errors.New("STSClient is required for testing")
+	}
+	closer, err := identity.GetAWSUsername(ctx, stsClient)
 	if err != nil {
 		return nil, err
 	}
-	closer := currentUser.Username
 
 	// 4. Get store (must be provided for testing)
 	store := input.Store
@@ -88,11 +91,10 @@ func testableBreakGlassCloseCommand(ctx context.Context, input BreakGlassCloseCo
 // ============================================================================
 
 func TestBreakGlassCloseCommand_Success(t *testing.T) {
-	currentUser, _ := user.Current()
 	eventID := "abcd123456789012"
 	activeEvent := &breakglass.BreakGlassEvent{
 		ID:            eventID,
-		Invoker:       currentUser.Username,
+		Invoker:       defaultMockUsername,
 		Profile:       "production",
 		ReasonCode:    breakglass.ReasonIncident,
 		Justification: "Production incident requiring emergency access",
@@ -119,9 +121,10 @@ func TestBreakGlassCloseCommand_Success(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: eventID,
-		Reason:  "Incident resolved, no longer need access",
-		Store:   store,
+		EventID:   eventID,
+		Reason:    "Incident resolved, no longer need access",
+		Store:     store,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -139,9 +142,9 @@ func TestBreakGlassCloseCommand_Success(t *testing.T) {
 		t.Errorf("expected status 'closed', got '%s'", updatedEvent.Status)
 	}
 
-	// Verify closed_by is current user
-	if updatedEvent.ClosedBy != currentUser.Username {
-		t.Errorf("expected closed_by '%s', got '%s'", currentUser.Username, updatedEvent.ClosedBy)
+	// Verify closed_by is using AWS identity (mock username)
+	if updatedEvent.ClosedBy != defaultMockUsername {
+		t.Errorf("expected closed_by '%s', got '%s'", defaultMockUsername, updatedEvent.ClosedBy)
 	}
 
 	// Verify closed_reason
@@ -177,9 +180,10 @@ func TestBreakGlassCloseCommand_InvalidEventIDFormat(t *testing.T) {
 	for _, id := range invalidIDs {
 		t.Run("id_"+id, func(t *testing.T) {
 			input := BreakGlassCloseCommandInput{
-				EventID: id,
-				Reason:  "Test reason",
-				Store:   store,
+				EventID:   id,
+				Reason:    "Test reason",
+				Store:     store,
+				STSClient: defaultMockSTSClient(),
 			}
 
 			_, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -201,9 +205,10 @@ func TestBreakGlassCloseCommand_EventNotFound(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: "abcd123456789012", // Valid format, but will return not found
-		Reason:  "Test reason",
-		Store:   store,
+		EventID:   "abcd123456789012", // Valid format, but will return not found
+		Reason:    "Test reason",
+		Store:     store,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -219,9 +224,10 @@ func TestBreakGlassCloseCommand_MissingReason(t *testing.T) {
 	store := &mockBreakGlassStore{}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: "abcd123456789012",
-		Reason:  "", // empty reason
-		Store:   store,
+		EventID:   "abcd123456789012",
+		Reason:    "", // empty reason
+		Store:     store,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -259,9 +265,10 @@ func TestBreakGlassCloseCommand_AlreadyClosed(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: eventID,
-		Reason:  "Trying to close again",
-		Store:   store,
+		EventID:   eventID,
+		Reason:    "Trying to close again",
+		Store:     store,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -293,9 +300,10 @@ func TestBreakGlassCloseCommand_AlreadyExpired(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: eventID,
-		Reason:  "Trying to close expired event",
-		Store:   store,
+		EventID:   eventID,
+		Reason:    "Trying to close expired event",
+		Store:     store,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -336,9 +344,10 @@ func TestBreakGlassCloseCommand_ConcurrentModification(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: eventID,
-		Reason:  "Closing event",
-		Store:   store,
+		EventID:   eventID,
+		Reason:    "Closing event",
+		Store:     store,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -358,9 +367,10 @@ func TestBreakGlassCloseCommand_GetError(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: "abcd123456789012",
-		Reason:  "Test reason",
-		Store:   store,
+		EventID:   "abcd123456789012",
+		Reason:    "Test reason",
+		Store:     store,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -397,9 +407,10 @@ func TestBreakGlassCloseCommand_UpdateError(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: eventID,
-		Reason:  "Test reason",
-		Store:   store,
+		EventID:   eventID,
+		Reason:    "Test reason",
+		Store:     store,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -416,7 +427,6 @@ func TestBreakGlassCloseCommand_UpdateError(t *testing.T) {
 // ============================================================================
 
 func TestBreakGlassCloseCommand_LogsCloseEvent(t *testing.T) {
-	currentUser, _ := user.Current()
 	eventID := "abcd123456789012"
 	activeEvent := &breakglass.BreakGlassEvent{
 		ID:            eventID,
@@ -444,10 +454,11 @@ func TestBreakGlassCloseCommand_LogsCloseEvent(t *testing.T) {
 	logger := &mockBreakGlassLogger{}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: eventID,
-		Reason:  "Incident resolved, access no longer needed",
-		Store:   store,
-		Logger:  logger,
+		EventID:   eventID,
+		Reason:    "Incident resolved, access no longer needed",
+		Store:     store,
+		Logger:    logger,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	_, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -472,9 +483,9 @@ func TestBreakGlassCloseCommand_LogsCloseEvent(t *testing.T) {
 		t.Errorf("expected event_id %q, got %q", eventID, entry.EventID)
 	}
 
-	// Verify closed_by is current user
-	if entry.ClosedBy != currentUser.Username {
-		t.Errorf("expected closed_by %q, got %q", currentUser.Username, entry.ClosedBy)
+	// Verify closed_by is using AWS identity (mock username)
+	if entry.ClosedBy != defaultMockUsername {
+		t.Errorf("expected closed_by %q, got %q", defaultMockUsername, entry.ClosedBy)
 	}
 
 	// Verify closed_reason
@@ -523,10 +534,11 @@ func TestBreakGlassCloseCommand_NoLoggingWhenLoggerNil(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: eventID,
-		Reason:  "Closing without logger",
-		Store:   store,
-		Logger:  nil, // Explicitly nil
+		EventID:   eventID,
+		Reason:    "Closing without logger",
+		Store:     store,
+		Logger:    nil, // Explicitly nil
+		STSClient: defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -553,7 +565,6 @@ func TestBreakGlassCloseCommand_NoLoggingWhenLoggerNil(t *testing.T) {
 // ============================================================================
 
 func TestBreakGlassCloseCommand_NotifiesOnClose(t *testing.T) {
-	currentUser, _ := user.Current()
 	eventID := "abcd123456789012"
 	activeEvent := &breakglass.BreakGlassEvent{
 		ID:            eventID,
@@ -580,8 +591,9 @@ func TestBreakGlassCloseCommand_NotifiesOnClose(t *testing.T) {
 	notifier := &mockBreakGlassNotifier{}
 
 	input := BreakGlassCloseCommandInput{
-		EventID:  eventID,
-		Reason:   "Incident resolved",
+		EventID:   eventID,
+		Reason:    "Incident resolved",
+		STSClient: defaultMockSTSClient(),
 		Store:    store,
 		Notifier: notifier,
 	}
@@ -611,9 +623,9 @@ func TestBreakGlassCloseCommand_NotifiesOnClose(t *testing.T) {
 		t.Errorf("expected status %q, got %q", breakglass.StatusClosed, event.BreakGlass.Status)
 	}
 
-	// Verify actor is current user (the closer)
-	if event.Actor != currentUser.Username {
-		t.Errorf("expected actor %q, got %q", currentUser.Username, event.Actor)
+	// Verify actor is using AWS identity (mock username - the closer)
+	if event.Actor != defaultMockUsername {
+		t.Errorf("expected actor %q, got %q", defaultMockUsername, event.Actor)
 	}
 
 	// Verify timestamp is set
@@ -655,10 +667,11 @@ func TestBreakGlassCloseCommand_NotificationErrorDoesNotFail(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID:  eventID,
-		Reason:   "Incident resolved",
-		Store:    store,
-		Notifier: notifier,
+		EventID:   eventID,
+		Reason:    "Incident resolved",
+		Store:     store,
+		Notifier:  notifier,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	// Command should succeed even when notification fails
@@ -711,10 +724,11 @@ func TestBreakGlassCloseCommand_NilNotifierDoesNotPanic(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID:  eventID,
-		Reason:   "Closing without notifier",
-		Store:    store,
-		Notifier: nil, // Explicitly nil
+		EventID:   eventID,
+		Reason:    "Closing without notifier",
+		Store:     store,
+		Notifier:  nil, // Explicitly nil
+		STSClient: defaultMockSTSClient(),
 	}
 
 	// Should not panic with nil notifier
@@ -737,7 +751,6 @@ func TestBreakGlassCloseCommand_NilNotifierDoesNotPanic(t *testing.T) {
 // ============================================================================
 
 func TestBreakGlassCloseCommand_OutputFields(t *testing.T) {
-	currentUser, _ := user.Current()
 	eventID := "abcd123456789012"
 	activeEvent := &breakglass.BreakGlassEvent{
 		ID:            eventID,
@@ -763,9 +776,10 @@ func TestBreakGlassCloseCommand_OutputFields(t *testing.T) {
 	}
 
 	input := BreakGlassCloseCommandInput{
-		EventID: eventID,
-		Reason:  "Incident resolved, production stable",
-		Store:   store,
+		EventID:   eventID,
+		Reason:    "Incident resolved, production stable",
+		Store:     store,
+		STSClient: defaultMockSTSClient(),
 	}
 
 	output, err := testableBreakGlassCloseCommand(context.Background(), input)
@@ -788,9 +802,9 @@ func TestBreakGlassCloseCommand_OutputFields(t *testing.T) {
 		t.Errorf("expected status 'closed', got '%s'", output.Event.Status)
 	}
 
-	// Verify ClosedBy
-	if output.Event.ClosedBy != currentUser.Username {
-		t.Errorf("expected closed_by '%s', got '%s'", currentUser.Username, output.Event.ClosedBy)
+	// Verify ClosedBy uses AWS identity (mock username)
+	if output.Event.ClosedBy != defaultMockUsername {
+		t.Errorf("expected closed_by '%s', got '%s'", defaultMockUsername, output.Event.ClosedBy)
 	}
 
 	// Verify ClosedReason

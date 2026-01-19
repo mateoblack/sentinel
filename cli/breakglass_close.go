@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 )
@@ -34,6 +35,10 @@ type BreakGlassCloseCommandInput struct {
 	// Logger is an optional Logger for audit trail logging.
 	// If nil, no break-glass events are logged.
 	Logger logging.Logger
+
+	// STSClient is an optional STS client for AWS identity extraction.
+	// If nil, a new client will be created from AWS config.
+	STSClient identity.STSAPI
 }
 
 // BreakGlassCloseCommandOutput represents the JSON output from the breakglass-close command.
@@ -90,33 +95,36 @@ func BreakGlassCloseCommand(ctx context.Context, input BreakGlassCloseCommandInp
 		return errors.New("reason is required")
 	}
 
-	// 3. Get current user as closer identity
-	currentUser, err := user.Current()
+	// 3. Load AWS config (needed for STS and DynamoDB)
+	awsCfgOpts := []func(*config.LoadOptions) error{}
+	if input.Region != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	}
+	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to get current user: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
 		return err
 	}
-	closer := currentUser.Username
 
-	// 4. Create or use provided Store
+	// 4. Get AWS identity for closer
+	stsClient := input.STSClient
+	if stsClient == nil {
+		stsClient = sts.NewFromConfig(awsCfg)
+	}
+	closer, err := identity.GetAWSUsername(ctx, stsClient)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to get AWS identity: %v\n", err)
+		return err
+	}
+
+	// 5. Create or use provided Store
 	store := input.Store
 	if store == nil {
-		// Load AWS config
-		awsCfgOpts := []func(*config.LoadOptions) error{}
-		if input.Region != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
-		}
-		awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
-			return err
-		}
-
-		// Create DynamoDB store
+		// Create DynamoDB store using already-loaded AWS config
 		store = breakglass.NewDynamoDBStore(awsCfg, input.BreakGlassTable)
 	}
 
-	// 5. Fetch event using store.Get()
+	// 6. Fetch event using store.Get()
 	event, err := store.Get(ctx, input.EventID)
 	if err != nil {
 		if errors.Is(err, breakglass.ErrEventNotFound) {
@@ -127,19 +135,19 @@ func BreakGlassCloseCommand(ctx context.Context, input BreakGlassCloseCommandInp
 		return err
 	}
 
-	// 6. Check transition validity
+	// 7. Check transition validity
 	if !event.CanTransitionTo(breakglass.StatusClosed) {
 		fmt.Fprintf(os.Stderr, "Cannot close event: current status is %s (only active events can be closed)\n", event.Status)
 		return errors.New("invalid state transition")
 	}
 
-	// 7. Update event fields
+	// 8. Update event fields
 	event.Status = breakglass.StatusClosed
 	event.ClosedBy = closer
 	event.ClosedReason = input.Reason
 	event.UpdatedAt = time.Now()
 
-	// 8. Store updated event
+	// 9. Store updated event
 	if err := store.Update(ctx, event); err != nil {
 		if errors.Is(err, breakglass.ErrConcurrentModification) {
 			fmt.Fprintf(os.Stderr, "Event was modified by another process, please retry\n")
@@ -149,13 +157,13 @@ func BreakGlassCloseCommand(ctx context.Context, input BreakGlassCloseCommandInp
 		return err
 	}
 
-	// 9. Log break-glass close event if Logger is provided
+	// 10. Log break-glass close event if Logger is provided
 	if input.Logger != nil {
 		entry := logging.NewBreakGlassLogEntry(logging.BreakGlassEventClosed, event)
 		input.Logger.LogBreakGlass(entry)
 	}
 
-	// 10. Fire notification if Notifier is provided (best-effort, errors logged but don't fail)
+	// 11. Fire notification if Notifier is provided (best-effort, errors logged but don't fail)
 	if input.Notifier != nil {
 		bgEvent := notification.NewBreakGlassEvent(notification.EventBreakGlassClosed, event, closer)
 		if err := input.Notifier.NotifyBreakGlass(ctx, bgEvent); err != nil {
@@ -163,7 +171,7 @@ func BreakGlassCloseCommand(ctx context.Context, input BreakGlassCloseCommandInp
 		}
 	}
 
-	// 11. Output success JSON
+	// 12. Output success JSON
 	output := BreakGlassCloseCommandOutput{
 		ID:           event.ID,
 		Profile:      event.Profile,

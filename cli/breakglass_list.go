@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 )
 
 // BreakGlassListCommandInput contains the input for the breakglass-list command.
@@ -25,6 +26,10 @@ type BreakGlassListCommandInput struct {
 	// Store is an optional Store implementation for testing.
 	// If nil, a DynamoDB store will be created using the BreakGlassTable and Region.
 	Store breakglass.Store
+
+	// STSClient is an optional STS client for AWS identity extraction.
+	// If nil, a new client will be created from AWS config.
+	STSClient identity.STSAPI
 }
 
 // BreakGlassEventSummary represents a single event in the list output.
@@ -80,38 +85,40 @@ func ConfigureBreakGlassListCommand(app *kingpin.Application, s *Sentinel) {
 // It retrieves break-glass events from DynamoDB based on filter flags.
 // On success, outputs JSON to stdout. On failure, outputs error to stderr and returns error.
 func BreakGlassListCommand(ctx context.Context, input BreakGlassListCommandInput) error {
-	// 1. Get current user if Invoker not specified and no other filter
-	invoker := input.Invoker
-	if invoker == "" && input.Status == "" && input.Profile == "" {
-		currentUser, err := user.Current()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to get current user: %v\n", err)
-			return err
-		}
-		invoker = currentUser.Username
+	// 1. Load AWS config (needed for STS and DynamoDB)
+	awsCfgOpts := []func(*config.LoadOptions) error{}
+	if input.Region != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	}
+	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
+		return err
 	}
 
-	// 2. Get or create store
-	store := input.Store
-	if store == nil {
-		// Load AWS config
-		awsCfgOpts := []func(*config.LoadOptions) error{}
-		if input.Region != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	// 2. Get AWS identity if Invoker not specified and no other filter
+	invoker := input.Invoker
+	if invoker == "" && input.Status == "" && input.Profile == "" {
+		stsClient := input.STSClient
+		if stsClient == nil {
+			stsClient = sts.NewFromConfig(awsCfg)
 		}
-		awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
+		invoker, err = identity.GetAWSUsername(ctx, stsClient)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to get AWS identity: %v\n", err)
 			return err
 		}
+	}
 
-		// Create DynamoDB store
+	// 3. Get or create store
+	store := input.Store
+	if store == nil {
+		// Create DynamoDB store using already-loaded AWS config
 		store = breakglass.NewDynamoDBStore(awsCfg, input.BreakGlassTable)
 	}
 
-	// 3. Query based on flags (priority: status > profile > invoker)
+	// 4. Query based on flags (priority: status > profile > invoker)
 	var events []*breakglass.BreakGlassEvent
-	var err error
 	limit := input.Limit
 
 	if input.Status != "" {
@@ -135,7 +142,7 @@ func BreakGlassListCommand(ctx context.Context, input BreakGlassListCommandInput
 		return err
 	}
 
-	// 4. Filter by invoker if specified AND query was not by invoker
+	// 5. Filter by invoker if specified AND query was not by invoker
 	if input.Invoker != "" && (input.Status != "" || input.Profile != "") {
 		filtered := make([]*breakglass.BreakGlassEvent, 0, len(events))
 		for _, event := range events {
@@ -146,7 +153,7 @@ func BreakGlassListCommand(ctx context.Context, input BreakGlassListCommandInput
 		events = filtered
 	}
 
-	// 5. Format results as JSON array
+	// 6. Format results as JSON array
 	summaries := make([]BreakGlassEventSummary, 0, len(events))
 	for _, event := range events {
 		summaries = append(summaries, BreakGlassEventSummary{

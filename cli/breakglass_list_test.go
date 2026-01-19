@@ -3,20 +3,27 @@ package cli
 import (
 	"context"
 	"errors"
-	"os/user"
 	"testing"
 	"time"
 
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 )
 
-// testableBreakGlassListCommand is a testable version that doesn't require current user lookup
-// when an invoker filter or other filter is explicitly provided.
-func testableBreakGlassListCommand(ctx context.Context, input BreakGlassListCommandInput, mockUsername string) ([]BreakGlassEventSummary, error) {
-	// 1. Get invoker (use mockUsername as default if no filter)
+// testableBreakGlassListCommand is a testable version that uses mock STS client.
+func testableBreakGlassListCommand(ctx context.Context, input BreakGlassListCommandInput) ([]BreakGlassEventSummary, error) {
+	// 1. Get invoker (use STSClient if no invoker filter and no other filter)
 	invoker := input.Invoker
 	if invoker == "" && input.Status == "" && input.Profile == "" {
-		invoker = mockUsername
+		stsClient := input.STSClient
+		if stsClient == nil {
+			return nil, errors.New("STSClient is required for testing when no filter is provided")
+		}
+		var err error
+		invoker, err = identity.GetAWSUsername(ctx, stsClient)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// 2. Get store (must be provided for testing)
@@ -81,14 +88,11 @@ func testableBreakGlassListCommand(ctx context.Context, input BreakGlassListComm
 }
 
 func TestBreakGlassListCommand_DefaultListsCurrentUserEvents(t *testing.T) {
-	currentUser, _ := user.Current()
-	mockUsername := currentUser.Username
-
 	now := time.Now()
 	expectedEvents := []*breakglass.BreakGlassEvent{
 		{
 			ID:         "abc123def4567890",
-			Invoker:    mockUsername,
+			Invoker:    defaultMockUsername,
 			Profile:    "dev",
 			Status:     breakglass.StatusActive,
 			ReasonCode: breakglass.ReasonIncident,
@@ -97,7 +101,7 @@ func TestBreakGlassListCommand_DefaultListsCurrentUserEvents(t *testing.T) {
 		},
 		{
 			ID:         "def456ghi7890123",
-			Invoker:    mockUsername,
+			Invoker:    defaultMockUsername,
 			Profile:    "prod",
 			Status:     breakglass.StatusClosed,
 			ReasonCode: breakglass.ReasonMaintenance,
@@ -115,18 +119,19 @@ func TestBreakGlassListCommand_DefaultListsCurrentUserEvents(t *testing.T) {
 	}
 
 	input := BreakGlassListCommandInput{
-		Store: store,
-		Limit: 100,
+		Store:     store,
+		Limit:     100,
+		STSClient: defaultMockSTSClient(),
 	}
 
-	summaries, err := testableBreakGlassListCommand(context.Background(), input, mockUsername)
+	summaries, err := testableBreakGlassListCommand(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify ListByInvoker was called with current user
-	if calledInvoker != mockUsername {
-		t.Errorf("expected invoker %q, got %q", mockUsername, calledInvoker)
+	// Verify ListByInvoker was called with AWS identity (mock username)
+	if calledInvoker != defaultMockUsername {
+		t.Errorf("expected invoker %q, got %q", defaultMockUsername, calledInvoker)
 	}
 
 	// Verify results
@@ -182,7 +187,7 @@ func TestBreakGlassListCommand_FilterByStatus(t *testing.T) {
 		Limit:  100,
 	}
 
-	summaries, err := testableBreakGlassListCommand(context.Background(), input, "currentuser")
+	summaries, err := testableBreakGlassListCommand(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -233,7 +238,7 @@ func TestBreakGlassListCommand_FilterByProfile(t *testing.T) {
 		Limit:   100,
 	}
 
-	summaries, err := testableBreakGlassListCommand(context.Background(), input, "currentuser")
+	summaries, err := testableBreakGlassListCommand(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -281,7 +286,7 @@ func TestBreakGlassListCommand_FilterByInvoker(t *testing.T) {
 		Limit:   100,
 	}
 
-	summaries, err := testableBreakGlassListCommand(context.Background(), input, "currentuser")
+	summaries, err := testableBreakGlassListCommand(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -313,7 +318,7 @@ func TestBreakGlassListCommand_EmptyResults(t *testing.T) {
 		Limit: 100,
 	}
 
-	summaries, err := testableBreakGlassListCommand(context.Background(), input, "currentuser")
+	summaries, err := testableBreakGlassListCommand(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -336,7 +341,7 @@ func TestBreakGlassListCommand_StoreError(t *testing.T) {
 		Limit: 100,
 	}
 
-	_, err := testableBreakGlassListCommand(context.Background(), input, "currentuser")
+	_, err := testableBreakGlassListCommand(context.Background(), input)
 	if err == nil {
 		t.Fatal("expected error when store fails")
 	}
@@ -355,7 +360,7 @@ func TestBreakGlassListCommand_InvalidStatus(t *testing.T) {
 		Limit:  100,
 	}
 
-	_, err := testableBreakGlassListCommand(context.Background(), input, "currentuser")
+	_, err := testableBreakGlassListCommand(context.Background(), input)
 	if err == nil {
 		t.Fatal("expected error for invalid status")
 	}
@@ -403,7 +408,7 @@ func TestBreakGlassListCommand_FilterByStatusAndInvoker(t *testing.T) {
 		Limit:   100,
 	}
 
-	summaries, err := testableBreakGlassListCommand(context.Background(), input, "currentuser")
+	summaries, err := testableBreakGlassListCommand(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -450,7 +455,7 @@ func TestBreakGlassListCommand_AllStatusValues(t *testing.T) {
 				Limit:  100,
 			}
 
-			summaries, err := testableBreakGlassListCommand(context.Background(), input, "currentuser")
+			summaries, err := testableBreakGlassListCommand(context.Background(), input)
 			if err != nil {
 				t.Fatalf("unexpected error for status %s: %v", status, err)
 			}
@@ -497,7 +502,7 @@ func TestBreakGlassListCommand_OutputContainsReasonCode(t *testing.T) {
 		Limit: 100,
 	}
 
-	summaries, err := testableBreakGlassListCommand(context.Background(), input, "testuser")
+	summaries, err := testableBreakGlassListCommand(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
