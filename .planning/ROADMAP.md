@@ -16,7 +16,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.7 Permissions Discovery** — [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) (Phases 60-68, shipped 2026-01-18)
 - ✅ **v1.7.1 Security Patch** — [milestones/v1.7.1-ROADMAP.md](milestones/v1.7.1-ROADMAP.md) (Phases 69-72, shipped 2026-01-19)
 - ✅ **v1.8 Credential Flow UX** — [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) (Phases 73-75, shipped 2026-01-19)
-- 🚧 **v1.9 SSO Profile Support** — Phases 76-77 (in progress)
+- 🚧 **v1.9 SSO Profile Support** — Phases 76-77 (ready for completion)
 
 ## Completed Milestones
 
@@ -397,10 +397,10 @@ Plans:
 **Goal**: Add --profile flag to whoami command (currently missing entirely)
 **Depends on**: Phase 76
 **Research**: Unlikely (extends existing CLI patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 77-01: TBD (run /gsd:plan-phase 77 to break down)
+- [x] 77-01: Add --profile flag to whoami command for SSO credential loading — completed 2026-01-19
 
 ## Progress (All Milestones)
 
@@ -416,6 +416,6 @@ Plans:
 | v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
-| v1.9 SSO Profile Support | 76-77 | 5/? | 🚧 In Progress | - |
+| v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Ready | - |
 
-**Totals:** 10 milestones shipped (75 phases, 123 plans), 1 in progress
+**Totals:** 10 milestones shipped (75 phases, 122 plans), 1 ready for completion

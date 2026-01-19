@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.9 SSO Profile Support — IN PROGRESS
+**Current focus:** v1.9 SSO Profile Support — COMPLETE
 
 ## Current Position
 
-Phase: 76 of 77 (SSO Credential Loading)
-Plan: 5 of 5 in current phase
+Phase: 77 of 77 (Whoami Profile Flag)
+Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-19 — Completed 76-05-PLAN.md (permissions/audit SSO support)
+Last activity: 2026-01-19 — Completed 77-01-PLAN.md (whoami profile flag)
 
-Progress: █████░░░░░ 50% (v1.9 SSO Profile Support - 1/2 phases)
+Progress: ██████████ 100% (v1.9 SSO Profile Support - 2/2 phases)
 
 ## Milestone Summary
 
@@ -104,9 +104,9 @@ Progress: █████░░░░░ 50% (v1.9 SSO Profile Support - 1/2 pha
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 121
+- Total plans completed: 122
 - Average duration: 3.0 min
-- Total execution time: ~511 min
+- Total execution time: ~513 min
 
 **By Milestone:**
 
@@ -122,7 +122,7 @@ Progress: █████░░░░░ 50% (v1.9 SSO Profile Support - 1/2 pha
 | v1.7 Permissions Discovery | 9 | 10 | ~66 min |
 | v1.7.1 Security Patch | 4 | 7 | ~86 min |
 | v1.8 Credential Flow UX | 3 | 3 | ~16 min |
-| v1.9 SSO Profile Support (in progress) | 1 | 5 | ~35 min |
+| v1.9 SSO Profile Support | 2 | 6 | ~37 min |
 
 ## Accumulated Context
 
@@ -417,6 +417,10 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - enforce plan and audit verify commands: Add --aws-profile for SSO credential loading
 - All commands follow same WithSharedConfigProfile pattern
 
+**v1.9 Whoami Profile Flag decisions (Phase 77-01):**
+- Use --profile (not --aws-profile) since whoami has no concept of target profile - it only needs credentials to call STS
+- Same WithSharedConfigProfile pattern for consistency with Phase 76
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -428,9 +432,9 @@ None — clean start for v1.8.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 76-05-PLAN.md (permissions/audit SSO support)
+Stopped at: Completed 77-01-PLAN.md (whoami profile flag)
 Resume file: None
-Next: Ready for Phase 77 (Whoami Profile Flag)
+Next: Milestone v1.9 complete - ready for /gsd:complete-milestone
 
 ## Roadmap Evolution
 
