@@ -294,21 +294,21 @@ func TestThreat_Spoofing_UnicodeLookalikesAreSanitized(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"cyrillic a", "аlice", "lice"},                   // Cyrillic 'а' (U+0430)
-		{"cyrillic e", "alicе", "alic"},                   // Cyrillic 'е' (U+0435)
-		{"cyrillic o", "bоb", "bb"},                       // Cyrillic 'о' (U+043E)
-		{"greek alpha", "αlice", "lice"},                  // Greek 'α' (U+03B1)
-		{"full-width a", "ａlice", "lice"},                 // Full-width 'a' (U+FF41)
-		{"script a", "𝒶lice", "lice"},                     // Mathematical script 'a'
-		{"mixed homoglyphs", "аlіcе", "lc"},               // Multiple Cyrillic
-		{"all homoglyphs", "аеіо", ""},                    // All non-Latin - should error
-		{"zero-width joiner", "ali\u200Dce", "alice"},     // Zero-width joiner
-		{"zero-width space", "ali\u200Bce", "alice"},      // Zero-width space
-		{"combining accent", "alice\u0301", "alice"},      // Combining acute
-		{"RTL override", "ali\u202Ece", "alice"},          // RTL override
-		{"BOM character", "\uFEFFalice", "alice"},         // Byte order mark
-		{"object replacement", "ali\uFFFCce", "alice"},    // Object replacement char
-		{"variation selector", "a\uFE0Flice", "alice"},    // Variation selector
+		{"cyrillic a", "аlice", "lice"},                // Cyrillic 'а' (U+0430)
+		{"cyrillic e", "alicе", "alic"},                // Cyrillic 'е' (U+0435)
+		{"cyrillic o", "bоb", "bb"},                    // Cyrillic 'о' (U+043E)
+		{"greek alpha", "αlice", "lice"},               // Greek 'α' (U+03B1)
+		{"full-width a", "ａlice", "lice"},              // Full-width 'a' (U+FF41)
+		{"script a", "𝒶lice", "lice"},                  // Mathematical script 'a'
+		{"mixed homoglyphs", "аlіcе", "lc"},            // Multiple Cyrillic
+		{"all homoglyphs", "аеіо", ""},                 // All non-Latin - should error
+		{"zero-width joiner", "ali\u200Dce", "alice"},  // Zero-width joiner
+		{"zero-width space", "ali\u200Bce", "alice"},   // Zero-width space
+		{"combining accent", "alice\u0301", "alice"},   // Combining acute
+		{"RTL override", "ali\u202Ece", "alice"},       // RTL override
+		{"BOM character", "\uFEFFalice", "alice"},      // Byte order mark
+		{"object replacement", "ali\uFFFCce", "alice"}, // Object replacement char
+		{"variation selector", "a\uFE0Flice", "alice"}, // Variation selector
 	}
 
 	for _, tc := range testCases {

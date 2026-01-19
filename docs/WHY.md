@@ -2,7 +2,7 @@
 
 ## The Scenario
 
-Your senior developer runs this at 2am:
+Your on-call SRE runs this at 2am during an incident:
 ```bash
 aws rds delete-db-instance --db-instance-identifier prod-primary
 ```
@@ -20,7 +20,7 @@ In the morning, you check CloudTrail:
 }
 ```
 
-**She has admin permissions. She's a senior dev. She's SUPPOSED to have this access.**
+**She's on-call. She has admin permissions. She's SUPPOSED to have this access for incidents.**
 
 **But you still can't answer basic questions:**
 - What was the business justification?
@@ -253,6 +253,100 @@ sentinel audit verify \
 grep "sentinel:alice" sentinel-decisions.log
 ```
 
+## Works With Any Access Model
+
+Sentinel doesn't dictate who should have production access. It enforces whatever model your organization chooses.
+
+### Model 1: Zero-Touch Production
+
+**Setup:** Developers never touch prod. All changes go through CI/CD.
+
+```
+Developers → Git → CI/CD → Terraform → Production
+```
+
+**Who still needs prod access:**
+- Platform/SRE team (infrastructure work)
+- Database admins (maintenance)
+- Security engineers (incident investigation)
+- On-call engineers (emergencies)
+
+**Sentinel's role:**
+```yaml
+rules:
+  # Developers can't access prod
+  - name: no-devs-in-prod
+    effect: deny
+    conditions:
+      profiles: [prod]
+      users: [dev-*]
+    reason: Developers use CI/CD for production changes
+
+  # Platform team can, with controls
+  - name: platform-prod-access
+    effect: allow
+    conditions:
+      profiles: [prod]
+      users: [sre-alice, sre-bob, platform-*]
+      time:
+        days: [monday, tuesday, wednesday, thursday, friday]
+        hours:
+          start: "09:00"
+          end: "18:00"
+    reason: Platform team business hours access
+
+  # On-call for emergencies
+  - name: oncall-prod-access
+    effect: allow
+    conditions:
+      profiles: [prod]
+      users: [oncall-*]
+    reason: On-call incident response
+```
+
+### Model 2: Trust But Verify
+
+**Setup:** Senior engineers have prod access for emergencies. Normal changes go through CI/CD.
+
+```yaml
+rules:
+  # Junior engineers: dev/staging only
+  - name: junior-no-prod
+    effect: deny
+    conditions:
+      profiles: [prod]
+      users: [junior-*]
+    reason: Junior engineers use CI/CD for production
+
+  # Senior engineers: prod with approval
+  - name: senior-prod-approval
+    effect: require_approval
+    conditions:
+      profiles: [prod]
+      users: [senior-*]
+    reason: Senior engineers require approval for production
+```
+
+### The Point
+
+**Every org has SOMEONE who can touch prod:**
+- SRE/Platform teams for infrastructure
+- DBAs for database maintenance
+- Security for incident response
+- On-call for emergencies when CI/CD is broken
+
+Sentinel doesn't give people access - IAM does that. Sentinel adds:
+- **WHEN** they can access (time windows)
+- **WHY** they accessed (justification)
+- **HOW** they got access (approval, break-glass, direct)
+- **WHAT** they did (CloudTrail + SourceIdentity)
+
+| Org Size | Access Model | Sentinel Value |
+|----------|--------------|----------------|
+| Small | Everyone has prod | Adds controls and audit |
+| Medium | Mixed privileges | Enforces separation |
+| Large | Platform/SRE only | Audits authorized access |
+
 ## Policy Effects
 
 Sentinel supports three policy effects:
@@ -287,7 +381,8 @@ rules:
       - platform-oncall
     auto_approve:
       users:
-        - senior-dev
+        - sre-alice
+        - platform-bob
       max_duration: 30m
       time:
         days: [monday, tuesday, wednesday, thursday, friday]

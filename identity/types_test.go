@@ -213,39 +213,39 @@ func TestParse(t *testing.T) {
 			wantErr:   "",
 		},
 		{
-			name:      "invalid - wrong prefix",
-			input:     "aws:alice:a1b2c3d4",
-			wantErr:   "start with 'sentinel:'",
+			name:    "invalid - wrong prefix",
+			input:   "aws:alice:a1b2c3d4",
+			wantErr: "start with 'sentinel:'",
 		},
 		{
-			name:      "invalid - missing prefix",
-			input:     "alice:a1b2c3d4",
-			wantErr:   "start with 'sentinel:'",
+			name:    "invalid - missing prefix",
+			input:   "alice:a1b2c3d4",
+			wantErr: "start with 'sentinel:'",
 		},
 		{
-			name:      "invalid - too few parts",
-			input:     "sentinel:alice",
-			wantErr:   "invalid SourceIdentity format",
+			name:    "invalid - too few parts",
+			input:   "sentinel:alice",
+			wantErr: "invalid SourceIdentity format",
 		},
 		{
-			name:      "invalid - too many parts",
-			input:     "sentinel:alice:a1b2c3d4:extra",
-			wantErr:   "invalid SourceIdentity format",
+			name:    "invalid - too many parts",
+			input:   "sentinel:alice:a1b2c3d4:extra",
+			wantErr: "invalid SourceIdentity format",
 		},
 		{
-			name:      "invalid - empty string",
-			input:     "",
-			wantErr:   "start with 'sentinel:'",
+			name:    "invalid - empty string",
+			input:   "",
+			wantErr: "start with 'sentinel:'",
 		},
 		{
-			name:      "invalid - empty user in parsed string",
-			input:     "sentinel::a1b2c3d4",
-			wantErr:   "empty",
+			name:    "invalid - empty user in parsed string",
+			input:   "sentinel::a1b2c3d4",
+			wantErr: "empty",
 		},
 		{
-			name:      "invalid - bad request-id in parsed string",
-			input:     "sentinel:alice:badid",
-			wantErr:   "request-id",
+			name:    "invalid - bad request-id in parsed string",
+			input:   "sentinel:alice:badid",
+			wantErr: "request-id",
 		},
 	}
 
@@ -310,7 +310,7 @@ func TestSourceIdentity_LengthConstraint(t *testing.T) {
 
 	si := &SourceIdentity{
 		User:      "abcdefghij0123456789", // 20 chars (max)
-		RequestID: "12345678",              // 8 chars (fixed)
+		RequestID: "12345678",             // 8 chars (fixed)
 	}
 
 	formatted := si.Format()
@@ -478,7 +478,7 @@ func TestSourceIdentity_AWSConstraintBoundary(t *testing.T) {
 		// Test with max-length user (20 chars) - this is the worst case
 		si := &SourceIdentity{
 			User:      "abcdefghij0123456789", // 20 chars (max)
-			RequestID: "12345678",              // 8 chars (fixed)
+			RequestID: "12345678",             // 8 chars (fixed)
 		}
 
 		formatted := si.Format()

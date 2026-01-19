@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/request"
@@ -34,6 +35,10 @@ type DenyCommandInput struct {
 	// Logger is an optional Logger for audit trail logging.
 	// If nil, no approval events are logged.
 	Logger logging.Logger
+
+	// STSClient is an optional STS client for AWS identity extraction.
+	// If nil, a new client will be created from AWS config.
+	STSClient identity.STSAPI
 }
 
 // DenyCommandOutput represents the JSON output from the deny command.
@@ -83,28 +88,31 @@ func DenyCommand(ctx context.Context, input DenyCommandInput) error {
 		return errors.New("invalid request ID format")
 	}
 
-	// 2. Get current user for approver identity
-	currentUser, err := user.Current()
+	// 2. Load AWS config (needed for STS and DynamoDB)
+	awsCfgOpts := []func(*config.LoadOptions) error{}
+	if input.Region != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	}
+	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to get current user: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
 		return err
 	}
-	approver := currentUser.Username
 
-	// 3. Get or create store
+	// 3. Get AWS identity for denier
+	stsClient := input.STSClient
+	if stsClient == nil {
+		stsClient = sts.NewFromConfig(awsCfg)
+	}
+	approver, err := identity.GetAWSUsername(ctx, stsClient)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to get AWS identity: %v\n", err)
+		return err
+	}
+
+	// 4. Get or create store
 	store := input.Store
 	if store == nil {
-		// Load AWS config
-		awsCfgOpts := []func(*config.LoadOptions) error{}
-		if input.Region != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
-		}
-		awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
-			return err
-		}
-
 		// Create DynamoDB store
 		store = request.NewDynamoDBStore(awsCfg, input.RequestTable)
 	}
@@ -114,7 +122,7 @@ func DenyCommand(ctx context.Context, input DenyCommandInput) error {
 		store = notification.NewNotifyStore(store, input.Notifier)
 	}
 
-	// 4. Fetch request from store
+	// 5. Fetch request from store
 	req, err := store.Get(ctx, input.RequestID)
 	if err != nil {
 		if errors.Is(err, request.ErrRequestNotFound) {
@@ -125,19 +133,19 @@ func DenyCommand(ctx context.Context, input DenyCommandInput) error {
 		return err
 	}
 
-	// 5. Check if transition is valid
+	// 6. Check if transition is valid
 	if !req.CanTransitionTo(request.StatusDenied) {
 		fmt.Fprintf(os.Stderr, "Cannot deny request: current status is %s (only pending requests can be denied)\n", req.Status)
 		return errors.New("invalid state transition")
 	}
 
-	// 6. Update request fields
+	// 7. Update request fields
 	req.Status = request.StatusDenied
 	req.Approver = approver
 	req.ApproverComment = input.Comment
 	req.UpdatedAt = time.Now()
 
-	// 7. Store updated request
+	// 8. Store updated request
 	if err := store.Update(ctx, req); err != nil {
 		if errors.Is(err, request.ErrConcurrentModification) {
 			fmt.Fprintf(os.Stderr, "Request was modified by another process, please retry\n")
@@ -147,13 +155,13 @@ func DenyCommand(ctx context.Context, input DenyCommandInput) error {
 		return err
 	}
 
-	// 8. Log denial event if Logger is provided
+	// 9. Log denial event if Logger is provided
 	if input.Logger != nil {
 		entry := logging.NewApprovalLogEntry(notification.EventRequestDenied, req, approver)
 		input.Logger.LogApproval(entry)
 	}
 
-	// 9. Output success JSON
+	// 10. Output success JSON
 	output := DenyCommandOutput{
 		ID:              req.ID,
 		Profile:         req.Profile,

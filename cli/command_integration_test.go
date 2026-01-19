@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/bootstrap"
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/notification"
@@ -19,6 +20,23 @@ import (
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/testutil"
 )
+
+// mockIntegrationSTSClient implements identity.STSAPI for integration testing.
+type mockIntegrationSTSClient struct {
+	username string
+}
+
+func newMockIntegrationSTSClient(username string) *mockIntegrationSTSClient {
+	return &mockIntegrationSTSClient{username: username}
+}
+
+func (m *mockIntegrationSTSClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	return &sts.GetCallerIdentityOutput{
+		Arn:     aws.String("arn:aws:iam::123456789012:user/" + m.username),
+		Account: aws.String("123456789012"),
+		UserId:  aws.String("AIDAEXAMPLE"),
+	}, nil
+}
 
 // ============================================================================
 // Approval Workflow Command Integration Tests
@@ -243,6 +261,7 @@ func TestCommandIntegration_Approval_ApproveUpdatesStatus(t *testing.T) {
 		RequestID: pendingReq.ID,
 		Comment:   "Approved for staging deployment",
 		Store:     store,
+		STSClient: newMockIntegrationSTSClient("approver"),
 	}
 
 	err := ApproveCommand(context.Background(), input)
@@ -273,11 +292,6 @@ func TestCommandIntegration_Approval_ApproveUpdatesStatus(t *testing.T) {
 func TestCommandIntegration_Approval_ApproveWithPolicy(t *testing.T) {
 	// Test that ApproveCommand checks CanApprove from ApprovalPolicy
 
-	currentUser, err := user.Current()
-	if err != nil {
-		t.Skip("cannot get current user")
-	}
-
 	store := testutil.NewMockRequestStore()
 
 	// Create a pending request (ID must be 16 lowercase hex characters)
@@ -294,14 +308,15 @@ func TestCommandIntegration_Approval_ApproveWithPolicy(t *testing.T) {
 	}
 	store.Requests[pendingReq.ID] = pendingReq
 
-	// Create policy where current user is an approver
+	// Create policy where "adminapprover" is an authorized approver
+	// (Note: AWS usernames are sanitized by the identity package to remove special chars)
 	approvalPolicy := &policy.ApprovalPolicy{
 		Version: "1",
 		Rules: []policy.ApprovalRule{
 			{
 				Name:      "production-approvers",
 				Profiles:  []string{"production"},
-				Approvers: []string{currentUser.Username}, // Current user can approve
+				Approvers: []string{"adminapprover"}, // adminapprover can approve (sanitized)
 			},
 		},
 	}
@@ -310,9 +325,10 @@ func TestCommandIntegration_Approval_ApproveWithPolicy(t *testing.T) {
 		RequestID:      pendingReq.ID,
 		Store:          store,
 		ApprovalPolicy: approvalPolicy,
+		STSClient:      newMockIntegrationSTSClient("adminapprover"),
 	}
 
-	err = ApproveCommand(context.Background(), input)
+	err := ApproveCommand(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -361,6 +377,7 @@ func TestCommandIntegration_Approval_ApproveUnauthorized(t *testing.T) {
 		RequestID:      pendingReq.ID,
 		Store:          store,
 		ApprovalPolicy: approvalPolicy,
+		STSClient:      newMockIntegrationSTSClient("unauthorized-user"),
 	}
 
 	err := ApproveCommand(context.Background(), input)
@@ -401,6 +418,7 @@ func TestCommandIntegration_Approval_DenyUpdatesStatus(t *testing.T) {
 		RequestID: pendingReq.ID,
 		Comment:   "Access denied: insufficient justification",
 		Store:     store,
+		STSClient: newMockIntegrationSTSClient("denier"),
 	}
 
 	err := DenyCommand(context.Background(), input)
@@ -431,11 +449,6 @@ func TestCommandIntegration_Approval_DenyUpdatesStatus(t *testing.T) {
 func TestCommandIntegration_Approval_DenyRecordsApprover(t *testing.T) {
 	// Test that DenyCommand records the denier identity
 
-	currentUser, err := user.Current()
-	if err != nil {
-		t.Skip("cannot get current user")
-	}
-
 	store := testutil.NewMockRequestStore()
 
 	// Create a pending request (ID must be 16 lowercase hex characters)
@@ -456,17 +469,19 @@ func TestCommandIntegration_Approval_DenyRecordsApprover(t *testing.T) {
 		RequestID: pendingReq.ID,
 		Comment:   "Denied",
 		Store:     store,
+		STSClient: newMockIntegrationSTSClient("denieradmin"),
 	}
 
-	err = DenyCommand(context.Background(), input)
+	err := DenyCommand(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Verify approver is recorded
+	// (Note: username is used directly from ARN which is already sanitized)
 	updatedReq := store.UpdateCalls[0]
-	if updatedReq.Approver != currentUser.Username {
-		t.Errorf("expected approver %s, got %s", currentUser.Username, updatedReq.Approver)
+	if updatedReq.Approver != "denieradmin" {
+		t.Errorf("expected approver denieradmin, got %s", updatedReq.Approver)
 	}
 }
 
@@ -569,6 +584,7 @@ func TestCommandIntegration_Approval_ApproveLogsEvent(t *testing.T) {
 		Comment:   "Approved",
 		Store:     store,
 		Logger:    logger,
+		STSClient: newMockIntegrationSTSClient("approver"),
 	}
 
 	err := ApproveCommand(context.Background(), input)
@@ -615,6 +631,7 @@ func TestCommandIntegration_Approval_DenyLogsEvent(t *testing.T) {
 		Comment:   "Denied",
 		Store:     store,
 		Logger:    logger,
+		STSClient: newMockIntegrationSTSClient("denier"),
 	}
 
 	err := DenyCommand(context.Background(), input)

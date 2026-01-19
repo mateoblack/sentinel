@@ -358,9 +358,9 @@ func TestValidateRequestID_BoundaryTests(t *testing.T) {
 			name string
 			id   string
 		}{
-			{"char before 0", string([]byte{'/', '1', '2', '3', '4', '5', '6', '7'})}, // '/' is before '0'
+			{"char before 0", string([]byte{'/', '1', '2', '3', '4', '5', '6', '7'})},         // '/' is before '0'
 			{"char after 9 before a", string([]byte{'1', '2', '3', '4', '5', '6', '7', ':'})}, // ':' is after '9'
-			{"char after f", string([]byte{'1', '2', '3', '4', '5', '6', '7', 'g'})},  // 'g' is after 'f'
+			{"char after f", string([]byte{'1', '2', '3', '4', '5', '6', '7', 'g'})},          // 'g' is after 'f'
 		}
 
 		for _, tc := range invalidCases {

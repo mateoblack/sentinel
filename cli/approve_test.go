@@ -3,30 +3,61 @@ package cli
 import (
 	"context"
 	"errors"
-	"os/user"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
-// testableApproveCommand is a testable version that allows mock store injection.
+// mockApproveSTSClient implements identity.STSAPI for testing approve command.
+type mockApproveSTSClient struct {
+	GetCallerIdentityFunc func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+func (m *mockApproveSTSClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	if m.GetCallerIdentityFunc != nil {
+		return m.GetCallerIdentityFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("GetCallerIdentityFunc not set")
+}
+
+// newMockApproveSTSClient creates a mock STS client that returns the specified username.
+func newMockApproveSTSClient(username string) *mockApproveSTSClient {
+	return &mockApproveSTSClient{
+		GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+			return &sts.GetCallerIdentityOutput{
+				Arn:     aws.String("arn:aws:iam::123456789012:user/" + username),
+				Account: aws.String("123456789012"),
+				UserId:  aws.String("AIDAEXAMPLE"),
+			}, nil
+		},
+	}
+}
+
+// testableApproveCommand is a testable version that allows mock store and STS client injection.
 func testableApproveCommand(ctx context.Context, input ApproveCommandInput) (*ApproveCommandOutput, error) {
 	// 1. Validate request ID format
 	if !request.ValidateRequestID(input.RequestID) {
 		return nil, errors.New("invalid request ID format")
 	}
 
-	// 2. Get current user for approver identity
-	currentUser, err := user.Current()
+	// 2. Get AWS identity for approver (must be provided via STSClient for testing)
+	if input.STSClient == nil {
+		return nil, errors.New("STSClient is required for testing")
+	}
+	identity, err := input.STSClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, err
 	}
-	approver := currentUser.Username
+	// Extract username from ARN - simple extraction for testing
+	arn := aws.ToString(identity.Arn)
+	approver := extractUsernameFromARN(arn)
 
 	// 3. Get store (must be provided for testing)
 	store := input.Store
@@ -84,6 +115,17 @@ func testableApproveCommand(ctx context.Context, input ApproveCommandInput) (*Ap
 	}, nil
 }
 
+// extractUsernameFromARN extracts the username from an IAM user ARN.
+// This is a simplified version for tests - the real implementation uses identity.ParseARN.
+func extractUsernameFromARN(arn string) string {
+	// Format: arn:aws:iam::123456789012:user/username or assumed-role/role/session
+	parts := strings.Split(arn, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return arn
+}
+
 func TestApproveCommand_Success(t *testing.T) {
 	now := time.Now()
 	pendingReq := &request.Request{
@@ -112,6 +154,7 @@ func TestApproveCommand_Success(t *testing.T) {
 	input := ApproveCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockApproveSTSClient("bob"),
 	}
 
 	output, err := testableApproveCommand(context.Background(), input)
@@ -130,10 +173,9 @@ func TestApproveCommand_Success(t *testing.T) {
 		t.Errorf("expected Status 'approved', got %q", output.Status)
 	}
 
-	// Verify approver was set to current user
-	currentUser, _ := user.Current()
-	if output.Approver != currentUser.Username {
-		t.Errorf("expected Approver '%s', got %q", currentUser.Username, output.Approver)
+	// Verify approver was set to AWS username
+	if output.Approver != "bob" {
+		t.Errorf("expected Approver 'bob', got %q", output.Approver)
 	}
 
 	// Verify request was updated
@@ -174,6 +216,7 @@ func TestApproveCommand_WithComment(t *testing.T) {
 		RequestID: "abc123def4567890",
 		Comment:   "Approved for maintenance window only",
 		Store:     store,
+		STSClient: newMockApproveSTSClient("bob"),
 	}
 
 	output, err := testableApproveCommand(context.Background(), input)
@@ -205,6 +248,7 @@ func TestApproveCommand_NotFound(t *testing.T) {
 	input := ApproveCommandInput{
 		RequestID: "1234567890abcdef",
 		Store:     store,
+		STSClient: newMockApproveSTSClient("bob"),
 	}
 
 	_, err := testableApproveCommand(context.Background(), input)
@@ -236,6 +280,7 @@ func TestApproveCommand_InvalidID(t *testing.T) {
 			input := ApproveCommandInput{
 				RequestID: tc.requestID,
 				Store:     store,
+				STSClient: newMockApproveSTSClient("bob"),
 			}
 
 			_, err := testableApproveCommand(context.Background(), input)
@@ -274,6 +319,7 @@ func TestApproveCommand_AlreadyApproved(t *testing.T) {
 	input := ApproveCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockApproveSTSClient("charlie"),
 	}
 
 	_, err := testableApproveCommand(context.Background(), input)
@@ -310,6 +356,7 @@ func TestApproveCommand_AlreadyDenied(t *testing.T) {
 	input := ApproveCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockApproveSTSClient("charlie"),
 	}
 
 	_, err := testableApproveCommand(context.Background(), input)
@@ -332,6 +379,7 @@ func TestApproveCommand_StoreError(t *testing.T) {
 	input := ApproveCommandInput{
 		RequestID: "1234567890abcdef",
 		Store:     store,
+		STSClient: newMockApproveSTSClient("bob"),
 	}
 
 	_, err := testableApproveCommand(context.Background(), input)
@@ -370,6 +418,7 @@ func TestApproveCommand_ConcurrentModification(t *testing.T) {
 	input := ApproveCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockApproveSTSClient("bob"),
 	}
 
 	_, err := testableApproveCommand(context.Background(), input)
@@ -412,6 +461,7 @@ func TestApproveCommand_NoPolicy_AllowsAnyApprover(t *testing.T) {
 	input := ApproveCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockApproveSTSClient("bob"),
 		// No ApprovalPolicy set
 	}
 
@@ -430,7 +480,6 @@ func TestApproveCommand_NoPolicy_AllowsAnyApprover(t *testing.T) {
 }
 
 func TestApproveCommand_Policy_AuthorizedApprover(t *testing.T) {
-	currentUser, _ := user.Current()
 	now := time.Now()
 	pendingReq := &request.Request{
 		ID:            "abc123def4567890",
@@ -455,14 +504,14 @@ func TestApproveCommand_Policy_AuthorizedApprover(t *testing.T) {
 		},
 	}
 
-	// Create policy where current user is an authorized approver
+	// Create policy where "admin-user" is an authorized approver
 	approvalPolicy := &policy.ApprovalPolicy{
 		Version: "1",
 		Rules: []policy.ApprovalRule{
 			{
 				Name:      "production-approvers",
 				Profiles:  []string{"production"},
-				Approvers: []string{currentUser.Username, "other-admin"},
+				Approvers: []string{"admin-user", "other-admin"},
 			},
 		},
 	}
@@ -471,6 +520,7 @@ func TestApproveCommand_Policy_AuthorizedApprover(t *testing.T) {
 		RequestID:      "abc123def4567890",
 		Store:          store,
 		ApprovalPolicy: approvalPolicy,
+		STSClient:      newMockApproveSTSClient("admin-user"),
 	}
 
 	output, err := testableApproveCommand(context.Background(), input)
@@ -507,14 +557,14 @@ func TestApproveCommand_Policy_UnauthorizedApprover(t *testing.T) {
 		},
 	}
 
-	// Create policy where current user is NOT an authorized approver
+	// Create policy where "unauthorized-user" is NOT an authorized approver
 	approvalPolicy := &policy.ApprovalPolicy{
 		Version: "1",
 		Rules: []policy.ApprovalRule{
 			{
 				Name:      "production-approvers",
 				Profiles:  []string{"production"},
-				Approvers: []string{"admin1", "admin2"}, // Current user not included
+				Approvers: []string{"admin1", "admin2"}, // unauthorized-user not included
 			},
 		},
 	}
@@ -523,6 +573,7 @@ func TestApproveCommand_Policy_UnauthorizedApprover(t *testing.T) {
 		RequestID:      "abc123def4567890",
 		Store:          store,
 		ApprovalPolicy: approvalPolicy,
+		STSClient:      newMockApproveSTSClient("unauthorized-user"),
 	}
 
 	_, err := testableApproveCommand(context.Background(), input)
@@ -580,6 +631,7 @@ func TestApproveCommand_Policy_NoRuleMatchesProfile(t *testing.T) {
 		RequestID:      "abc123def4567890",
 		Store:          store,
 		ApprovalPolicy: approvalPolicy,
+		STSClient:      newMockApproveSTSClient("bob"),
 	}
 
 	output, err := testableApproveCommand(context.Background(), input)
@@ -599,7 +651,6 @@ func TestApproveCommand_Policy_NoRuleMatchesProfile(t *testing.T) {
 // Tests for approval logging
 
 func TestApproveCommand_Logger_LogsApprovedEvent(t *testing.T) {
-	currentUser, _ := user.Current()
 	now := time.Now()
 	pendingReq := &request.Request{
 		ID:            "abc123def4567890",
@@ -629,6 +680,7 @@ func TestApproveCommand_Logger_LogsApprovedEvent(t *testing.T) {
 		Comment:   "Approved for maintenance window",
 		Store:     store,
 		Logger:    logger,
+		STSClient: newMockApproveSTSClient("approver-user"),
 	}
 
 	output, err := testableApproveCommand(context.Background(), input)
@@ -659,11 +711,11 @@ func TestApproveCommand_Logger_LogsApprovedEvent(t *testing.T) {
 	if entry.Status != string(request.StatusApproved) {
 		t.Errorf("expected status %q, got %q", request.StatusApproved, entry.Status)
 	}
-	if entry.Actor != currentUser.Username {
-		t.Errorf("expected actor %q, got %q", currentUser.Username, entry.Actor)
+	if entry.Actor != "approver-user" {
+		t.Errorf("expected actor %q, got %q", "approver-user", entry.Actor)
 	}
-	if entry.Approver != currentUser.Username {
-		t.Errorf("expected approver %q, got %q", currentUser.Username, entry.Approver)
+	if entry.Approver != "approver-user" {
+		t.Errorf("expected approver %q, got %q", "approver-user", entry.Approver)
 	}
 	if entry.ApproverComment != "Approved for maintenance window" {
 		t.Errorf("expected comment %q, got %q", "Approved for maintenance window", entry.ApproverComment)
@@ -696,6 +748,7 @@ func TestApproveCommand_NoLogger_NoPanic(t *testing.T) {
 	input := ApproveCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockApproveSTSClient("bob"),
 		// Logger is nil
 	}
 

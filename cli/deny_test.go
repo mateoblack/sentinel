@@ -3,28 +3,71 @@ package cli
 import (
 	"context"
 	"errors"
-	"os/user"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
-// testableDenyCommand is a testable version that allows mock store injection.
+// mockDenySTSClient implements identity.STSAPI for testing deny command.
+type mockDenySTSClient struct {
+	GetCallerIdentityFunc func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+func (m *mockDenySTSClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	if m.GetCallerIdentityFunc != nil {
+		return m.GetCallerIdentityFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("GetCallerIdentityFunc not set")
+}
+
+// newMockDenySTSClient creates a mock STS client that returns the specified username.
+func newMockDenySTSClient(username string) *mockDenySTSClient {
+	return &mockDenySTSClient{
+		GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+			return &sts.GetCallerIdentityOutput{
+				Arn:     aws.String("arn:aws:iam::123456789012:user/" + username),
+				Account: aws.String("123456789012"),
+				UserId:  aws.String("AIDAEXAMPLE"),
+			}, nil
+		},
+	}
+}
+
+// extractDenyUsernameFromARN extracts the username from an IAM user ARN.
+// This is a simplified version for tests - the real implementation uses identity.ParseARN.
+func extractDenyUsernameFromARN(arn string) string {
+	// Format: arn:aws:iam::123456789012:user/username or assumed-role/role/session
+	parts := strings.Split(arn, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return arn
+}
+
+// testableDenyCommand is a testable version that allows mock store and STS client injection.
 func testableDenyCommand(ctx context.Context, input DenyCommandInput) (*DenyCommandOutput, error) {
 	// 1. Validate request ID format
 	if !request.ValidateRequestID(input.RequestID) {
 		return nil, errors.New("invalid request ID format")
 	}
 
-	// 2. Get current user for approver identity
-	currentUser, err := user.Current()
+	// 2. Get AWS identity for denier (must be provided via STSClient for testing)
+	if input.STSClient == nil {
+		return nil, errors.New("STSClient is required for testing")
+	}
+	identity, err := input.STSClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, err
 	}
-	approver := currentUser.Username
+	// Extract username from ARN - simple extraction for testing
+	arn := aws.ToString(identity.Arn)
+	approver := extractDenyUsernameFromARN(arn)
 
 	// 3. Get store (must be provided for testing)
 	store := input.Store
@@ -99,6 +142,7 @@ func TestDenyCommand_Success(t *testing.T) {
 	input := DenyCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockDenySTSClient("bob"),
 	}
 
 	output, err := testableDenyCommand(context.Background(), input)
@@ -117,10 +161,9 @@ func TestDenyCommand_Success(t *testing.T) {
 		t.Errorf("expected Status 'denied', got %q", output.Status)
 	}
 
-	// Verify approver was set to current user
-	currentUser, _ := user.Current()
-	if output.Approver != currentUser.Username {
-		t.Errorf("expected Approver '%s', got %q", currentUser.Username, output.Approver)
+	// Verify approver was set to AWS username
+	if output.Approver != "bob" {
+		t.Errorf("expected Approver 'bob', got %q", output.Approver)
 	}
 
 	// Verify request was updated
@@ -161,6 +204,7 @@ func TestDenyCommand_WithComment(t *testing.T) {
 		RequestID: "abc123def4567890",
 		Comment:   "Insufficient justification provided",
 		Store:     store,
+		STSClient: newMockDenySTSClient("bob"),
 	}
 
 	output, err := testableDenyCommand(context.Background(), input)
@@ -192,6 +236,7 @@ func TestDenyCommand_NotFound(t *testing.T) {
 	input := DenyCommandInput{
 		RequestID: "1234567890abcdef",
 		Store:     store,
+		STSClient: newMockDenySTSClient("bob"),
 	}
 
 	_, err := testableDenyCommand(context.Background(), input)
@@ -223,6 +268,7 @@ func TestDenyCommand_InvalidID(t *testing.T) {
 			input := DenyCommandInput{
 				RequestID: tc.requestID,
 				Store:     store,
+				STSClient: newMockDenySTSClient("bob"),
 			}
 
 			_, err := testableDenyCommand(context.Background(), input)
@@ -261,6 +307,7 @@ func TestDenyCommand_AlreadyApproved(t *testing.T) {
 	input := DenyCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockDenySTSClient("charlie"),
 	}
 
 	_, err := testableDenyCommand(context.Background(), input)
@@ -297,6 +344,7 @@ func TestDenyCommand_AlreadyDenied(t *testing.T) {
 	input := DenyCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockDenySTSClient("charlie"),
 	}
 
 	_, err := testableDenyCommand(context.Background(), input)
@@ -319,6 +367,7 @@ func TestDenyCommand_StoreError(t *testing.T) {
 	input := DenyCommandInput{
 		RequestID: "1234567890abcdef",
 		Store:     store,
+		STSClient: newMockDenySTSClient("bob"),
 	}
 
 	_, err := testableDenyCommand(context.Background(), input)
@@ -357,6 +406,7 @@ func TestDenyCommand_ConcurrentModification(t *testing.T) {
 	input := DenyCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockDenySTSClient("bob"),
 	}
 
 	_, err := testableDenyCommand(context.Background(), input)
@@ -372,7 +422,6 @@ func TestDenyCommand_ConcurrentModification(t *testing.T) {
 // Tests for denial logging
 
 func TestDenyCommand_Logger_LogsDeniedEvent(t *testing.T) {
-	currentUser, _ := user.Current()
 	now := time.Now()
 	pendingReq := &request.Request{
 		ID:            "abc123def4567890",
@@ -402,6 +451,7 @@ func TestDenyCommand_Logger_LogsDeniedEvent(t *testing.T) {
 		Comment:   "Insufficient justification provided",
 		Store:     store,
 		Logger:    logger,
+		STSClient: newMockDenySTSClient("denier-user"),
 	}
 
 	output, err := testableDenyCommand(context.Background(), input)
@@ -432,11 +482,11 @@ func TestDenyCommand_Logger_LogsDeniedEvent(t *testing.T) {
 	if entry.Status != string(request.StatusDenied) {
 		t.Errorf("expected status %q, got %q", request.StatusDenied, entry.Status)
 	}
-	if entry.Actor != currentUser.Username {
-		t.Errorf("expected actor %q, got %q", currentUser.Username, entry.Actor)
+	if entry.Actor != "denier-user" {
+		t.Errorf("expected actor %q, got %q", "denier-user", entry.Actor)
 	}
-	if entry.Approver != currentUser.Username {
-		t.Errorf("expected approver %q, got %q", currentUser.Username, entry.Approver)
+	if entry.Approver != "denier-user" {
+		t.Errorf("expected approver %q, got %q", "denier-user", entry.Approver)
 	}
 	if entry.ApproverComment != "Insufficient justification provided" {
 		t.Errorf("expected comment %q, got %q", "Insufficient justification provided", entry.ApproverComment)
@@ -469,6 +519,7 @@ func TestDenyCommand_NoLogger_NoPanic(t *testing.T) {
 	input := DenyCommandInput{
 		RequestID: "abc123def4567890",
 		Store:     store,
+		STSClient: newMockDenySTSClient("bob"),
 		// Logger is nil
 	}
 
