@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 74 of 75 (Auto SSO Login)
-Plan: 1 of 1 in current phase
-Status: Plan complete
-Last activity: 2026-01-19 — Completed 74-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-01-19 — Completed 74-02-PLAN.md
 
-Progress: █░░░░░░░░░ 33% (v1.8 Credential Flow UX - 1/3 phases)
+Progress: ██░░░░░░░░ 67% (v1.8 Credential Flow UX - 2/3 phases)
 
 ## Milestone Summary
 
@@ -104,9 +104,9 @@ Progress: █░░░░░░░░░ 33% (v1.8 Credential Flow UX - 1/3 phas
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 119
+- Total plans completed: 121
 - Average duration: 3.0 min
-- Total execution time: ~495 min
+- Total execution time: ~511 min
 
 **By Milestone:**
 
@@ -121,6 +121,7 @@ Progress: █░░░░░░░░░ 33% (v1.8 Credential Flow UX - 1/3 phas
 | v1.6 Testing & Hardening | 10 | 25 | ~48 min |
 | v1.7 Permissions Discovery | 9 | 10 | ~66 min |
 | v1.7.1 Security Patch | 4 | 7 | ~86 min |
+| v1.8 Credential Flow UX (in progress) | 2 | 3 | ~16 min |
 
 ## Accumulated Context
 
@@ -383,6 +384,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - RFC 8628 polling defaults: 5 second interval and slow down delay
 - String-based keyring error detection fallback for wrapped errors
 
+**v1.8 Auto Login Integration decisions (Phase 74-02):**
+- WithAutoLogin uses Go generics for type-safe retry wrapper across different return types
+- GetSSOConfigForProfile returns nil (not error) for missing profiles to simplify fallback
+- AWS config file loaded early when auto-login enabled for SSO config lookup
+- Keyring field in AutoLoginConfig unused - AWS SDK handles token caching internally
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -394,7 +401,7 @@ None — clean start for v1.8.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 74-01-PLAN.md
+Stopped at: Completed 74-02-PLAN.md
 Resume file: None
 Next: Phase 74 complete, ready for Phase 75 planning
 
