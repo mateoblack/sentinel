@@ -1,5 +1,34 @@
 # Project Milestones: Sentinel
 
+## v1.7 Permissions Discovery (Shipped: 2026-01-18)
+
+**Delivered:** Self-service permissions discovery with IAM policy generation, permission validation via SimulatePrincipalPolicy, interactive setup wizard, structured error messages with actionable suggestions, and streamlined onboarding documentation.
+
+**Phases completed:** 60-68 (10 plans total)
+
+**Key accomplishments:**
+- Permission schema mapping all 10 Sentinel features to required IAM actions with query functions
+- `sentinel permissions` CLI with Terraform HCL, CloudFormation YAML, and JSON output formats
+- Feature auto-detection probing SSM and DynamoDB to discover configured features
+- `sentinel permissions check` for validating credentials have required permissions via IAM SimulatePrincipalPolicy
+- `sentinel init wizard` for interactive first-time setup with profile discovery and IAM policy generation
+- Structured error types with 17 error codes and actionable fix suggestions for AWS errors
+- `sentinel config validate` for validating policy, approval, breakglass, ratelimit configs before runtime
+- Quick start templates (basic, approvals, full) via `sentinel config generate` for rapid deployment
+- Streamlined onboarding: QUICKSTART.md (5-minute setup), PERMISSIONS.md (full IAM matrix), updated commands.md
+
+**Stats:**
+- 62 files created/modified
+- 86,891 lines of Go (total codebase, +12,261 from v1.6)
+- 9 phases, 10 plans
+- 1 day from v1.6 to v1.7
+
+**Git range:** `feat(60-01)` -> `docs(68-01)`
+
+**What's next:** Production deployment ready. Consider v2.0 for UI dashboard, multi-account federation, policy versioning, or event-driven policy updates.
+
+---
+
 ## v1.6 Testing & Hardening (Shipped: 2026-01-17)
 
 **Delivered:** Comprehensive test coverage and validation with >80% coverage on all Sentinel packages, security regression suite, performance benchmarks, and pre-release validation confirming production readiness.

@@ -13,7 +13,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.4 Sentinel Bootstrapping** — [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) (Phases 35-42, shipped 2026-01-16)
 - ✅ **v1.5 Enforcement & Assurance** — [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) (Phases 43-49, shipped 2026-01-16)
 - ✅ **v1.6 Testing & Hardening** — [milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md) (Phases 50-59, shipped 2026-01-17)
-- 🚧 **v1.7 Permissions Discovery** — Phases 60-68 (in progress)
+- ✅ **v1.7 Permissions Discovery** — [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) (Phases 60-68, shipped 2026-01-18)
 
 ## Completed Milestones
 
@@ -334,101 +334,20 @@ Plans:
 
 </details>
 
-### 🚧 v1.7 Permissions Discovery (In Progress)
+<details>
+<summary>✅ v1.7 Permissions Discovery (Phases 60-68) — SHIPPED 2026-01-18</summary>
 
-**Milestone Goal:** Help users understand and configure Sentinel permissions without trial-and-error. Commands to discover required IAM actions, validate current permissions, and streamline onboarding.
+- [x] Phase 60: Permissions Schema (1/1 plans) — completed 2026-01-18
+- [x] Phase 61: Permissions Command (1/1 plans) — completed 2026-01-18
+- [x] Phase 62: Feature Detection (1/1 plans) — completed 2026-01-18
+- [x] Phase 63: Permission Validation (1/1 plans) — completed 2026-01-18
+- [x] Phase 64: Guided Setup (1/1 plans) — completed 2026-01-18
+- [x] Phase 65: Error Enhancement (2/2 plans) — completed 2026-01-18
+- [x] Phase 66: Config Validation (1/1 plans) — completed 2026-01-18
+- [x] Phase 67: Quick Start Templates (1/1 plans) — completed 2026-01-18
+- [x] Phase 68: Onboarding Docs (1/1 plans) — completed 2026-01-18
 
-#### Phase 60: Permissions Schema
-
-**Goal**: Define permission requirements per subsystem, map features to IAM actions
-**Depends on**: v1.6 complete
-**Research**: Unlikely (internal patterns)
-**Plans**: 1 plan
-
-Plans:
-- [x] 60-01: Permission types and registry — completed 2026-01-18
-
-#### Phase 61: Permissions Command
-
-**Goal**: `sentinel permissions` CLI with JSON/Terraform/CloudFormation output formats
-**Depends on**: Phase 60
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 1 plan
-
-Plans:
-- [x] 61-01: Permission formatters and CLI command — completed 2026-01-18
-
-#### Phase 62: Feature Detection
-
-**Goal**: Auto-detect which subsystems are configured, suggest minimal permissions
-**Depends on**: Phase 61
-**Research**: Unlikely (internal patterns)
-**Plans**: 1 plan
-
-Plans:
-- [x] 62-01: Detection types, detector logic, --detect CLI flag — completed 2026-01-18
-
-#### Phase 63: Permission Validation
-
-**Goal**: `sentinel permissions check` to verify current creds have required access
-**Depends on**: Phase 62
-**Research**: Likely (STS/IAM simulation APIs)
-**Research topics**: sts:GetCallerIdentity, iam:SimulatePrincipalPolicy, dry-run patterns
-**Plans**: TBD
-
-Plans:
-- [ ] 63-01: TBD
-
-#### Phase 64: Guided Setup
-
-**Goal**: `sentinel init` wizard for interactive first-time configuration
-**Depends on**: Phase 63
-**Research**: Unlikely (internal patterns)
-**Plans**: TBD
-
-Plans:
-- [ ] 64-01: TBD
-
-#### Phase 65: Error Enhancement
-
-**Goal**: Better error messages for permission failures with specific fix suggestions
-**Depends on**: Phase 64
-**Research**: Unlikely (internal patterns)
-**Plans**: 2 plans
-
-Plans:
-- [x] 65-01: Structured error types and AWS error classifiers — completed 2026-01-18
-- [x] 65-02: CLI integration with error enhancement — completed 2026-01-18
-
-#### Phase 66: Config Validation
-
-**Goal**: `sentinel config validate` to catch misconfigurations before runtime
-**Depends on**: Phase 65
-**Research**: Unlikely (internal patterns)
-**Plans**: TBD
-
-Plans:
-- [ ] 66-01: TBD
-
-#### Phase 67: Quick Start Templates
-
-**Goal**: Pre-built configs for common use cases (`--template basic|approvals|full`)
-**Depends on**: Phase 66
-**Research**: Unlikely (internal patterns)
-**Plans**: TBD
-
-Plans:
-- [ ] 67-01: TBD
-
-#### Phase 68: Onboarding Docs
-
-**Goal**: QUICKSTART.md, updated BOOTSTRAP.md, permission matrix documentation
-**Depends on**: Phase 67
-**Research**: Unlikely (documentation)
-**Plans**: 1 plan
-
-Plans:
-- [x] 68-01: Onboarding documentation (QUICKSTART.md, PERMISSIONS.md, commands.md) — completed 2026-01-18
+</details>
 
 ## Progress (All Milestones)
 
@@ -441,6 +360,6 @@ Plans:
 | v1.4 Sentinel Bootstrapping | 35-42 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.5 Enforcement & Assurance | 43-49 | 8/8 | ✅ Complete | 2026-01-16 |
 | v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
-| v1.7 Permissions Discovery | 60-68 | 7/? | 🚧 In Progress | - |
+| v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
 
-**Totals:** 7 milestones shipped, 1 in progress (68 phases, 108+ plans)
+**Totals:** 8 milestones shipped (68 phases, 112 plans)

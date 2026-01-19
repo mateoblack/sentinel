@@ -4,7 +4,7 @@
 
 ## What This Is
 
-Sentinel is an intent-aware access control layer for AWS credentials, built on top of aws-vault. It evaluates policy rules before issuing credentials, allowing teams to use powerful AWS tooling without handing out unchecked access. Sentinel integrates at the credential boundary via `credential_process` and `exec` commands, making it invisible to downstream tools. Includes approval workflows for sensitive access and break-glass emergency bypass for incident response.
+Sentinel is an intent-aware access control layer for AWS credentials, built on top of aws-vault. It evaluates policy rules before issuing credentials, allowing teams to use powerful AWS tooling without handing out unchecked access. Sentinel integrates at the credential boundary via `credential_process` and `exec` commands, making it invisible to downstream tools. Includes approval workflows for sensitive access, break-glass emergency bypass for incident response, and self-service tooling for permissions discovery and configuration validation.
 
 ## Core Value
 
@@ -55,10 +55,19 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ Security regression test suite for denial path validation — v1.6
 - ✓ Performance benchmarks for policy evaluation and identity generation — v1.6
 - ✓ Pre-release validation with GO recommendation — v1.6
+- ✓ Permission schema mapping features to IAM actions — v1.7
+- ✓ `sentinel permissions` CLI with Terraform/CloudFormation output formats — v1.7
+- ✓ Feature auto-detection for minimal permission discovery — v1.7
+- ✓ `sentinel permissions check` for validating credentials via IAM SimulatePrincipalPolicy — v1.7
+- ✓ `sentinel init wizard` for interactive first-time setup — v1.7
+- ✓ Structured error types with actionable fix suggestions — v1.7
+- ✓ `sentinel config validate` for pre-runtime configuration validation — v1.7
+- ✓ Quick start templates (basic, approvals, full) for rapid deployment — v1.7
+- ✓ Streamlined onboarding documentation (QUICKSTART.md, PERMISSIONS.md) — v1.7
 
 ### Active
 
-(None — all v1.6 requirements validated)
+(None — all v1.7 requirements validated)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -67,8 +76,8 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.6 with 74,630 LOC Go.
-Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail.
+Shipped v1.7 with 86,891 LOC Go.
+Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
 - Credential storage abstraction (keyring backends)
@@ -126,6 +135,17 @@ v1.6 adds comprehensive testing and hardening:
 - 1,085 total tests with race detector validation
 - Pre-release validation confirming production readiness
 
+v1.7 adds permissions discovery and onboarding:
+- Permission schema mapping 10 features to required IAM actions
+- `sentinel permissions` CLI with Terraform/CloudFormation/JSON output for IAM policy creation
+- Feature auto-detection probing SSM and DynamoDB for minimal permissions
+- `sentinel permissions check` validating credentials via IAM SimulatePrincipalPolicy
+- `sentinel init wizard` for interactive first-time setup with profile discovery
+- Structured error types with 17 error codes and actionable suggestions
+- `sentinel config validate` for pre-runtime configuration validation
+- Quick start templates for rapid deployment via `sentinel config generate`
+- Streamlined onboarding: QUICKSTART.md, PERMISSIONS.md, updated commands.md
+
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
 ## Constraints
@@ -180,6 +200,16 @@ Target users: Platform engineers and security teams who need guardrails without 
 | CloudTrail pass rate metric | 100% for zero sessions (no issues is success) | ✓ Good |
 | Drift detection advisory-only | Warnings logged but credentials still issued | ✓ Good |
 | Three-level assurance model | Deployment, runtime, continuous verification | ✓ Good |
+| 8 subsystems, 10 features | Complete permission coverage for all Sentinel capabilities | ✓ Good |
+| Terraform aws_iam_policy_document format | Most common Terraform pattern for IAM policies | ✓ Good |
+| Always-detected features | credential_issue, audit_verify, enforce_analyze (universal) | ✓ Good |
+| SimulatePrincipalPolicy for validation | Checks actual IAM permissions without credential scope | ✓ Good |
+| Wizard as subcommand | Kingpin limitation with parent command default actions | ✓ Good |
+| SentinelError interface | Unwrap() for error chain compatibility (errors.Is/errors.As) | ✓ Good |
+| Error string matching | Reliable AWS error detection across SDK versions | ✓ Good |
+| Warnings don't fail validation | Valid with warnings returns exit 0 for CI friendliness | ✓ Good |
+| Config type auto-detection | Check distinctive fields in first rule to determine type | ✓ Good |
+| No explicit default-deny in templates | Policy engine already denies on no match | ✓ Good |
 
 ---
-*Last updated: 2026-01-17 after v1.6 milestone*
+*Last updated: 2026-01-18 after v1.7 milestone*

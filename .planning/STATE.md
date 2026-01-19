@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-17)
+See: .planning/PROJECT.md (updated 2026-01-18)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.7 Permissions Discovery — In Progress
+**Current focus:** v1.7 Complete — Planning next milestone
 
 ## Current Position
 
 Phase: 68 of 68 (Onboarding Docs)
-Plan: 1 of 1 in current phase
-Status: Phase Complete
-Last activity: 2026-01-18 — Completed 68-01-PLAN.md
+Plan: Complete
+Status: Milestone Complete
+Last activity: 2026-01-18 — v1.7 milestone complete
 
-Progress: ██████████ 100%
+Progress: ██████████ 100% (8 milestones shipped)
 
 ## Milestone Summary
 
@@ -78,12 +78,25 @@ Progress: ██████████ 100%
 - 1,085 tests total
 - Pre-release validation complete
 
+**v1.7 Permissions Discovery shipped:** 2026-01-18
+- 9 phases, 10 plans
+- +12,261 lines of Go (86,891 total)
+- Permission schema mapping 10 features to IAM actions
+- `sentinel permissions` CLI with Terraform/CloudFormation output
+- Feature auto-detection probing SSM and DynamoDB
+- `sentinel permissions check` via IAM SimulatePrincipalPolicy
+- `sentinel init wizard` for interactive first-time setup
+- Structured error types with actionable suggestions
+- `sentinel config validate` for pre-runtime validation
+- Quick start templates (basic, approvals, full)
+- Streamlined onboarding docs (QUICKSTART.md, PERMISSIONS.md)
+
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 104
-- Average duration: 3.0 min
-- Total execution time: ~343 min
+- Total plans completed: 112
+- Average duration: 3.1 min
+- Total execution time: ~409 min
 
 **By Milestone:**
 
@@ -96,6 +109,7 @@ Progress: ██████████ 100%
 | v1.4 Sentinel Bootstrapping | 8 | 8 | ~20 min |
 | v1.5 Enforcement & Assurance | 7 | 8 | ~20 min |
 | v1.6 Testing & Hardening | 10 | 25 | ~48 min |
+| v1.7 Permissions Discovery | 9 | 10 | ~66 min |
 
 ## Accumulated Context
 
@@ -330,9 +344,9 @@ None — clean start for v1.4.
 ## Session Continuity
 
 Last session: 2026-01-18
-Stopped at: Completed 68-01-PLAN.md (Onboarding Docs)
+Stopped at: v1.7 milestone complete
 Resume file: None
-Next: Milestone complete - ready for /gsd:complete-milestone
+Next: Plan next milestone (`/gsd:discuss-milestone`) or project complete
 
 ## Roadmap Evolution
 
@@ -342,5 +356,5 @@ Next: Milestone complete - ready for /gsd:complete-milestone
 - Milestone v1.3 shipped: 2026-01-16 — Break-Glass (Phases 27-34)
 - Milestone v1.4 shipped: 2026-01-16 — Sentinel Bootstrapping (Phases 35-42)
 - Milestone v1.5 shipped: 2026-01-16 — Enforcement & Assurance (Phases 43-49)
-- Milestone v1.6 shipped: 2026-01-17 — Testing & Hardening (Phases 50-59, 25 plans)
-- Milestone v1.7 created: 2026-01-18 — Permissions Discovery (Phases 60-68, 9 phases)
+- Milestone v1.6 shipped: 2026-01-17 — Testing & Hardening (Phases 50-59)
+- Milestone v1.7 shipped: 2026-01-18 — Permissions Discovery (Phases 60-68)
