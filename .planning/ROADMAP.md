@@ -45,10 +45,10 @@ Plans:
 **Goal**: Add `sentinel whoami` command showing AWS identity and extracted policy username
 **Depends on**: Phase 70
 **Research**: Unlikely (extends existing CLI patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 71-01: TBD
+- [ ] 71-01: Whoami command with human and JSON output
 
 #### Phase 72: Security Validation
 
