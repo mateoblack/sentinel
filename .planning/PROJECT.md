@@ -66,10 +66,14 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ `sentinel whoami` command for identity debugging — v1.7.1
 - ✓ Security regression tests for identity extraction — v1.7.1
 - ✓ CHANGELOG.md and SECURITY.md with vulnerability advisory — v1.7.1
+- ✓ SSO profile resolution for credentials and exec commands via AWS SDK credential provider chain — v1.8
+- ✓ Auto SSO login triggering with OIDC device code flow when sessions expire — v1.8
+- ✓ All CLI commands support --profile/--aws-profile for SSO credential loading — v1.9
+- ✓ Whoami command --profile flag for identity debugging with SSO profiles — v1.9
 
 ### Active
 
-(None — all v1.7.1 requirements validated)
+(None — all v1.9 requirements validated)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -78,7 +82,7 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.7.1 with 90,540 LOC Go.
+Shipped v1.9 with 92,948 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -156,6 +160,17 @@ v1.7.1 adds critical security fix:
 - 1,072 lines of security regression tests
 - CHANGELOG.md and SECURITY.md with vulnerability advisory (SENTINEL-2026-001)
 
+v1.8 adds credential flow UX improvements:
+- SSO profile resolution from ~/.aws/config for automatic profile detection
+- Auto SSO login triggering with OIDC device code flow when sessions expire
+- Generic retry wrapper for SSO credential resolution
+
+v1.9 fixes systemic SSO profile support:
+- All CLI commands now properly load SSO credentials when --profile is specified
+- Added config.WithSharedConfigProfile pattern for AWS SDK integration
+- Added --aws-profile flag to approval workflow, break-glass, infrastructure, and audit commands
+- Added --profile flag to whoami command for SSO identity debugging
+
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
 ## Constraints
@@ -226,4 +241,4 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Attack scenario demonstration tests | Explicitly show vulnerability and verify fix | ✓ Good |
 
 ---
-*Last updated: 2026-01-19 after v1.7.1 milestone*
+*Last updated: 2026-01-19 after v1.9 milestone*

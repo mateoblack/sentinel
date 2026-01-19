@@ -16,7 +16,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.7 Permissions Discovery** — [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) (Phases 60-68, shipped 2026-01-18)
 - ✅ **v1.7.1 Security Patch** — [milestones/v1.7.1-ROADMAP.md](milestones/v1.7.1-ROADMAP.md) (Phases 69-72, shipped 2026-01-19)
 - ✅ **v1.8 Credential Flow UX** — [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) (Phases 73-75, shipped 2026-01-19)
-- 🚧 **v1.9 SSO Profile Support** — Phases 76-77 (ready for completion)
+- ✅ **v1.9 SSO Profile Support** — [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) (Phases 76-77, shipped 2026-01-19)
 
 ## Completed Milestones
 
@@ -373,34 +373,15 @@ Plans:
 
 </details>
 
-### 🚧 v1.9 SSO Profile Support (In Progress)
+<details>
+<summary>✅ v1.9 SSO Profile Support (Phases 76-77) — SHIPPED 2026-01-19</summary>
 
 **Milestone Goal:** Fix systemic bug where --profile flag doesn't load SSO credentials, ensuring all Sentinel commands work seamlessly with SSO profiles like AWS CLI does.
 
-#### Phase 76: SSO Credential Loading
+- [x] Phase 76: SSO Credential Loading (5/5 plans) — completed 2026-01-19
+- [x] Phase 77: Whoami Profile Flag (1/1 plan) — completed 2026-01-19
 
-**Goal**: Integrate with AWS SDK SSO credential provider chain so all commands properly load SSO credentials from --profile
-**Depends on**: v1.8 complete
-**Research**: Likely (AWS SDK SSO credential provider patterns)
-**Research topics**: AWS SDK SSO credential provider chain, ~/.aws/sso/cache/ integration, credential resolution order
-**Plans**: 5
-
-Plans:
-- [x] 76-01: Core command SSO credential loading (credentials, exec) — completed 2026-01-19
-- [x] 76-02: Approval workflow command SSO credential loading — completed 2026-01-19
-- [x] 76-03: Break-glass command SSO credential loading — completed 2026-01-19
-- [x] 76-04: Infrastructure command SSO credential loading — completed 2026-01-19
-- [x] 76-05: Permissions and audit command SSO credential loading — completed 2026-01-19
-
-#### Phase 77: Whoami Profile Flag
-
-**Goal**: Add --profile flag to whoami command (currently missing entirely)
-**Depends on**: Phase 76
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 1
-
-Plans:
-- [x] 77-01: Add --profile flag to whoami command for SSO credential loading — completed 2026-01-19
+</details>
 
 ## Progress (All Milestones)
 
@@ -416,6 +397,6 @@ Plans:
 | v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
-| v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Ready | - |
+| v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
 
-**Totals:** 10 milestones shipped (75 phases, 122 plans), 1 ready for completion
+**Totals:** 11 milestones shipped (77 phases, 128 plans)

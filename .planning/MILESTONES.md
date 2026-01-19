@@ -1,5 +1,56 @@
 # Project Milestones: Sentinel
 
+## v1.9 SSO Profile Support (Shipped: 2026-01-19)
+
+**Delivered:** Fixed systemic bug where --profile flag didn't load SSO credentials, ensuring all Sentinel commands work seamlessly with SSO profiles like AWS CLI does.
+
+**Phases completed:** 76-77 (6 plans total)
+
+**Key accomplishments:**
+- Fixed --profile flag not loading SSO credentials across all Sentinel CLI commands
+- Added config.WithSharedConfigProfile pattern for AWS SDK credential provider chain integration
+- Added --aws-profile flag to approval workflow commands (approve, deny, list)
+- Added --aws-profile flag to break-glass commands (breakglass-check, breakglass-close, breakglass-list)
+- Added --aws-profile flag to infrastructure commands (bootstrap, status, config validate)
+- Added --aws-profile flag to permissions and audit commands
+- Added --profile flag to whoami command (completes SSO profile support)
+
+**Stats:**
+- 34 files created/modified
+- 92,948 lines of Go (total codebase, +2,408 from v1.8)
+- 2 phases, 6 plans
+- Same day as v1.8
+
+**Git range:** `feat(76-01)` → `docs(77-01)`
+
+**What's next:** Production deployment ready. All Sentinel CLI commands now fully support SSO profiles.
+
+---
+
+## v1.8 Credential Flow UX (Shipped: 2026-01-19)
+
+**Delivered:** Developer experience improvements for credential handling with automatic SSO profile resolution and login triggering when SSO sessions expire.
+
+**Phases completed:** 73-75 (3 plans total)
+
+**Key accomplishments:**
+- SSO profile resolution from ~/.aws/config for automatic profile detection
+- Auto SSO login triggering with OIDC device code flow when sessions expire
+- Generic retry wrapper for SSO credential resolution across different return types
+- AWS auth error enhancement (Phase 75 deferred to v1.9)
+
+**Stats:**
+- 23 files created/modified
+- 90,540 lines of Go (total codebase)
+- 3 phases, 3 plans
+- Same day as v1.7.1
+
+**Git range:** `feat(73-01)` → `docs(74-02)`
+
+**What's next:** v1.9 SSO Profile Support for --profile flag credential loading across all commands.
+
+---
+
 ## v1.7.1 Security Patch (Shipped: 2026-01-19)
 
 **Delivered:** Critical security fix replacing OS username (`os/user.Current()`) with AWS-authenticated identity (STS GetCallerIdentity) for policy evaluation across all CLI commands.
