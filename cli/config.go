@@ -21,6 +21,7 @@ type ConfigValidateCommandInput struct {
 	ConfigType string   // Override detected type (policy, approval, breakglass, ratelimit, bootstrap)
 	Output     string   // human, json
 	Region     string   // AWS region for SSM
+	AWSProfile string   // Optional AWS profile for SSM credentials
 
 	// For testing
 	Stdout   *os.File
@@ -71,6 +72,9 @@ func ConfigureConfigCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("region", "AWS region for SSM operations").
 		StringVar(&input.Region)
+
+	cmd.Flag("aws-profile", "AWS profile for SSM credentials (optional, uses default chain if not specified)").
+		StringVar(&input.AWSProfile)
 
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		exitCode, err := ConfigValidateCommand(context.Background(), input)
@@ -201,6 +205,9 @@ func ConfigValidateCommand(ctx context.Context, input ConfigValidateCommandInput
 		if ssmFetch == nil {
 			// Load AWS config
 			var opts []func(*awsconfig.LoadOptions) error
+			if input.AWSProfile != "" {
+				opts = append(opts, awsconfig.WithSharedConfigProfile(input.AWSProfile))
+			}
 			if input.Region != "" {
 				opts = append(opts, awsconfig.WithRegion(input.Region))
 			}
