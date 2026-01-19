@@ -18,6 +18,7 @@ type BootstrapCommandInput struct {
 	PolicyRoot          string
 	Profiles            []string
 	Region              string
+	AWSProfile          string // AWS profile for credentials (optional)
 	PlanOnly            bool
 	AutoApprove         bool
 	GenerateIAMPolicies bool
@@ -65,6 +66,9 @@ func ConfigureBootstrapCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("region", "AWS region for SSM operations").
 		StringVar(&input.Region)
+
+	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
+		StringVar(&input.AWSProfile)
 
 	cmd.Flag("plan", "Show plan without applying").
 		BoolVar(&input.PlanOnly)
@@ -129,6 +133,9 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 	if planner == nil {
 		// Load AWS config
 		awsCfgOpts := []func(*config.LoadOptions) error{}
+		if input.AWSProfile != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+		}
 		if input.Region != "" {
 			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 		}
@@ -201,6 +208,9 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 	if executor == nil {
 		// Load AWS config
 		awsCfgOpts := []func(*config.LoadOptions) error{}
+		if input.AWSProfile != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+		}
 		if input.Region != "" {
 			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
 		}
