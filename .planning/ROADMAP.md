@@ -382,10 +382,10 @@ Plans:
 **Depends on**: Phase 73
 **Research**: Likely (SSO OIDC device authorization flow)
 **Research topics**: SSO OIDC device authorization, aws sso login implementation, browser launch patterns
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 74-01: TBD (run /gsd:plan-phase 74 to break down)
+- [x] 74-01: SSO error detection and login infrastructure — completed 2026-01-19
 
 #### Phase 75: AWS Auth Error Enhancement
 
@@ -410,6 +410,6 @@ Plans:
 | v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
 | v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
-| v1.8 Credential Flow UX | 73-75 | 0/? | 🚧 In Progress | - |
+| v1.8 Credential Flow UX | 73-75 | 1/? | 🚧 In Progress | - |
 
-**Totals:** 9 milestones shipped (72 phases, 119 plans), 1 in progress
+**Totals:** 9 milestones shipped (72 phases, 120 plans), 1 in progress

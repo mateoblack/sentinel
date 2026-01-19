@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 
 ## Current Position
 
-Phase: 73 of 75 (SSO Profile Resolution)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-19 — Milestone v1.8 created
+Phase: 74 of 75 (Auto SSO Login)
+Plan: 1 of 1 in current phase
+Status: Plan complete
+Last activity: 2026-01-19 — Completed 74-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0% (v1.8 Credential Flow UX)
+Progress: █░░░░░░░░░ 33% (v1.8 Credential Flow UX - 1/3 phases)
 
 ## Milestone Summary
 
@@ -377,6 +377,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Advisory includes remediation steps and verification command (sentinel whoami)
 - Added security best practices section for ongoing guidance
 
+**v1.8 SSO Error Detection decisions (Phase 74-01):**
+- OIDCClient interface enables mock injection for testable OIDC operations
+- Default client name "sentinel" (configurable via SSOLoginConfig.ClientName)
+- RFC 8628 polling defaults: 5 second interval and slow down delay
+- String-based keyring error detection fallback for wrapped errors
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -388,9 +394,9 @@ None — clean start for v1.8.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Milestone v1.8 initialization
+Stopped at: Completed 74-01-PLAN.md
 Resume file: None
-Next: Plan Phase 73 (`/gsd:plan-phase 73`)
+Next: Phase 74 complete, ready for Phase 75 planning
 
 ## Roadmap Evolution
 
