@@ -3,10 +3,12 @@ package cli
 import (
 	"context"
 	"errors"
-	"os/user"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
@@ -108,6 +110,40 @@ func (m *mockSentinel) ValidateProfile(profileName string) error {
 	return nil
 }
 
+// mockRequestSTSClient implements identity.STSAPI for testing request command.
+type mockRequestSTSClient struct {
+	GetCallerIdentityFunc func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+func (m *mockRequestSTSClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	if m.GetCallerIdentityFunc != nil {
+		return m.GetCallerIdentityFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("GetCallerIdentityFunc not set")
+}
+
+// newMockRequestSTSClient creates a mock STS client that returns the specified username.
+func newMockRequestSTSClient(username string) *mockRequestSTSClient {
+	return &mockRequestSTSClient{
+		GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+			return &sts.GetCallerIdentityOutput{
+				Arn:     aws.String("arn:aws:iam::123456789012:user/" + username),
+				Account: aws.String("123456789012"),
+				UserId:  aws.String("AIDAEXAMPLE"),
+			}, nil
+		},
+	}
+}
+
+// extractRequestUsernameFromARN extracts the username from an IAM user ARN.
+func extractRequestUsernameFromARN(arn string) string {
+	parts := strings.Split(arn, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return arn
+}
+
 // testableRequestCommandOutput contains test output with auto-approval status.
 type testableRequestCommandOutput struct {
 	Request      *request.Request
@@ -115,19 +151,23 @@ type testableRequestCommandOutput struct {
 	Logger       *mockLogger
 }
 
-// testableRequestCommand is a testable version that accepts a profile validator.
+// testableRequestCommand is a testable version that accepts a profile validator and STS client.
 func testableRequestCommand(ctx context.Context, input RequestCommandInput, validateProfile func(string) error) (*testableRequestCommandOutput, error) {
-	// 1. Get current user
-	currentUser, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-	username := currentUser.Username
-
-	// 2. Validate profile exists in AWS config
+	// 1. Validate profile exists in AWS config
 	if err := validateProfile(input.ProfileName); err != nil {
 		return nil, err
 	}
+
+	// 2. Get AWS identity for requester (must be provided via STSClient for testing)
+	if input.STSClient == nil {
+		return nil, errors.New("STSClient is required for testing")
+	}
+	identity, err := input.STSClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return nil, err
+	}
+	arn := aws.ToString(identity.Arn)
+	username := extractRequestUsernameFromARN(arn)
 
 	// 3. Cap duration at MaxDuration
 	duration := input.Duration
@@ -217,6 +257,7 @@ func TestRequestCommand_Success(t *testing.T) {
 		Duration:      1 * time.Hour,
 		Justification: "Testing the request command functionality",
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 	}
 
 	output, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
@@ -243,6 +284,11 @@ func TestRequestCommand_Success(t *testing.T) {
 		t.Errorf("unexpected justification: %s", storedRequest.Justification)
 	}
 
+	// Verify requester was set to AWS username
+	if storedRequest.Requester != "testuser" {
+		t.Errorf("expected requester 'testuser', got '%s'", storedRequest.Requester)
+	}
+
 	// Verify auto-approve is false when no policy
 	if output.AutoApproved {
 		t.Error("expected AutoApproved to be false without policy")
@@ -257,6 +303,7 @@ func TestRequestCommand_ProfileNotFound(t *testing.T) {
 		Duration:      1 * time.Hour,
 		Justification: "Testing the request command functionality",
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 	}
 
 	validateProfile := func(string) error {
@@ -280,6 +327,7 @@ func TestRequestCommand_JustificationTooShort(t *testing.T) {
 		Duration:      1 * time.Hour,
 		Justification: "short", // Only 5 chars, minimum is 10
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 	}
 
 	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
@@ -305,6 +353,7 @@ func TestRequestCommand_JustificationTooLong(t *testing.T) {
 		Duration:      1 * time.Hour,
 		Justification: string(longJustification),
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 	}
 
 	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
@@ -330,6 +379,7 @@ func TestRequestCommand_DurationExceedsMax(t *testing.T) {
 		Duration:      12 * time.Hour, // Exceeds 8h max
 		Justification: "Testing the request command functionality with long duration",
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 	}
 
 	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
@@ -358,6 +408,7 @@ func TestRequestCommand_StoreCreateFails(t *testing.T) {
 		Duration:      1 * time.Hour,
 		Justification: "Testing the request command functionality",
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 	}
 
 	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
@@ -383,6 +434,7 @@ func TestRequestCommand_RequestFieldsPopulated(t *testing.T) {
 		Duration:      2 * time.Hour,
 		Justification: "Need access to investigate production issue TICKET-123",
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 	}
 
 	_, err := testableRequestCommand(context.Background(), input, func(string) error { return nil })
@@ -400,10 +452,9 @@ func TestRequestCommand_RequestFieldsPopulated(t *testing.T) {
 		t.Errorf("invalid request ID: %s", storedRequest.ID)
 	}
 
-	// Requester should be current user
-	currentUser, _ := user.Current()
-	if storedRequest.Requester != currentUser.Username {
-		t.Errorf("expected requester '%s', got '%s'", currentUser.Username, storedRequest.Requester)
+	// Requester should be AWS username from mock STS client
+	if storedRequest.Requester != "testuser" {
+		t.Errorf("expected requester 'testuser', got '%s'", storedRequest.Requester)
 	}
 
 	// Profile should match input
@@ -455,6 +506,7 @@ func TestRequestCommand_AutoApprove_NoPolicy(t *testing.T) {
 		Duration:      1 * time.Hour,
 		Justification: "Testing request without approval policy",
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 		// No ApprovalPolicy set
 	}
 
@@ -473,7 +525,6 @@ func TestRequestCommand_AutoApprove_NoPolicy(t *testing.T) {
 }
 
 func TestRequestCommand_AutoApprove_MatchingPolicy(t *testing.T) {
-	currentUser, _ := user.Current()
 	var storedRequest *request.Request
 	store := &mockStore{
 		createFn: func(ctx context.Context, req *request.Request) error {
@@ -482,7 +533,7 @@ func TestRequestCommand_AutoApprove_MatchingPolicy(t *testing.T) {
 		},
 	}
 
-	// Create policy with auto-approve for current user
+	// Create policy with auto-approve for test user
 	approvalPolicy := &policy.ApprovalPolicy{
 		Version: "1",
 		Rules: []policy.ApprovalRule{
@@ -491,7 +542,7 @@ func TestRequestCommand_AutoApprove_MatchingPolicy(t *testing.T) {
 				Profiles:  []string{"production"},
 				Approvers: []string{"admin"},
 				AutoApprove: &policy.AutoApproveCondition{
-					Users:       []string{currentUser.Username},
+					Users:       []string{"testuser"},
 					MaxDuration: 2 * time.Hour,
 				},
 			},
@@ -503,6 +554,7 @@ func TestRequestCommand_AutoApprove_MatchingPolicy(t *testing.T) {
 		Duration:       1 * time.Hour,
 		Justification:  "Testing auto-approve with matching policy",
 		Store:          store,
+		STSClient:      newMockRequestSTSClient("testuser"),
 		ApprovalPolicy: approvalPolicy,
 	}
 
@@ -515,8 +567,8 @@ func TestRequestCommand_AutoApprove_MatchingPolicy(t *testing.T) {
 	if storedRequest.Status != request.StatusApproved {
 		t.Errorf("expected status approved, got %s", storedRequest.Status)
 	}
-	if storedRequest.Approver != currentUser.Username {
-		t.Errorf("expected approver %s, got %s", currentUser.Username, storedRequest.Approver)
+	if storedRequest.Approver != "testuser" {
+		t.Errorf("expected approver testuser, got %s", storedRequest.Approver)
 	}
 	if storedRequest.ApproverComment != "auto-approved by policy" {
 		t.Errorf("unexpected approver comment: %s", storedRequest.ApproverComment)
@@ -556,6 +608,7 @@ func TestRequestCommand_AutoApprove_NonMatchingPolicy(t *testing.T) {
 		Duration:       1 * time.Hour,
 		Justification:  "Testing auto-approve with non-matching user",
 		Store:          store,
+		STSClient:      newMockRequestSTSClient("testuser"),
 		ApprovalPolicy: approvalPolicy,
 	}
 
@@ -574,7 +627,6 @@ func TestRequestCommand_AutoApprove_NonMatchingPolicy(t *testing.T) {
 }
 
 func TestRequestCommand_AutoApprove_DurationExceedsMax(t *testing.T) {
-	currentUser, _ := user.Current()
 	var storedRequest *request.Request
 	store := &mockStore{
 		createFn: func(ctx context.Context, req *request.Request) error {
@@ -592,7 +644,7 @@ func TestRequestCommand_AutoApprove_DurationExceedsMax(t *testing.T) {
 				Profiles:  []string{"production"},
 				Approvers: []string{"admin"},
 				AutoApprove: &policy.AutoApproveCondition{
-					Users:       []string{currentUser.Username},
+					Users:       []string{"testuser"},
 					MaxDuration: 1 * time.Hour,
 				},
 			},
@@ -604,6 +656,7 @@ func TestRequestCommand_AutoApprove_DurationExceedsMax(t *testing.T) {
 		Duration:       2 * time.Hour, // Exceeds auto-approve max of 1h
 		Justification:  "Testing auto-approve with duration exceeding max",
 		Store:          store,
+		STSClient:      newMockRequestSTSClient("testuser"),
 		ApprovalPolicy: approvalPolicy,
 	}
 
@@ -622,7 +675,6 @@ func TestRequestCommand_AutoApprove_DurationExceedsMax(t *testing.T) {
 }
 
 func TestRequestCommand_AutoApprove_ProfileNoRule(t *testing.T) {
-	currentUser, _ := user.Current()
 	var storedRequest *request.Request
 	store := &mockStore{
 		createFn: func(ctx context.Context, req *request.Request) error {
@@ -640,7 +692,7 @@ func TestRequestCommand_AutoApprove_ProfileNoRule(t *testing.T) {
 				Profiles:  []string{"staging"},
 				Approvers: []string{"admin"},
 				AutoApprove: &policy.AutoApproveCondition{
-					Users:       []string{currentUser.Username},
+					Users:       []string{"testuser"},
 					MaxDuration: 2 * time.Hour,
 				},
 			},
@@ -652,6 +704,7 @@ func TestRequestCommand_AutoApprove_ProfileNoRule(t *testing.T) {
 		Duration:       1 * time.Hour,
 		Justification:  "Testing request with no matching rule for profile",
 		Store:          store,
+		STSClient:      newMockRequestSTSClient("testuser"),
 		ApprovalPolicy: approvalPolicy,
 	}
 
@@ -685,6 +738,7 @@ func TestRequestCommand_Logger_LogsCreatedEvent(t *testing.T) {
 		Duration:      1 * time.Hour,
 		Justification: "Testing request logging functionality",
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 		Logger:        logger,
 	}
 
@@ -717,7 +771,6 @@ func TestRequestCommand_Logger_LogsCreatedEvent(t *testing.T) {
 }
 
 func TestRequestCommand_Logger_AutoApproved_LogsBothEvents(t *testing.T) {
-	currentUser, _ := user.Current()
 	store := &mockStore{
 		createFn: func(ctx context.Context, req *request.Request) error {
 			return nil
@@ -726,7 +779,7 @@ func TestRequestCommand_Logger_AutoApproved_LogsBothEvents(t *testing.T) {
 
 	logger := &mockLogger{}
 
-	// Create policy with auto-approve for current user
+	// Create policy with auto-approve for test user
 	approvalPolicy := &policy.ApprovalPolicy{
 		Version: "1",
 		Rules: []policy.ApprovalRule{
@@ -735,7 +788,7 @@ func TestRequestCommand_Logger_AutoApproved_LogsBothEvents(t *testing.T) {
 				Profiles:  []string{"production"},
 				Approvers: []string{"admin"},
 				AutoApprove: &policy.AutoApproveCondition{
-					Users:       []string{currentUser.Username},
+					Users:       []string{"testuser"},
 					MaxDuration: 2 * time.Hour,
 				},
 			},
@@ -747,6 +800,7 @@ func TestRequestCommand_Logger_AutoApproved_LogsBothEvents(t *testing.T) {
 		Duration:       1 * time.Hour,
 		Justification:  "Testing auto-approve logging",
 		Store:          store,
+		STSClient:      newMockRequestSTSClient("testuser"),
 		Logger:         logger,
 		ApprovalPolicy: approvalPolicy,
 	}
@@ -797,6 +851,7 @@ func TestRequestCommand_NoLogger_NoPanic(t *testing.T) {
 		Duration:      1 * time.Hour,
 		Justification: "Testing request without logger",
 		Store:         store,
+		STSClient:     newMockRequestSTSClient("testuser"),
 		// Logger is nil
 	}
 

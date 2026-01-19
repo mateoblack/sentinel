@@ -3,12 +3,38 @@ package cli
 import (
 	"context"
 	"errors"
-	"os/user"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/request"
 )
+
+// mockListSTSClient implements identity.STSAPI for testing sentinel list command.
+type mockListSTSClient struct {
+	GetCallerIdentityFunc func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+func (m *mockListSTSClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	if m.GetCallerIdentityFunc != nil {
+		return m.GetCallerIdentityFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("GetCallerIdentityFunc not set")
+}
+
+// newMockListSTSClient creates a mock STS client that returns the specified username.
+func newMockListSTSClient(username string) *mockListSTSClient {
+	return &mockListSTSClient{
+		GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+			return &sts.GetCallerIdentityOutput{
+				Arn:     aws.String("arn:aws:iam::123456789012:user/" + username),
+				Account: aws.String("123456789012"),
+				UserId:  aws.String("AIDAEXAMPLE"),
+			}, nil
+		},
+	}
+}
 
 // testableSentinelListCommand is a testable version that doesn't require current user lookup
 // when a requester filter or other filter is explicitly provided.
@@ -80,8 +106,7 @@ func testableSentinelListCommand(ctx context.Context, input SentinelListCommandI
 }
 
 func TestSentinelListCommand_DefaultListsCurrentUserRequests(t *testing.T) {
-	currentUser, _ := user.Current()
-	mockUsername := currentUser.Username
+	mockUsername := "testuser"
 
 	now := time.Now()
 	expectedReqs := []*request.Request{
@@ -112,8 +137,9 @@ func TestSentinelListCommand_DefaultListsCurrentUserRequests(t *testing.T) {
 	}
 
 	input := SentinelListCommandInput{
-		Store: store,
-		Limit: 100,
+		Store:     store,
+		Limit:     100,
+		STSClient: newMockListSTSClient(mockUsername),
 	}
 
 	summaries, err := testableSentinelListCommand(context.Background(), input, mockUsername)

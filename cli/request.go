@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/notification"
 	"github.com/byteness/aws-vault/v7/policy"
@@ -39,6 +40,10 @@ type RequestCommandInput struct {
 	// Logger is an optional Logger for audit trail logging.
 	// If nil, no approval events are logged.
 	Logger logging.Logger
+
+	// STSClient is an optional STS client for AWS identity extraction.
+	// If nil, a new client will be created from AWS config.
+	STSClient identity.STSAPI
 }
 
 // RequestCommandOutput represents the JSON output from the request command.
@@ -86,41 +91,44 @@ func ConfigureRequestCommand(app *kingpin.Application, s *Sentinel) {
 // It creates an access request and stores it in DynamoDB.
 // On success, outputs JSON to stdout. On failure, outputs error to stderr and returns error.
 func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel) error {
-	// 1. Get current user
-	currentUser, err := user.Current()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to get current user: %v\n", err)
-		return err
-	}
-	username := currentUser.Username
-
-	// 2. Validate profile exists in AWS config
+	// 1. Validate profile exists in AWS config
 	if err := s.ValidateProfile(input.ProfileName); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return err
 	}
 
-	// 3. Cap duration at MaxDuration
+	// 2. Cap duration at MaxDuration
 	duration := input.Duration
 	if duration > request.MaxDuration {
 		fmt.Fprintf(os.Stderr, "Warning: duration %v exceeds maximum, capping at %v\n", duration, request.MaxDuration)
 		duration = request.MaxDuration
 	}
 
-	// 4. Get or create store
+	// 3. Load AWS config (needed for STS and DynamoDB)
+	awsCfgOpts := []func(*config.LoadOptions) error{}
+	if input.Region != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	}
+	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
+		return err
+	}
+
+	// 4. Get AWS identity for requester
+	stsClient := input.STSClient
+	if stsClient == nil {
+		stsClient = sts.NewFromConfig(awsCfg)
+	}
+	username, err := identity.GetAWSUsername(ctx, stsClient)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to get AWS identity: %v\n", err)
+		return err
+	}
+
+	// 5. Get or create store
 	store := input.Store
 	if store == nil {
-		// Load AWS config
-		awsCfgOpts := []func(*config.LoadOptions) error{}
-		if input.Region != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
-		}
-		awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
-			return err
-		}
-
 		// Create DynamoDB store
 		store = request.NewDynamoDBStore(awsCfg, input.RequestTable)
 	}
@@ -130,7 +138,7 @@ func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel)
 		store = notification.NewNotifyStore(store, input.Notifier)
 	}
 
-	// 5. Build Request struct
+	// 6. Build Request struct
 	now := time.Now()
 	req := &request.Request{
 		ID:            request.NewRequestID(),
@@ -144,7 +152,7 @@ func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel)
 		ExpiresAt:     now.Add(request.DefaultRequestTTL),
 	}
 
-	// 6. Check auto-approve if approval policy is provided
+	// 7. Check auto-approve if approval policy is provided
 	autoApproved := false
 	if input.ApprovalPolicy != nil {
 		rule := policy.FindApprovalRule(input.ApprovalPolicy, input.ProfileName)
@@ -156,19 +164,19 @@ func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel)
 		}
 	}
 
-	// 7. Validate request
+	// 8. Validate request
 	if err := req.Validate(); err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid request: %v\n", err)
 		return err
 	}
 
-	// 8. Store request
+	// 9. Store request
 	if err := store.Create(ctx, req); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create request: %v\n", err)
 		return err
 	}
 
-	// 9. Log approval events if Logger is provided
+	// 10. Log approval events if Logger is provided
 	if input.Logger != nil {
 		// Log request created event
 		createdEntry := logging.NewApprovalLogEntry(notification.EventRequestCreated, req, username)
@@ -181,7 +189,7 @@ func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel)
 		}
 	}
 
-	// 10. Output success JSON
+	// 11. Output success JSON
 	output := RequestCommandOutput{
 		RequestID:    req.ID,
 		Profile:      req.Profile,

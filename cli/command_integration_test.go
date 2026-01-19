@@ -59,6 +59,7 @@ func TestCommandIntegration_Approval_RequestCreatesAndStores(t *testing.T) {
 		Duration:      2 * time.Hour,
 		Justification: "Integration test: need production access for deployment",
 		Store:         store,
+		STSClient:     newMockIntegrationSTSClient("testuser"),
 	}
 
 	// Use testable version with profile validator
@@ -93,14 +94,9 @@ func TestCommandIntegration_Approval_RequestCreatesAndStores(t *testing.T) {
 func TestCommandIntegration_Approval_RequestAutoApprove(t *testing.T) {
 	// Test that RequestCommand auto-approves when ApprovalPolicy matches
 
-	currentUser, err := user.Current()
-	if err != nil {
-		t.Skip("cannot get current user")
-	}
-
 	store := testutil.NewMockRequestStore()
 
-	// Create policy with auto-approve for current user
+	// Create policy with auto-approve for test user
 	approvalPolicy := &policy.ApprovalPolicy{
 		Version: "1",
 		Rules: []policy.ApprovalRule{
@@ -109,7 +105,7 @@ func TestCommandIntegration_Approval_RequestAutoApprove(t *testing.T) {
 				Profiles:  []string{"staging"},
 				Approvers: []string{"admin"},
 				AutoApprove: &policy.AutoApproveCondition{
-					Users:       []string{currentUser.Username},
+					Users:       []string{"testuser"},
 					MaxDuration: 4 * time.Hour,
 				},
 			},
@@ -121,6 +117,7 @@ func TestCommandIntegration_Approval_RequestAutoApprove(t *testing.T) {
 		Duration:       1 * time.Hour,
 		Justification:  "Integration test: auto-approve testing",
 		Store:          store,
+		STSClient:      newMockIntegrationSTSClient("testuser"),
 		ApprovalPolicy: approvalPolicy,
 	}
 
@@ -138,8 +135,8 @@ func TestCommandIntegration_Approval_RequestAutoApprove(t *testing.T) {
 	if storedReq.Status != request.StatusApproved {
 		t.Errorf("expected status approved, got %s", storedReq.Status)
 	}
-	if storedReq.Approver != currentUser.Username {
-		t.Errorf("expected approver %s, got %s", currentUser.Username, storedReq.Approver)
+	if storedReq.Approver != "testuser" {
+		t.Errorf("expected approver testuser, got %s", storedReq.Approver)
 	}
 }
 
@@ -154,6 +151,7 @@ func TestCommandIntegration_Approval_RequestWithNotifier(t *testing.T) {
 		Duration:      1 * time.Hour,
 		Justification: "Integration test: notification testing",
 		Store:         store,
+		STSClient:     newMockIntegrationSTSClient("testuser"),
 		Notifier:      notifier,
 	}
 

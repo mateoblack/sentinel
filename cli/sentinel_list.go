@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/user"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/request"
 )
 
@@ -25,6 +26,10 @@ type SentinelListCommandInput struct {
 	// Store is an optional Store implementation for testing.
 	// If nil, a DynamoDB store will be created using the RequestTable and Region.
 	Store request.Store
+
+	// STSClient is an optional STS client for AWS identity extraction.
+	// If nil, a new client will be created from AWS config.
+	STSClient identity.STSAPI
 }
 
 // RequestSummary represents a single request in the list output.
@@ -79,38 +84,41 @@ func ConfigureSentinelListCommand(app *kingpin.Application, s *Sentinel) {
 // It retrieves access requests from DynamoDB based on filter flags.
 // On success, outputs JSON to stdout. On failure, outputs error to stderr and returns error.
 func SentinelListCommand(ctx context.Context, input SentinelListCommandInput) error {
-	// 1. Get current user if Requester not specified and no other filter
-	requester := input.Requester
-	if requester == "" && input.Status == "" && input.Profile == "" {
-		currentUser, err := user.Current()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to get current user: %v\n", err)
-			return err
-		}
-		requester = currentUser.Username
+	// 1. Load AWS config (needed for STS and DynamoDB)
+	awsCfgOpts := []func(*config.LoadOptions) error{}
+	if input.Region != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	}
+	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
+		return err
 	}
 
-	// 2. Get or create store
-	store := input.Store
-	if store == nil {
-		// Load AWS config
-		awsCfgOpts := []func(*config.LoadOptions) error{}
-		if input.Region != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	// 2. Get AWS identity if Requester not specified and no other filter
+	requester := input.Requester
+	if requester == "" && input.Status == "" && input.Profile == "" {
+		stsClient := input.STSClient
+		if stsClient == nil {
+			stsClient = sts.NewFromConfig(awsCfg)
 		}
-		awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
+		username, err := identity.GetAWSUsername(ctx, stsClient)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to get AWS identity: %v\n", err)
 			return err
 		}
+		requester = username
+	}
 
+	// 3. Get or create store
+	store := input.Store
+	if store == nil {
 		// Create DynamoDB store
 		store = request.NewDynamoDBStore(awsCfg, input.RequestTable)
 	}
 
-	// 3. Query based on flags (priority: status > profile > requester)
+	// 4. Query based on flags (priority: status > profile > requester)
 	var requests []*request.Request
-	var err error
 	limit := input.Limit
 
 	if input.Status != "" {
@@ -134,7 +142,7 @@ func SentinelListCommand(ctx context.Context, input SentinelListCommandInput) er
 		return err
 	}
 
-	// 4. Filter by requester if specified AND query was not by requester
+	// 5. Filter by requester if specified AND query was not by requester
 	if input.Requester != "" && (input.Status != "" || input.Profile != "") {
 		filtered := make([]*request.Request, 0, len(requests))
 		for _, req := range requests {
@@ -145,7 +153,7 @@ func SentinelListCommand(ctx context.Context, input SentinelListCommandInput) er
 		requests = filtered
 	}
 
-	// 5. Format results as JSON array
+	// 6. Format results as JSON array
 	summaries := make([]RequestSummary, 0, len(requests))
 	for _, req := range requests {
 		summaries = append(summaries, RequestSummary{
