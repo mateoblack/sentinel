@@ -28,6 +28,19 @@ type ConfigValidateCommandInput struct {
 	SSMFetch func(ctx context.Context, path string) ([]byte, error) // Override for testing
 }
 
+// ConfigGenerateCommandInput contains the input for config generate.
+type ConfigGenerateCommandInput struct {
+	Template   string   // basic, approvals, full
+	Profiles   []string // AWS profiles to include
+	Users      []string // Users for approvers/break-glass
+	OutputDir  string   // Directory to write files (empty = stdout)
+	JSONOutput bool     // Output as JSON instead of YAML files
+
+	// For testing
+	Stdout *os.File
+	Stderr *os.File
+}
+
 // configCmd holds the config command reference for subcommand registration.
 var configCmd *kingpin.CmdClause
 
@@ -63,6 +76,48 @@ func ConfigureConfigCommand(app *kingpin.Application, s *Sentinel) {
 		exitCode, err := ConfigValidateCommand(context.Background(), input)
 		if err != nil {
 			app.FatalIfError(err, "config validate")
+		}
+		if exitCode != 0 {
+			os.Exit(exitCode)
+		}
+		return nil
+	})
+
+	// Configure generate subcommand
+	configureConfigGenerateCommand(configCmd, app)
+}
+
+// configureConfigGenerateCommand sets up the generate subcommand.
+func configureConfigGenerateCommand(parent *kingpin.CmdClause, app *kingpin.Application) {
+	genInput := ConfigGenerateCommandInput{}
+
+	cmd := parent.Command("generate", "Generate configuration templates")
+
+	cmd.Flag("template", "Template type: basic, approvals, full").
+		Short('t').
+		Required().
+		EnumVar(&genInput.Template, "basic", "approvals", "full")
+
+	cmd.Flag("profile", "AWS profile to include (repeatable)").
+		Short('p').
+		Required().
+		StringsVar(&genInput.Profiles)
+
+	cmd.Flag("user", "User for approvers/break-glass (repeatable, required for approvals/full)").
+		Short('u').
+		StringsVar(&genInput.Users)
+
+	cmd.Flag("output-dir", "Directory to write config files (omit for stdout)").
+		Short('o').
+		StringVar(&genInput.OutputDir)
+
+	cmd.Flag("json", "Output as JSON instead of YAML").
+		BoolVar(&genInput.JSONOutput)
+
+	cmd.Action(func(c *kingpin.ParseContext) error {
+		exitCode, err := ConfigGenerateCommand(genInput)
+		if err != nil {
+			app.FatalIfError(err, "config generate")
 		}
 		if exitCode != 0 {
 			os.Exit(exitCode)
@@ -337,4 +392,127 @@ func pluralize(count int) string {
 		return ""
 	}
 	return "s"
+}
+
+// ConfigGenerateCommand executes the config generate command logic.
+// It returns exit code (0=success, 1=error) and any fatal error.
+func ConfigGenerateCommand(input ConfigGenerateCommandInput) (int, error) {
+	// Set up I/O
+	stdout := input.Stdout
+	if stdout == nil {
+		stdout = os.Stdout
+	}
+	stderr := input.Stderr
+	if stderr == nil {
+		stderr = os.Stderr
+	}
+
+	// Validate template ID
+	templateID := config.TemplateID(input.Template)
+	if !templateID.IsValid() {
+		err := fmt.Errorf("invalid template: %s (valid: basic, approvals, full)", input.Template)
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1, err
+	}
+
+	// Generate the template
+	output, err := config.GenerateTemplate(templateID, input.Profiles, input.Users)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1, err
+	}
+
+	// Handle output mode
+	if input.JSONOutput {
+		return outputGenerateJSON(stdout, output)
+	}
+
+	if input.OutputDir != "" {
+		return outputGenerateFiles(stdout, stderr, input.OutputDir, output)
+	}
+
+	return outputGenerateHumanReadable(stdout, output)
+}
+
+// outputGenerateJSON outputs the template as JSON.
+func outputGenerateJSON(stdout *os.File, output *config.TemplateOutput) (int, error) {
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return 1, fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+	fmt.Fprintln(stdout, string(data))
+	return 0, nil
+}
+
+// outputGenerateFiles writes templates to files in the specified directory.
+func outputGenerateFiles(stdout, stderr *os.File, dir string, output *config.TemplateOutput) (int, error) {
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		fmt.Fprintf(stderr, "Error: failed to create directory %s: %v\n", dir, err)
+		return 1, err
+	}
+
+	files := []struct {
+		name    string
+		content string
+	}{
+		{"policy.yaml", output.Policy},
+		{"approval.yaml", output.Approval},
+		{"breakglass.yaml", output.BreakGlass},
+		{"ratelimit.yaml", output.RateLimit},
+	}
+
+	var written []string
+	for _, f := range files {
+		if f.content == "" {
+			continue // Skip empty configs
+		}
+		path := dir + "/" + f.name
+		if err := os.WriteFile(path, []byte(f.content), 0644); err != nil {
+			fmt.Fprintf(stderr, "Error: failed to write %s: %v\n", path, err)
+			return 1, err
+		}
+		written = append(written, f.name)
+	}
+
+	fmt.Fprintf(stdout, "Generated %d config file%s in %s:\n", len(written), pluralize(len(written)), dir)
+	for _, name := range written {
+		fmt.Fprintf(stdout, "  + %s\n", name)
+	}
+
+	return 0, nil
+}
+
+// outputGenerateHumanReadable outputs templates to stdout with section headers.
+func outputGenerateHumanReadable(stdout *os.File, output *config.TemplateOutput) (int, error) {
+	sections := []struct {
+		title   string
+		file    string
+		content string
+	}{
+		{"Access Policy", "policy.yaml", output.Policy},
+		{"Approval Policy", "approval.yaml", output.Approval},
+		{"Break-Glass Policy", "breakglass.yaml", output.BreakGlass},
+		{"Rate Limit Policy", "ratelimit.yaml", output.RateLimit},
+	}
+
+	first := true
+	for _, s := range sections {
+		if s.content == "" {
+			continue
+		}
+
+		if !first {
+			fmt.Fprintln(stdout) // Blank line between sections
+		}
+		first = false
+
+		// Section header
+		header := fmt.Sprintf("# %s (%s)", s.title, s.file)
+		divider := strings.Repeat("=", len(header))
+		fmt.Fprintf(stdout, "%s\n# %s\n", header, divider)
+		fmt.Fprintln(stdout, s.content)
+	}
+
+	return 0, nil
 }

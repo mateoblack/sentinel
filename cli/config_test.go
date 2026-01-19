@@ -624,3 +624,391 @@ func TestPluralize(t *testing.T) {
 		}
 	}
 }
+
+// Tests for ConfigGenerateCommand
+
+func TestConfigGenerateCommand_BasicTemplate(t *testing.T) {
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := ConfigGenerateCommandInput{
+		Template: "basic",
+		Profiles: []string{"dev", "staging"},
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := ConfigGenerateCommand(input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	// Verify policy output
+	if !strings.Contains(output, "Access Policy") {
+		t.Errorf("output should contain 'Access Policy', got: %s", output)
+	}
+	if !strings.Contains(output, "allow-configured-profiles") {
+		t.Errorf("output should contain rule name, got: %s", output)
+	}
+	if !strings.Contains(output, "dev") {
+		t.Errorf("output should contain profile 'dev', got: %s", output)
+	}
+
+	// Basic template should NOT have approval, breakglass, ratelimit
+	if strings.Contains(output, "Approval Policy") {
+		t.Errorf("basic template should not have Approval Policy")
+	}
+}
+
+func TestConfigGenerateCommand_ApprovalsTemplate(t *testing.T) {
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := ConfigGenerateCommandInput{
+		Template: "approvals",
+		Profiles: []string{"prod"},
+		Users:    []string{"alice", "bob"},
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := ConfigGenerateCommand(input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	// Verify both policy and approval
+	if !strings.Contains(output, "Access Policy") {
+		t.Errorf("output should contain 'Access Policy'")
+	}
+	if !strings.Contains(output, "Approval Policy") {
+		t.Errorf("output should contain 'Approval Policy'")
+	}
+	if !strings.Contains(output, "require_approval") {
+		t.Errorf("output should contain 'require_approval' effect")
+	}
+	if !strings.Contains(output, "alice") {
+		t.Errorf("output should contain approver 'alice'")
+	}
+
+	// Approvals should NOT have breakglass or ratelimit
+	if strings.Contains(output, "Break-Glass Policy") {
+		t.Errorf("approvals template should not have Break-Glass Policy")
+	}
+}
+
+func TestConfigGenerateCommand_FullTemplate(t *testing.T) {
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := ConfigGenerateCommandInput{
+		Template: "full",
+		Profiles: []string{"prod"},
+		Users:    []string{"oncall"},
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := ConfigGenerateCommand(input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	// Verify all four configs are present
+	if !strings.Contains(output, "Access Policy") {
+		t.Errorf("output should contain 'Access Policy'")
+	}
+	if !strings.Contains(output, "Approval Policy") {
+		t.Errorf("output should contain 'Approval Policy'")
+	}
+	if !strings.Contains(output, "Break-Glass Policy") {
+		t.Errorf("output should contain 'Break-Glass Policy'")
+	}
+	if !strings.Contains(output, "Rate Limit Policy") {
+		t.Errorf("output should contain 'Rate Limit Policy'")
+	}
+}
+
+func TestConfigGenerateCommand_ApprovalsWithoutUsers(t *testing.T) {
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := ConfigGenerateCommandInput{
+		Template: "approvals",
+		Profiles: []string{"prod"},
+		// No users - should error
+		Stdout: stdout,
+		Stderr: stderr,
+	}
+
+	exitCode, err := ConfigGenerateCommand(input)
+	if err == nil {
+		t.Error("expected error for approvals without users")
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1", exitCode)
+	}
+
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "at least one user") {
+		t.Errorf("stderr should mention users required, got: %s", errOutput)
+	}
+}
+
+func TestConfigGenerateCommand_InvalidTemplate(t *testing.T) {
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := ConfigGenerateCommandInput{
+		Template: "invalid-template",
+		Profiles: []string{"dev"},
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+
+	exitCode, err := ConfigGenerateCommand(input)
+	if err == nil {
+		t.Error("expected error for invalid template")
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1", exitCode)
+	}
+
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "invalid template") {
+		t.Errorf("stderr should mention invalid template, got: %s", errOutput)
+	}
+}
+
+func TestConfigGenerateCommand_JSONOutput(t *testing.T) {
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := ConfigGenerateCommandInput{
+		Template:   "basic",
+		Profiles:   []string{"dev"},
+		JSONOutput: true,
+		Stdout:     stdout,
+		Stderr:     stderr,
+	}
+
+	exitCode, err := ConfigGenerateCommand(input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	// Verify JSON structure
+	if !strings.Contains(output, `"Policy":`) {
+		t.Errorf("JSON output should contain 'Policy' field, got: %s", output)
+	}
+	if !strings.Contains(output, `"Approval":`) {
+		t.Errorf("JSON output should contain 'Approval' field, got: %s", output)
+	}
+}
+
+func TestConfigGenerateCommand_FileOutput(t *testing.T) {
+	// Create temp dir for output
+	tmpDir, err := os.MkdirTemp("", "config-generate-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	outputDir := filepath.Join(tmpDir, "policies")
+
+	input := ConfigGenerateCommandInput{
+		Template:  "full",
+		Profiles:  []string{"prod"},
+		Users:     []string{"admin"},
+		OutputDir: outputDir,
+		Stdout:    stdout,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := ConfigGenerateCommand(input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify files were created
+	expectedFiles := []string{"policy.yaml", "approval.yaml", "breakglass.yaml", "ratelimit.yaml"}
+	for _, name := range expectedFiles {
+		path := filepath.Join(outputDir, name)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Errorf("expected file %s was not created", name)
+		}
+	}
+
+	// Verify stdout message
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	if !strings.Contains(output, "Generated 4 config files") {
+		t.Errorf("stdout should contain file count, got: %s", output)
+	}
+	for _, name := range expectedFiles {
+		if !strings.Contains(output, name) {
+			t.Errorf("stdout should list file %s, got: %s", name, output)
+		}
+	}
+}
+
+func TestConfigGenerateCommand_BasicFileOutput(t *testing.T) {
+	// Create temp dir for output
+	tmpDir, err := os.MkdirTemp("", "config-generate-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	outputDir := filepath.Join(tmpDir, "policies")
+
+	input := ConfigGenerateCommandInput{
+		Template:  "basic",
+		Profiles:  []string{"dev"},
+		OutputDir: outputDir,
+		Stdout:    stdout,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := ConfigGenerateCommand(input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Basic should only create policy.yaml
+	if _, err := os.Stat(filepath.Join(outputDir, "policy.yaml")); os.IsNotExist(err) {
+		t.Error("expected policy.yaml to be created")
+	}
+	if _, err := os.Stat(filepath.Join(outputDir, "approval.yaml")); !os.IsNotExist(err) {
+		t.Error("approval.yaml should not be created for basic template")
+	}
+
+	// Verify stdout
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	if !strings.Contains(output, "Generated 1 config file") {
+		t.Errorf("stdout should say 1 config file, got: %s", output)
+	}
+}
