@@ -102,6 +102,12 @@ Sentinel extends [aws-vault](https://github.com/99designs/aws-vault), adding pol
 - AWS account with SSM Parameter Store access
 - AWS credentials (SSO, IAM user, or instance role)
 
+## Limitations
+
+- **Session duration** is bounded by AWS role limits, not policy. Policy-level `max_duration` planned for v1.8.
+- **Console access** is not controlled by Sentinel. Use trust policies requiring SourceIdentity to block console from sensitive roles.
+- **Session revocation** not yet supported. Credentials are valid until expiry (default 1h, break-glass max 4h).
+
 ## License
 
 MIT
