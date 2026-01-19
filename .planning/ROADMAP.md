@@ -15,7 +15,8 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.6 Testing & Hardening** — [milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md) (Phases 50-59, shipped 2026-01-17)
 - ✅ **v1.7 Permissions Discovery** — [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) (Phases 60-68, shipped 2026-01-18)
 - ✅ **v1.7.1 Security Patch** — [milestones/v1.7.1-ROADMAP.md](milestones/v1.7.1-ROADMAP.md) (Phases 69-72, shipped 2026-01-19)
-- 🚧 **v1.8 Credential Flow UX** — Phases 73-75 (in progress)
+- ✅ **v1.8 Credential Flow UX** — [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) (Phases 73-75, shipped 2026-01-19)
+- 🚧 **v1.9 SSO Profile Support** — Phases 76-77 (in progress)
 
 ## Completed Milestones
 
@@ -361,41 +362,41 @@ Plans:
 
 </details>
 
-### 🚧 v1.8 Credential Flow UX (In Progress)
+<details>
+<summary>✅ v1.8 Credential Flow UX (Phases 73-75) — SHIPPED 2026-01-19</summary>
 
-**Milestone Goal:** Developer experience improvements for credential handling — automatic SSO profile resolution and login triggering, plus clear error messages for authentication failures.
+**Milestone Goal:** Developer experience improvements for credential handling — automatic SSO profile resolution and login triggering.
 
-#### Phase 73: SSO Profile Resolution
+- [x] Phase 73: SSO Profile Resolution (1/1 plans) — completed 2026-01-19
+- [x] Phase 74: Auto SSO Login (2/2 plans) — completed 2026-01-19
+- [x] Phase 75: AWS Auth Error Enhancement (deferred to v1.9)
 
-**Goal**: Read AWS profile config, detect SSO configuration, use cached SSO credentials automatically without manual export
-**Depends on**: v1.7.1 complete
-**Research**: Likely (aws-sdk-go-v2 SSO credential provider patterns)
-**Research topics**: AWS SDK SSO credential resolution, ~/.aws/config parsing, SSO token cache location
+</details>
+
+### 🚧 v1.9 SSO Profile Support (In Progress)
+
+**Milestone Goal:** Fix systemic bug where --profile flag doesn't load SSO credentials, ensuring all Sentinel commands work seamlessly with SSO profiles like AWS CLI does.
+
+#### Phase 76: SSO Credential Loading
+
+**Goal**: Integrate with AWS SDK SSO credential provider chain so all commands properly load SSO credentials from --profile
+**Depends on**: v1.8 complete
+**Research**: Likely (AWS SDK SSO credential provider patterns)
+**Research topics**: AWS SDK SSO credential provider chain, ~/.aws/sso/cache/ integration, credential resolution order
 **Plans**: TBD
 
 Plans:
-- [ ] 73-01: TBD (run /gsd:plan-phase 73 to break down)
+- [ ] 76-01: TBD (run /gsd:plan-phase 76 to break down)
 
-#### Phase 74: Auto SSO Login
+#### Phase 77: Whoami Profile Flag
 
-**Goal**: Automatically trigger SSO login flow when credentials are missing or expired, instead of failing with "invalid token"
-**Depends on**: Phase 73
-**Research**: Likely (SSO OIDC device authorization flow)
-**Research topics**: SSO OIDC device authorization, aws sso login implementation, browser launch patterns
-**Plans**: 1
-
-Plans:
-- [x] 74-01: SSO error detection and login infrastructure — completed 2026-01-19
-
-#### Phase 75: AWS Auth Error Enhancement
-
-**Goal**: Clear error messages with actionable suggestions for AWS authentication failures (SSO expired, no credentials, permission denied)
-**Depends on**: Phase 74
-**Research**: Unlikely (internal patterns, extends v1.7 error infrastructure)
+**Goal**: Add --profile flag to whoami command (currently missing entirely)
+**Depends on**: Phase 76
+**Research**: Unlikely (extends existing CLI patterns)
 **Plans**: TBD
 
 Plans:
-- [ ] 75-01: TBD (run /gsd:plan-phase 75 to break down)
+- [ ] 77-01: TBD (run /gsd:plan-phase 77 to break down)
 
 ## Progress (All Milestones)
 
@@ -410,6 +411,7 @@ Plans:
 | v1.6 Testing & Hardening | 50-59 | 25/25 | ✅ Complete | 2026-01-17 |
 | v1.7 Permissions Discovery | 60-68 | 10/10 | ✅ Complete | 2026-01-18 |
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
-| v1.8 Credential Flow UX | 73-75 | 1/? | 🚧 In Progress | - |
+| v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
+| v1.9 SSO Profile Support | 76-77 | 0/? | 🚧 In Progress | - |
 
-**Totals:** 9 milestones shipped (72 phases, 120 plans), 1 in progress
+**Totals:** 10 milestones shipped (75 phases, 123 plans), 1 in progress

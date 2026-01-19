@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.8 Credential Flow UX — IN PROGRESS
+**Current focus:** v1.9 SSO Profile Support — IN PROGRESS
 
 ## Current Position
 
-Phase: 74 of 75 (Auto SSO Login)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-19 — Completed 74-02-PLAN.md
+Phase: 76 of 77 (SSO Credential Loading)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-19 — Milestone v1.9 created
 
-Progress: ██░░░░░░░░ 67% (v1.8 Credential Flow UX - 2/3 phases)
+Progress: ░░░░░░░░░░ 0% (v1.9 SSO Profile Support - 0/2 phases)
 
 ## Milestone Summary
 
@@ -121,7 +121,8 @@ Progress: ██░░░░░░░░ 67% (v1.8 Credential Flow UX - 2/3 phas
 | v1.6 Testing & Hardening | 10 | 25 | ~48 min |
 | v1.7 Permissions Discovery | 9 | 10 | ~66 min |
 | v1.7.1 Security Patch | 4 | 7 | ~86 min |
-| v1.8 Credential Flow UX (in progress) | 2 | 3 | ~16 min |
+| v1.8 Credential Flow UX | 3 | 3 | ~16 min |
+| v1.9 SSO Profile Support (in progress) | 0 | 0 | - |
 
 ## Accumulated Context
 
@@ -401,9 +402,9 @@ None — clean start for v1.8.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 74-02-PLAN.md
+Stopped at: Milestone v1.9 initialization
 Resume file: None
-Next: Phase 74 complete, ready for Phase 75 planning
+Next: Ready to plan Phase 76 (SSO Credential Loading)
 
 ## Roadmap Evolution
 
@@ -416,4 +417,5 @@ Next: Phase 74 complete, ready for Phase 75 planning
 - Milestone v1.6 shipped: 2026-01-17 — Testing & Hardening (Phases 50-59)
 - Milestone v1.7 shipped: 2026-01-18 — Permissions Discovery (Phases 60-68)
 - Milestone v1.7.1 shipped: 2026-01-19 — Security Patch (Phases 69-72) - Fix OS username bug
-- Milestone v1.8 created: 2026-01-19 — Credential Flow UX (Phases 73-75) - SSO profile resolution and auto-login
+- Milestone v1.8 shipped: 2026-01-19 — Credential Flow UX (Phases 73-75) - SSO profile resolution and auto-login
+- Milestone v1.9 created: 2026-01-19 — SSO Profile Support (Phases 76-77) - Fix --profile SSO credential loading
