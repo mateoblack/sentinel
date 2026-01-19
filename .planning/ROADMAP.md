@@ -17,6 +17,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.7.1 Security Patch** — [milestones/v1.7.1-ROADMAP.md](milestones/v1.7.1-ROADMAP.md) (Phases 69-72, shipped 2026-01-19)
 - ✅ **v1.8 Credential Flow UX** — [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) (Phases 73-75, shipped 2026-01-19)
 - ✅ **v1.9 SSO Profile Support** — [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) (Phases 76-77, shipped 2026-01-19)
+- 🚧 **v1.10 Real-time Revocation** — Phases 78-83 (in progress)
 
 ## Completed Milestones
 
@@ -383,6 +384,72 @@ Plans:
 
 </details>
 
+### 🚧 v1.10 Real-time Revocation (In Progress)
+
+**Milestone Goal:** Enable instant credential revocation via server mode - each credential request checks Sentinel policy, allowing real-time blocking of access.
+
+#### Phase 78: Server Infrastructure
+
+**Goal**: Port ECS server mode to sentinel exec command with --server flag
+**Depends on**: v1.9 complete
+**Research**: Likely (porting aws-vault server package patterns)
+**Research topics**: ECS metadata endpoint, credential provider chain, HTTP server patterns
+**Plans**: TBD
+
+Plans:
+- [ ] 78-01: TBD (run /gsd:plan-phase 78 to break down)
+
+#### Phase 79: Server Policy Integration
+
+**Goal**: Hook policy evaluation into credential server requests
+**Depends on**: Phase 78
+**Research**: Unlikely (extends existing policy evaluation)
+**Plans**: TBD
+
+Plans:
+- [ ] 79-01: TBD
+
+#### Phase 80: Short-lived Sessions
+
+**Goal**: Enforce short credential TTLs in server mode for rapid revocation
+**Depends on**: Phase 79
+**Research**: Unlikely (extends existing duration logic)
+**Plans**: TBD
+
+Plans:
+- [ ] 80-01: TBD
+
+#### Phase 81: Session Management
+
+**Goal**: Track and manage active server sessions for visibility and control
+**Depends on**: Phase 80
+**Research**: Likely (new session tracking design)
+**Research topics**: Active session storage, revocation patterns, in-memory vs persistent state
+**Plans**: TBD
+
+Plans:
+- [ ] 81-01: TBD
+
+#### Phase 82: Server Mode Enforcement
+
+**Goal**: Policy conditions to require server mode for sensitive profiles
+**Depends on**: Phase 81
+**Research**: Unlikely (extends existing policy schema)
+**Plans**: TBD
+
+Plans:
+- [ ] 82-01: TBD
+
+#### Phase 83: Server Mode Testing
+
+**Goal**: Comprehensive testing for server mode and revocation timing
+**Depends on**: Phase 82
+**Research**: Unlikely (extends existing test patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 83-01: TBD
+
 ## Progress (All Milestones)
 
 | Milestone | Phases | Plans | Status | Shipped |
@@ -398,5 +465,6 @@ Plans:
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
+| v1.10 Real-time Revocation | 78-83 | 0/? | 🚧 In Progress | - |
 
-**Totals:** 11 milestones shipped (77 phases, 128 plans)
+**Totals:** 11 milestones shipped (77 phases, 128 plans), 1 in progress (6 phases)
