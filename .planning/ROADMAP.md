@@ -35,10 +35,10 @@ Plans:
 **Goal**: Replace `user.Current()` with AWS identity extraction in credential flow
 **Depends on**: Phase 69
 **Research**: Unlikely (internal refactoring)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 70-01: TBD
+- [x] 70-01: AWS identity integration in credential flow — completed 2026-01-19
 
 #### Phase 71: Whoami Command
 
@@ -48,7 +48,7 @@ Plans:
 **Plans**: 1
 
 Plans:
-- [ ] 71-01: Whoami command with human and JSON output
+- [x] 71-01: Whoami command with human and JSON output — completed 2026-01-19
 
 #### Phase 72: Security Validation
 
