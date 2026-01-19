@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 76 of 77 (SSO Credential Loading)
-Plan: 3 of 5 in current phase
+Plan: 2 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-19 — Completed 76-03-PLAN.md
+Last activity: 2026-01-19 — Completed 76-02-PLAN.md
 
 Progress: █░░░░░░░░░ 10% (v1.9 SSO Profile Support - Phase 76 in progress)
 
@@ -391,6 +391,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - AWS config file loaded early when auto-login enabled for SSO config lookup
 - Keyring field in AutoLoginConfig unused - AWS SDK handles token caching internally
 
+**v1.9 Approval Workflow SSO Credential Loading decisions (Phase 76-02):**
+- request command: Use existing --profile flag for both target profile and AWS credential loading
+- approve, deny, list commands: Add separate --aws-profile flag for credentials (optional)
+- Pattern: WithSharedConfigProfile(profile) enables SSO credential loading for approval commands
+
 **v1.9 Break-Glass SSO Credential Loading decisions (Phase 76-03):**
 - breakglass command: Use existing --profile flag for both target profile and AWS credential loading
 - breakglass-check, breakglass-close, breakglass-list: Add separate --aws-profile flag for credentials
@@ -407,9 +412,9 @@ None — clean start for v1.8.
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 76-03-PLAN.md (break-glass SSO credential loading)
+Stopped at: Completed 76-02-PLAN.md (approval workflow SSO credential loading)
 Resume file: None
-Next: Execute 76-04-PLAN.md (approval workflow commands)
+Next: Execute 76-03-PLAN.md (break-glass SSO credential loading)
 
 ## Roadmap Evolution
 
