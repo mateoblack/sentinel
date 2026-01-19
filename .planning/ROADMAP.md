@@ -425,10 +425,10 @@ Plans:
 **Goal**: QUICKSTART.md, updated BOOTSTRAP.md, permission matrix documentation
 **Depends on**: Phase 67
 **Research**: Unlikely (documentation)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 68-01: TBD
+- [x] 68-01: Onboarding documentation (QUICKSTART.md, PERMISSIONS.md, commands.md) — completed 2026-01-18
 
 ## Progress (All Milestones)
 
