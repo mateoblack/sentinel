@@ -412,16 +412,17 @@ Plans:
 - [x] 78.1-01: Add bootstrap command SSO profile test coverage — completed 2026-01-19
 - [x] 78.1-02: Add whoami command SSO profile test coverage — completed 2026-01-19
 
-#### Phase 79: Server Policy Integration
+#### Phase 79: Server Policy Integration — COMPLETE
 
 **Goal**: Hook policy evaluation into credential server requests
 **Depends on**: Phase 78
 **Research**: Unlikely (extends existing policy evaluation)
-**Plans**: 2+
+**Plans**: 2
+**Status**: Complete (2026-01-20)
 
 Plans:
 - [x] 79-01: Add credential mode awareness to policy schema — completed 2026-01-20
-- [ ] 79-02: TBD
+- [x] 79-02: Add server mode integration tests and documentation — completed 2026-01-20
 
 #### Phase 80: Short-lived Sessions
 

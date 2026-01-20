@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 79 (Server Policy Integration)
-Plan: 1 of ? in current phase
-Status: In progress
-Last activity: 2026-01-20 — Completed 79-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-01-20 — Completed 79-02-PLAN.md
 
-Progress: ██░░░░░░░░ 25% (v1.10 Real-time Revocation - 1/6 phases, 3/? plans)
+Progress: ██░░░░░░░░ 33% (v1.10 Real-time Revocation - 1/6 phases, 4/? plans)
 
 ## Milestone Summary
 
@@ -436,6 +436,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Mode check added as final condition in matchesConditions (after profiles, users, time)
 - Three modes defined: ModeServer (per-request), ModeCLI (one-time exec), ModeCredentialProcess (one-time credential_process)
 
+**v1.10 Server Mode Integration Tests and Documentation decisions (Phase 79-02):**
+- createModeConditionalPolicy test helper for consistent mode-conditional test policy creation
+- Mode condition documented after time condition in policy-reference.md
+- Server Mode documented as subsection of exec command in commands.md
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -447,9 +452,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 79-01-PLAN.md
+Stopped at: Completed 79-02-PLAN.md (Phase 79 complete)
 Resume file: None
-Next: /gsd:execute-plan 79-02
+Next: /gsd:plan-phase 80
 
 ## Roadmap Evolution
 
