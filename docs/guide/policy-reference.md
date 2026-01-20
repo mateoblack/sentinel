@@ -41,6 +41,44 @@ rules:
 | `allow` | Grant access - issue credentials |
 | `deny` | Reject access - no credentials issued |
 | `require_approval` | Request must be approved before access |
+| `require_server` | Grant access only via server mode (`sentinel exec --server`) |
+
+### require_server Effect
+
+The `require_server` effect enforces server mode for credential delivery. This is the recommended pattern for sensitive profiles requiring:
+
+- **Instant revocation**: Server mode evaluates policy per-request, so policy changes take effect immediately
+- **Per-request audit**: Every credential fetch is logged with policy decision
+- **Short-lived credentials**: Server mode enforces shorter credential TTLs (default 15 minutes)
+
+**Example:**
+
+```yaml
+version: "1"
+rules:
+  # Production requires server mode for instant revocation capability
+  - name: prod-requires-server
+    effect: require_server
+    conditions:
+      profiles: [production]
+    reason: Production requires server mode for instant revocation
+
+  # Development allows any mode
+  - name: dev-allow
+    effect: allow
+    conditions:
+      profiles: [development]
+```
+
+**Behavior:**
+
+| Request Mode | Effect |
+|--------------|--------|
+| `sentinel exec --server prod -- aws s3 ls` | Allow |
+| `sentinel exec prod -- aws s3 ls` | Deny with message: "policy requires server mode" |
+| `sentinel credentials --profile prod` | Deny with message: "policy requires server mode" |
+
+**Note:** `require_server` denials cannot be bypassed by approval workflows or break-glass. If you need emergency access that bypasses server mode, use a separate rule with `allow` effect that checks for break-glass context.
 
 ### Complete Example
 
