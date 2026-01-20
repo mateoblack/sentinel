@@ -17,13 +17,14 @@ type Request struct {
 
 // Decision represents the outcome of policy evaluation.
 type Decision struct {
-	Effect            Effect
-	MatchedRule       string
-	Reason            string
-	RuleIndex         int           // Position of matched rule in policy (0-based, -1 if no match)
-	Conditions        *Condition    // Copy of matched rule's conditions for logging (nil for default deny)
-	EvaluatedAt       time.Time     // Timestamp when evaluation occurred
-	MaxServerDuration time.Duration // Policy-imposed cap on server mode session duration (0 = no cap)
+	Effect             Effect
+	MatchedRule        string
+	Reason             string
+	RuleIndex          int           // Position of matched rule in policy (0-based, -1 if no match)
+	Conditions         *Condition    // Copy of matched rule's conditions for logging (nil for default deny)
+	EvaluatedAt        time.Time     // Timestamp when evaluation occurred
+	MaxServerDuration  time.Duration // Policy-imposed cap on server mode session duration (0 = no cap)
+	RequiresServerMode bool          // True when EffectRequireServer matched but mode was not server
 }
 
 // String returns a human-readable representation of the decision.
