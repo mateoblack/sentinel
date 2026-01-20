@@ -3,6 +3,7 @@ package sentinel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -1687,5 +1688,58 @@ func TestSentinelServer_SessionRevoked_DeniesCredentials(t *testing.T) {
 	// Verify credentials were NOT issued (MockCredentialProvider not called)
 	if mockProvider.CallCount() != 0 {
 		t.Errorf("Expected 0 credential requests when session revoked (fail-closed), got %d", mockProvider.CallCount())
+	}
+}
+
+func TestSentinelServer_SessionRevocationStoreError_AllowsCredentials(t *testing.T) {
+	// Test fail-open availability: store errors don't block credential issuance
+	mockStore := NewMockSessionStore()
+
+	// Create server with session store
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.SessionStore = mockStore
+	})
+	defer server.Shutdown(context.Background())
+
+	// Verify session was created on startup
+	if mockStore.CreateCallCount() != 1 {
+		t.Fatalf("Expected 1 Create call on startup, got %d", mockStore.CreateCallCount())
+	}
+
+	// Get the session ID that was created
+	if server.sessionID == "" {
+		t.Fatal("Expected server.sessionID to be set after startup")
+	}
+
+	// Configure mock to return an error on Get (simulating DynamoDB connectivity issue)
+	mockStore.GetErr = errors.New("DynamoDB timeout")
+
+	// Track credential provider calls
+	mockProvider := &MockCredentialProvider{}
+	server.config.CredentialProvider = mockProvider
+
+	// Issue a credential request
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Verify HTTP 200 response (fail-open for availability)
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d for store error (fail-open), got %d. Body: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	// Verify credentials WERE issued despite store error
+	if mockProvider.CallCount() != 1 {
+		t.Errorf("Expected 1 credential request with store error (fail-open), got %d", mockProvider.CallCount())
+	}
+
+	// Verify response contains credentials
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if resp["AccessKeyId"] == "" {
+		t.Error("Expected AccessKeyId in response (fail-open)")
 	}
 }
