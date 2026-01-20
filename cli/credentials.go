@@ -223,10 +223,21 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	// 7. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 8. Handle deny decision - check for approved request or break-glass first
+	// 8. Handle deny decision - check for require_server mode first, then approved request or break-glass
 	var approvedReq *request.Request
 	var activeBreakGlass *breakglass.BreakGlassEvent
 	if decision.Effect == policy.EffectDeny {
+		// Check if denial is due to server mode requirement - this cannot be bypassed
+		if decision.RequiresServerMode {
+			if input.Logger != nil {
+				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
+				input.Logger.LogDecision(entry)
+			}
+			serverErr := fmt.Errorf("policy requires server mode for profile %q - use 'sentinel exec --server %s -- <command>' for real-time revocation control", input.ProfileName, input.ProfileName)
+			fmt.Fprintf(stderr, "Error: %v\n", serverErr)
+			return serverErr
+		}
+
 		// Check for approved request before denying
 		if input.Store != nil {
 			var storeErr error
