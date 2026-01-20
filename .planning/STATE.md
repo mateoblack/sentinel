@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.10 Real-time Revocation (Phase 79: Server Policy Integration)
+**Current focus:** v1.10 Real-time Revocation (Phase 81: Session Management)
 
 ## Current Position
 
-Phase: 80 (Short-Lived Sessions)
-Plan: 1 of 3 in current phase
+Phase: 81 (Session Management)
+Plan: 1 of 4 in current phase
 Status: Plan 01 complete
-Last activity: 2026-01-20 — Completed 80-01-PLAN.md
+Last activity: 2026-01-20 — Completed 81-01-PLAN.md
 
-Progress: ███░░░░░░░ 37% (v1.10 Real-time Revocation - 2/6 phases, 5/? plans)
+Progress: ████░░░░░░ 42% (v1.10 Real-time Revocation - 3/6 phases, 6/? plans)
 
 ## Milestone Summary
 
@@ -446,6 +446,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - 0 value for MaxServerDuration means no policy-imposed limit (same pattern as BreakGlassPolicyRule.MaxDuration)
 - Duration capping order: config -> policy cap -> break-glass cap -> final (each can only reduce, not increase)
 
+**v1.10 Session Management decisions (Phase 81-01):**
+- SessionStatus uses "revoked" (not "closed") to differentiate from break-glass terminology
+- Touch operation uses UpdateItem for atomic increment (hot-path optimization)
+- FindActiveByServerInstance queries by server_instance_id with status filter
+- Session package follows breakglass package patterns exactly
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -457,9 +463,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 80-01-PLAN.md (Phase 80 Plan 01 complete)
+Stopped at: Completed 81-01-PLAN.md (Phase 81 Plan 01 complete)
 Resume file: None
-Next: /gsd:execute-plan 80-02
+Next: /gsd:execute-plan 81-02
 
 ## Roadmap Evolution
 

@@ -424,26 +424,30 @@ Plans:
 - [x] 79-01: Add credential mode awareness to policy schema — completed 2026-01-20
 - [x] 79-02: Add server mode integration tests and documentation — completed 2026-01-20
 
-#### Phase 80: Short-lived Sessions
+#### Phase 80: Short-lived Sessions — COMPLETE
 
 **Goal**: Enforce short credential TTLs in server mode for rapid revocation
 **Depends on**: Phase 79
 **Research**: Unlikely (extends existing duration logic)
-**Plans**: TBD
+**Plans**: 3
+**Status**: Complete (2026-01-20)
 
 Plans:
-- [ ] 80-01: TBD
+- [x] 80-01: Server duration defaults and policy caps — completed 2026-01-20
 
-#### Phase 81: Session Management
+#### Phase 81: Session Management — IN PROGRESS
 
 **Goal**: Track and manage active server sessions for visibility and control
 **Depends on**: Phase 80
 **Research**: Likely (new session tracking design)
 **Research topics**: Active session storage, revocation patterns, in-memory vs persistent state
-**Plans**: TBD
+**Plans**: 4
 
 Plans:
-- [ ] 81-01: TBD
+- [x] 81-01: Session schema, Store interface, and DynamoDB implementation — completed 2026-01-20
+- [ ] 81-02: Session lifecycle commands (create, list, revoke)
+- [ ] 81-03: Server integration with session tracking
+- [ ] 81-04: Session monitoring and alerts
 
 #### Phase 82: Server Mode Enforcement
 
