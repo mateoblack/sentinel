@@ -419,10 +419,10 @@ Plans:
 **Goal**: Add `-server` suffix functions for real-time revocation mode
 **Depends on**: Phase 84
 **Research**: Unlikely (extends Phase 84 with --server flag, internal patterns)
-**Plans**: TBD
+**Plans**: 1/1
 
 Plans:
-- [ ] 85-01: TBD
+- [x] 85-01: Server mode variants with --include-server flag — completed 2026-01-20
 
 #### Phase 86: Shell Completions
 
@@ -462,6 +462,6 @@ Plans:
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 | v1.10 Real-time Revocation | 78-83 | 15/15 | ✅ Complete | 2026-01-20 |
-| v1.11 Shell Integration | 84-87 | 1/? | 🚧 In progress | - |
+| v1.11 Shell Integration | 84-87 | 2/? | 🚧 In progress | - |
 
 **Totals:** 13 milestones shipped (84.1 phases, 149 plans)
