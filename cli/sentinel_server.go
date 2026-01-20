@@ -357,3 +357,161 @@ func truncateString(s string, maxLen int) string {
 func isSessionNotFound(err error) bool {
 	return errors.Is(err, session.ErrSessionNotFound)
 }
+
+// ServerRevokeCommandInput contains the input for the server revoke command.
+type ServerRevokeCommandInput struct {
+	Region       string
+	TableName    string
+	SessionID    string // Required, positional arg
+	Reason       string // Required
+	OutputFormat string // human, json
+	AWSProfile   string
+
+	// Store is an optional Store implementation for testing.
+	Store session.Store
+
+	// STSClient is an optional STS client for AWS identity extraction.
+	// If nil, a new client will be created from AWS config.
+	STSClient identity.STSAPI
+}
+
+// ServerRevokeCommandOutput represents the JSON output from the server revoke command.
+type ServerRevokeCommandOutput struct {
+	ID            string `json:"id"`
+	Status        string `json:"status"`
+	RevokedBy     string `json:"revoked_by"`
+	RevokedReason string `json:"revoked_reason"`
+	Message       string `json:"message"`
+}
+
+// ConfigureServerRevokeCommand sets up the server revoke command with kingpin.
+func ConfigureServerRevokeCommand(app *kingpin.Application, s *Sentinel) {
+	input := ServerRevokeCommandInput{}
+
+	cmd := app.Command("server-revoke", "Revoke a server session for immediate access termination")
+
+	cmd.Arg("session-id", "Session ID to revoke").
+		Required().
+		StringVar(&input.SessionID)
+
+	cmd.Flag("reason", "Reason for revocation (required)").
+		Required().
+		StringVar(&input.Reason)
+
+	cmd.Flag("region", "AWS region for DynamoDB").
+		Required().
+		StringVar(&input.Region)
+
+	cmd.Flag("table", "DynamoDB table name for sessions").
+		Required().
+		StringVar(&input.TableName)
+
+	cmd.Flag("output", "Output format (human, json)").
+		Default("human").
+		EnumVar(&input.OutputFormat, "human", "json")
+
+	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
+		StringVar(&input.AWSProfile)
+
+	cmd.Action(func(c *kingpin.ParseContext) error {
+		err := ServerRevokeCommand(context.Background(), input)
+		app.FatalIfError(err, "server-revoke")
+		return nil
+	})
+}
+
+// ServerRevokeCommand executes the server revoke command logic.
+// It revokes a session for immediate credential denial.
+func ServerRevokeCommand(ctx context.Context, input ServerRevokeCommandInput) error {
+	// 1. Validate session ID format
+	if !session.ValidateSessionID(input.SessionID) {
+		fmt.Fprintf(os.Stderr, "Invalid session ID format: %s (must be 16 lowercase hex characters)\n", input.SessionID)
+		return fmt.Errorf("invalid session ID format: %s", input.SessionID)
+	}
+
+	// 2. Validate reason is non-empty
+	if input.Reason == "" {
+		fmt.Fprintf(os.Stderr, "Reason is required for revocation\n")
+		return fmt.Errorf("reason is required for revocation")
+	}
+
+	// 3. Load AWS config
+	awsCfgOpts := []func(*config.LoadOptions) error{}
+	if input.AWSProfile != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+	}
+	if input.Region != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	}
+	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
+		return err
+	}
+
+	// 4. Get AWS identity for RevokedBy
+	stsClient := input.STSClient
+	if stsClient == nil {
+		stsClient = sts.NewFromConfig(awsCfg)
+	}
+	revokedBy, err := identity.GetAWSUsername(ctx, stsClient)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to get AWS identity: %v\n", err)
+		return err
+	}
+
+	// 5. Get or create store
+	store := input.Store
+	if store == nil {
+		store = session.NewDynamoDBStore(awsCfg, input.TableName)
+	}
+
+	// 6. Revoke session
+	revokeInput := session.RevokeInput{
+		SessionID: input.SessionID,
+		RevokedBy: revokedBy,
+		Reason:    input.Reason,
+	}
+
+	revokedSession, err := session.Revoke(ctx, store, revokeInput)
+	if err != nil {
+		// Handle specific error cases
+		if errors.Is(err, session.ErrSessionNotFound) {
+			fmt.Fprintf(os.Stderr, "Session not found: %s\n", input.SessionID)
+			return err
+		}
+		if errors.Is(err, session.ErrSessionAlreadyRevoked) {
+			fmt.Fprintf(os.Stderr, "Session already revoked: %s\n", input.SessionID)
+			return err
+		}
+		if errors.Is(err, session.ErrSessionExpired) {
+			fmt.Fprintf(os.Stderr, "Session already expired: %s\n", input.SessionID)
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "Failed to revoke session: %v\n", err)
+		return err
+	}
+
+	// 7. Output result
+	if input.OutputFormat == "json" {
+		output := ServerRevokeCommandOutput{
+			ID:            revokedSession.ID,
+			Status:        string(revokedSession.Status),
+			RevokedBy:     revokedSession.RevokedBy,
+			RevokedReason: revokedSession.RevokedReason,
+			Message:       fmt.Sprintf("Session %s revoked by %s", revokedSession.ID, revokedSession.RevokedBy),
+		}
+		jsonBytes, err := json.MarshalIndent(&output, "", "  ")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to marshal output to JSON: %v\n", err)
+			return err
+		}
+		fmt.Println(string(jsonBytes))
+	} else {
+		// Human-readable format
+		fmt.Printf("Session %s revoked by %s\n", revokedSession.ID, revokedSession.RevokedBy)
+		fmt.Printf("Reason: %s\n", revokedSession.RevokedReason)
+	}
+
+	return nil
+}

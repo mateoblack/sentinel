@@ -54,6 +54,7 @@ func main() {
 	// Server session commands
 	cli.ConfigureServerSessionsCommand(app, s)
 	cli.ConfigureServerSessionCommand(app, s)
+	cli.ConfigureServerRevokeCommand(app, s)
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
