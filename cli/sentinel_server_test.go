@@ -784,3 +784,348 @@ func TestServerSessionCommand_RevokedSession(t *testing.T) {
 		t.Errorf("expected revoked_reason 'Suspicious activity detected', got %s", sess.RevokedReason)
 	}
 }
+
+// testableServerRevokeCommand is a testable version for the revoke command.
+// It returns the revoked session for verification instead of outputting to stdout.
+func testableServerRevokeCommand(ctx context.Context, input ServerRevokeCommandInput) (*session.ServerSession, error) {
+	// 1. Validate session ID format
+	if !session.ValidateSessionID(input.SessionID) {
+		return nil, errors.New("invalid session ID format: " + input.SessionID)
+	}
+
+	// 2. Validate reason is non-empty
+	if input.Reason == "" {
+		return nil, errors.New("reason is required for revocation")
+	}
+
+	// 3. Get AWS identity for RevokedBy
+	stsClient := input.STSClient
+	if stsClient == nil {
+		return nil, errors.New("STSClient is required for testing")
+	}
+	revokedBy, err := identity.GetAWSUsername(ctx, stsClient)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Get store (must be provided for testing)
+	store := input.Store
+	if store == nil {
+		return nil, errors.New("store is required for testing")
+	}
+
+	// 5. Revoke session
+	revokeInput := session.RevokeInput{
+		SessionID: input.SessionID,
+		RevokedBy: revokedBy,
+		Reason:    input.Reason,
+	}
+
+	revokedSession, err := session.Revoke(ctx, store, revokeInput)
+	if err != nil {
+		return nil, err
+	}
+
+	return revokedSession, nil
+}
+
+// TestServerRevokeCommand_Success tests successful session revocation.
+func TestServerRevokeCommand_Success(t *testing.T) {
+	now := time.Now()
+	activeSession := &session.ServerSession{
+		ID:               "abc1234567890def",
+		User:             "alice",
+		Profile:          "production",
+		Status:           session.StatusActive,
+		StartedAt:        now.Add(-30 * time.Minute),
+		LastAccessAt:     now.Add(-5 * time.Minute),
+		ExpiresAt:        now.Add(30 * time.Minute),
+		RequestCount:     42,
+		ServerInstanceID: "server-1",
+		SourceIdentity:   "sentinel:alice:req123",
+	}
+
+	// Create a mock store that tracks session updates
+	var updatedSession *session.ServerSession
+	store := &mockSessionStore{
+		getFn: func(ctx context.Context, id string) (*session.ServerSession, error) {
+			if id == activeSession.ID {
+				// Return a copy so we can track updates separately
+				sessCopy := *activeSession
+				return &sessCopy, nil
+			}
+			return nil, session.ErrSessionNotFound
+		},
+		updateFn: func(ctx context.Context, sess *session.ServerSession) error {
+			updatedSession = sess
+			return nil
+		},
+	}
+
+	input := ServerRevokeCommandInput{
+		SessionID: activeSession.ID,
+		Reason:    "Security incident",
+		Store:     store,
+		STSClient: newMockSessionSTSClient("admin"),
+	}
+
+	revokedSession, err := testableServerRevokeCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	// Verify session was revoked
+	if revokedSession.Status != session.StatusRevoked {
+		t.Errorf("Expected status revoked, got %s", revokedSession.Status)
+	}
+	if revokedSession.RevokedBy != "admin" {
+		t.Errorf("Expected revoked_by 'admin', got %s", revokedSession.RevokedBy)
+	}
+	if revokedSession.RevokedReason != "Security incident" {
+		t.Errorf("Expected revoked_reason 'Security incident', got %s", revokedSession.RevokedReason)
+	}
+
+	// Verify update was called
+	if updatedSession == nil {
+		t.Fatal("Expected store.Update to be called")
+	}
+	if updatedSession.Status != session.StatusRevoked {
+		t.Errorf("Expected updated session status revoked, got %s", updatedSession.Status)
+	}
+}
+
+// TestServerRevokeCommand_NotFound tests error when session not found.
+func TestServerRevokeCommand_NotFound(t *testing.T) {
+	store := &mockSessionStore{
+		getFn: func(ctx context.Context, id string) (*session.ServerSession, error) {
+			return nil, session.ErrSessionNotFound
+		},
+	}
+
+	input := ServerRevokeCommandInput{
+		SessionID: "abc1234567890def",
+		Reason:    "Test reason",
+		Store:     store,
+		STSClient: newMockSessionSTSClient("admin"),
+	}
+
+	_, err := testableServerRevokeCommand(context.Background(), input)
+	if !errors.Is(err, session.ErrSessionNotFound) {
+		t.Errorf("Expected ErrSessionNotFound, got: %v", err)
+	}
+}
+
+// TestServerRevokeCommand_AlreadyRevoked tests error when session already revoked.
+func TestServerRevokeCommand_AlreadyRevoked(t *testing.T) {
+	now := time.Now()
+	revokedSession := &session.ServerSession{
+		ID:            "abc1234567890def",
+		User:          "alice",
+		Profile:       "production",
+		Status:        session.StatusRevoked,
+		StartedAt:     now.Add(-1 * time.Hour),
+		LastAccessAt:  now.Add(-30 * time.Minute),
+		ExpiresAt:     now.Add(30 * time.Minute),
+		RevokedBy:     "previous-admin",
+		RevokedReason: "Earlier revocation",
+	}
+
+	store := &mockSessionStore{
+		getFn: func(ctx context.Context, id string) (*session.ServerSession, error) {
+			if id == revokedSession.ID {
+				sessCopy := *revokedSession
+				return &sessCopy, nil
+			}
+			return nil, session.ErrSessionNotFound
+		},
+	}
+
+	input := ServerRevokeCommandInput{
+		SessionID: revokedSession.ID,
+		Reason:    "Attempt to revoke again",
+		Store:     store,
+		STSClient: newMockSessionSTSClient("admin"),
+	}
+
+	_, err := testableServerRevokeCommand(context.Background(), input)
+	if !errors.Is(err, session.ErrSessionAlreadyRevoked) {
+		t.Errorf("Expected ErrSessionAlreadyRevoked, got: %v", err)
+	}
+}
+
+// TestServerRevokeCommand_Expired tests error when session already expired.
+func TestServerRevokeCommand_Expired(t *testing.T) {
+	now := time.Now()
+	expiredSession := &session.ServerSession{
+		ID:           "abc1234567890def",
+		User:         "alice",
+		Profile:      "production",
+		Status:       session.StatusExpired,
+		StartedAt:    now.Add(-2 * time.Hour),
+		LastAccessAt: now.Add(-1 * time.Hour),
+		ExpiresAt:    now.Add(-30 * time.Minute),
+	}
+
+	store := &mockSessionStore{
+		getFn: func(ctx context.Context, id string) (*session.ServerSession, error) {
+			if id == expiredSession.ID {
+				sessCopy := *expiredSession
+				return &sessCopy, nil
+			}
+			return nil, session.ErrSessionNotFound
+		},
+	}
+
+	input := ServerRevokeCommandInput{
+		SessionID: expiredSession.ID,
+		Reason:    "Attempt to revoke expired session",
+		Store:     store,
+		STSClient: newMockSessionSTSClient("admin"),
+	}
+
+	_, err := testableServerRevokeCommand(context.Background(), input)
+	if !errors.Is(err, session.ErrSessionExpired) {
+		t.Errorf("Expected ErrSessionExpired, got: %v", err)
+	}
+}
+
+// TestServerRevokeCommand_InvalidSessionID tests error for invalid session ID format.
+func TestServerRevokeCommand_InvalidSessionID(t *testing.T) {
+	invalidIDs := []string{
+		"invalid",           // Not 16 hex chars
+		"ABC1234567890DEF",  // Uppercase
+		"abc123def456789",   // Too short (15 chars)
+		"abc1234567890defg", // Too long (17 chars)
+		"abc-123-456-890d",  // Contains dashes
+		"",                  // Empty
+	}
+
+	for _, id := range invalidIDs {
+		t.Run(id, func(t *testing.T) {
+			input := ServerRevokeCommandInput{
+				SessionID: id,
+				Reason:    "Test reason",
+				STSClient: newMockSessionSTSClient("admin"),
+			}
+
+			_, err := testableServerRevokeCommand(context.Background(), input)
+			if err == nil {
+				t.Errorf("Expected error for invalid session ID %q", id)
+			}
+		})
+	}
+}
+
+// TestServerRevokeCommand_EmptyReason tests error when reason is empty.
+func TestServerRevokeCommand_EmptyReason(t *testing.T) {
+	input := ServerRevokeCommandInput{
+		SessionID: "abc1234567890def",
+		Reason:    "", // Empty reason
+		STSClient: newMockSessionSTSClient("admin"),
+	}
+
+	_, err := testableServerRevokeCommand(context.Background(), input)
+	if err == nil {
+		t.Error("Expected error for empty reason")
+	}
+	expectedErr := "reason is required for revocation"
+	if err != nil && err.Error() != expectedErr {
+		t.Errorf("Expected error %q, got: %v", expectedErr, err)
+	}
+}
+
+// TestServerRevokeCommand_JSONOutput tests that revocation returns correct data for JSON output.
+func TestServerRevokeCommand_JSONOutput(t *testing.T) {
+	now := time.Now()
+	activeSession := &session.ServerSession{
+		ID:               "abc1234567890def",
+		User:             "alice",
+		Profile:          "production",
+		Status:           session.StatusActive,
+		StartedAt:        now.Add(-30 * time.Minute),
+		LastAccessAt:     now.Add(-5 * time.Minute),
+		ExpiresAt:        now.Add(30 * time.Minute),
+		RequestCount:     42,
+		ServerInstanceID: "server-1",
+	}
+
+	store := &mockSessionStore{
+		getFn: func(ctx context.Context, id string) (*session.ServerSession, error) {
+			if id == activeSession.ID {
+				sessCopy := *activeSession
+				return &sessCopy, nil
+			}
+			return nil, session.ErrSessionNotFound
+		},
+		updateFn: func(ctx context.Context, sess *session.ServerSession) error {
+			return nil
+		},
+	}
+
+	input := ServerRevokeCommandInput{
+		SessionID:    activeSession.ID,
+		Reason:       "Security audit",
+		OutputFormat: "json",
+		Store:        store,
+		STSClient:    newMockSessionSTSClient("security-team"),
+	}
+
+	revokedSession, err := testableServerRevokeCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	// Verify the session data that would be in JSON output
+	if revokedSession.ID != activeSession.ID {
+		t.Errorf("Expected ID %q, got %q", activeSession.ID, revokedSession.ID)
+	}
+	if revokedSession.Status != session.StatusRevoked {
+		t.Errorf("Expected status revoked, got %s", revokedSession.Status)
+	}
+	if revokedSession.RevokedBy != "securityteam" {
+		t.Errorf("Expected revoked_by 'securityteam', got %s", revokedSession.RevokedBy)
+	}
+	if revokedSession.RevokedReason != "Security audit" {
+		t.Errorf("Expected revoked_reason 'Security audit', got %s", revokedSession.RevokedReason)
+	}
+}
+
+// TestServerRevokeCommand_StoreError tests error handling when store fails.
+func TestServerRevokeCommand_StoreError(t *testing.T) {
+	now := time.Now()
+	activeSession := &session.ServerSession{
+		ID:           "abc1234567890def",
+		User:         "alice",
+		Profile:      "production",
+		Status:       session.StatusActive,
+		StartedAt:    now.Add(-30 * time.Minute),
+		LastAccessAt: now.Add(-5 * time.Minute),
+		ExpiresAt:    now.Add(30 * time.Minute),
+	}
+
+	expectedErr := errors.New("DynamoDB write capacity exceeded")
+	store := &mockSessionStore{
+		getFn: func(ctx context.Context, id string) (*session.ServerSession, error) {
+			if id == activeSession.ID {
+				sessCopy := *activeSession
+				return &sessCopy, nil
+			}
+			return nil, session.ErrSessionNotFound
+		},
+		updateFn: func(ctx context.Context, sess *session.ServerSession) error {
+			return expectedErr
+		},
+	}
+
+	input := ServerRevokeCommandInput{
+		SessionID: activeSession.ID,
+		Reason:    "Test revocation",
+		Store:     store,
+		STSClient: newMockSessionSTSClient("admin"),
+	}
+
+	_, err := testableServerRevokeCommand(context.Background(), input)
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("Expected error %v, got: %v", expectedErr, err)
+	}
+}
