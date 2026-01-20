@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 81 (Session Management)
-Plan: 3 of 4 in current phase
-Status: Plan 03 complete
-Last activity: 2026-01-20 — Completed 81-03-PLAN.md
+Plan: 4 of 4 in current phase
+Status: Phase 81 complete
+Last activity: 2026-01-20 — Completed 81-04-PLAN.md
 
-Progress: █████░░░░░ 45% (v1.10 Real-time Revocation - 3/6 phases, 8/? plans)
+Progress: █████░░░░░ 50% (v1.10 Real-time Revocation - 4/6 phases, 9/? plans)
 
 ## Milestone Summary
 
@@ -466,6 +466,13 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Session ID validation performed before store call in detail command (fail fast)
 - mockSessionStore follows same function-field pattern as mockBreakGlassStore for testing
 
+**v1.10 Session Revocation decisions (Phase 81-04):**
+- Revocation check fails-closed for security - revoked sessions are denied credentials immediately (403)
+- Store errors fail-open for availability - don't block credentials due to store connectivity issues
+- State machine validation: only active sessions can be revoked (expired/already-revoked return errors)
+- RevokedBy extracted from AWS identity via STS GetCallerIdentity
+- Reason flag is required for revocation (audit trail)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -477,9 +484,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 81-03-PLAN.md (Phase 81 Plan 03 complete)
+Stopped at: Completed 81-04-PLAN.md (Phase 81 complete)
 Resume file: None
-Next: /gsd:execute-plan 81-04
+Next: /gsd:plan-phase 82
 
 ## Roadmap Evolution
 

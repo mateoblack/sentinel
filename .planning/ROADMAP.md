@@ -435,19 +435,20 @@ Plans:
 Plans:
 - [x] 80-01: Server duration defaults and policy caps — completed 2026-01-20
 
-#### Phase 81: Session Management — IN PROGRESS
+#### Phase 81: Session Management — COMPLETE
 
 **Goal**: Track and manage active server sessions for visibility and control
 **Depends on**: Phase 80
 **Research**: Likely (new session tracking design)
 **Research topics**: Active session storage, revocation patterns, in-memory vs persistent state
 **Plans**: 4
+**Status**: Complete (2026-01-20)
 
 Plans:
 - [x] 81-01: Session schema, Store interface, and DynamoDB implementation — completed 2026-01-20
-- [ ] 81-02: Session lifecycle commands (create, list, revoke)
-- [ ] 81-03: Server integration with session tracking
-- [ ] 81-04: Session monitoring and alerts
+- [x] 81-02: Session lifecycle integration (create on startup, touch on request, expire on shutdown) — completed 2026-01-20
+- [x] 81-03: Server session CLI commands (list, detail) — completed 2026-01-20
+- [x] 81-04: Session revocation (CLI command, server-side check, tests) — completed 2026-01-20
 
 #### Phase 82: Server Mode Enforcement
 
