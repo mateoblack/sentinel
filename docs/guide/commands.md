@@ -115,6 +115,52 @@ sentinel exec --profile dev --policy-parameter /sentinel/policies/dev -d 2h -- t
 | `AWS_CREDENTIAL_EXPIRATION` | ISO8601 expiration time |
 | `AWS_SENTINEL` | Profile name (prevents nesting) |
 
+#### Server Mode
+
+Server mode starts a local credential server that evaluates policy on every credential request. This enables real-time revocation - changing policy immediately affects subsequent credential requests.
+
+**Flags:**
+- `--server, -s` - Enable server mode (starts credential server instead of env vars)
+- `--server-port PORT` - Port for credential server (default: auto-assigned)
+- `--lazy` - Skip credential prefetch on server startup
+
+**How it works:**
+
+1. Server listens on localhost with a random auth token
+2. Sets `AWS_CONTAINER_CREDENTIALS_FULL_URI` for the subprocess
+3. Each credential request from the subprocess triggers policy evaluation
+4. Credentials are served or denied based on current policy
+
+**Example:**
+
+```bash
+# Start terraform with server mode credentials
+sentinel exec --server --profile production -- terraform plan
+
+# Server mode with explicit port
+sentinel exec --server --server-port 9999 --profile staging -- aws s3 ls
+```
+
+**Server mode vs standard exec:**
+
+| Aspect | Standard exec | Server mode |
+|--------|--------------|-------------|
+| Policy evaluation | Once at startup | Every credential request |
+| Revocation timing | Next exec invocation | Immediate (next request) |
+| Credential delivery | Environment variables | HTTP credential server |
+| Credential lifetime | Full session duration | Can be shorter TTL |
+| Use case | Short-lived commands | Long-running processes |
+
+**When to use server mode:**
+
+- Long-running processes that need revocation capability
+- Profiles requiring real-time access control
+- Compliance scenarios requiring per-request audit
+- Terraform/CDK operations on sensitive infrastructure
+
+**Incompatible flags:**
+- `--server` cannot be combined with `--no-session` (server requires session credentials)
+
 ---
 
 ## Access Request Commands
