@@ -455,12 +455,13 @@ Plans:
 **Goal**: Policy conditions to require server mode for sensitive profiles
 **Depends on**: Phase 81
 **Research**: Unlikely (extends existing policy schema)
-**Plans**: 2
+**Plans**: 3
 **Status**: Complete (2026-01-20)
 
 Plans:
 - [x] 82-01: Require server effect schema (EffectRequireServer, RequiresServerMode flag) — completed 2026-01-20
 - [x] 82-02: CLI error handling for require_server denials — completed 2026-01-20
+- [x] 82-03: Server integration tests and documentation — completed 2026-01-20
 
 #### Phase 83: Server Mode Testing
 
