@@ -56,5 +56,8 @@ func main() {
 	cli.ConfigureServerSessionCommand(app, s)
 	cli.ConfigureServerRevokeCommand(app, s)
 
+	// Shell integration commands
+	cli.ConfigureShellInitCommand(app, s)
+
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
