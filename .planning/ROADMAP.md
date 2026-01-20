@@ -450,15 +450,16 @@ Plans:
 - [x] 81-03: Server session CLI commands (list, detail) — completed 2026-01-20
 - [x] 81-04: Session revocation (CLI command, server-side check, tests) — completed 2026-01-20
 
-#### Phase 82: Server Mode Enforcement
+#### Phase 82: Server Mode Enforcement — *In progress*
 
 **Goal**: Policy conditions to require server mode for sensitive profiles
 **Depends on**: Phase 81
 **Research**: Unlikely (extends existing policy schema)
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 82-01: TBD
+- [x] 82-01: Require server effect schema (EffectRequireServer, RequiresServerMode flag) — completed 2026-01-20
+- [ ] 82-02: CLI error handling for require_server denials
 
 #### Phase 83: Server Mode Testing
 

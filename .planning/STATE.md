@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.10 Real-time Revocation (Phase 81: Session Management)
+**Current focus:** v1.10 Real-time Revocation (Phase 82: Server Mode Enforcement)
 
 ## Current Position
 
-Phase: 81 (Session Management)
-Plan: 4 of 4 in current phase
-Status: Phase 81 complete
-Last activity: 2026-01-20 — Completed 81-04-PLAN.md
+Phase: 82 (Server Mode Enforcement)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-20 — Completed 82-01-PLAN.md
 
-Progress: █████░░░░░ 50% (v1.10 Real-time Revocation - 4/6 phases, 9/? plans)
+Progress: █████░░░░░ 53% (v1.10 Real-time Revocation - 5/6 phases, 10/? plans)
 
 ## Milestone Summary
 
@@ -473,6 +473,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - RevokedBy extracted from AWS identity via STS GetCallerIdentity
 - Reason flag is required for revocation (audit trail)
 
+**v1.10 Server Mode Enforcement decisions (Phase 82-01):**
+- require_server effect converts to allow/deny based on mode, preserving rule metadata (name, reason)
+- RequiresServerMode boolean flag enables targeted error messages (vs parsing reason strings)
+- Effect conversion pattern: special effects (require_server) convert to allow/deny with metadata flags
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -484,9 +489,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 81-04-PLAN.md (Phase 81 complete)
+Stopped at: Completed 82-01-PLAN.md
 Resume file: None
-Next: /gsd:plan-phase 82
+Next: /gsd:execute-plan 82-02
 
 ## Roadmap Evolution
 
