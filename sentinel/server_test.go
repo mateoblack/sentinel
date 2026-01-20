@@ -1619,3 +1619,73 @@ func TestSentinelServer_SessionTouchNotOnDeny(t *testing.T) {
 		t.Errorf("Expected 0 Touch calls on deny, got %d", mockStore.TouchCallCount())
 	}
 }
+
+// ============================================================================
+// Session revocation tests - verify fail-closed security and fail-open availability
+// ============================================================================
+
+func TestSentinelServer_SessionRevoked_DeniesCredentials(t *testing.T) {
+	// Test fail-closed security: revoked sessions are denied credentials immediately (403)
+	mockStore := NewMockSessionStore()
+
+	// Create server with session store
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.SessionStore = mockStore
+	})
+	defer server.Shutdown(context.Background())
+
+	// Verify session was created on startup
+	if mockStore.CreateCallCount() != 1 {
+		t.Fatalf("Expected 1 Create call on startup, got %d", mockStore.CreateCallCount())
+	}
+
+	// Get the session ID that was created
+	sessionID := server.sessionID
+	if sessionID == "" {
+		t.Fatal("Expected server.sessionID to be set after startup")
+	}
+
+	// Configure mock to return a revoked session when Get is called
+	revokedSession := &session.ServerSession{
+		ID:            sessionID,
+		User:          "testuser",
+		Profile:       "test-profile",
+		Status:        session.StatusRevoked,
+		RevokedBy:     "admin",
+		RevokedReason: "Security incident",
+		StartedAt:     time.Now().Add(-1 * time.Hour),
+		ExpiresAt:     time.Now().Add(1 * time.Hour),
+		CreatedAt:     time.Now().Add(-1 * time.Hour),
+		UpdatedAt:     time.Now(),
+	}
+	mockStore.GetResult = revokedSession
+
+	// Create credential provider to track if it was called
+	mockProvider := &MockCredentialProvider{}
+	server.config.CredentialProvider = mockProvider
+
+	// Issue a credential request
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Verify HTTP 403 response (fail-closed security)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected status %d for revoked session (fail-closed), got %d", http.StatusForbidden, rec.Code)
+	}
+
+	// Verify error message
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if !strings.Contains(resp["Message"], "Session revoked") {
+		t.Errorf("Expected 'Session revoked' message, got: %s", resp["Message"])
+	}
+
+	// Verify credentials were NOT issued (MockCredentialProvider not called)
+	if mockProvider.CallCount() != 0 {
+		t.Errorf("Expected 0 credential requests when session revoked (fail-closed), got %d", mockProvider.CallCount())
+	}
+}
