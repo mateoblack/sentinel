@@ -14,6 +14,7 @@ import (
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
+	"github.com/byteness/aws-vault/v7/session"
 	"github.com/byteness/aws-vault/v7/testutil"
 )
 
@@ -1129,5 +1130,349 @@ func TestSentinelServer_ModeCondition_EmptyModeAllowsServer(t *testing.T) {
 	// Server should be allowed (empty mode = wildcard)
 	if rec.Code != http.StatusOK {
 		t.Errorf("Expected status %d (empty mode = wildcard allows server), got %d", http.StatusOK, rec.Code)
+	}
+}
+
+// ============================================================================
+// Session tracking tests
+// ============================================================================
+
+// MockSessionStore implements session.Store for testing.
+type MockSessionStore struct {
+	mu sync.Mutex
+
+	// Configurable behavior
+	CreateErr error
+	GetResult *session.ServerSession
+	GetErr    error
+	UpdateErr error
+	TouchErr  error
+
+	// Call tracking
+	CreateCalls []session.ServerSession
+	GetCalls    []string
+	UpdateCalls []session.ServerSession
+	TouchCalls  []string
+
+	// Internal state for tracking created sessions
+	sessions map[string]*session.ServerSession
+}
+
+func NewMockSessionStore() *MockSessionStore {
+	return &MockSessionStore{
+		sessions: make(map[string]*session.ServerSession),
+	}
+}
+
+func (m *MockSessionStore) Create(ctx context.Context, sess *session.ServerSession) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.CreateCalls = append(m.CreateCalls, *sess)
+	if m.CreateErr != nil {
+		return m.CreateErr
+	}
+	// Store a copy
+	copy := *sess
+	m.sessions[sess.ID] = &copy
+	return nil
+}
+
+func (m *MockSessionStore) Get(ctx context.Context, id string) (*session.ServerSession, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.GetCalls = append(m.GetCalls, id)
+	if m.GetErr != nil {
+		return nil, m.GetErr
+	}
+	if m.GetResult != nil {
+		return m.GetResult, nil
+	}
+	// Return from internal map if available
+	if sess, ok := m.sessions[id]; ok {
+		copy := *sess
+		return &copy, nil
+	}
+	return nil, session.ErrSessionNotFound
+}
+
+func (m *MockSessionStore) Update(ctx context.Context, sess *session.ServerSession) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.UpdateCalls = append(m.UpdateCalls, *sess)
+	if m.UpdateErr != nil {
+		return m.UpdateErr
+	}
+	// Update internal map
+	if _, ok := m.sessions[sess.ID]; ok {
+		copy := *sess
+		m.sessions[sess.ID] = &copy
+	}
+	return nil
+}
+
+func (m *MockSessionStore) Delete(ctx context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.sessions, id)
+	return nil
+}
+
+func (m *MockSessionStore) ListByUser(ctx context.Context, user string, limit int) ([]*session.ServerSession, error) {
+	return nil, nil
+}
+
+func (m *MockSessionStore) ListByStatus(ctx context.Context, status session.SessionStatus, limit int) ([]*session.ServerSession, error) {
+	return nil, nil
+}
+
+func (m *MockSessionStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*session.ServerSession, error) {
+	return nil, nil
+}
+
+func (m *MockSessionStore) FindActiveByServerInstance(ctx context.Context, serverInstanceID string) (*session.ServerSession, error) {
+	return nil, nil
+}
+
+func (m *MockSessionStore) Touch(ctx context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.TouchCalls = append(m.TouchCalls, id)
+	if m.TouchErr != nil {
+		return m.TouchErr
+	}
+	// Update request count if session exists
+	if sess, ok := m.sessions[id]; ok {
+		sess.RequestCount++
+		sess.LastAccessAt = time.Now().UTC()
+	}
+	return nil
+}
+
+func (m *MockSessionStore) CreateCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.CreateCalls)
+}
+
+func (m *MockSessionStore) TouchCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.TouchCalls)
+}
+
+func (m *MockSessionStore) UpdateCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.UpdateCalls)
+}
+
+func (m *MockSessionStore) LastCreateCall() *session.ServerSession {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.CreateCalls) == 0 {
+		return nil
+	}
+	sess := m.CreateCalls[len(m.CreateCalls)-1]
+	return &sess
+}
+
+func (m *MockSessionStore) LastUpdateCall() *session.ServerSession {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.UpdateCalls) == 0 {
+		return nil
+	}
+	sess := m.UpdateCalls[len(m.UpdateCalls)-1]
+	return &sess
+}
+
+func TestSentinelServer_SessionCreation(t *testing.T) {
+	mockStore := NewMockSessionStore()
+
+	server, _ := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.SessionStore = mockStore
+	})
+	defer server.Shutdown(context.Background())
+
+	// Verify Create was called on startup
+	if mockStore.CreateCallCount() != 1 {
+		t.Fatalf("Expected 1 session Create call on startup, got %d", mockStore.CreateCallCount())
+	}
+
+	// Verify session fields
+	createdSession := mockStore.LastCreateCall()
+	if createdSession == nil {
+		t.Fatal("Expected created session to be recorded")
+	}
+	if createdSession.User != "testuser" {
+		t.Errorf("Expected User 'testuser', got '%s'", createdSession.User)
+	}
+	if createdSession.Profile != "test-profile" {
+		t.Errorf("Expected Profile 'test-profile', got '%s'", createdSession.Profile)
+	}
+	if createdSession.Status != session.StatusActive {
+		t.Errorf("Expected Status 'active', got '%s'", createdSession.Status)
+	}
+	if createdSession.ServerInstanceID == "" {
+		t.Error("Expected ServerInstanceID to be set")
+	}
+	if !session.ValidateSessionID(createdSession.ID) {
+		t.Errorf("Expected valid session ID, got '%s'", createdSession.ID)
+	}
+
+	// Verify server has sessionID set
+	if server.sessionID == "" {
+		t.Error("Expected server.sessionID to be set after successful Create")
+	}
+}
+
+func TestSentinelServer_SessionTouch(t *testing.T) {
+	mockStore := NewMockSessionStore()
+
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.SessionStore = mockStore
+	})
+	defer server.Shutdown(context.Background())
+
+	// Issue a credential request
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Verify credentials were issued
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	// Verify Touch was called
+	if mockStore.TouchCallCount() != 1 {
+		t.Fatalf("Expected 1 Touch call after credential issuance, got %d", mockStore.TouchCallCount())
+	}
+
+	// Issue another request
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2.Header.Set("Authorization", authToken)
+	rec2 := httptest.NewRecorder()
+	server.DefaultRoute(rec2, req2)
+
+	// Verify Touch was called again
+	if mockStore.TouchCallCount() != 2 {
+		t.Fatalf("Expected 2 Touch calls after second credential issuance, got %d", mockStore.TouchCallCount())
+	}
+}
+
+func TestSentinelServer_SessionShutdown(t *testing.T) {
+	mockStore := NewMockSessionStore()
+
+	server, _ := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.SessionStore = mockStore
+	})
+
+	// Verify session was created
+	if mockStore.CreateCallCount() != 1 {
+		t.Fatalf("Expected 1 Create call, got %d", mockStore.CreateCallCount())
+	}
+
+	// Shutdown server
+	err := server.Shutdown(context.Background())
+	if err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
+
+	// Verify Update was called to set Status=Expired
+	if mockStore.UpdateCallCount() != 1 {
+		t.Fatalf("Expected 1 Update call on shutdown, got %d", mockStore.UpdateCallCount())
+	}
+
+	updatedSession := mockStore.LastUpdateCall()
+	if updatedSession == nil {
+		t.Fatal("Expected updated session to be recorded")
+	}
+	if updatedSession.Status != session.StatusExpired {
+		t.Errorf("Expected Status 'expired' on shutdown, got '%s'", updatedSession.Status)
+	}
+}
+
+func TestSentinelServer_SessionTrackingOptional(t *testing.T) {
+	// Test that server works without SessionStore configured
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.SessionStore = nil // No session tracking
+	})
+	defer server.Shutdown(context.Background())
+
+	// Verify sessionID is empty
+	if server.sessionID != "" {
+		t.Errorf("Expected empty sessionID when no SessionStore, got '%s'", server.sessionID)
+	}
+
+	// Issue a credential request - should not panic
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+
+	// Should not panic
+	server.DefaultRoute(rec, req)
+
+	// Should still return credentials
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestSentinelServer_SessionCreationFailure(t *testing.T) {
+	// Test that server still starts when session creation fails (best-effort)
+	mockStore := NewMockSessionStore()
+	mockStore.CreateErr = session.ErrSessionExists // Simulate creation failure
+
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.SessionStore = mockStore
+	})
+	defer server.Shutdown(context.Background())
+
+	// Verify Create was attempted
+	if mockStore.CreateCallCount() != 1 {
+		t.Fatalf("Expected 1 Create call attempt, got %d", mockStore.CreateCallCount())
+	}
+
+	// Verify sessionID is empty (creation failed)
+	if server.sessionID != "" {
+		t.Errorf("Expected empty sessionID after Create failure, got '%s'", server.sessionID)
+	}
+
+	// Server should still work (best-effort tracking)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestSentinelServer_SessionTouchNotOnDeny(t *testing.T) {
+	// Test that Touch is NOT called when policy denies access
+	mockStore := NewMockSessionStore()
+
+	server, authToken := createTestServer(t, policy.EffectDeny, func(c *SentinelServerConfig) {
+		c.SessionStore = mockStore
+	})
+	defer server.Shutdown(context.Background())
+
+	// Issue a credential request that will be denied
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Verify request was denied
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("Expected status %d, got %d", http.StatusForbidden, rec.Code)
+	}
+
+	// Verify Touch was NOT called (no credentials issued)
+	if mockStore.TouchCallCount() != 0 {
+		t.Errorf("Expected 0 Touch calls on deny, got %d", mockStore.TouchCallCount())
 	}
 }
