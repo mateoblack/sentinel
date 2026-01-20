@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 
 ## Current Position
 
-Phase: 79 (Server Policy Integration)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-20 — Completed 79-02-PLAN.md
+Phase: 80 (Short-Lived Sessions)
+Plan: 1 of 3 in current phase
+Status: Plan 01 complete
+Last activity: 2026-01-20 — Completed 80-01-PLAN.md
 
-Progress: ██░░░░░░░░ 33% (v1.10 Real-time Revocation - 1/6 phases, 4/? plans)
+Progress: ███░░░░░░░ 37% (v1.10 Real-time Revocation - 2/6 phases, 5/? plans)
 
 ## Milestone Summary
 
@@ -441,6 +441,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Mode condition documented after time condition in policy-reference.md
 - Server Mode documented as subsection of exec command in commands.md
 
+**v1.10 Short-Lived Sessions decisions (Phase 80-01):**
+- DefaultServerSessionDuration=15min - balances security (rapid revocation) with performance (SDK caching)
+- 0 value for MaxServerDuration means no policy-imposed limit (same pattern as BreakGlassPolicyRule.MaxDuration)
+- Duration capping order: config -> policy cap -> break-glass cap -> final (each can only reduce, not increase)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -452,9 +457,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 79-02-PLAN.md (Phase 79 complete)
+Stopped at: Completed 80-01-PLAN.md (Phase 80 Plan 01 complete)
 Resume file: None
-Next: /gsd:plan-phase 80
+Next: /gsd:execute-plan 80-02
 
 ## Roadmap Evolution
 
