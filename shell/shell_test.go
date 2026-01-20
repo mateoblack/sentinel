@@ -227,10 +227,10 @@ func TestSanitizeFunctionName(t *testing.T) {
 		{"My@Profile!", "sentinel-My-Profile"},
 		{"prod/staging", "sentinel-prod-staging"},
 		{"123", "sentinel-123"},
-		{"a--b", "sentinel-a-b"},      // Consecutive hyphens collapsed
-		{"-start", "sentinel-start"},  // Leading special char
-		{"end-", "sentinel-end"},      // Trailing special char
-		{"@#$%", "sentinel-"},         // All special chars -> empty after sanitization
+		{"a--b", "sentinel-a-b"},     // Consecutive hyphens collapsed
+		{"-start", "sentinel-start"}, // Leading special char
+		{"end-", "sentinel-end"},     // Trailing special char
+		{"@#$%", "sentinel-"},        // All special chars -> empty after sanitization
 		{"test123abc", "sentinel-test123abc"},
 	}
 
@@ -467,5 +467,112 @@ func TestGenerateScript_BackwardCompatible(t *testing.T) {
 	// Should NOT have server variants
 	if strings.Contains(scriptOld, "-server()") {
 		t.Error("GenerateScript (backward compat) should not include server variants")
+	}
+}
+
+func TestGenerateScript_IncludesCompletions(t *testing.T) {
+	profiles := []ProfileInfo{
+		{Name: "production", PolicyPath: "/sentinel/policies/production"},
+		{Name: "staging", PolicyPath: "/sentinel/policies/staging"},
+	}
+
+	script := GenerateScript(profiles, "/sentinel/policies", FormatBash)
+
+	// Check bash completion block with shell detection
+	if !strings.Contains(script, `if [[ -n "${BASH_VERSION:-}" ]]`) {
+		t.Error("Script missing bash shell detection")
+	}
+	if !strings.Contains(script, "complete -o default -o bashdefault sentinel-production") {
+		t.Error("Script missing bash completion for sentinel-production")
+	}
+	if !strings.Contains(script, "complete -o default -o bashdefault sentinel-staging") {
+		t.Error("Script missing bash completion for sentinel-staging")
+	}
+
+	// Check zsh completion block with shell detection
+	if !strings.Contains(script, `if [[ -n "${ZSH_VERSION:-}" ]]`) {
+		t.Error("Script missing zsh shell detection")
+	}
+	if !strings.Contains(script, "compdef _command_names sentinel-production") {
+		t.Error("Script missing zsh completion for sentinel-production")
+	}
+	if !strings.Contains(script, "compdef _command_names sentinel-staging") {
+		t.Error("Script missing zsh completion for sentinel-staging")
+	}
+}
+
+func TestGenerateScript_CompletionsWithServerVariants(t *testing.T) {
+	profiles := []ProfileInfo{
+		{Name: "production", PolicyPath: "/sentinel/policies/production"},
+		{Name: "staging", PolicyPath: "/sentinel/policies/staging"},
+	}
+
+	opts := GenerateOptions{IncludeServer: true}
+	script := GenerateScriptWithOptions(profiles, "/sentinel/policies", FormatBash, opts)
+
+	// Check bash completions for both standard and server variants
+	if !strings.Contains(script, "complete -o default -o bashdefault sentinel-production") {
+		t.Error("Script missing bash completion for sentinel-production")
+	}
+	if !strings.Contains(script, "complete -o default -o bashdefault sentinel-production-server") {
+		t.Error("Script missing bash completion for sentinel-production-server")
+	}
+	if !strings.Contains(script, "complete -o default -o bashdefault sentinel-staging") {
+		t.Error("Script missing bash completion for sentinel-staging")
+	}
+	if !strings.Contains(script, "complete -o default -o bashdefault sentinel-staging-server") {
+		t.Error("Script missing bash completion for sentinel-staging-server")
+	}
+
+	// Check zsh completions for both standard and server variants
+	if !strings.Contains(script, "compdef _command_names sentinel-production") {
+		t.Error("Script missing zsh completion for sentinel-production")
+	}
+	if !strings.Contains(script, "compdef _command_names sentinel-production-server") {
+		t.Error("Script missing zsh completion for sentinel-production-server")
+	}
+	if !strings.Contains(script, "compdef _command_names sentinel-staging") {
+		t.Error("Script missing zsh completion for sentinel-staging")
+	}
+	if !strings.Contains(script, "compdef _command_names sentinel-staging-server") {
+		t.Error("Script missing zsh completion for sentinel-staging-server")
+	}
+}
+
+func TestGenerateScript_EmptyProfiles_NoCompletions(t *testing.T) {
+	profiles := []ProfileInfo{}
+
+	script := GenerateScript(profiles, "/sentinel/policies", FormatBash)
+
+	// Should NOT have completion registrations for empty profiles
+	if strings.Contains(script, "complete -o") {
+		t.Error("Script should NOT contain bash completion registrations when no profiles")
+	}
+	if strings.Contains(script, "compdef") {
+		t.Error("Script should NOT contain zsh completion registrations when no profiles")
+	}
+	if strings.Contains(script, "BASH_VERSION") {
+		t.Error("Script should NOT contain bash shell detection when no profiles")
+	}
+	if strings.Contains(script, "ZSH_VERSION") {
+		t.Error("Script should NOT contain zsh shell detection when no profiles")
+	}
+}
+
+func TestGenerateScript_CompletionSanitizedNames(t *testing.T) {
+	profiles := []ProfileInfo{
+		{Name: "my-team/staging", PolicyPath: "/sentinel/policies/my-team/staging"},
+	}
+
+	script := GenerateScript(profiles, "/sentinel/policies", FormatBash)
+
+	// Bash completion should use sanitized name
+	if !strings.Contains(script, "complete -o default -o bashdefault sentinel-my-team-staging") {
+		t.Errorf("Script should use sanitized function name in bash completion. Got:\n%s", script)
+	}
+
+	// Zsh completion should use same sanitized name
+	if !strings.Contains(script, "compdef _command_names sentinel-my-team-staging") {
+		t.Errorf("Script should use sanitized function name in zsh completion. Got:\n%s", script)
 	}
 }
