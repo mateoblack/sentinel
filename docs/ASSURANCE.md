@@ -166,6 +166,7 @@ sentinel audit verify \
 | `--user` | Filter by username | No |
 | `--region` | AWS region for CloudTrail operations | No |
 | `--json` | Machine-readable JSON output | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Human-Readable Output:**
 

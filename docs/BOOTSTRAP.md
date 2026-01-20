@@ -68,7 +68,7 @@ Creates or updates SSM parameters for Sentinel policies.
 | `--region` | AWS region for SSM operations | AWS default |
 | `--generate-iam-policies` | Output IAM policy documents | false |
 | `--json` | Machine-readable JSON output | false |
-| `--description` | Description for generated policy comments | - |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | - |
 
 **Examples:**
 
@@ -98,6 +98,7 @@ Shows current Sentinel policy status from SSM.
 | `--policy-root` | SSM parameter path prefix | `/sentinel/policies` |
 | `--region` | AWS region for SSM operations | AWS default |
 | `--json` | Machine-readable JSON output | false |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | - |
 
 **Examples:**
 
@@ -404,13 +405,13 @@ Update `~/.aws/config` to use Sentinel:
 
 ```ini
 [profile dev]
-credential_process = sentinel credentials --profile dev
+credential_process = sentinel credentials --profile dev --policy-parameter /sentinel/policies/dev
 
 [profile staging]
-credential_process = sentinel credentials --profile staging
+credential_process = sentinel credentials --profile staging --policy-parameter /sentinel/policies/staging
 
 [profile prod]
-credential_process = sentinel credentials --profile prod
+credential_process = sentinel credentials --profile prod --policy-parameter /sentinel/policies/prod
 ```
 
 ### Step 4: Test Credentials
@@ -419,7 +420,7 @@ Verify Sentinel issues credentials correctly:
 
 ```bash
 # Test credential issuance
-sentinel credentials --profile dev
+sentinel credentials --profile dev --policy-parameter /sentinel/policies/dev
 
 # Test with AWS CLI
 aws sts get-caller-identity --profile dev

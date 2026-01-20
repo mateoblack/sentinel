@@ -132,9 +132,14 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 	planner := input.Planner
 	if planner == nil {
 		// Load AWS config
+		// If --aws-profile not specified, use first --profile for credential loading (SSO support)
+		credentialProfile := input.AWSProfile
+		if credentialProfile == "" && len(input.Profiles) > 0 {
+			credentialProfile = input.Profiles[0]
+		}
 		awsCfgOpts := []func(*config.LoadOptions) error{}
-		if input.AWSProfile != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+		if credentialProfile != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(credentialProfile))
 		}
 		if input.Region != "" {
 			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
@@ -207,9 +212,14 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 	executor := input.Executor
 	if executor == nil {
 		// Load AWS config
+		// If --aws-profile not specified, use first --profile for credential loading (SSO support)
+		credentialProfile := input.AWSProfile
+		if credentialProfile == "" && len(input.Profiles) > 0 {
+			credentialProfile = input.Profiles[0]
+		}
 		awsCfgOpts := []func(*config.LoadOptions) error{}
-		if input.AWSProfile != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+		if credentialProfile != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(credentialProfile))
 		}
 		if input.Region != "" {
 			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))

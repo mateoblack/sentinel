@@ -216,6 +216,16 @@ sentinel breakglass-close a1b2c3d4e5f67890 \
   --breakglass-table sentinel-breakglass
 ```
 
+### Using SSO Profiles
+
+If your AWS credentials come from an SSO profile, use `--aws-profile`:
+
+```bash
+sentinel breakglass-list --breakglass-table sentinel-breakglass --aws-profile admin-sso
+sentinel breakglass-check a1b2c3d4e5f67890 --breakglass-table sentinel-breakglass --aws-profile admin-sso
+sentinel breakglass-close a1b2c3d4e5f67890 --reason "Resolved" --breakglass-table sentinel-breakglass --aws-profile admin-sso
+```
+
 ## Event Lifecycle
 
 ### States
@@ -230,7 +240,7 @@ sentinel breakglass-close a1b2c3d4e5f67890 \
 
 | Limit | Value |
 |-------|-------|
-| Default duration | 4 hours |
+| Default duration | 1 hour |
 | Maximum duration | 4 hours |
 
 Break-glass access is intentionally time-limited to encourage prompt incident resolution.

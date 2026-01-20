@@ -63,6 +63,7 @@ sentinel enforce plan --role=ROLE_ARN [--role=ROLE_ARN...] [--region=REGION] [--
 | `--role` | Role ARN to analyze (repeatable) | Yes |
 | `--region` | AWS region for IAM operations | No |
 | `--json` | Output in JSON format | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Example:**
 

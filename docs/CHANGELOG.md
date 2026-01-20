@@ -5,6 +5,65 @@ All notable changes to Sentinel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-01-20
+
+### Added
+
+- **Server Mode**: SentinelServer HTTP server with per-request policy evaluation
+- `--server` flag for `sentinel exec` enabling AWS_CONTAINER_CREDENTIALS_FULL_URI integration
+- CredentialMode-aware policies with `mode` condition (server, cli, credential_process)
+- 15-minute default server sessions with MaxServerDuration policy caps
+- Session tracking via DynamoDB with `--session-table` flag
+- `require_server` policy effect for mandatory server mode enforcement
+- `sentinel server-sessions` command to list tracked sessions
+- `sentinel server-session` command to view session details
+- `sentinel server-revoke` command to revoke active sessions
+- `--server-duration` flag for configurable session duration
+
+### Changed
+
+- Policy evaluation now considers credential mode for mode-conditional rules
+- Server mode credentials use short-lived sessions (15 min default) for rapid revocation
+
+## [1.10.1] - 2026-01-19
+
+### Added
+
+- Test coverage for bootstrap command SSO credential loading via `--aws-profile`
+- Test coverage for whoami command SSO credential loading via `--profile`
+- SSO profile test patterns for future credential testing
+
+## [1.9.0] - 2026-01-19
+
+### Added
+
+- `--aws-profile` flag for SSO credential loading on all infrastructure commands:
+  - `sentinel list`, `sentinel check`, `sentinel approve`, `sentinel deny`
+  - `sentinel breakglass-list`, `sentinel breakglass-check`, `sentinel breakglass-close`
+  - `sentinel init bootstrap`, `sentinel init status`
+  - `sentinel enforce plan`, `sentinel audit verify`
+  - `sentinel permissions list`, `sentinel permissions check`
+  - `sentinel config validate`
+
+### Changed
+
+- All commands now support SSO profile credential loading via AWS SDK shared config
+
+## [1.8.0] - 2026-01-19
+
+### Added
+
+- `--auto-login` flag for automatic SSO re-authentication on expired tokens
+- `--stdout` flag for credentials command to print credentials to stdout
+- OIDCClient interface for testable OIDC token refresh operations
+- WithAutoLogin generic retry wrapper for transparent SSO credential refresh
+- GetSSOConfigForProfile helper for SSO configuration lookup
+
+### Changed
+
+- Improved SSO credential flow with automatic token refresh capability
+- Better error messages for expired SSO sessions
+
 ## [1.7.1] - 2026-01-19
 
 ### Security

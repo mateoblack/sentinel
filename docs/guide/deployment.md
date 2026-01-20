@@ -219,6 +219,32 @@ For break-glass features:
 }
 ```
 
+### SentinelSessionsAccess
+
+For server mode session tracking:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SentinelSessionsTable",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:*:*:table/sentinel-sessions",
+        "arn:aws:dynamodb:*:*:table/sentinel-sessions/index/*"
+      ]
+    }
+  ]
+}
+```
+
 ### Restricting ARN Scope
 
 For tighter security, specify region and account:
@@ -263,6 +289,35 @@ aws dynamodb create-table \
 ```bash
 aws dynamodb create-table \
   --table-name sentinel-breakglass \
+  --attribute-definitions \
+    AttributeName=pk,AttributeType=S \
+    AttributeName=sk,AttributeType=S \
+    AttributeName=gsi1pk,AttributeType=S \
+    AttributeName=gsi1sk,AttributeType=S \
+  --key-schema \
+    AttributeName=pk,KeyType=HASH \
+    AttributeName=sk,KeyType=RANGE \
+  --global-secondary-indexes \
+    '[
+      {
+        "IndexName": "gsi1",
+        "KeySchema": [
+          {"AttributeName": "gsi1pk", "KeyType": "HASH"},
+          {"AttributeName": "gsi1sk", "KeyType": "RANGE"}
+        ],
+        "Projection": {"ProjectionType": "ALL"}
+      }
+    ]' \
+  --billing-mode PAY_PER_REQUEST
+```
+
+### Sessions Table (Server Mode)
+
+For server mode with session tracking (`--session-table`):
+
+```bash
+aws dynamodb create-table \
+  --table-name sentinel-sessions \
   --attribute-definitions \
     AttributeName=pk,AttributeType=S \
     AttributeName=sk,AttributeType=S \
@@ -378,7 +433,7 @@ See [Enforcement Patterns](../ENFORCEMENT.md) for complete documentation.
 
 - [ ] SSM parameters created for all profiles
 - [ ] IAM policies attached to appropriate roles
-- [ ] DynamoDB tables created (if using approval/break-glass)
+- [ ] DynamoDB tables created (if using approval/break-glass/server mode)
 - [ ] Logging directory exists and is writable
 
 ### Policies
@@ -454,11 +509,46 @@ resource "aws_iam_policy" "sentinel_reader" {
 }
 ```
 
-### DynamoDB Table
+### DynamoDB Tables
 
 ```hcl
 resource "aws_dynamodb_table" "sentinel_requests" {
   name         = "sentinel-requests"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+  range_key    = "sk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  attribute {
+    name = "gsi1pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "gsi1sk"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "gsi1"
+    hash_key        = "gsi1pk"
+    range_key       = "gsi1sk"
+    projection_type = "ALL"
+  }
+}
+
+# For server mode session tracking
+resource "aws_dynamodb_table" "sentinel_sessions" {
+  name         = "sentinel-sessions"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "pk"
   range_key    = "sk"

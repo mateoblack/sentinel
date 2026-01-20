@@ -89,9 +89,14 @@ func ConfigureSentinelListCommand(app *kingpin.Application, s *Sentinel) {
 // On success, outputs JSON to stdout. On failure, outputs error to stderr and returns error.
 func SentinelListCommand(ctx context.Context, input SentinelListCommandInput) error {
 	// 1. Load AWS config (needed for STS and DynamoDB)
+	// If --aws-profile not specified, use --profile for credential loading (SSO support)
+	credentialProfile := input.AWSProfile
+	if credentialProfile == "" && input.Profile != "" {
+		credentialProfile = input.Profile
+	}
 	awsCfgOpts := []func(*config.LoadOptions) error{}
-	if input.AWSProfile != "" {
-		awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+	if credentialProfile != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(credentialProfile))
 	}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))

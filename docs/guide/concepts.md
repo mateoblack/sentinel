@@ -148,7 +148,7 @@ conditions:
 
 - Empty list `[]` or omitted: matches any user
 - Non-empty list: matches if requesting user is in the list
-- Username is determined by the OS (output of `whoami`)
+- Username is extracted from AWS identity via STS GetCallerIdentity (verify with `sentinel whoami`)
 
 ### time
 

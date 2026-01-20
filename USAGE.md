@@ -1,4 +1,12 @@
-# Usage
+# Usage (Inherited from aws-vault)
+
+> **Note:** Sentinel is built on [aws-vault](https://github.com/99designs/aws-vault). This document covers the underlying credential management features inherited from aws-vault.
+>
+> **New to Sentinel?** Start with the [Getting Started guide](docs/guide/getting-started.md) for Sentinel-specific setup, then return here for advanced credential configuration.
+>
+> **Key difference:** Where this doc says `aws-vault`, you can use `sentinel` - the credential handling commands (`exec`, `login`, `add`, `list`, etc.) work identically.
+
+---
 
 - [Usage](#usage)
   - [Getting Help](#getting-help)

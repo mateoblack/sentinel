@@ -36,6 +36,8 @@ sentinel credentials --profile PROFILE --policy-parameter PATH [flags]
 | `--log-file` | Path to write decision logs | No |
 | `--log-stderr` | Write decision logs to stderr | No |
 | `--require-sentinel` | Warn if role lacks trust policy enforcement | No |
+| `--auto-login` | Automatically trigger SSO login when credentials are expired or missing | No |
+| `--stdout` | Print SSO URL instead of opening browser (used with --auto-login) | No |
 
 **Examples:**
 
@@ -122,7 +124,11 @@ Server mode starts a local credential server that evaluates policy on every cred
 **Flags:**
 - `--server, -s` - Enable server mode (starts credential server instead of env vars)
 - `--server-port PORT` - Port for credential server (default: auto-assigned)
+- `--server-duration` - Session duration in server mode (default: 15m for rapid revocation)
+- `--session-table TABLE` - DynamoDB table for session tracking (optional, enables revocation)
 - `--lazy` - Skip credential prefetch on server startup
+- `--auto-login` - Automatically trigger SSO login when credentials are expired or missing
+- `--stdout` - Print SSO URL instead of opening browser (used with --auto-login)
 
 **How it works:**
 
@@ -234,6 +240,7 @@ sentinel list --request-table TABLE [flags]
 | `--profile` | Filter by AWS profile | No |
 | `--limit` | Maximum results | No (default: 100) |
 | `--region` | AWS region for DynamoDB | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -282,6 +289,7 @@ sentinel check REQUEST_ID --request-table TABLE [flags]
 |------|-------------|----------|
 | `--request-table` | DynamoDB table name | Yes |
 | `--region` | AWS region for DynamoDB | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -323,6 +331,7 @@ sentinel approve REQUEST_ID --request-table TABLE [flags]
 | `--request-table` | DynamoDB table name | Yes |
 | `--comment` | Optional approval comment | No |
 | `--region` | AWS region for DynamoDB | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -365,6 +374,7 @@ sentinel deny REQUEST_ID --request-table TABLE [flags]
 | `--request-table` | DynamoDB table name | Yes |
 | `--comment` | Optional denial comment | No |
 | `--region` | AWS region for DynamoDB | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -462,6 +472,7 @@ sentinel breakglass-list --breakglass-table TABLE [flags]
 | `--profile` | Filter by AWS profile | No |
 | `--limit` | Maximum results | No (default: 100) |
 | `--region` | AWS region for DynamoDB | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -511,6 +522,7 @@ sentinel breakglass-check EVENT_ID --breakglass-table TABLE [flags]
 |------|-------------|----------|
 | `--breakglass-table` | DynamoDB table name | Yes |
 | `--region` | AWS region for DynamoDB | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -554,6 +566,7 @@ sentinel breakglass-close EVENT_ID --reason TEXT --breakglass-table TABLE [flags
 | `--reason` | Reason for closing early | Yes |
 | `--breakglass-table` | DynamoDB table name | Yes |
 | `--region` | AWS region for DynamoDB | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -600,7 +613,7 @@ sentinel init bootstrap --profile PROFILE [flags]
 | `--region` | AWS region for SSM | No |
 | `--generate-iam-policies` | Output IAM policy documents | No |
 | `--json` | Machine-readable JSON output | No |
-| `--description` | Description for generated policies | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -636,6 +649,7 @@ sentinel init status [flags]
 | `--policy-root` | SSM parameter path prefix | No (default: `/sentinel/policies`) |
 | `--region` | AWS region for SSM | No |
 | `--json` | Machine-readable JSON output | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -680,6 +694,7 @@ sentinel enforce plan --role ROLE_ARN [flags]
 | `--role` | Role ARN to analyze (repeatable) | Yes |
 | `--region` | AWS region for IAM | No |
 | `--json` | Machine-readable JSON output | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -783,6 +798,7 @@ sentinel audit verify --start TIME --end TIME [flags]
 | `--user` | Filter by username | No |
 | `--region` | AWS region for CloudTrail | No |
 | `--json` | Machine-readable JSON output | No |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -858,6 +874,7 @@ sentinel permissions list [flags]
 | `--required-only` | Exclude optional features (notify_sns, notify_webhook) | false |
 | `--detect` | Auto-detect configured features and show only required permissions | false |
 | `--region` | AWS region for detection (only with --detect) | - |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | - |
 
 **Examples:**
 
@@ -928,6 +945,7 @@ sentinel permissions check [flags]
 | `--features` | Check specific feature(s), comma-separated | - |
 | `--output` | Output format: human, json | human |
 | `--aws-region` | AWS region for API calls | - |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | - |
 
 **Examples:**
 
@@ -992,6 +1010,7 @@ sentinel config validate [paths...] [flags]
 | `--type` | Config type: policy, approval, breakglass, ratelimit, bootstrap (auto-detect if not specified) | - |
 | `--output` | Output format: human, json | human |
 | `--region` | AWS region for SSM operations | - |
+| `--aws-profile` | AWS profile for SSM credentials (optional, uses default chain if not specified) | - |
 
 **Examples:**
 
@@ -1228,3 +1247,222 @@ sentinel init wizard \
   ]
 }
 ```
+
+---
+
+## Identity Commands
+
+### whoami
+
+Show current AWS identity and the policy username used for Sentinel policy evaluation.
+
+**Usage:**
+```bash
+sentinel whoami [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--region` | AWS region for STS operations | - |
+| `--profile` | AWS profile for credentials (uses SSO credential provider if profile is SSO-configured) | - |
+| `--json` | Output in JSON format | false |
+
+**Examples:**
+
+```bash
+# Show current identity
+sentinel whoami
+
+# With specific profile
+sentinel whoami --profile dev
+
+# JSON output
+sentinel whoami --json
+```
+
+**Output (human format):**
+
+```
+AWS Identity
+============
+
+ARN:             arn:aws:iam::123456789012:user/alice
+Account:         123456789012
+Identity Type:   iam-user
+Raw Username:    alice
+Policy Username: alice
+
+The policy username is used for matching against Sentinel policy rules.
+```
+
+**Output (JSON):**
+
+```json
+{
+  "arn": "arn:aws:iam::123456789012:user/alice",
+  "account_id": "123456789012",
+  "identity_type": "iam-user",
+  "raw_username": "alice",
+  "policy_username": "alice"
+}
+```
+
+---
+
+## Server Session Commands
+
+These commands manage server sessions when using `sentinel exec --server` with session tracking enabled via `--session-table`.
+
+### server-sessions
+
+List server sessions.
+
+**Usage:**
+```bash
+sentinel server-sessions --region REGION --table TABLE [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--region` | AWS region for DynamoDB | Yes |
+| `--table` | DynamoDB table name for sessions | Yes |
+| `--status` | Filter by status (active, revoked, expired) | No |
+| `--user` | Filter by user | No |
+| `--profile` | Filter by AWS profile served | No |
+| `--limit` | Maximum number of results | No (default: 100) |
+| `--output` | Output format (human, json) | No (default: human) |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
+
+**Examples:**
+
+```bash
+# List your sessions
+sentinel server-sessions --region us-east-1 --table sentinel-sessions
+
+# List active sessions
+sentinel server-sessions --region us-east-1 --table sentinel-sessions --status active
+
+# List sessions for specific profile
+sentinel server-sessions --region us-east-1 --table sentinel-sessions --profile prod
+
+# JSON output
+sentinel server-sessions --region us-east-1 --table sentinel-sessions --output json
+```
+
+**Output (JSON):**
+
+```json
+{
+  "sessions": [
+    {
+      "id": "a1b2c3d4e5f67890",
+      "user": "alice",
+      "profile": "prod",
+      "status": "active",
+      "started_at": "2026-01-20T10:30:00Z",
+      "last_access_at": "2026-01-20T10:45:00Z",
+      "expires_at": "2026-01-20T10:45:00Z",
+      "request_count": 15,
+      "server_instance_id": "b2c3d4e5f6789012"
+    }
+  ]
+}
+```
+
+---
+
+### server-session
+
+Show details of a specific server session.
+
+**Usage:**
+```bash
+sentinel server-session SESSION_ID --region REGION --table TABLE [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--region` | AWS region for DynamoDB | Yes |
+| `--table` | DynamoDB table name for sessions | Yes |
+| `--output` | Output format (human, json) | No (default: human) |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
+
+**Examples:**
+
+```bash
+sentinel server-session a1b2c3d4e5f67890 --region us-east-1 --table sentinel-sessions
+
+# JSON output
+sentinel server-session a1b2c3d4e5f67890 --region us-east-1 --table sentinel-sessions --output json
+```
+
+**Output (JSON):**
+
+```json
+{
+  "id": "a1b2c3d4e5f67890",
+  "user": "alice",
+  "profile": "prod",
+  "status": "active",
+  "started_at": "2026-01-20T10:30:00Z",
+  "last_access_at": "2026-01-20T10:45:00Z",
+  "expires_at": "2026-01-20T10:45:00Z",
+  "request_count": 15,
+  "server_instance_id": "b2c3d4e5f6789012"
+}
+```
+
+---
+
+### server-revoke
+
+Revoke an active server session. Revoked sessions will be denied credentials on their next request.
+
+**Usage:**
+```bash
+sentinel server-revoke SESSION_ID --reason TEXT --region REGION --table TABLE [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--reason` | Reason for revocation | Yes |
+| `--region` | AWS region for DynamoDB | Yes |
+| `--table` | DynamoDB table name for sessions | Yes |
+| `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
+
+**Examples:**
+
+```bash
+sentinel server-revoke a1b2c3d4e5f67890 \
+  --reason "Suspicious activity detected" \
+  --region us-east-1 \
+  --table sentinel-sessions
+```
+
+**Output (JSON):**
+
+```json
+{
+  "id": "a1b2c3d4e5f67890",
+  "profile": "prod",
+  "status": "revoked",
+  "revoked_by": "bob",
+  "revoked_reason": "Suspicious activity detected",
+  "revoked_at": "2026-01-20T10:50:00Z"
+}
+```
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | Session revoked successfully |
+| 1 | Error (session not found, already revoked, or API error) |

@@ -199,11 +199,11 @@ Debug output includes:
    - Is the profile name correct?
    - Is there a time window restriction?
 
-4. **Check username:**
+4. **Check your AWS identity:**
    ```bash
-   whoami
+   sentinel whoami
    ```
-   - Sentinel uses OS username for matching
+   - Sentinel uses AWS identity for matching (not OS username)
 
 ---
 
@@ -486,7 +486,7 @@ Yes. Configure `credential_process` in your profile, and aws-vault will use Sent
 
 ### Q: Can multiple users share the same machine?
 
-Yes. Sentinel uses OS username (`whoami`) for user identification. Each user's requests are tracked separately.
+Yes. Sentinel uses AWS identity for user identification (via STS GetCallerIdentity). Each user's requests are tracked by their AWS identity, not their local OS username.
 
 ### Q: How long are credentials valid?
 

@@ -7,7 +7,7 @@ Sentinel gates AWS credential issuance through policies stored in SSM Parameter 
 ## Prerequisites
 
 - AWS credentials configured (SSO, IAM user, or environment variables)
-- Go 1.21+ (for building from source)
+- Go 1.25+ (for building from source)
 
 ## Install
 

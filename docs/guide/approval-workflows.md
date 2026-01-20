@@ -163,6 +163,9 @@ Wait for approval, or check status:
 
 ```bash
 sentinel check a1b2c3d4e5f67890 --request-table sentinel-requests
+
+# With SSO profile for AWS credentials
+sentinel check a1b2c3d4e5f67890 --request-table sentinel-requests --aws-profile admin-sso
 ```
 
 **Output:**
@@ -234,6 +237,16 @@ sentinel list --request-table sentinel-requests --status pending
 
 ```bash
 sentinel list --request-table sentinel-requests --profile prod
+```
+
+### Using SSO Profiles
+
+If your AWS credentials come from an SSO profile, use `--aws-profile`:
+
+```bash
+sentinel list --request-table sentinel-requests --aws-profile admin-sso
+sentinel approve a1b2c3d4e5f67890 --request-table sentinel-requests --aws-profile admin-sso
+sentinel deny a1b2c3d4e5f67890 --request-table sentinel-requests --aws-profile admin-sso
 ```
 
 ## Auto-Approval

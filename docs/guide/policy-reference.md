@@ -21,10 +21,11 @@ Access policies define rules for credential issuance. Each rule specifies condit
 version: "1"
 rules:
   - name: string              # Rule identifier
-    effect: string            # allow | deny | require_approval
+    effect: string            # allow | deny | require_approval | require_server
     conditions:               # All conditions must match
       profiles: [string]      # AWS profile names (empty = any)
       users: [string]         # Usernames (empty = any)
+      mode: [string]          # Credential modes: server, cli, credential_process (empty = any)
       time:                   # Time constraints (optional)
         days: [string]        # Weekdays (empty = any)
         hours:                # Hour range (optional)
@@ -470,6 +471,7 @@ Rule 2: profiles=["prod"], users=["alice"]    → Match! → apply effect
 |-----------|-------------|-----------------|
 | `profiles` | Matches any profile | Matches if profile in list |
 | `users` | Matches any user | Matches if user in list |
+| `mode` | Matches any mode | Matches if mode in list |
 | `time` | Matches any time | Matches if within window |
 
 ### Example Evaluation
@@ -498,9 +500,10 @@ rules:
 | Error | Cause |
 |-------|-------|
 | "rule at index N missing name" | Rule lacks `name` field |
-| "invalid effect" | Effect not one of: allow, deny, require_approval |
+| "invalid effect" | Effect not one of: allow, deny, require_approval, require_server |
 | "invalid weekday" | Day not one of: monday-sunday |
 | "invalid timezone" | Timezone not recognized by system |
+| "invalid credential mode" | Mode not one of: server, cli, credential_process |
 
 ### Approval Policy
 

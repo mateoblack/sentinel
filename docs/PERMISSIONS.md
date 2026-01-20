@@ -11,13 +11,14 @@ Sentinel has 10 features across 8 subsystems. Each feature requires specific IAM
 | Feature | Required Actions | Resource |
 |---------|------------------|----------|
 | `policy_load` | ssm:GetParameter, ssm:GetParameters, ssm:GetParametersByPath | arn:aws:ssm:*:*:parameter/sentinel/policies/* |
-| `credential_issue` | sts:AssumeRole | arn:aws:iam::*:role/* |
+| `credential_issue` | sts:AssumeRole, sts:GetCallerIdentity | arn:aws:iam::*:role/*, * |
 | `approval_workflow` | dynamodb:PutItem, GetItem, DeleteItem, Query | arn:aws:dynamodb:*:*:table/sentinel-requests |
 | `breakglass` | dynamodb:PutItem, GetItem, DeleteItem, Query | arn:aws:dynamodb:*:*:table/sentinel-breakglass |
 | `notify_sns` | sns:Publish | arn:aws:sns:*:*:sentinel-* |
 | `notify_webhook` | (none - HTTP only) | N/A |
 | `audit_verify` | cloudtrail:LookupEvents | * |
 | `enforce_analyze` | iam:GetRole | arn:aws:iam::*:role/* |
+| `session_tracking` | dynamodb:PutItem, GetItem, UpdateItem, Query | arn:aws:dynamodb:*:*:table/sentinel-sessions |
 | `bootstrap_plan` | ssm:GetParameter, ssm:GetParametersByPath | arn:aws:ssm:*:*:parameter/sentinel/* |
 | `bootstrap_apply` | ssm:PutParameter, DeleteParameter, AddTagsToResource, RemoveTagsFromResource | arn:aws:ssm:*:*:parameter/sentinel/* |
 
@@ -46,6 +47,12 @@ For basic credential issuance without approval workflows or break-glass:
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
       "Resource": "arn:aws:iam::*:role/*"
+    },
+    {
+      "Sid": "SentinelIdentity",
+      "Effect": "Allow",
+      "Action": "sts:GetCallerIdentity",
+      "Resource": "*"
     }
   ]
 }
@@ -74,6 +81,12 @@ For all features including approval workflows, break-glass, and audit verificati
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
       "Resource": "arn:aws:iam::*:role/*"
+    },
+    {
+      "Sid": "SentinelIdentity",
+      "Effect": "Allow",
+      "Action": "sts:GetCallerIdentity",
+      "Resource": "*"
     },
     {
       "Sid": "SentinelApprovalWorkflow",
@@ -133,6 +146,20 @@ For all features including approval workflows, break-glass, and audit verificati
         "ssm:RemoveTagsFromResource"
       ],
       "Resource": "arn:aws:ssm:*:*:parameter/sentinel/*"
+    },
+    {
+      "Sid": "SentinelSessionTracking",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:*:*:table/sentinel-sessions",
+        "arn:aws:dynamodb:*:*:table/sentinel-sessions/index/*"
+      ]
     }
   ]
 }
@@ -363,6 +390,19 @@ Note: CloudTrail LookupEvents does not support resource-level permissions.
 | ssm:DeleteParameter | /sentinel/* | Remove parameters |
 | ssm:AddTagsToResource | /sentinel/* | Tag parameters |
 | ssm:RemoveTagsFromResource | /sentinel/* | Untag parameters |
+
+### session_tracking (Server Mode)
+
+**Purpose:** Track and manage server mode sessions for real-time revocation.
+
+**Required for:** `sentinel exec --server --session-table`, `sentinel server-sessions`, `sentinel server-session`, `sentinel server-revoke`.
+
+| Action | Resource | Purpose |
+|--------|----------|---------|
+| dynamodb:PutItem | sentinel-sessions | Create/update sessions |
+| dynamodb:GetItem | sentinel-sessions | Read session details |
+| dynamodb:UpdateItem | sentinel-sessions | Touch and revoke sessions |
+| dynamodb:Query | sentinel-sessions, sentinel-sessions/index/* | List and filter sessions |
 
 ## Restricting Resource Scope
 

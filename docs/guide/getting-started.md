@@ -6,7 +6,7 @@ This guide walks you through installing Sentinel, creating your first policy, an
 
 ### Required
 
-- **Go 1.21+** - For building from source
+- **Go 1.25+** - For building from source
 - **AWS Account** - With permissions to create SSM parameters
 - **AWS Credentials** - For initial setup (see [Configuring AWS Credentials](#configuring-aws-credentials) below)
 
@@ -84,7 +84,7 @@ Sentinel needs these minimum permissions to operate:
     {
       "Sid": "SentinelIdentity",
       "Effect": "Allow",
-      "Action": "iam:GetUser",
+      "Action": "sts:GetCallerIdentity",
       "Resource": "*"
     }
   ]
@@ -231,6 +231,18 @@ sentinel exec --profile dev --policy-parameter /sentinel/policies/dev -- aws s3 
 | `--region` | AWS region for SSM |
 | `--log-file` | Write decision logs to file |
 | `--log-stderr` | Write decision logs to stderr |
+| `--server` / `-s` | Enable server mode for per-request policy evaluation |
+| `--auto-login` | Automatically trigger SSO login when needed |
+
+**Server Mode:**
+
+For sensitive profiles requiring real-time revocation capability:
+
+```bash
+sentinel exec --server --profile prod --policy-parameter /sentinel/policies/prod -- terraform plan
+```
+
+Server mode evaluates policy on every credential request, enabling instant access revocation when policies change. See [CLI Reference](commands.md#server-mode) for details.
 
 ## Using credential_process
 
@@ -262,6 +274,30 @@ credential_process = sentinel credentials --profile production --policy-paramete
 ```
 
 ## Verifying It Works
+
+### Check Your Identity
+
+First, verify which AWS identity Sentinel sees for policy evaluation:
+
+```bash
+sentinel whoami
+```
+
+Output:
+```
+AWS Identity
+============
+
+ARN:             arn:aws:iam::123456789012:user/alice
+Account:         123456789012
+Identity Type:   iam-user
+Raw Username:    alice
+Policy Username: alice
+
+The policy username is used for matching against Sentinel policy rules.
+```
+
+The "Policy Username" is what matches against the `users` condition in your policies.
 
 ### Check Policy Status
 

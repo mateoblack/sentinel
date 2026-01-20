@@ -120,8 +120,10 @@ See [ENFORCEMENT.md](ENFORCEMENT.md) for trust policy patterns.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.7.x   | :white_check_mark: |
-| 1.6.x   | :x:                |
-| < 1.6   | :x:                |
+| 1.10.x  | :white_check_mark: |
+| 1.9.x   | :x:                |
+| 1.8.x   | :x:                |
+| 1.7.x   | :x:                |
+| < 1.7   | :x:                |
 
 Security updates are provided for the latest minor version only. Users are encouraged to upgrade to the latest version.
