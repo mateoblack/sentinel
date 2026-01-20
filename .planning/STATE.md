@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Current Position
 
-Phase: 86 of 87 (Shell Completions)
+Phase: 87 of 87 (Documentation & Testing)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-20 — Completed 86-01-PLAN.md
+Last activity: 2026-01-20 — Completed 87-01-PLAN.md
 
-Progress: ███░░░░░░░ 75% (v1.11 Shell Integration)
+Progress: ██████████ 100% (v1.11 Shell Integration)
 
 ## Milestone Summary
 
@@ -528,9 +528,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 86-01-PLAN.md
+Stopped at: Completed 87-01-PLAN.md
 Resume file: None
-Next: Phase 87 (Documentation & Testing) or verify-work
+Next: v1.11 milestone complete - run /gsd:complete-milestone or /gsd:verify-work
 
 ## Roadmap Evolution
 

@@ -440,10 +440,10 @@ Plans:
 **Goal**: Shell integration docs, tests, and examples
 **Depends on**: Phase 86
 **Research**: Unlikely (documentation and testing follow established patterns)
-**Plans**: TBD
+**Plans**: 1/1
 
 Plans:
-- [ ] 87-01: TBD
+- [x] 87-01: Shell integration documentation — completed 2026-01-20
 
 ## Progress (All Milestones)
 
@@ -462,6 +462,6 @@ Plans:
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 | v1.10 Real-time Revocation | 78-83 | 15/15 | ✅ Complete | 2026-01-20 |
-| v1.11 Shell Integration | 84-87 | 3/? | 🚧 In progress | - |
+| v1.11 Shell Integration | 84-87 | 4/4 | 🚧 In progress | - |
 
 **Totals:** 13 milestones shipped (84.1 phases, 149 plans)
