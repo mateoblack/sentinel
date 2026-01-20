@@ -20,31 +20,33 @@ import (
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/sentinel"
+	"github.com/byteness/aws-vault/v7/session"
 	"github.com/byteness/aws-vault/v7/sso"
 	"github.com/byteness/aws-vault/v7/vault"
 )
 
 // SentinelExecCommandInput contains the input for the sentinel exec command.
 type SentinelExecCommandInput struct {
-	ProfileName     string
-	PolicyParameter string // SSM parameter path, e.g., /sentinel/policies/default
-	Command         string
-	Args            []string
-	Region          string
-	NoSession       bool
-	SessionDuration time.Duration
-	ServerDuration  time.Duration     // Duration for server mode sessions (0 = use default 15m)
-	LogFile         string            // Path to log file (empty = no file logging)
-	LogStderr       bool              // Log to stderr (default: false)
-	Store           request.Store     // Optional: for approved request checking (nil = no checking)
-	BreakGlassStore breakglass.Store  // Optional: for break-glass checking (nil = no checking)
-	STSClient       identity.STSAPI   // Optional: for testing (nil = create from AWS config)
-	AutoLogin       bool              // Enable automatic SSO login on credential errors
-	UseStdout       bool              // Print SSO URL instead of opening browser (for --auto-login)
-	ConfigFile      *vault.ConfigFile // Optional: for auto-login SSO config lookup (nil = load from env)
-	StartServer     bool              // Run credential server instead of env var injection
-	ServerPort      int               // Port for server (0 = auto-assign)
-	Lazy            bool              // Lazily fetch credentials in server mode
+	ProfileName      string
+	PolicyParameter  string // SSM parameter path, e.g., /sentinel/policies/default
+	Command          string
+	Args             []string
+	Region           string
+	NoSession        bool
+	SessionDuration  time.Duration
+	ServerDuration   time.Duration     // Duration for server mode sessions (0 = use default 15m)
+	LogFile          string            // Path to log file (empty = no file logging)
+	LogStderr        bool              // Log to stderr (default: false)
+	Store            request.Store     // Optional: for approved request checking (nil = no checking)
+	BreakGlassStore  breakglass.Store  // Optional: for break-glass checking (nil = no checking)
+	STSClient        identity.STSAPI   // Optional: for testing (nil = create from AWS config)
+	AutoLogin        bool              // Enable automatic SSO login on credential errors
+	UseStdout        bool              // Print SSO URL instead of opening browser (for --auto-login)
+	ConfigFile       *vault.ConfigFile // Optional: for auto-login SSO config lookup (nil = load from env)
+	StartServer      bool              // Run credential server instead of env var injection
+	ServerPort       int               // Port for server (0 = auto-assign)
+	Lazy             bool              // Lazily fetch credentials in server mode
+	SessionTableName string            // DynamoDB table for session tracking (optional)
 }
 
 // ConfigureSentinelExecCommand sets up the sentinel exec command with kingpin.
@@ -97,6 +99,9 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("server-duration", "Session duration in server mode (default 15m for rapid revocation)").
 		DurationVar(&input.ServerDuration)
+
+	cmd.Flag("session-table", "DynamoDB table for session tracking (optional, server mode only)").
+		StringVar(&input.SessionTableName)
 
 	cmd.Arg("cmd", "Command to execute, defaults to $SHELL").
 		StringVar(&input.Command)
@@ -325,6 +330,13 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 			PolicyLoader:       cachedLoader,
 			CredentialProvider: credProvider,
 			LazyLoad:           input.Lazy,
+		}
+
+		// Create session store if session table specified (optional, server mode only)
+		if input.SessionTableName != "" {
+			sessionStore := session.NewDynamoDBStore(awsCfg, input.SessionTableName)
+			serverConfig.SessionStore = sessionStore
+			log.Printf("Session tracking enabled: table=%s", input.SessionTableName)
 		}
 
 		sentinelServer, err := sentinel.NewSentinelServer(ctx, serverConfig, "", input.ServerPort)
