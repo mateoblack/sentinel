@@ -232,6 +232,8 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
 	// Handle deny decision - check for approved request or break-glass first
+	// Note: require_server rules return EffectAllow in server mode (handled by Evaluate),
+	// so they never reach this deny block when accessed via SentinelServer.
 	var approvedReq *request.Request
 	var activeBreakGlass *breakglass.BreakGlassEvent
 	if decision.Effect == policy.EffectDeny {
