@@ -326,6 +326,14 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 		s.config.Logger.LogDecision(entry)
 	}
 
+	// Touch session to update LastAccessAt and increment RequestCount
+	// This is fire-and-forget - session tracking should not impact credential serving
+	if s.sessionID != "" && s.config.SessionStore != nil {
+		if touchErr := s.config.SessionStore.Touch(ctx, s.sessionID); touchErr != nil {
+			log.Printf("Warning: failed to touch session: %v", touchErr)
+		}
+	}
+
 	// Write credentials response (SDK-compatible format)
 	writeCredsToResponse(creds, w)
 }
