@@ -335,3 +335,137 @@ func TestNewShellGeneratorWithClient(t *testing.T) {
 		t.Error("ShellGenerator not using provided mock client")
 	}
 }
+
+func TestGenerateScriptWithOptions_IncludeServerFalse(t *testing.T) {
+	profiles := []ProfileInfo{
+		{Name: "production", PolicyPath: "/sentinel/policies/production"},
+		{Name: "staging", PolicyPath: "/sentinel/policies/staging"},
+	}
+
+	opts := GenerateOptions{IncludeServer: false}
+	script := GenerateScriptWithOptions(profiles, "/sentinel/policies", FormatBash, opts)
+
+	// Should have standard functions
+	if !strings.Contains(script, "sentinel-production()") {
+		t.Error("Script missing sentinel-production function")
+	}
+	if !strings.Contains(script, "sentinel-staging()") {
+		t.Error("Script missing sentinel-staging function")
+	}
+
+	// Should NOT have -server variants
+	if strings.Contains(script, "sentinel-production-server()") {
+		t.Error("Script should NOT contain sentinel-production-server function when IncludeServer=false")
+	}
+	if strings.Contains(script, "sentinel-staging-server()") {
+		t.Error("Script should NOT contain sentinel-staging-server function when IncludeServer=false")
+	}
+
+	// Should NOT have server mode comment
+	if strings.Contains(script, "-server variants use real-time revocation mode") {
+		t.Error("Script should NOT contain server mode comment when IncludeServer=false")
+	}
+}
+
+func TestGenerateScriptWithOptions_IncludeServerTrue(t *testing.T) {
+	profiles := []ProfileInfo{
+		{Name: "production", PolicyPath: "/sentinel/policies/production"},
+		{Name: "staging", PolicyPath: "/sentinel/policies/staging"},
+	}
+
+	opts := GenerateOptions{IncludeServer: true}
+	script := GenerateScriptWithOptions(profiles, "/sentinel/policies", FormatBash, opts)
+
+	// Should have standard functions
+	if !strings.Contains(script, "sentinel-production()") {
+		t.Error("Script missing sentinel-production function")
+	}
+	if !strings.Contains(script, "sentinel-staging()") {
+		t.Error("Script missing sentinel-staging function")
+	}
+
+	// Should have -server variants
+	if !strings.Contains(script, "sentinel-production-server()") {
+		t.Error("Script missing sentinel-production-server function")
+	}
+	if !strings.Contains(script, "sentinel-staging-server()") {
+		t.Error("Script missing sentinel-staging-server function")
+	}
+
+	// Server variants should include --server flag
+	if !strings.Contains(script, "sentinel exec --server --profile production") {
+		t.Error("Server variant missing --server flag for production")
+	}
+	if !strings.Contains(script, "sentinel exec --server --profile staging") {
+		t.Error("Server variant missing --server flag for staging")
+	}
+
+	// Should have server mode comment
+	if !strings.Contains(script, "-server variants use real-time revocation mode") {
+		t.Error("Script missing server mode comment")
+	}
+}
+
+func TestGenerateScriptWithOptions_EmptyProfilesWithServer(t *testing.T) {
+	profiles := []ProfileInfo{}
+
+	opts := GenerateOptions{IncludeServer: true}
+	script := GenerateScriptWithOptions(profiles, "/sentinel/policies", FormatBash, opts)
+
+	// Should have header with server comment
+	if !strings.Contains(script, "# Sentinel shell functions") {
+		t.Error("Script missing header comment")
+	}
+	if !strings.Contains(script, "-server variants use real-time revocation mode") {
+		t.Error("Script missing server mode comment")
+	}
+
+	// Should indicate no profiles found
+	if !strings.Contains(script, "# No profiles found under /sentinel/policies") {
+		t.Error("Script should indicate no profiles found")
+	}
+}
+
+func TestGenerateScriptWithOptions_ServerVariantFunctionContent(t *testing.T) {
+	profiles := []ProfileInfo{
+		{Name: "admin", PolicyPath: "/sentinel/policies/admin"},
+	}
+
+	opts := GenerateOptions{IncludeServer: true}
+	script := GenerateScriptWithOptions(profiles, "/sentinel/policies", FormatBash, opts)
+
+	// Check standard function content
+	expectedStandard := `sentinel-admin() {
+    sentinel exec --profile admin --policy-parameter /sentinel/policies/admin -- "$@"
+}`
+	if !strings.Contains(script, expectedStandard) {
+		t.Errorf("Standard function content incorrect. Got:\n%s", script)
+	}
+
+	// Check server function content
+	expectedServer := `sentinel-admin-server() {
+    sentinel exec --server --profile admin --policy-parameter /sentinel/policies/admin -- "$@"
+}`
+	if !strings.Contains(script, expectedServer) {
+		t.Errorf("Server function content incorrect. Got:\n%s", script)
+	}
+}
+
+func TestGenerateScript_BackwardCompatible(t *testing.T) {
+	profiles := []ProfileInfo{
+		{Name: "test", PolicyPath: "/sentinel/policies/test"},
+	}
+
+	// GenerateScript should produce same output as GenerateScriptWithOptions with default options
+	scriptOld := GenerateScript(profiles, "/sentinel/policies", FormatBash)
+	scriptNew := GenerateScriptWithOptions(profiles, "/sentinel/policies", FormatBash, GenerateOptions{})
+
+	if scriptOld != scriptNew {
+		t.Errorf("GenerateScript and GenerateScriptWithOptions (default opts) produce different output.\nOld:\n%s\nNew:\n%s", scriptOld, scriptNew)
+	}
+
+	// Should NOT have server variants
+	if strings.Contains(scriptOld, "-server()") {
+		t.Error("GenerateScript (backward compat) should not include server variants")
+	}
+}
