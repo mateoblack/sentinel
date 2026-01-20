@@ -33,6 +33,7 @@ type SentinelExecCommandInput struct {
 	Region          string
 	NoSession       bool
 	SessionDuration time.Duration
+	ServerDuration  time.Duration     // Duration for server mode sessions (0 = use default 15m)
 	LogFile         string            // Path to log file (empty = no file logging)
 	LogStderr       bool              // Log to stderr (default: false)
 	Store           request.Store     // Optional: for approved request checking (nil = no checking)
@@ -93,6 +94,9 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("lazy", "When using --server, lazily fetch credentials").
 		BoolVar(&input.Lazy)
+
+	cmd.Flag("server-duration", "Session duration in server mode (default 15m for rapid revocation)").
+		DurationVar(&input.ServerDuration)
 
 	cmd.Arg("cmd", "Command to execute, defaults to $SHELL").
 		StringVar(&input.Command)
@@ -299,6 +303,12 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 
 	// 8.6. Server mode: start SentinelServer for per-request policy evaluation
 	if input.StartServer {
+		// Determine server session duration: use explicit flag, or default to 15 minutes
+		serverSessionDuration := input.ServerDuration
+		if serverSessionDuration == 0 {
+			serverSessionDuration = sentinel.DefaultServerSessionDuration
+		}
+
 		// Create credential provider adapter that wraps Sentinel.GetCredentialsWithSourceIdentity
 		credProvider := &sentinelCredentialProviderAdapter{sentinel: s}
 
@@ -307,7 +317,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 			PolicyParameter:    input.PolicyParameter,
 			Region:             input.Region,
 			NoSession:          input.NoSession,
-			SessionDuration:    sessionDuration,
+			SessionDuration:    serverSessionDuration,
 			User:               username,
 			Logger:             logger,
 			Store:              input.Store,

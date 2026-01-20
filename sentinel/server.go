@@ -21,6 +21,16 @@ import (
 	"github.com/byteness/aws-vault/v7/request"
 )
 
+const (
+	// DefaultServerSessionDuration is the default session duration in server mode.
+	// Short sessions enable rapid credential revocation - policy changes take effect
+	// within this window as credentials are refreshed per-request.
+	// 15 minutes balances security (rapid revocation) with performance (SDK caches credentials).
+	// AWS SDKs typically refresh 5 minutes before expiry, so 15-minute credentials
+	// refresh roughly every 10 minutes.
+	DefaultServerSessionDuration = 15 * time.Minute
+)
+
 // CredentialProvider defines the interface for retrieving credentials with SourceIdentity.
 // This abstraction enables testing without real AWS credentials.
 type CredentialProvider interface {
