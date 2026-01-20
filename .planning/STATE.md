@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 81 (Session Management)
-Plan: 2 of 4 in current phase
-Status: Plan 02 complete
-Last activity: 2026-01-20 — Completed 81-02-PLAN.md
+Plan: 3 of 4 in current phase
+Status: Plan 03 complete
+Last activity: 2026-01-20 — Completed 81-03-PLAN.md
 
-Progress: ████░░░░░░ 42% (v1.10 Real-time Revocation - 3/6 phases, 7/? plans)
+Progress: █████░░░░░ 45% (v1.10 Real-time Revocation - 3/6 phases, 8/? plans)
 
 ## Milestone Summary
 
@@ -459,6 +459,13 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - ServerInstanceID auto-generated via identity.NewRequestID() if not provided
 - --session-table flag is opt-in (no session tracking without explicit flag)
 
+**v1.10 Server Session CLI Commands decisions (Phase 81-03):**
+- List command defaults to current user's sessions when no filter specified
+- Filter priority matches breakglass-list: status > profile > user
+- Both server-sessions and server-session commands support human and JSON output formats
+- Session ID validation performed before store call in detail command (fail fast)
+- mockSessionStore follows same function-field pattern as mockBreakGlassStore for testing
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -470,9 +477,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 81-02-PLAN.md (Phase 81 Plan 02 complete)
+Stopped at: Completed 81-03-PLAN.md (Phase 81 Plan 03 complete)
 Resume file: None
-Next: /gsd:execute-plan 81-03
+Next: /gsd:execute-plan 81-04
 
 ## Roadmap Evolution
 
