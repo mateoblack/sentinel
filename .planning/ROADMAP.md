@@ -450,16 +450,17 @@ Plans:
 - [x] 81-03: Server session CLI commands (list, detail) — completed 2026-01-20
 - [x] 81-04: Session revocation (CLI command, server-side check, tests) — completed 2026-01-20
 
-#### Phase 82: Server Mode Enforcement — *In progress*
+#### Phase 82: Server Mode Enforcement — COMPLETE
 
 **Goal**: Policy conditions to require server mode for sensitive profiles
 **Depends on**: Phase 81
 **Research**: Unlikely (extends existing policy schema)
 **Plans**: 2
+**Status**: Complete (2026-01-20)
 
 Plans:
 - [x] 82-01: Require server effect schema (EffectRequireServer, RequiresServerMode flag) — completed 2026-01-20
-- [ ] 82-02: CLI error handling for require_server denials
+- [x] 82-02: CLI error handling for require_server denials — completed 2026-01-20
 
 #### Phase 83: Server Mode Testing
 
@@ -486,7 +487,7 @@ Plans:
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
-| v1.10 Real-time Revocation | 78-83 | 11/? | 🚧 In Progress | - |
+| v1.10 Real-time Revocation | 78-83 | 12/? | 🚧 In Progress | - |
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 
 **Totals:** 12 milestones shipped (78.1 phases, 131 plans), 1 in progress (v1.10)

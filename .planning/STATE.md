@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 82 (Server Mode Enforcement)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-20 — Completed 82-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-01-20 — Completed 82-02-PLAN.md
 
-Progress: █████░░░░░ 53% (v1.10 Real-time Revocation - 5/6 phases, 10/? plans)
+Progress: █████░░░░░ 55% (v1.10 Real-time Revocation - 5/6 phases, 11/? plans)
 
 ## Milestone Summary
 
@@ -478,6 +478,10 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - RequiresServerMode boolean flag enables targeted error messages (vs parsing reason strings)
 - Effect conversion pattern: special effects (require_server) convert to allow/deny with metadata flags
 
+**v1.10 Server Mode Enforcement decisions (Phase 82-02):**
+- require_server denials checked BEFORE approval/break-glass bypass - server mode cannot be bypassed
+- Actionable error messages: credentials command suggests full exec --server pattern, exec command suggests --server flag
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -489,9 +493,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 82-01-PLAN.md
+Stopped at: Completed 82-02-PLAN.md (Phase 82 complete)
 Resume file: None
-Next: /gsd:execute-plan 82-02
+Next: /gsd:plan-phase 83
 
 ## Roadmap Evolution
 
