@@ -212,8 +212,18 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 		// Approved request or active break-glass found - continue to credential issuance
 	}
 
-	// Cap session duration to remaining break-glass time if applicable
+	// Apply session duration capping (order: policy cap -> break-glass cap -> final)
 	sessionDuration := s.config.SessionDuration
+
+	// Apply policy-based session duration cap (if set by matched rule)
+	if decision.MaxServerDuration > 0 {
+		if sessionDuration == 0 || sessionDuration > decision.MaxServerDuration {
+			sessionDuration = decision.MaxServerDuration
+			log.Printf("Capping session duration to policy max_server_duration: %v", decision.MaxServerDuration)
+		}
+	}
+
+	// Cap session duration to remaining break-glass time if applicable
 	if activeBreakGlass != nil {
 		remainingTime := breakglass.RemainingDuration(activeBreakGlass)
 		if sessionDuration == 0 || sessionDuration > remainingTime {
