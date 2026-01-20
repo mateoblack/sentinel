@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.11 Shell Integration — auto-generated shell functions for Sentinel profiles
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 87 of 87 (Documentation & Testing)
-Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-20 — Completed 87-01-PLAN.md
+Phase: 87 of 87 (completed)
+Plan: N/A
+Status: v1.11 Shell Integration milestone shipped
+Last activity: 2026-01-20 — Milestone v1.11 complete
 
-Progress: ██████████ 100% (v1.11 Shell Integration)
+Progress: ██████████ 100% (All milestones complete)
 
 ## Milestone Summary
 
@@ -119,12 +119,21 @@ Progress: ██████████ 100% (v1.11 Shell Integration)
 - Session tracking via DynamoDB with revocation support
 - require_server policy effect for server mode enforcement
 
+**v1.11 Shell Integration shipped:** 2026-01-20
+- 4 phases, 4 plans
+- +1,380 lines of Go (101,101 total)
+- `sentinel shell init` command with SSM-based profile discovery
+- Auto-generated shell wrapper functions for one-command AWS access
+- Server mode variants with --include-server flag
+- Bash and zsh tab completion registrations
+- Shell integration documentation
+
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 132
-- Average duration: 3.0 min
-- Total execution time: ~525 min
+- Total plans completed: 153
+- Average duration: 3.6 min
+- Total execution time: ~539 min
 
 **By Milestone:**
 
@@ -142,6 +151,8 @@ Progress: ██████████ 100% (v1.11 Shell Integration)
 | v1.8 Credential Flow UX | 3 | 3 | ~16 min |
 | v1.9 SSO Profile Support | 2 | 6 | ~6 min |
 | v1.10.1 SSO Credential Fixes | 1 | 2 | ~6 min |
+| v1.10 Real-time Revocation | 6 | 15 | ~102 min |
+| v1.11 Shell Integration | 4 | 4 | ~14 min |
 
 ## Accumulated Context
 
@@ -528,9 +539,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 87-01-PLAN.md
+Stopped at: v1.11 Shell Integration milestone complete
 Resume file: None
-Next: v1.11 milestone complete - run /gsd:complete-milestone or /gsd:verify-work
+Next: Plan next milestone with /gsd:discuss-milestone or archive planning
 
 ## Roadmap Evolution
 
@@ -547,4 +558,4 @@ Next: v1.11 milestone complete - run /gsd:complete-milestone or /gsd:verify-work
 - Milestone v1.9 shipped: 2026-01-19 — SSO Profile Support (Phases 76-77) - Fix --profile SSO credential loading
 - Milestone v1.10.1 shipped: 2026-01-19 — SSO Credential Fixes (Phase 78.1) - Test coverage for bootstrap and whoami SSO profile handling
 - Milestone v1.10 shipped: 2026-01-20 — Real-time Revocation (Phases 78-83) - Server mode for instant credential revocation
-- Milestone v1.11 created: 2026-01-20 — Shell Integration (Phases 84-87) - Auto-generated shell functions for profiles
+- Milestone v1.11 shipped: 2026-01-20 — Shell Integration (Phases 84-87) - Auto-generated shell functions for profiles

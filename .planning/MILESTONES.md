@@ -1,5 +1,30 @@
 # Project Milestones: Sentinel
 
+## v1.11 Shell Integration (Shipped: 2026-01-20)
+
+**Delivered:** Developer UX improvement with `sentinel shell init` command that auto-generates shell wrapper functions for all configured Sentinel profiles, reducing daily boilerplate.
+
+**Phases completed:** 84-87 (4 plans total)
+
+**Key accomplishments:**
+- `sentinel shell init` command with SSM-based profile discovery from /sentinel/policies/*
+- Auto-generated shell wrapper functions (sentinel-{profile}) for one-command AWS access
+- Server mode variants with --include-server flag (-server suffix functions for real-time revocation)
+- Bash and zsh tab completion registrations for all generated functions
+- Shell integration documentation in commands.md and QUICKSTART.md
+
+**Stats:**
+- 17 files created/modified
+- 101,101 lines of Go (total codebase, +1,380 from v1.10)
+- 4 phases, 4 plans
+- 1 day (2026-01-20)
+
+**Git range:** `feat(84-01)` → `docs(87-01)`
+
+**What's next:** Production deployment ready. Consider v2.0 for UI dashboard, multi-account federation, or policy versioning.
+
+---
+
 ## v1.10 Real-time Revocation (Shipped: 2026-01-20)
 
 **Delivered:** Server mode enabling instant credential revocation - each credential request evaluates policy in real-time, allowing immediate blocking when sessions are revoked or policies change.

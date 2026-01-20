@@ -19,7 +19,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.9 SSO Profile Support** — [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) (Phases 76-77, shipped 2026-01-19)
 - ✅ **v1.10.1 SSO Credential Fixes** — [milestones/v1.10.1-ROADMAP.md](milestones/v1.10.1-ROADMAP.md) (Phase 78.1, shipped 2026-01-19)
 - ✅ **v1.10 Real-time Revocation** — [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) (Phases 78-83, shipped 2026-01-20)
-- 🚧 **v1.11 Shell Integration** — Phases 84-87 (in progress)
+- ✅ **v1.11 Shell Integration** — [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) (Phases 84-87, shipped 2026-01-20)
 
 ## Completed Milestones
 
@@ -400,50 +400,17 @@ See [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.11 Shell Integration (In Progress)
+<details>
+<summary>✅ v1.11 Shell Integration (Phases 84-87) — SHIPPED 2026-01-20</summary>
 
-**Milestone Goal:** Developer UX improvement - reduce daily boilerplate with auto-generated shell functions for all configured Sentinel profiles.
+- [x] Phase 84: Shell Init Command (1/1 plans) — completed 2026-01-20
+- [x] Phase 85: Server Mode Variants (1/1 plans) — completed 2026-01-20
+- [x] Phase 86: Shell Completions (1/1 plans) — completed 2026-01-20
+- [x] Phase 87: Documentation & Testing (1/1 plans) — completed 2026-01-20
 
-#### Phase 84: Shell Init Command
+See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
-**Goal**: Core `sentinel shell init` with profile detection and function generation
-**Depends on**: v1.10 complete
-**Research**: Unlikely (internal Go patterns, existing SSM status command to reuse)
-**Plans**: 1/1
-
-Plans:
-- [x] 84-01: Shell package and CLI shell init command — completed 2026-01-20
-
-#### Phase 85: Server Mode Variants
-
-**Goal**: Add `-server` suffix functions for real-time revocation mode
-**Depends on**: Phase 84
-**Research**: Unlikely (extends Phase 84 with --server flag, internal patterns)
-**Plans**: 1/1
-
-Plans:
-- [x] 85-01: Server mode variants with --include-server flag — completed 2026-01-20
-
-#### Phase 86: Shell Completions
-
-**Goal**: Tab completion for generated functions (bash and zsh)
-**Depends on**: Phase 85
-**Research**: Likely (shell completion systems differ between bash/zsh)
-**Research topics**: bash complete builtin, zsh compdef, command argument completion
-**Plans**: 1/1
-
-Plans:
-- [x] 86-01: Completion registration generation — completed 2026-01-20
-
-#### Phase 87: Documentation & Testing
-
-**Goal**: Shell integration docs, tests, and examples
-**Depends on**: Phase 86
-**Research**: Unlikely (documentation and testing follow established patterns)
-**Plans**: 1/1
-
-Plans:
-- [x] 87-01: Shell integration documentation — completed 2026-01-20
+</details>
 
 ## Progress (All Milestones)
 
@@ -462,6 +429,6 @@ Plans:
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 | v1.10 Real-time Revocation | 78-83 | 15/15 | ✅ Complete | 2026-01-20 |
-| v1.11 Shell Integration | 84-87 | 4/4 | 🚧 In progress | - |
+| v1.11 Shell Integration | 84-87 | 4/4 | ✅ Complete | 2026-01-20 |
 
-**Totals:** 13 milestones shipped (84.1 phases, 149 plans)
+**Totals:** 14 milestones shipped (87 phases, 153 plans)

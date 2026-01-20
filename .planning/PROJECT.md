@@ -76,10 +76,14 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ Session tracking via DynamoDB with create/touch/expire/revoke lifecycle — v1.10
 - ✓ Real-time session revocation with fail-closed security — v1.10
 - ✓ require_server policy effect for enforcing server mode on sensitive profiles — v1.10
+- ✓ `sentinel shell init` command for auto-generating shell wrapper functions — v1.11
+- ✓ SSM-based profile discovery from /sentinel/policies/* for shell functions — v1.11
+- ✓ Server mode variants with --include-server flag for shell integration — v1.11
+- ✓ Bash and zsh tab completion for generated shell functions — v1.11
 
 ### Active
 
-(None — all v1.10 requirements validated)
+(None — all v1.11 requirements validated)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -88,7 +92,7 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.10 with 99,721 LOC Go.
+Shipped v1.11 with 101,101 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -186,6 +190,13 @@ v1.10 adds real-time credential revocation via server mode:
 - Real-time revocation with fail-closed security and fail-open availability
 - require_server policy effect for enforcing server mode on sensitive profiles
 
+v1.11 adds shell integration for developer UX:
+- `sentinel shell init` command with SSM-based profile discovery
+- Auto-generated shell wrapper functions (sentinel-{profile}) for one-command AWS access
+- Server mode variants with --include-server flag (sentinel-{profile}-server functions)
+- Bash and zsh tab completion registrations for all generated functions
+- Shell integration documentation in commands.md and QUICKSTART.md
+
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
 ## Constraints
@@ -254,6 +265,13 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Username from AWS ARN, not OS user | Prevents policy bypass via local user impersonation | ✓ Good |
 | TestSecurityRegression_ prefix | CI/CD filtering of security tests | ✓ Good |
 | Attack scenario demonstration tests | Explicitly show vulnerability and verify fix | ✓ Good |
+| Shell function sentinel-{profile} naming | Clear namespace, sanitized for shell safety | ✓ Good |
+| Server variants with -server suffix | Distinct names for server mode, user can choose | ✓ Good |
+| Same bash/zsh output | POSIX-compatible functions work in both shells | ✓ Good |
+| Script to stdout, status to stderr | eval-compatible output for shell rc integration | ✓ Good |
+| Shell detection via $SHELL | Auto-detect format, explicit --format override available | ✓ Good |
+| Completion via -o default -o bashdefault (bash) | Standard fallback for file/command completion | ✓ Good |
+| Completion via compdef _command_names (zsh) | Standard zsh completion approach | ✓ Good |
 
 ---
-*Last updated: 2026-01-20 after v1.10 milestone*
+*Last updated: 2026-01-20 after v1.11 milestone*
