@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 ## Current Position
 
 Phase: 84 of 87 (Shell Init Command)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-20 — Milestone v1.11 created
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-01-20 — Completed 84-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0% (v1.11 Shell Integration)
+Progress: █░░░░░░░░░ 25% (v1.11 Shell Integration)
 
 ## Milestone Summary
 
@@ -510,6 +510,13 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Revocation timing test uses 5 workers at 100ms intervals (~50 req/sec) for coverage with reasonable test duration
 - Concurrent stress test uses 50 goroutines x 100 requests = 5000 total requests for thread-safety verification
 
+**v1.11 Shell Init Command decisions (Phase 84-01):**
+- Shell function names use sentinel-{profile} format with sanitization
+- GenerateScript supports both bash and zsh (same POSIX-compatible output)
+- Auto-detect shell format from $SHELL env variable, default to bash
+- Script output to stdout, status messages to stderr for eval compatibility
+- ssmShellAPI interface follows same pattern as ssmStatusAPI for testability
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -521,9 +528,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Milestone v1.11 initialization
+Stopped at: Completed 84-01-PLAN.md
 Resume file: None
-Next: Plan Phase 84 (Shell Init Command)
+Next: Phase 85 (Shell Completion) or verify-work
 
 ## Roadmap Evolution
 
