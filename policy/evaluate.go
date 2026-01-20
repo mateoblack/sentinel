@@ -12,6 +12,7 @@ type Request struct {
 	User    string
 	Profile string
 	Time    time.Time
+	Mode    CredentialMode // Credential delivery mode (server, cli, credential_process)
 }
 
 // Decision represents the outcome of policy evaluation.
@@ -84,7 +85,24 @@ func matchesConditions(c *Condition, req *Request) bool {
 	if !matchesTimeWindow(c.Time, req.Time) {
 		return false
 	}
+	if !matchesMode(c.Mode, req.Mode) {
+		return false
+	}
 	return true
+}
+
+// matchesMode checks if the request mode matches the condition.
+// An empty mode list matches any mode.
+func matchesMode(modes []CredentialMode, mode CredentialMode) bool {
+	if len(modes) == 0 {
+		return true
+	}
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
 }
 
 // matchesProfiles checks if the request profile matches the condition.

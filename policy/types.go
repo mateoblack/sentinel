@@ -41,9 +41,10 @@ const (
 // All specified conditions must match for the rule to apply.
 // Empty or nil conditions are considered to match any request.
 type Condition struct {
-	Profiles []string    `yaml:"profiles,omitempty" json:"profiles,omitempty"`
-	Users    []string    `yaml:"users,omitempty" json:"users,omitempty"`
-	Time     *TimeWindow `yaml:"time,omitempty" json:"time,omitempty"`
+	Profiles []string         `yaml:"profiles,omitempty" json:"profiles,omitempty"`
+	Users    []string         `yaml:"users,omitempty" json:"users,omitempty"`
+	Time     *TimeWindow      `yaml:"time,omitempty" json:"time,omitempty"`
+	Mode     []CredentialMode `yaml:"mode,omitempty" json:"mode,omitempty"` // Empty = match any mode
 }
 
 // TimeWindow restricts when a rule applies.
@@ -91,6 +92,29 @@ func (e Effect) IsValid() bool {
 // String returns the string representation of the Effect.
 func (e Effect) String() string {
 	return string(e)
+}
+
+// CredentialMode identifies how credentials are being requested.
+// Server mode evaluates policy per-request, CLI mode evaluates once.
+type CredentialMode string
+
+const (
+	// ModeServer indicates credentials served via credential server (per-request evaluation).
+	ModeServer CredentialMode = "server"
+	// ModeCLI indicates credentials served via exec command (one-time evaluation).
+	ModeCLI CredentialMode = "cli"
+	// ModeCredentialProcess indicates credentials served via credential_process (one-time evaluation).
+	ModeCredentialProcess CredentialMode = "credential_process"
+)
+
+// IsValid returns true if the CredentialMode is a known value.
+func (m CredentialMode) IsValid() bool {
+	return m == ModeServer || m == ModeCLI || m == ModeCredentialProcess
+}
+
+// String returns the string representation of the CredentialMode.
+func (m CredentialMode) String() string {
+	return string(m)
 }
 
 // IsValid returns true if the Weekday is a known value.
