@@ -265,6 +265,21 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 		// Approved request or active break-glass found - continue to credential issuance
 	}
 
+	// Check for session revocation before serving credentials
+	// Revocation check fails-closed for security (revoked = deny) but fails-open for store errors (availability)
+	if s.sessionID != "" && s.config.SessionStore != nil {
+		revoked, revokeErr := session.IsSessionRevoked(ctx, s.config.SessionStore, s.sessionID)
+		if revokeErr != nil {
+			// Store error - log but don't deny (fail-open for availability)
+			log.Printf("Warning: failed to check session revocation: %v", revokeErr)
+		} else if revoked {
+			// Session is revoked - deny access immediately (fail-closed for security)
+			log.Printf("Session revoked: %s - denying credentials", s.sessionID)
+			writeErrorMessage(w, "Session revoked", http.StatusForbidden)
+			return
+		}
+	}
+
 	// Apply session duration capping (order: policy cap -> break-glass cap -> final)
 	sessionDuration := s.config.SessionDuration
 
