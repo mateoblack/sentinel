@@ -68,6 +68,49 @@ Check your IAM permissions are sufficient:
 sentinel permissions check --auto-detect
 ```
 
+## Daily Usage: Shell Functions
+
+Typing full `sentinel exec --profile ... --policy-parameter ...` commands is tedious for daily use. Sentinel can generate shell wrapper functions for all your configured profiles.
+
+### One-Time Setup
+
+Add to your shell profile:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc:
+eval "$(sentinel shell init)"
+```
+
+Then restart your shell or run `source ~/.bashrc` (or `~/.zshrc`).
+
+### Usage
+
+```bash
+# Instead of:
+sentinel exec --profile production --policy-parameter /sentinel/policies/production -- aws s3 ls
+
+# Just use:
+sentinel-production aws s3 ls
+```
+
+Shell functions are automatically created for each profile found under your policy root.
+
+### Server Mode (Optional)
+
+For real-time revocation capability on long-running processes, generate server mode variants:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc:
+eval "$(sentinel shell init --include-server)"
+
+# Then use:
+sentinel-production-server terraform plan
+```
+
+Server mode re-evaluates policy on every credential request, enabling instant revocation.
+
+See [CLI Reference](guide/commands.md#shell-init) for full details.
+
 ## What's Next
 
 - [Getting Started Guide](guide/getting-started.md) - Full setup walkthrough
