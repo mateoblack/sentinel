@@ -60,14 +60,28 @@ func Evaluate(policy *Policy, req *Request) Decision {
 		if matchesConditions(&rule.Conditions, req) {
 			// Copy conditions to avoid reference to original
 			conditionsCopy := rule.Conditions
+
+			// Handle require_server effect - allow only in server mode
+			effect := rule.Effect
+			requiresServerMode := false
+			if rule.Effect == EffectRequireServer {
+				if req.Mode == ModeServer {
+					effect = EffectAllow
+				} else {
+					effect = EffectDeny
+					requiresServerMode = true
+				}
+			}
+
 			return Decision{
-				Effect:            rule.Effect,
-				MatchedRule:       rule.Name,
-				Reason:            rule.Reason,
-				RuleIndex:         i,
-				Conditions:        &conditionsCopy,
-				EvaluatedAt:       evaluatedAt,
-				MaxServerDuration: rule.MaxServerDuration,
+				Effect:             effect,
+				MatchedRule:        rule.Name,
+				Reason:             rule.Reason,
+				RuleIndex:          i,
+				Conditions:         &conditionsCopy,
+				EvaluatedAt:        evaluatedAt,
+				MaxServerDuration:  rule.MaxServerDuration,
+				RequiresServerMode: requiresServerMode,
 			}
 		}
 	}
