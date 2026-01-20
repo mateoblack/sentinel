@@ -51,5 +51,9 @@ func main() {
 	// Identity commands
 	cli.ConfigureWhoamiCommand(app, s)
 
+	// Server session commands
+	cli.ConfigureServerSessionsCommand(app, s)
+	cli.ConfigureServerSessionCommand(app, s)
+
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
