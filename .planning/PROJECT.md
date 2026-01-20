@@ -70,10 +70,16 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ Auto SSO login triggering with OIDC device code flow when sessions expire — v1.8
 - ✓ All CLI commands support --profile/--aws-profile for SSO credential loading — v1.9
 - ✓ Whoami command --profile flag for identity debugging with SSO profiles — v1.9
+- ✓ Server mode with per-request policy evaluation via --server flag — v1.10
+- ✓ CredentialMode-aware policies (server/cli/credential_process conditions) — v1.10
+- ✓ 15-minute default server sessions with MaxServerDuration policy caps — v1.10
+- ✓ Session tracking via DynamoDB with create/touch/expire/revoke lifecycle — v1.10
+- ✓ Real-time session revocation with fail-closed security — v1.10
+- ✓ require_server policy effect for enforcing server mode on sensitive profiles — v1.10
 
 ### Active
 
-(None — all v1.9 requirements validated)
+(None — all v1.10 requirements validated)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -82,7 +88,7 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.9 with 92,948 LOC Go.
+Shipped v1.10 with 99,721 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -171,6 +177,15 @@ v1.9 fixes systemic SSO profile support:
 - Added --aws-profile flag to approval workflow, break-glass, infrastructure, and audit commands
 - Added --profile flag to whoami command for SSO identity debugging
 
+v1.10 adds real-time credential revocation via server mode:
+- SentinelServer HTTP server evaluates policy on every credential request
+- --server flag for sentinel exec with AWS_CONTAINER_CREDENTIALS_FULL_URI
+- CredentialMode type for mode-aware policy rules (server/cli/credential_process)
+- 15-minute default sessions with MaxServerDuration policy caps
+- Session tracking (DynamoDB) with create/touch/expire/revoke lifecycle
+- Real-time revocation with fail-closed security and fail-open availability
+- require_server policy effect for enforcing server mode on sensitive profiles
+
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
 ## Constraints
@@ -241,4 +256,4 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Attack scenario demonstration tests | Explicitly show vulnerability and verify fix | ✓ Good |
 
 ---
-*Last updated: 2026-01-19 after v1.9 milestone*
+*Last updated: 2026-01-20 after v1.10 milestone*

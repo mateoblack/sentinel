@@ -1,5 +1,31 @@
 # Project Milestones: Sentinel
 
+## v1.10 Real-time Revocation (Shipped: 2026-01-20)
+
+**Delivered:** Server mode enabling instant credential revocation - each credential request evaluates policy in real-time, allowing immediate blocking when sessions are revoked or policies change.
+
+**Phases completed:** 78-83 (15 plans total)
+
+**Key accomplishments:**
+- SentinelServer HTTP server with policy evaluation on every credential request
+- --server flag for sentinel exec enabling per-request policy evaluation via AWS_CONTAINER_CREDENTIALS_FULL_URI
+- CredentialMode type (server/cli/credential_process) for mode-aware policy rules
+- 15-minute default server sessions with MaxServerDuration policy caps for rapid revocation
+- Session tracking via DynamoDB with create/touch/expire lifecycle and revocation support
+- require_server policy effect forcing server mode for sensitive profiles (cannot be bypassed)
+
+**Stats:**
+- 48 files created/modified
+- 99,721 lines of Go (total codebase, +6,773 from v1.9)
+- 6 phases, 15 plans
+- 2 days (2026-01-19 → 2026-01-20)
+
+**Git range:** `feat(78-01)` → `test(83-03)`
+
+**What's next:** Production deployment ready. Server mode enables real-time credential revocation for high-security environments.
+
+---
+
 ## v1.10.1 SSO Credential Fixes (Shipped: 2026-01-19)
 
 **Delivered:** Test coverage for SSO credential loading patterns in bootstrap and whoami commands, verifying the --aws-profile and --profile flags correctly flow to WithSharedConfigProfile.

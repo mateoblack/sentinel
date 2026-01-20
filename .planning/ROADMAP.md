@@ -17,8 +17,8 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.7.1 Security Patch** — [milestones/v1.7.1-ROADMAP.md](milestones/v1.7.1-ROADMAP.md) (Phases 69-72, shipped 2026-01-19)
 - ✅ **v1.8 Credential Flow UX** — [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) (Phases 73-75, shipped 2026-01-19)
 - ✅ **v1.9 SSO Profile Support** — [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) (Phases 76-77, shipped 2026-01-19)
-- ✅ **v1.10 Real-time Revocation** — [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) (Phases 78-83, shipped 2026-01-20)
 - ✅ **v1.10.1 SSO Credential Fixes** — [milestones/v1.10.1-ROADMAP.md](milestones/v1.10.1-ROADMAP.md) (Phase 78.1, shipped 2026-01-19)
+- ✅ **v1.10 Real-time Revocation** — [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) (Phases 78-83, shipped 2026-01-20)
 
 ## Completed Milestones
 
@@ -388,93 +388,14 @@ Plans:
 <details>
 <summary>✅ v1.10 Real-time Revocation (Phases 78-83) — SHIPPED 2026-01-20</summary>
 
-**Milestone Goal:** Enable instant credential revocation via server mode - each credential request checks Sentinel policy, allowing real-time blocking of access.
+- [x] Phase 78: Server Infrastructure (2/2 plans) — completed 2026-01-19
+- [x] Phase 79: Server Policy Integration (2/2 plans) — completed 2026-01-20
+- [x] Phase 80: Short-Lived Sessions (1/1 plans) — completed 2026-01-20
+- [x] Phase 81: Session Management (4/4 plans) — completed 2026-01-20
+- [x] Phase 82: Server Mode Enforcement (3/3 plans) — completed 2026-01-20
+- [x] Phase 83: Server Mode Testing (3/3 plans) — completed 2026-01-20
 
-#### Phase 78: Server Infrastructure
-
-**Goal**: Port ECS server mode to sentinel exec command with --server flag
-**Depends on**: v1.9 complete
-**Research**: Likely (porting aws-vault server package patterns)
-**Research topics**: ECS metadata endpoint, credential provider chain, HTTP server patterns
-**Plans**: 2
-
-Plans:
-- [x] 78-01: SentinelServer type with policy-aware credential serving — completed 2026-01-19
-- [x] 78-02: --server flag CLI integration for sentinel exec command — completed 2026-01-19
-
-#### Phase 78.1: SSO Credential Fixes (INSERTED - v1.10.1)
-
-**Goal**: Add test coverage for SSO credential loading (fixes already in place from v1.9)
-**Depends on**: Phase 78
-**Research**: Unlikely (same pattern as v1.9 Phase 76)
-**Plans**: 2
-
-Plans:
-- [x] 78.1-01: Add bootstrap command SSO profile test coverage — completed 2026-01-19
-- [x] 78.1-02: Add whoami command SSO profile test coverage — completed 2026-01-19
-
-#### Phase 79: Server Policy Integration — COMPLETE
-
-**Goal**: Hook policy evaluation into credential server requests
-**Depends on**: Phase 78
-**Research**: Unlikely (extends existing policy evaluation)
-**Plans**: 2
-**Status**: Complete (2026-01-20)
-
-Plans:
-- [x] 79-01: Add credential mode awareness to policy schema — completed 2026-01-20
-- [x] 79-02: Add server mode integration tests and documentation — completed 2026-01-20
-
-#### Phase 80: Short-lived Sessions — COMPLETE
-
-**Goal**: Enforce short credential TTLs in server mode for rapid revocation
-**Depends on**: Phase 79
-**Research**: Unlikely (extends existing duration logic)
-**Plans**: 3
-**Status**: Complete (2026-01-20)
-
-Plans:
-- [x] 80-01: Server duration defaults and policy caps — completed 2026-01-20
-
-#### Phase 81: Session Management — COMPLETE
-
-**Goal**: Track and manage active server sessions for visibility and control
-**Depends on**: Phase 80
-**Research**: Likely (new session tracking design)
-**Research topics**: Active session storage, revocation patterns, in-memory vs persistent state
-**Plans**: 4
-**Status**: Complete (2026-01-20)
-
-Plans:
-- [x] 81-01: Session schema, Store interface, and DynamoDB implementation — completed 2026-01-20
-- [x] 81-02: Session lifecycle integration (create on startup, touch on request, expire on shutdown) — completed 2026-01-20
-- [x] 81-03: Server session CLI commands (list, detail) — completed 2026-01-20
-- [x] 81-04: Session revocation (CLI command, server-side check, tests) — completed 2026-01-20
-
-#### Phase 82: Server Mode Enforcement — COMPLETE
-
-**Goal**: Policy conditions to require server mode for sensitive profiles
-**Depends on**: Phase 81
-**Research**: Unlikely (extends existing policy schema)
-**Plans**: 3
-**Status**: Complete (2026-01-20)
-
-Plans:
-- [x] 82-01: Require server effect schema (EffectRequireServer, RequiresServerMode flag) — completed 2026-01-20
-- [x] 82-02: CLI error handling for require_server denials — completed 2026-01-20
-- [x] 82-03: Server integration tests and documentation — completed 2026-01-20
-
-#### Phase 83: Server Mode Testing
-
-**Goal**: Comprehensive testing for server mode and revocation timing
-**Depends on**: Phase 82
-**Research**: Unlikely (extends existing test patterns)
-**Plans**: 3
-
-Plans:
-- [x] 83-01: Server integration tests (revocation check fail-closed/fail-open) — completed 2026-01-20
-- [x] 83-02: Server session CLI tests (list, detail, revoke commands) — completed 2026-01-20
-- [x] 83-03: Server load tests (HTTP load, revocation timing, concurrent stress) — completed 2026-01-20
+See [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) for full details.
 
 </details>
 
@@ -493,7 +414,7 @@ Plans:
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
-| v1.10 Real-time Revocation | 78-83 | 17/17 | ✅ Complete | 2026-01-20 |
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
+| v1.10 Real-time Revocation | 78-83 | 15/15 | ✅ Complete | 2026-01-20 |
 
 **Totals:** 13 milestones shipped (84.1 phases, 148 plans)
