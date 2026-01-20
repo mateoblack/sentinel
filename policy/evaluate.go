@@ -17,12 +17,13 @@ type Request struct {
 
 // Decision represents the outcome of policy evaluation.
 type Decision struct {
-	Effect      Effect
-	MatchedRule string
-	Reason      string
-	RuleIndex   int        // Position of matched rule in policy (0-based, -1 if no match)
-	Conditions  *Condition // Copy of matched rule's conditions for logging (nil for default deny)
-	EvaluatedAt time.Time  // Timestamp when evaluation occurred
+	Effect            Effect
+	MatchedRule       string
+	Reason            string
+	RuleIndex         int           // Position of matched rule in policy (0-based, -1 if no match)
+	Conditions        *Condition    // Copy of matched rule's conditions for logging (nil for default deny)
+	EvaluatedAt       time.Time     // Timestamp when evaluation occurred
+	MaxServerDuration time.Duration // Policy-imposed cap on server mode session duration (0 = no cap)
 }
 
 // String returns a human-readable representation of the decision.
@@ -59,12 +60,13 @@ func Evaluate(policy *Policy, req *Request) Decision {
 			// Copy conditions to avoid reference to original
 			conditionsCopy := rule.Conditions
 			return Decision{
-				Effect:      rule.Effect,
-				MatchedRule: rule.Name,
-				Reason:      rule.Reason,
-				RuleIndex:   i,
-				Conditions:  &conditionsCopy,
-				EvaluatedAt: evaluatedAt,
+				Effect:            rule.Effect,
+				MatchedRule:       rule.Name,
+				Reason:            rule.Reason,
+				RuleIndex:         i,
+				Conditions:        &conditionsCopy,
+				EvaluatedAt:       evaluatedAt,
+				MaxServerDuration: rule.MaxServerDuration,
 			}
 		}
 	}

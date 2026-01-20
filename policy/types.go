@@ -4,6 +4,8 @@
 // and time constraints.
 package policy
 
+import "time"
+
 // Policy is the top-level container for access rules.
 // It contains a version identifier and a list of rules that are
 // evaluated in order to determine access decisions.
@@ -17,10 +19,11 @@ type Policy struct {
 // the access decision. Each rule specifies an effect (allow/deny),
 // conditions that must match, and an optional reason for logging.
 type Rule struct {
-	Name       string    `yaml:"name" json:"name"`
-	Effect     Effect    `yaml:"effect" json:"effect"`
-	Conditions Condition `yaml:"conditions" json:"conditions"`
-	Reason     string    `yaml:"reason,omitempty" json:"reason,omitempty"`
+	Name              string        `yaml:"name" json:"name"`
+	Effect            Effect        `yaml:"effect" json:"effect"`
+	Conditions        Condition     `yaml:"conditions" json:"conditions"`
+	Reason            string        `yaml:"reason,omitempty" json:"reason,omitempty"`
+	MaxServerDuration time.Duration `yaml:"max_server_duration,omitempty" json:"max_server_duration,omitempty"`
 }
 
 // Effect is the outcome of a matched rule.
