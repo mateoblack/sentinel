@@ -1134,6 +1134,78 @@ func TestSentinelServer_ModeCondition_EmptyModeAllowsServer(t *testing.T) {
 }
 
 // ============================================================================
+// require_server effect tests - verify server mode allows require_server rules
+// ============================================================================
+
+func TestSentinelServer_RequireServerEffect_Allowed(t *testing.T) {
+	// Create policy with require_server effect
+	requireServerPolicy := &policy.Policy{
+		Version: "1",
+		Rules: []policy.Rule{
+			{
+				Name:   "prod-requires-server",
+				Effect: policy.EffectRequireServer,
+				Conditions: policy.Condition{
+					Profiles: []string{"production"},
+				},
+				Reason: "Production requires server mode",
+			},
+		},
+	}
+
+	mockLoader := testutil.NewMockPolicyLoader()
+	mockLoader.Policies["/sentinel/policies/test"] = requireServerPolicy
+
+	mockProvider := &MockCredentialProvider{
+		CredentialResult: &CredentialResult{
+			AccessKeyID:     "AKIAIOSFODNN7EXAMPLE",
+			SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+			SessionToken:    "token",
+			Expiration:      time.Now().Add(15 * time.Minute),
+			CanExpire:       true,
+			SourceIdentity:  "sentinel:testuser:abc123",
+			RoleARN:         "arn:aws:iam::123456789012:role/TestRole",
+		},
+	}
+
+	config := SentinelServerConfig{
+		ProfileName:        "production",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	// Make request
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "test-token")
+	rec := httptest.NewRecorder()
+
+	server.DefaultRoute(rec, req)
+
+	// Should allow - server mode satisfies require_server
+	if rec.Code != http.StatusOK {
+		t.Errorf("Status = %d, want %d. Body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	// Verify credentials returned
+	var creds map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&creds); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if creds["AccessKeyId"] != "AKIAIOSFODNN7EXAMPLE" {
+		t.Errorf("AccessKeyId = %v, want AKIAIOSFODNN7EXAMPLE", creds["AccessKeyId"])
+	}
+}
+
+// ============================================================================
 // Session tracking tests
 // ============================================================================
 
