@@ -11,10 +11,10 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 
 Phase: 83 (Server Mode Testing)
 Plan: 3 of 3 in current phase
-Status: Plan 03 complete, completing phase
-Last activity: 2026-01-20 — Completed 83-01-PLAN.md (server integration tests)
+Status: Phase complete
+Last activity: 2026-01-20 — Completed 83-03-PLAN.md (server load tests)
 
-Progress: █████░░░░░ 55% (v1.10 Real-time Revocation - 5/6 phases, 14/? plans)
+Progress: ██████░░░░ 60% (v1.10 Real-time Revocation - 6/6 phases complete)
 
 ## Milestone Summary
 
@@ -494,6 +494,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Test active session happy path: credentials issued and Touch called for tracking
 - All tests use MockSessionStore with GetResult/GetErr configuration for session state simulation
 
+**v1.10 Server Mode Testing decisions (Phase 83-03):**
+- Call DefaultRoute directly (not HTTP server) to bypass network overhead in load tests
+- Use 100 req/sec for 10 seconds as server load test target (vs 1000 req/sec for pure policy evaluation)
+- Revocation timing test uses 5 workers at 100ms intervals (~50 req/sec) for coverage with reasonable test duration
+- Concurrent stress test uses 50 goroutines x 100 requests = 5000 total requests for thread-safety verification
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -505,9 +511,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 83-01-PLAN.md (server integration tests)
+Stopped at: Completed 83-03-PLAN.md (server load tests)
 Resume file: None
-Next: Phase 83 complete - ready for phase completion
+Next: Milestone v1.10 complete - ready for milestone completion
 
 ## Roadmap Evolution
 

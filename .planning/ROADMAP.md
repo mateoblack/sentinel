@@ -17,7 +17,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.7.1 Security Patch** — [milestones/v1.7.1-ROADMAP.md](milestones/v1.7.1-ROADMAP.md) (Phases 69-72, shipped 2026-01-19)
 - ✅ **v1.8 Credential Flow UX** — [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) (Phases 73-75, shipped 2026-01-19)
 - ✅ **v1.9 SSO Profile Support** — [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) (Phases 76-77, shipped 2026-01-19)
-- 🚧 **v1.10 Real-time Revocation** — Phases 78-83 (in progress)
+- ✅ **v1.10 Real-time Revocation** — [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) (Phases 78-83, shipped 2026-01-20)
 - ✅ **v1.10.1 SSO Credential Fixes** — [milestones/v1.10.1-ROADMAP.md](milestones/v1.10.1-ROADMAP.md) (Phase 78.1, shipped 2026-01-19)
 
 ## Completed Milestones
@@ -385,7 +385,8 @@ Plans:
 
 </details>
 
-### 🚧 v1.10 Real-time Revocation (In Progress)
+<details>
+<summary>✅ v1.10 Real-time Revocation (Phases 78-83) — SHIPPED 2026-01-20</summary>
 
 **Milestone Goal:** Enable instant credential revocation via server mode - each credential request checks Sentinel policy, allowing real-time blocking of access.
 
@@ -468,10 +469,14 @@ Plans:
 **Goal**: Comprehensive testing for server mode and revocation timing
 **Depends on**: Phase 82
 **Research**: Unlikely (extends existing test patterns)
-**Plans**: TBD
+**Plans**: 3
 
 Plans:
-- [ ] 83-01: TBD
+- [x] 83-01: Server integration tests (revocation check fail-closed/fail-open) — completed 2026-01-20
+- [x] 83-02: Server session CLI tests (list, detail, revoke commands) — completed 2026-01-20
+- [x] 83-03: Server load tests (HTTP load, revocation timing, concurrent stress) — completed 2026-01-20
+
+</details>
 
 ## Progress (All Milestones)
 
@@ -488,7 +493,7 @@ Plans:
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
-| v1.10 Real-time Revocation | 78-83 | 14/? | 🚧 In Progress | - |
+| v1.10 Real-time Revocation | 78-83 | 17/17 | ✅ Complete | 2026-01-20 |
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 
-**Totals:** 12 milestones shipped (78.1 phases, 131 plans), 1 in progress (v1.10)
+**Totals:** 13 milestones shipped (84.1 phases, 148 plans)
