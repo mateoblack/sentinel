@@ -14,10 +14,11 @@ import (
 
 // ShellInitCommandInput contains the input for the shell init command.
 type ShellInitCommandInput struct {
-	PolicyRoot string
-	Region     string
-	AWSProfile string
-	Format     string // "bash", "zsh", or empty for auto-detect
+	PolicyRoot    string
+	Region        string
+	AWSProfile    string
+	Format        string // "bash", "zsh", or empty for auto-detect
+	IncludeServer bool   // Generate -server variants for real-time revocation mode
 
 	// ShellGenerator is an optional ShellGenerator implementation for testing.
 	// If nil, a new ShellGenerator will be created using AWS config.
@@ -57,6 +58,10 @@ func ConfigureShellInitCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("format", "Output format: bash, zsh (default: auto-detect from $SHELL)").
 		StringVar(&input.Format)
+
+	cmd.Flag("include-server", "Also generate -server variants for real-time revocation mode").
+		Default("false").
+		BoolVar(&input.IncludeServer)
 
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := ShellInitCommand(context.Background(), input)
@@ -108,8 +113,9 @@ func ShellInitCommand(ctx context.Context, input ShellInitCommandInput) error {
 	// Detect shell format
 	format := detectShellFormat(input.Format)
 
-	// Generate script
-	script := shell.GenerateScript(profiles, input.PolicyRoot, format)
+	// Generate script with options
+	opts := shell.GenerateOptions{IncludeServer: input.IncludeServer}
+	script := shell.GenerateScriptWithOptions(profiles, input.PolicyRoot, format, opts)
 
 	// Print script to stdout (for eval)
 	fmt.Fprint(stdout, script)
@@ -119,7 +125,11 @@ func ShellInitCommand(ctx context.Context, input ShellInitCommandInput) error {
 		fmt.Fprintf(stderr, "# No profiles found under %s\n", input.PolicyRoot)
 		fmt.Fprintf(stderr, "# Run 'sentinel init' to create your first policy\n")
 	} else {
-		fmt.Fprintf(stderr, "# Generated %d shell function(s) for format: %s\n", len(profiles), format)
+		if input.IncludeServer {
+			fmt.Fprintf(stderr, "# Generated %d shell function(s) (%d with server mode) for format: %s\n", len(profiles), len(profiles), format)
+		} else {
+			fmt.Fprintf(stderr, "# Generated %d shell function(s) for format: %s\n", len(profiles), format)
+		}
 		fmt.Fprintf(stderr, "# Usage: Add to your shell profile: eval \"$(sentinel shell init)\"\n")
 	}
 

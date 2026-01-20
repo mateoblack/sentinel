@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -238,13 +239,14 @@ func TestDetectShellFormat_WithEmptyShellEnv(t *testing.T) {
 func testableShellInitCommand(ctx context.Context, input ShellInitCommandInput, profiles []shell.ProfileInfo) (stdout, stderr string, err error) {
 	// Create mock generator using the shell package's exported test helper
 	// Since we can't easily mock the generator, we'll test the command
-	// structure through the actual shell.GenerateScript function.
+	// structure through the actual shell.GenerateScriptWithOptions function.
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 
-	// Generate script directly
+	// Generate script with options
 	format := detectShellFormat(input.Format)
-	script := shell.GenerateScript(profiles, input.PolicyRoot, format)
+	opts := shell.GenerateOptions{IncludeServer: input.IncludeServer}
+	script := shell.GenerateScriptWithOptions(profiles, input.PolicyRoot, format, opts)
 
 	// Write to buffers
 	stdoutBuf.WriteString(script)
@@ -253,7 +255,11 @@ func testableShellInitCommand(ctx context.Context, input ShellInitCommandInput, 
 		stderrBuf.WriteString("# No profiles found under " + input.PolicyRoot + "\n")
 		stderrBuf.WriteString("# Run 'sentinel init' to create your first policy\n")
 	} else {
-		stderrBuf.WriteString("# Generated " + string(rune('0'+len(profiles))) + " shell function(s) for format: " + string(format) + "\n")
+		if input.IncludeServer {
+			stderrBuf.WriteString(fmt.Sprintf("# Generated %d shell function(s) (%d with server mode) for format: %s\n", len(profiles), len(profiles), format))
+		} else {
+			stderrBuf.WriteString(fmt.Sprintf("# Generated %d shell function(s) for format: %s\n", len(profiles), format))
+		}
 		stderrBuf.WriteString("# Usage: Add to your shell profile: eval \"$(sentinel shell init)\"\n")
 	}
 
@@ -320,5 +326,86 @@ func TestShellInitCommand_WithProfiles(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "eval") {
 		t.Error("Stderr should contain usage hint")
+	}
+}
+
+func TestShellInitCommand_IncludeServerFalse(t *testing.T) {
+	input := ShellInitCommandInput{
+		PolicyRoot:    "/sentinel/policies",
+		Format:        "bash",
+		IncludeServer: false,
+	}
+
+	profiles := []shell.ProfileInfo{
+		{Name: "production", PolicyPath: "/sentinel/policies/production"},
+	}
+
+	stdout, stderr, err := testableShellInitCommand(context.Background(), input, profiles)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Should have standard function
+	if !strings.Contains(stdout, "sentinel-production()") {
+		t.Error("Stdout should contain sentinel-production function")
+	}
+
+	// Should NOT have server variant
+	if strings.Contains(stdout, "sentinel-production-server()") {
+		t.Error("Stdout should NOT contain sentinel-production-server function when IncludeServer=false")
+	}
+
+	// Stderr should NOT mention server mode
+	if strings.Contains(stderr, "with server mode") {
+		t.Error("Stderr should NOT mention server mode when IncludeServer=false")
+	}
+}
+
+func TestShellInitCommand_IncludeServerTrue(t *testing.T) {
+	input := ShellInitCommandInput{
+		PolicyRoot:    "/sentinel/policies",
+		Format:        "bash",
+		IncludeServer: true,
+	}
+
+	profiles := []shell.ProfileInfo{
+		{Name: "production", PolicyPath: "/sentinel/policies/production"},
+		{Name: "staging", PolicyPath: "/sentinel/policies/staging"},
+	}
+
+	stdout, stderr, err := testableShellInitCommand(context.Background(), input, profiles)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Should have standard functions
+	if !strings.Contains(stdout, "sentinel-production()") {
+		t.Error("Stdout should contain sentinel-production function")
+	}
+	if !strings.Contains(stdout, "sentinel-staging()") {
+		t.Error("Stdout should contain sentinel-staging function")
+	}
+
+	// Should have server variants
+	if !strings.Contains(stdout, "sentinel-production-server()") {
+		t.Error("Stdout should contain sentinel-production-server function")
+	}
+	if !strings.Contains(stdout, "sentinel-staging-server()") {
+		t.Error("Stdout should contain sentinel-staging-server function")
+	}
+
+	// Server variants should include --server flag
+	if !strings.Contains(stdout, "sentinel exec --server --profile production") {
+		t.Error("Server variant should include --server flag for production")
+	}
+	if !strings.Contains(stdout, "sentinel exec --server --profile staging") {
+		t.Error("Server variant should include --server flag for staging")
+	}
+
+	// Stderr should mention server mode count
+	if !strings.Contains(stderr, "with server mode") {
+		t.Error("Stderr should mention server mode when IncludeServer=true")
 	}
 }
