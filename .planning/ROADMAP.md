@@ -19,6 +19,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.9 SSO Profile Support** — [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) (Phases 76-77, shipped 2026-01-19)
 - ✅ **v1.10.1 SSO Credential Fixes** — [milestones/v1.10.1-ROADMAP.md](milestones/v1.10.1-ROADMAP.md) (Phase 78.1, shipped 2026-01-19)
 - ✅ **v1.10 Real-time Revocation** — [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) (Phases 78-83, shipped 2026-01-20)
+- 🚧 **v1.11 Shell Integration** — Phases 84-87 (in progress)
 
 ## Completed Milestones
 
@@ -399,6 +400,51 @@ See [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) for full details.
 
 </details>
 
+### 🚧 v1.11 Shell Integration (In Progress)
+
+**Milestone Goal:** Developer UX improvement - reduce daily boilerplate with auto-generated shell functions for all configured Sentinel profiles.
+
+#### Phase 84: Shell Init Command
+
+**Goal**: Core `sentinel shell init` with profile detection and function generation
+**Depends on**: v1.10 complete
+**Research**: Unlikely (internal Go patterns, existing SSM status command to reuse)
+**Plans**: TBD
+
+Plans:
+- [ ] 84-01: TBD (run /gsd:plan-phase 84 to break down)
+
+#### Phase 85: Server Mode Variants
+
+**Goal**: Add `-server` suffix functions for real-time revocation mode
+**Depends on**: Phase 84
+**Research**: Unlikely (extends Phase 84 with --server flag, internal patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 85-01: TBD
+
+#### Phase 86: Shell Completions
+
+**Goal**: Tab completion for generated functions (bash and zsh)
+**Depends on**: Phase 85
+**Research**: Likely (shell completion systems differ between bash/zsh)
+**Research topics**: bash complete builtin, zsh compdef, command argument completion
+**Plans**: TBD
+
+Plans:
+- [ ] 86-01: TBD
+
+#### Phase 87: Documentation & Testing
+
+**Goal**: Shell integration docs, tests, and examples
+**Depends on**: Phase 86
+**Research**: Unlikely (documentation and testing follow established patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 87-01: TBD
+
 ## Progress (All Milestones)
 
 | Milestone | Phases | Plans | Status | Shipped |
@@ -416,5 +462,6 @@ See [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) for full details.
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 | v1.10 Real-time Revocation | 78-83 | 15/15 | ✅ Complete | 2026-01-20 |
+| v1.11 Shell Integration | 84-87 | 0/? | 🚧 In progress | - |
 
 **Totals:** 13 milestones shipped (84.1 phases, 148 plans)

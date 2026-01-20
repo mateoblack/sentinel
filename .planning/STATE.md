@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.10 Real-time Revocation complete — ready for next milestone
+**Current focus:** v1.11 Shell Integration — auto-generated shell functions for Sentinel profiles
 
 ## Current Position
 
-Phase: 83 (Server Mode Testing) — MILESTONE COMPLETE
-Plan: All plans complete
-Status: v1.10 shipped
-Last activity: 2026-01-20 — Milestone v1.10 complete
+Phase: 84 of 87 (Shell Init Command)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-20 — Milestone v1.11 created
 
-Progress: ██████████ 100% (v1.10 Real-time Revocation - SHIPPED)
+Progress: ░░░░░░░░░░ 0% (v1.11 Shell Integration)
 
 ## Milestone Summary
 
@@ -521,9 +521,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Milestone v1.10 shipped
+Stopped at: Milestone v1.11 initialization
 Resume file: None
-Next: Plan next milestone or close project
+Next: Plan Phase 84 (Shell Init Command)
 
 ## Roadmap Evolution
 
@@ -540,3 +540,4 @@ Next: Plan next milestone or close project
 - Milestone v1.9 shipped: 2026-01-19 — SSO Profile Support (Phases 76-77) - Fix --profile SSO credential loading
 - Milestone v1.10.1 shipped: 2026-01-19 — SSO Credential Fixes (Phase 78.1) - Test coverage for bootstrap and whoami SSO profile handling
 - Milestone v1.10 shipped: 2026-01-20 — Real-time Revocation (Phases 78-83) - Server mode for instant credential revocation
+- Milestone v1.11 created: 2026-01-20 — Shell Integration (Phases 84-87) - Auto-generated shell functions for profiles
