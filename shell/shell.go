@@ -141,9 +141,13 @@ func GenerateScriptWithOptions(profiles []ProfileInfo, policyRoot string, format
 		return sb.String()
 	}
 
+	// Collect all function names for completion registration
+	var allFuncNames []string
+
 	// Generate a function for each profile
 	for _, profile := range profiles {
 		funcName := sanitizeFunctionName(profile.Name)
+		allFuncNames = append(allFuncNames, funcName)
 
 		// Standard function
 		sb.WriteString(fmt.Sprintf("%s() {\n", funcName))
@@ -154,13 +158,33 @@ func GenerateScriptWithOptions(profiles []ProfileInfo, policyRoot string, format
 
 		// Server mode variant (if requested)
 		if opts.IncludeServer {
-			sb.WriteString(fmt.Sprintf("%s-server() {\n", funcName))
+			serverFuncName := funcName + "-server"
+			allFuncNames = append(allFuncNames, serverFuncName)
+
+			sb.WriteString(fmt.Sprintf("%s() {\n", serverFuncName))
 			sb.WriteString(fmt.Sprintf("    sentinel exec --server --profile %s --policy-parameter %s -- \"$@\"\n",
 				shellEscape(profile.Name), shellEscape(profile.PolicyPath)))
 			sb.WriteString("}\n")
 			sb.WriteString("\n")
 		}
 	}
+
+	// Add completion registrations for all generated functions
+	// Bash completion
+	sb.WriteString("# Completion registrations (bash)\n")
+	sb.WriteString("if [[ -n \"${BASH_VERSION:-}\" ]]; then\n")
+	for _, funcName := range allFuncNames {
+		sb.WriteString(fmt.Sprintf("    complete -o default -o bashdefault %s\n", funcName))
+	}
+	sb.WriteString("fi\n\n")
+
+	// Zsh completion
+	sb.WriteString("# Completion registrations (zsh)\n")
+	sb.WriteString("if [[ -n \"${ZSH_VERSION:-}\" ]]; then\n")
+	for _, funcName := range allFuncNames {
+		sb.WriteString(fmt.Sprintf("    compdef _command_names %s\n", funcName))
+	}
+	sb.WriteString("fi\n")
 
 	return sb.String()
 }
