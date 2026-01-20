@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 81 (Session Management)
-Plan: 1 of 4 in current phase
-Status: Plan 01 complete
-Last activity: 2026-01-20 — Completed 81-01-PLAN.md
+Plan: 2 of 4 in current phase
+Status: Plan 02 complete
+Last activity: 2026-01-20 — Completed 81-02-PLAN.md
 
-Progress: ████░░░░░░ 42% (v1.10 Real-time Revocation - 3/6 phases, 6/? plans)
+Progress: ████░░░░░░ 42% (v1.10 Real-time Revocation - 3/6 phases, 7/? plans)
 
 ## Milestone Summary
 
@@ -452,6 +452,13 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - FindActiveByServerInstance queries by server_instance_id with status filter
 - Session package follows breakglass package patterns exactly
 
+**v1.10 Session Integration decisions (Phase 81-02):**
+- Session tracking is best-effort: failures logged but don't block server startup or credential serving
+- Session Touch is fire-and-forget to not impact credential hot path latency
+- Sessions marked "expired" on shutdown (not "revoked") for accurate state representation
+- ServerInstanceID auto-generated via identity.NewRequestID() if not provided
+- --session-table flag is opt-in (no session tracking without explicit flag)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -463,9 +470,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 81-01-PLAN.md (Phase 81 Plan 01 complete)
+Stopped at: Completed 81-02-PLAN.md (Phase 81 Plan 02 complete)
 Resume file: None
-Next: /gsd:execute-plan 81-02
+Next: /gsd:execute-plan 81-03
 
 ## Roadmap Evolution
 
