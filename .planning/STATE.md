@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 83 (Server Mode Testing)
-Plan: 2 of 3 in current phase
-Status: Plan 02 complete, continuing phase
-Last activity: 2026-01-20 — Completed 83-02-PLAN.md (server-revoke command tests)
+Plan: 3 of 3 in current phase
+Status: Plan 03 complete, completing phase
+Last activity: 2026-01-20 — Completed 83-01-PLAN.md (server integration tests)
 
 Progress: █████░░░░░ 55% (v1.10 Real-time Revocation - 5/6 phases, 14/? plans)
 
@@ -488,6 +488,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Tests use session.Revoke directly rather than reimplementing revocation logic
 - Test environment limitation: 1password SDK CGO dependency prevents running CLI tests (tests validated via go fmt)
 
+**v1.10 Server Mode Testing decisions (Phase 83-01):**
+- Test revocation check fail-closed for security: HTTP 403 when session revoked
+- Test revocation check fail-open for availability: credentials issued despite store errors
+- Test active session happy path: credentials issued and Touch called for tracking
+- All tests use MockSessionStore with GetResult/GetErr configuration for session state simulation
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -499,9 +505,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 83-02-PLAN.md (server-revoke command tests)
+Stopped at: Completed 83-01-PLAN.md (server integration tests)
 Resume file: None
-Next: /gsd:execute-plan 83-03
+Next: Phase 83 complete - ready for phase completion
 
 ## Roadmap Evolution
 
