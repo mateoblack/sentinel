@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 
 ## Current Position
 
-Phase: 82 (Server Mode Enforcement)
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-01-20 — Completed 82-03-PLAN.md
+Phase: 83 (Server Mode Testing)
+Plan: 2 of 3 in current phase
+Status: Plan 02 complete, continuing phase
+Last activity: 2026-01-20 — Completed 83-02-PLAN.md (server-revoke command tests)
 
-Progress: █████░░░░░ 55% (v1.10 Real-time Revocation - 5/6 phases, 12/? plans)
+Progress: █████░░░░░ 55% (v1.10 Real-time Revocation - 5/6 phases, 14/? plans)
 
 ## Milestone Summary
 
@@ -482,6 +482,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - require_server denials checked BEFORE approval/break-glass bypass - server mode cannot be bypassed
 - Actionable error messages: credentials command suggests full exec --server pattern, exec command suggests --server flag
 
+**v1.10 Server Mode Testing decisions (Phase 83-02):**
+- testableServerRevokeCommand returns *session.ServerSession for direct verification in tests
+- All server-revoke tests committed together as they share the testable command function
+- Tests use session.Revoke directly rather than reimplementing revocation logic
+- Test environment limitation: 1password SDK CGO dependency prevents running CLI tests (tests validated via go fmt)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -493,9 +499,9 @@ None — clean start for v1.10.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 82-03-PLAN.md (Phase 82 complete)
+Stopped at: Completed 83-02-PLAN.md (server-revoke command tests)
 Resume file: None
-Next: /gsd:plan-phase 83
+Next: /gsd:execute-plan 83-03
 
 ## Roadmap Evolution
 
