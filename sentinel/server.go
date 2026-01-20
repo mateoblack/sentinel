@@ -19,6 +19,7 @@ import (
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
+	"github.com/byteness/aws-vault/v7/session"
 )
 
 const (
@@ -96,6 +97,15 @@ type SentinelServerConfig struct {
 
 	// LazyLoad defers credential prefetch when true.
 	LazyLoad bool
+
+	// SessionStore is the optional session store for tracking active sessions.
+	// If nil, session tracking is disabled (best-effort feature).
+	SessionStore session.Store
+
+	// ServerInstanceID is a unique identifier for this server instance.
+	// If empty, a new ID is generated using identity.NewRequestID().
+	// Used for session correlation and multi-server scenarios.
+	ServerInstanceID string
 }
 
 // SentinelServer is an HTTP server that serves policy-gated AWS credentials.
@@ -105,6 +115,10 @@ type SentinelServer struct {
 	authToken string
 	server    http.Server
 	config    SentinelServerConfig
+
+	// sessionID is the current session ID (created on startup if SessionStore is configured).
+	// Empty string if session tracking is disabled.
+	sessionID string
 }
 
 // NewSentinelServer creates a new SentinelServer that listens on the specified port.
@@ -140,10 +154,49 @@ func NewSentinelServer(ctx context.Context, config SentinelServerConfig, authTok
 		}
 	}
 
+	// Generate ServerInstanceID if not provided
+	if config.ServerInstanceID == "" {
+		config.ServerInstanceID = identity.NewRequestID()
+	}
+
 	s := &SentinelServer{
 		listener:  listener,
 		authToken: authToken,
 		config:    config,
+	}
+
+	// Create session if SessionStore is configured (best-effort tracking)
+	if config.SessionStore != nil {
+		sessionID := session.NewSessionID()
+		now := time.Now().UTC()
+
+		// Calculate session expiry: use SessionDuration or default
+		sessionDuration := config.SessionDuration
+		if sessionDuration == 0 {
+			sessionDuration = DefaultServerSessionDuration
+		}
+
+		serverSession := &session.ServerSession{
+			ID:               sessionID,
+			User:             config.User,
+			Profile:          config.ProfileName,
+			ServerInstanceID: config.ServerInstanceID,
+			Status:           session.StatusActive,
+			StartedAt:        now,
+			LastAccessAt:     now,
+			ExpiresAt:        now.Add(sessionDuration),
+			RequestCount:     0,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		}
+
+		if err := config.SessionStore.Create(ctx, serverSession); err != nil {
+			// Log error but don't fail server startup - session tracking is best-effort
+			log.Printf("Warning: failed to create session record: %v", err)
+		} else {
+			s.sessionID = sessionID
+			log.Printf("Session created: %s for user %s profile %s", sessionID, config.User, config.ProfileName)
+		}
 	}
 
 	// Set up HTTP router
@@ -294,6 +347,22 @@ func (s *SentinelServer) Serve() error {
 
 // Shutdown gracefully shuts down the server.
 func (s *SentinelServer) Shutdown(ctx context.Context) error {
+	// Mark session as expired if session tracking is enabled
+	if s.sessionID != "" && s.config.SessionStore != nil {
+		sess, err := s.config.SessionStore.Get(ctx, s.sessionID)
+		if err != nil {
+			log.Printf("Warning: failed to get session for shutdown: %v", err)
+		} else if !sess.Status.IsTerminal() {
+			sess.Status = session.StatusExpired
+			sess.UpdatedAt = time.Now().UTC()
+			if updateErr := s.config.SessionStore.Update(ctx, sess); updateErr != nil {
+				log.Printf("Warning: failed to mark session expired on shutdown: %v", updateErr)
+			} else {
+				log.Printf("Session %s marked expired on shutdown", s.sessionID)
+			}
+		}
+	}
+
 	return s.server.Shutdown(ctx)
 }
 
