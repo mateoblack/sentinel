@@ -1262,15 +1262,15 @@ func TestParseHourMinute_EdgeCases(t *testing.T) {
 		{"Afternoon", "17:30", 17, 30},
 		{"Midnight", "00:00", 0, 0},
 		{"End of day", "23:59", 23, 59},
-		{"Empty string", "", 0, 0},                    // len(parts) != 2
-		{"No colon", "0900", 0, 0},                    // len(parts) != 2
-		{"Multiple colons", "09:00:00", 0, 0},         // len(parts) != 2
-		{"Just hour", "09", 0, 0},                     // len(parts) != 2
-		{"Colon only", ":", 0, 0},                     // parts[0] and parts[1] empty
-		{"Leading colon", ":30", 0, 30},               // hour parse fails -> 0
-		{"Trailing colon", "09:", 9, 0},               // minute parse fails -> 0
-		{"Invalid hour chars", "ab:30", 0, 30},        // hour parse fails -> 0
-		{"Invalid minute chars", "09:cd", 9, 0},       // minute parse fails -> 0
+		{"Empty string", "", 0, 0},              // len(parts) != 2
+		{"No colon", "0900", 0, 0},              // len(parts) != 2
+		{"Multiple colons", "09:00:00", 0, 0},   // len(parts) != 2
+		{"Just hour", "09", 0, 0},               // len(parts) != 2
+		{"Colon only", ":", 0, 0},               // parts[0] and parts[1] empty
+		{"Leading colon", ":30", 0, 30},         // hour parse fails -> 0
+		{"Trailing colon", "09:", 9, 0},         // minute parse fails -> 0
+		{"Invalid hour chars", "ab:30", 0, 30},  // hour parse fails -> 0
+		{"Invalid minute chars", "09:cd", 9, 0}, // minute parse fails -> 0
 	}
 
 	for _, tt := range tests {
@@ -1378,4 +1378,111 @@ func TestEvaluate_EdgeCases(t *testing.T) {
 			t.Errorf("expected EffectAllow from first rule, got %v", decision.Effect)
 		}
 	})
+}
+
+func TestMatchesMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		modes    []CredentialMode
+		mode     CredentialMode
+		expected bool
+	}{
+		{"empty list matches any mode", nil, ModeServer, true},
+		{"empty list matches cli", nil, ModeCLI, true},
+		{"server matches server", []CredentialMode{ModeServer}, ModeServer, true},
+		{"server does not match cli", []CredentialMode{ModeServer}, ModeCLI, false},
+		{"multiple modes - server matches", []CredentialMode{ModeServer, ModeCLI}, ModeServer, true},
+		{"multiple modes - cli matches", []CredentialMode{ModeServer, ModeCLI}, ModeCLI, true},
+		{"multiple modes - credential_process no match", []CredentialMode{ModeServer, ModeCLI}, ModeCredentialProcess, false},
+		{"credential_process matches", []CredentialMode{ModeCredentialProcess}, ModeCredentialProcess, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := matchesMode(tt.modes, tt.mode)
+			if result != tt.expected {
+				t.Errorf("matchesMode(%v, %v) = %v, want %v", tt.modes, tt.mode, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestEvaluate_ModeCondition(t *testing.T) {
+	tests := []struct {
+		name       string
+		policy     *Policy
+		request    *Request
+		wantEffect Effect
+		wantRule   string
+	}{
+		{
+			name: "server-only rule matches server mode",
+			policy: &Policy{
+				Version: "1",
+				Rules: []Rule{
+					{Name: "server-only", Effect: EffectAllow, Conditions: Condition{Mode: []CredentialMode{ModeServer}}},
+				},
+			},
+			request:    &Request{User: "alice", Profile: "prod", Time: time.Now(), Mode: ModeServer},
+			wantEffect: EffectAllow,
+			wantRule:   "server-only",
+		},
+		{
+			name: "server-only rule denies cli mode",
+			policy: &Policy{
+				Version: "1",
+				Rules: []Rule{
+					{Name: "server-only", Effect: EffectAllow, Conditions: Condition{Mode: []CredentialMode{ModeServer}}},
+				},
+			},
+			request:    &Request{User: "alice", Profile: "prod", Time: time.Now(), Mode: ModeCLI},
+			wantEffect: EffectDeny,
+			wantRule:   "", // default deny
+		},
+		{
+			name: "no mode condition matches any mode",
+			policy: &Policy{
+				Version: "1",
+				Rules: []Rule{
+					{Name: "any-mode", Effect: EffectAllow, Conditions: Condition{Users: []string{"alice"}}},
+				},
+			},
+			request:    &Request{User: "alice", Profile: "prod", Time: time.Now(), Mode: ModeCredentialProcess},
+			wantEffect: EffectAllow,
+			wantRule:   "any-mode",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decision := Evaluate(tt.policy, tt.request)
+			if decision.Effect != tt.wantEffect {
+				t.Errorf("Effect = %v, want %v", decision.Effect, tt.wantEffect)
+			}
+			if decision.MatchedRule != tt.wantRule {
+				t.Errorf("MatchedRule = %v, want %v", decision.MatchedRule, tt.wantRule)
+			}
+		})
+	}
+}
+
+func TestCredentialMode_IsValid(t *testing.T) {
+	tests := []struct {
+		mode  CredentialMode
+		valid bool
+	}{
+		{ModeServer, true},
+		{ModeCLI, true},
+		{ModeCredentialProcess, true},
+		{"", false},
+		{"invalid", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.mode), func(t *testing.T) {
+			if got := tt.mode.IsValid(); got != tt.valid {
+				t.Errorf("CredentialMode(%q).IsValid() = %v, want %v", tt.mode, got, tt.valid)
+			}
+		})
+	}
 }
