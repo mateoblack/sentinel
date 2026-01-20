@@ -154,6 +154,7 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 		User:    s.config.User,
 		Profile: s.config.ProfileName,
 		Time:    time.Now(),
+		Mode:    policy.ModeServer, // Server mode - per-request evaluation
 	}
 
 	// Load policy

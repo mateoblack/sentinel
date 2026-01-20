@@ -31,12 +31,12 @@ type CredentialsCommandInput struct {
 	Region          string
 	NoSession       bool
 	SessionDuration time.Duration
-	Logger          logging.Logger   // nil means no logging
-	LogFile         string           // Path to log file (empty = no file logging)
-	LogStderr       bool             // Log to stderr (default: false)
-	Store           request.Store    // Optional: for approved request checking (nil = no checking)
-	BreakGlassStore breakglass.Store // Optional: for break-glass checking (nil = no checking)
-	RequireSentinel bool             // Check role enforcement before issuing credentials
+	Logger          logging.Logger       // nil means no logging
+	LogFile         string               // Path to log file (empty = no file logging)
+	LogStderr       bool                 // Log to stderr (default: false)
+	Store           request.Store        // Optional: for approved request checking (nil = no checking)
+	BreakGlassStore breakglass.Store     // Optional: for break-glass checking (nil = no checking)
+	RequireSentinel bool                 // Check role enforcement before issuing credentials
 	DriftChecker    enforce.DriftChecker // Optional: for testing (nil = create from AWS config)
 	Stderr          io.Writer            // Optional: for error output (nil = os.Stderr)
 	STSClient       identity.STSAPI      // Optional: for testing (nil = create from AWS config)
@@ -217,6 +217,7 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		User:    username,
 		Profile: input.ProfileName,
 		Time:    time.Now(),
+		Mode:    policy.ModeCredentialProcess, // credential_process mode - one-time evaluation
 	}
 
 	// 7. Evaluate policy
@@ -292,8 +293,8 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		Region:          input.Region,
 		NoSession:       input.NoSession,
 		SessionDuration: sessionDuration, // May be capped to break-glass remaining time
-		User:            username,         // For SourceIdentity stamping on role assumption
-		RequestID:       requestID,        // For CloudTrail correlation
+		User:            username,        // For SourceIdentity stamping on role assumption
+		RequestID:       requestID,       // For CloudTrail correlation
 	}
 
 	// Retrieve credentials with SourceIdentity stamping (if profile has role_arn)
@@ -330,7 +331,7 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 				} else {
 					fmt.Fprintf(os.Stderr, "Warning: Could not verify Sentinel enforcement for %s\n", creds.RoleARN)
 				}
-			// DriftStatusOK - no warning needed
+				// DriftStatusOK - no warning needed
 			}
 		}
 	}

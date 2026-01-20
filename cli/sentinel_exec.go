@@ -230,6 +230,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		User:    username,
 		Profile: input.ProfileName,
 		Time:    time.Now(),
+		Mode:    policy.ModeCLI, // CLI mode - one-time evaluation
 	}
 
 	// 7. Evaluate policy
