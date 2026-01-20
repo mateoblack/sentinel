@@ -430,10 +430,10 @@ Plans:
 **Depends on**: Phase 85
 **Research**: Likely (shell completion systems differ between bash/zsh)
 **Research topics**: bash complete builtin, zsh compdef, command argument completion
-**Plans**: TBD
+**Plans**: 1/1
 
 Plans:
-- [ ] 86-01: TBD
+- [x] 86-01: Completion registration generation — completed 2026-01-20
 
 #### Phase 87: Documentation & Testing
 
@@ -462,6 +462,6 @@ Plans:
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 | v1.10 Real-time Revocation | 78-83 | 15/15 | ✅ Complete | 2026-01-20 |
-| v1.11 Shell Integration | 84-87 | 2/? | 🚧 In progress | - |
+| v1.11 Shell Integration | 84-87 | 3/? | 🚧 In progress | - |
 
 **Totals:** 13 milestones shipped (84.1 phases, 149 plans)
