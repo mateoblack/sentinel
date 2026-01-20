@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-19)
 ## Current Position
 
 Phase: 79 (Server Policy Integration)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-19 — v1.10.1 milestone complete
+Plan: 1 of ? in current phase
+Status: In progress
+Last activity: 2026-01-20 — Completed 79-01-PLAN.md
 
-Progress: ██░░░░░░░░ 25% (v1.10 Real-time Revocation - 1/6 phases, 2/? plans)
+Progress: ██░░░░░░░░ 25% (v1.10 Real-time Revocation - 1/6 phases, 3/? plans)
 
 ## Milestone Summary
 
@@ -430,6 +430,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Use --profile (not --aws-profile) since whoami has no concept of target profile - it only needs credentials to call STS
 - Same WithSharedConfigProfile pattern for consistency with Phase 76
 
+**v1.10 Credential Mode Schema decisions (Phase 79-01):**
+- CredentialMode type placed after Effect for logical grouping in policy schema
+- Empty mode list matches any mode (wildcard semantics, consistent with profiles/users/days)
+- Mode check added as final condition in matchesConditions (after profiles, users, time)
+- Three modes defined: ModeServer (per-request), ModeCLI (one-time exec), ModeCredentialProcess (one-time credential_process)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -440,10 +446,10 @@ None — clean start for v1.10.
 
 ## Session Continuity
 
-Last session: 2026-01-19
-Stopped at: v1.10.1 milestone complete
+Last session: 2026-01-20
+Stopped at: Completed 79-01-PLAN.md
 Resume file: None
-Next: /gsd:plan-phase 79
+Next: /gsd:execute-plan 79-02
 
 ## Roadmap Evolution
 

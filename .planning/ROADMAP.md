@@ -417,10 +417,11 @@ Plans:
 **Goal**: Hook policy evaluation into credential server requests
 **Depends on**: Phase 78
 **Research**: Unlikely (extends existing policy evaluation)
-**Plans**: TBD
+**Plans**: 2+
 
 Plans:
-- [ ] 79-01: TBD
+- [x] 79-01: Add credential mode awareness to policy schema — completed 2026-01-20
+- [ ] 79-02: TBD
 
 #### Phase 80: Short-lived Sessions
 
@@ -478,7 +479,7 @@ Plans:
 | v1.7.1 Security Patch | 69-72 | 7/7 | ✅ Complete | 2026-01-19 |
 | v1.8 Credential Flow UX | 73-75 | 3/3 | ✅ Complete | 2026-01-19 |
 | v1.9 SSO Profile Support | 76-77 | 6/6 | ✅ Complete | 2026-01-19 |
-| v1.10 Real-time Revocation | 78-83 | 2/? | 🚧 In Progress | - |
+| v1.10 Real-time Revocation | 78-83 | 3/? | 🚧 In Progress | - |
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 
-**Totals:** 12 milestones shipped (78.1 phases, 130 plans), 1 in progress (v1.10)
+**Totals:** 12 milestones shipped (78.1 phases, 131 plans), 1 in progress (v1.10)
