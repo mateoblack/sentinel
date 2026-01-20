@@ -700,3 +700,192 @@ func TestGenerateRandomString(t *testing.T) {
 		}
 	}
 }
+
+// ============================================================================
+// Mode condition tests - verify server mode policy integration
+// ============================================================================
+
+// createModeConditionalPolicy creates a policy that only allows a specific mode.
+func createModeConditionalPolicy(effect policy.Effect, allowedMode policy.CredentialMode) *policy.Policy {
+	return &policy.Policy{
+		Rules: []policy.Rule{
+			{
+				Name:       "mode-conditional",
+				Effect:     effect,
+				Conditions: policy.Condition{Mode: []policy.CredentialMode{allowedMode}},
+			},
+		},
+	}
+}
+
+func TestSentinelServer_ModeCondition_ServerAllowed(t *testing.T) {
+	// Policy allows only server mode
+	mockLoader := testutil.NewMockPolicyLoader()
+	mockLoader.Policies["/sentinel/policies/test"] = createModeConditionalPolicy(policy.EffectAllow, policy.ModeServer)
+
+	mockProvider := &MockCredentialProvider{}
+
+	config := SentinelServerConfig{
+		ProfileName:        "test-profile",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-auth-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	// Create request
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "test-auth-token")
+
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Server should be allowed (policy allows server mode)
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d (server mode allowed), got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestSentinelServer_PassesModeServer(t *testing.T) {
+	// Use a mock policy loader that captures the request
+	mockLogger := testutil.NewMockLogger()
+
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.Logger = mockLogger
+	})
+	defer server.Shutdown(context.Background())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// The logged decision should show the request was for server mode
+	// We can verify this indirectly through the decision log which includes request details
+	if mockLogger.DecisionCount() != 1 {
+		t.Fatalf("Expected 1 decision log, got %d", mockLogger.DecisionCount())
+	}
+
+	// Verify credentials were issued (mode allowed)
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestSentinelServer_ModeCondition_CLIOnlyDeniesServer(t *testing.T) {
+	// Policy allows only CLI mode - should deny server requests
+	mockLoader := testutil.NewMockPolicyLoader()
+	mockLoader.Policies["/sentinel/policies/test"] = createModeConditionalPolicy(policy.EffectAllow, policy.ModeCLI)
+
+	mockProvider := &MockCredentialProvider{}
+
+	config := SentinelServerConfig{
+		ProfileName:        "test-profile",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-auth-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "test-auth-token")
+
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Server should be denied (policy only allows CLI mode)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected status %d (CLI-only policy denies server), got %d", http.StatusForbidden, rec.Code)
+	}
+}
+
+func TestSentinelServer_ModeCondition_CredentialProcessOnlyDeniesServer(t *testing.T) {
+	// Policy allows only credential_process mode - should deny server requests
+	mockLoader := testutil.NewMockPolicyLoader()
+	mockLoader.Policies["/sentinel/policies/test"] = createModeConditionalPolicy(policy.EffectAllow, policy.ModeCredentialProcess)
+
+	mockProvider := &MockCredentialProvider{}
+
+	config := SentinelServerConfig{
+		ProfileName:        "test-profile",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-auth-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "test-auth-token")
+
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Server should be denied (policy only allows credential_process mode)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected status %d (credential_process-only denies server), got %d", http.StatusForbidden, rec.Code)
+	}
+}
+
+func TestSentinelServer_ModeCondition_EmptyModeAllowsServer(t *testing.T) {
+	// Policy with no mode condition (empty) should allow any mode including server
+	mockLoader := testutil.NewMockPolicyLoader()
+	mockLoader.Policies["/sentinel/policies/test"] = &policy.Policy{
+		Rules: []policy.Rule{
+			{
+				Name:   "any-mode",
+				Effect: policy.EffectAllow,
+				// No Mode condition - wildcard
+			},
+		},
+	}
+
+	mockProvider := &MockCredentialProvider{}
+
+	config := SentinelServerConfig{
+		ProfileName:        "test-profile",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-auth-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "test-auth-token")
+
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Server should be allowed (empty mode = wildcard)
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d (empty mode = wildcard allows server), got %d", http.StatusOK, rec.Code)
+	}
+}
