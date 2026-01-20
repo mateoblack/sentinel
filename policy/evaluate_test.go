@@ -1600,3 +1600,73 @@ func TestCredentialMode_IsValid(t *testing.T) {
 		})
 	}
 }
+
+func TestEvaluate_RequireServerEffect(t *testing.T) {
+	tests := []struct {
+		name               string
+		mode               CredentialMode
+		wantEffect         Effect
+		wantRequiresServer bool
+	}{
+		{
+			name:               "server mode allowed",
+			mode:               ModeServer,
+			wantEffect:         EffectAllow,
+			wantRequiresServer: false,
+		},
+		{
+			name:               "cli mode denied",
+			mode:               ModeCLI,
+			wantEffect:         EffectDeny,
+			wantRequiresServer: true,
+		},
+		{
+			name:               "credential_process mode denied",
+			mode:               ModeCredentialProcess,
+			wantEffect:         EffectDeny,
+			wantRequiresServer: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := &Policy{
+				Version: "1",
+				Rules: []Rule{
+					{
+						Name:   "require-server",
+						Effect: EffectRequireServer,
+						Conditions: Condition{
+							Profiles: []string{"production"},
+						},
+					},
+				},
+			}
+
+			req := &Request{
+				User:    "alice",
+				Profile: "production",
+				Time:    time.Now(),
+				Mode:    tt.mode,
+			}
+
+			decision := Evaluate(policy, req)
+
+			if decision.Effect != tt.wantEffect {
+				t.Errorf("Effect = %v, want %v", decision.Effect, tt.wantEffect)
+			}
+			if decision.RequiresServerMode != tt.wantRequiresServer {
+				t.Errorf("RequiresServerMode = %v, want %v", decision.RequiresServerMode, tt.wantRequiresServer)
+			}
+			if decision.MatchedRule != "require-server" {
+				t.Errorf("MatchedRule = %v, want require-server", decision.MatchedRule)
+			}
+		})
+	}
+}
+
+func TestEffectRequireServer_IsValid(t *testing.T) {
+	if !EffectRequireServer.IsValid() {
+		t.Error("EffectRequireServer.IsValid() = false, want true")
+	}
+}
