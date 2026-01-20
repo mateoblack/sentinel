@@ -1743,3 +1743,76 @@ func TestSentinelServer_SessionRevocationStoreError_AllowsCredentials(t *testing
 		t.Error("Expected AccessKeyId in response (fail-open)")
 	}
 }
+
+func TestSentinelServer_SessionActive_AllowsCredentials(t *testing.T) {
+	// Test happy path: active sessions serve credentials normally
+	mockStore := NewMockSessionStore()
+
+	// Create server with session store
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.SessionStore = mockStore
+	})
+	defer server.Shutdown(context.Background())
+
+	// Verify session was created on startup
+	if mockStore.CreateCallCount() != 1 {
+		t.Fatalf("Expected 1 Create call on startup, got %d", mockStore.CreateCallCount())
+	}
+
+	sessionID := server.sessionID
+	if sessionID == "" {
+		t.Fatal("Expected server.sessionID to be set after startup")
+	}
+
+	// Configure mock to return an active session when Get is called
+	// (The mock store already stores active sessions by default, but let's be explicit)
+	activeSession := &session.ServerSession{
+		ID:           sessionID,
+		User:         "testuser",
+		Profile:      "test-profile",
+		Status:       session.StatusActive,
+		StartedAt:    time.Now().Add(-10 * time.Minute),
+		ExpiresAt:    time.Now().Add(50 * time.Minute),
+		RequestCount: 5,
+		CreatedAt:    time.Now().Add(-10 * time.Minute),
+		UpdatedAt:    time.Now(),
+	}
+	mockStore.GetResult = activeSession
+
+	// Track credential provider calls
+	mockProvider := &MockCredentialProvider{}
+	server.config.CredentialProvider = mockProvider
+
+	// Issue a credential request
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Verify HTTP 200 response
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d for active session, got %d. Body: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	// Verify credentials were issued
+	if mockProvider.CallCount() != 1 {
+		t.Errorf("Expected 1 credential request for active session, got %d", mockProvider.CallCount())
+	}
+
+	// Verify Touch was called (session tracking working)
+	if mockStore.TouchCallCount() != 1 {
+		t.Errorf("Expected 1 Touch call for active session, got %d", mockStore.TouchCallCount())
+	}
+
+	// Verify response contains credentials
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if resp["AccessKeyId"] == "" {
+		t.Error("Expected AccessKeyId in response")
+	}
+	if resp["SecretAccessKey"] == "" {
+		t.Error("Expected SecretAccessKey in response")
+	}
+}
