@@ -1205,6 +1205,77 @@ func TestSentinelServer_RequireServerEffect_Allowed(t *testing.T) {
 	}
 }
 
+func TestSentinelServer_RequireServerEffect_Logging(t *testing.T) {
+	// Create policy with require_server effect
+	requireServerPolicy := &policy.Policy{
+		Version: "1",
+		Rules: []policy.Rule{
+			{
+				Name:   "prod-requires-server",
+				Effect: policy.EffectRequireServer,
+				Conditions: policy.Condition{
+					Profiles: []string{"production"},
+				},
+				Reason: "Production requires server mode",
+			},
+		},
+	}
+
+	mockLoader := testutil.NewMockPolicyLoader()
+	mockLoader.Policies["/sentinel/policies/test"] = requireServerPolicy
+
+	mockProvider := &MockCredentialProvider{
+		CredentialResult: &CredentialResult{
+			AccessKeyID:     "AKIAIOSFODNN7EXAMPLE",
+			SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+			SessionToken:    "token",
+			Expiration:      time.Now().Add(15 * time.Minute),
+			CanExpire:       true,
+			SourceIdentity:  "sentinel:testuser:abc123",
+			RoleARN:         "arn:aws:iam::123456789012:role/TestRole",
+		},
+	}
+
+	mockLogger := testutil.NewMockLogger()
+
+	config := SentinelServerConfig{
+		ProfileName:        "production",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		Logger:             mockLogger,
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	// Make request
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "test-token")
+	rec := httptest.NewRecorder()
+
+	server.DefaultRoute(rec, req)
+
+	// Verify logging occurred
+	if mockLogger.DecisionCount() != 1 {
+		t.Fatalf("Expected 1 log entry, got %d", mockLogger.DecisionCount())
+	}
+
+	// The logged effect should be "allow" (converted from require_server)
+	entry := mockLogger.LastDecision()
+	if entry.Effect != "allow" {
+		t.Errorf("Logged effect = %v, want allow", entry.Effect)
+	}
+	if entry.Rule != "prod-requires-server" {
+		t.Errorf("Rule = %v, want prod-requires-server", entry.Rule)
+	}
+}
+
 // ============================================================================
 // Session tracking tests
 // ============================================================================
