@@ -1466,6 +1466,120 @@ func TestEvaluate_ModeCondition(t *testing.T) {
 	}
 }
 
+func TestEvaluate_MaxServerDuration(t *testing.T) {
+	t.Run("Decision includes MaxServerDuration from matched rule", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:              "allow-with-duration-cap",
+					Effect:            EffectAllow,
+					Conditions:        Condition{Profiles: []string{"production"}},
+					MaxServerDuration: 10 * time.Minute,
+				},
+			},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+			Mode:    ModeServer,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.MaxServerDuration != 10*time.Minute {
+			t.Errorf("expected MaxServerDuration 10m, got %v", decision.MaxServerDuration)
+		}
+	})
+
+	t.Run("Decision MaxServerDuration is 0 when rule has no cap", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:       "allow-no-cap",
+					Effect:     EffectAllow,
+					Conditions: Condition{Profiles: []string{"staging"}},
+					// MaxServerDuration not set (defaults to 0)
+				},
+			},
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "staging",
+			Time:    time.Now(),
+			Mode:    ModeServer,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.MaxServerDuration != 0 {
+			t.Errorf("expected MaxServerDuration 0 (no cap), got %v", decision.MaxServerDuration)
+		}
+	})
+
+	t.Run("Default deny has 0 MaxServerDuration", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules:   []Rule{}, // No rules - default deny
+		}
+		req := &Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+			Mode:    ModeServer,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Effect != EffectDeny {
+			t.Errorf("expected default deny, got %v", decision.Effect)
+		}
+		if decision.MaxServerDuration != 0 {
+			t.Errorf("expected MaxServerDuration 0 for default deny, got %v", decision.MaxServerDuration)
+		}
+	})
+
+	t.Run("MaxServerDuration preserved with various durations", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			duration time.Duration
+		}{
+			{"5 minutes", 5 * time.Minute},
+			{"15 minutes", 15 * time.Minute},
+			{"1 hour", 1 * time.Hour},
+			{"30 seconds", 30 * time.Second},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				policy := &Policy{
+					Version: "1",
+					Rules: []Rule{
+						{
+							Name:              "allow-duration",
+							Effect:            EffectAllow,
+							MaxServerDuration: tc.duration,
+						},
+					},
+				}
+				req := &Request{
+					User:    "alice",
+					Profile: "production",
+					Time:    time.Now(),
+				}
+
+				decision := Evaluate(policy, req)
+
+				if decision.MaxServerDuration != tc.duration {
+					t.Errorf("expected MaxServerDuration %v, got %v", tc.duration, decision.MaxServerDuration)
+				}
+			})
+		}
+	})
+}
+
 func TestCredentialMode_IsValid(t *testing.T) {
 	tests := []struct {
 		mode  CredentialMode

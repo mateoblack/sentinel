@@ -848,6 +848,248 @@ func TestSentinelServer_ModeCondition_CredentialProcessOnlyDeniesServer(t *testi
 	}
 }
 
+// ============================================================================
+// Server duration tests - verify short-lived session handling
+// ============================================================================
+
+func TestDefaultServerSessionDuration(t *testing.T) {
+	// Verify the constant is 15 minutes
+	if DefaultServerSessionDuration != 15*time.Minute {
+		t.Errorf("expected DefaultServerSessionDuration to be 15 minutes, got %v", DefaultServerSessionDuration)
+	}
+}
+
+// createPolicyWithMaxDuration creates a policy with a MaxServerDuration cap.
+func createPolicyWithMaxDuration(effect policy.Effect, maxDuration time.Duration) *policy.Policy {
+	return &policy.Policy{
+		Rules: []policy.Rule{
+			{
+				Name:              "duration-capped-rule",
+				Effect:            effect,
+				MaxServerDuration: maxDuration,
+			},
+		},
+	}
+}
+
+func TestSentinelServer_PolicyDurationCapping(t *testing.T) {
+	mockProvider := &MockCredentialProvider{}
+	mockLoader := testutil.NewMockPolicyLoader()
+
+	// Policy allows but caps duration to 5 minutes
+	mockLoader.Policies["/sentinel/policies/test"] = createPolicyWithMaxDuration(policy.EffectAllow, 5*time.Minute)
+
+	config := SentinelServerConfig{
+		ProfileName:        "test-profile",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		SessionDuration:    1 * time.Hour, // Request 1 hour
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-auth-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "test-auth-token")
+
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Check response
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	// Check that credentials were requested with capped duration
+	if mockProvider.CallCount() != 1 {
+		t.Fatalf("Expected 1 credential request, got %d", mockProvider.CallCount())
+	}
+
+	credReq := mockProvider.Calls[0]
+	// Session duration should be capped to 5 minutes from policy
+	if credReq.SessionDuration != 5*time.Minute {
+		t.Errorf("Expected session duration to be capped to 5m, got %v", credReq.SessionDuration)
+	}
+}
+
+func TestSentinelServer_PolicyDurationCap_NoCapWhenZero(t *testing.T) {
+	mockProvider := &MockCredentialProvider{}
+	mockLoader := testutil.NewMockPolicyLoader()
+
+	// Policy allows but has no duration cap (0 = no cap)
+	mockLoader.Policies["/sentinel/policies/test"] = createPolicyWithMaxDuration(policy.EffectAllow, 0)
+
+	config := SentinelServerConfig{
+		ProfileName:        "test-profile",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		SessionDuration:    30 * time.Minute, // Request 30 minutes
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-auth-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "test-auth-token")
+
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	if mockProvider.CallCount() != 1 {
+		t.Fatalf("Expected 1 credential request, got %d", mockProvider.CallCount())
+	}
+
+	credReq := mockProvider.Calls[0]
+	// Session duration should not be capped (policy has 0 = no cap)
+	if credReq.SessionDuration != 30*time.Minute {
+		t.Errorf("Expected session duration 30m (no cap), got %v", credReq.SessionDuration)
+	}
+}
+
+func TestSentinelServer_PolicyAndBreakGlassCapInteraction(t *testing.T) {
+	// Test that the smallest cap wins: policy cap vs break-glass remaining time
+	mockProvider := &MockCredentialProvider{}
+	mockLoader := testutil.NewMockPolicyLoader()
+	mockStore := testutil.NewMockBreakGlassStore()
+
+	// Policy caps at 10 minutes
+	mockLoader.Policies["/sentinel/policies/test"] = createPolicyWithMaxDuration(policy.EffectDeny, 10*time.Minute)
+
+	// Break-glass expires in 5 minutes (smaller than policy cap)
+	bgExpiry := time.Now().Add(5 * time.Minute)
+	mockStore.ListByInvokerFunc = func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+		return []*breakglass.BreakGlassEvent{
+			{
+				ID:        "bg-cap-test",
+				Invoker:   "testuser",
+				Profile:   "test-profile",
+				Status:    breakglass.StatusActive,
+				ExpiresAt: bgExpiry,
+				CreatedAt: time.Now().Add(-5 * time.Minute),
+			},
+		}, nil
+	}
+
+	config := SentinelServerConfig{
+		ProfileName:        "test-profile",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		BreakGlassStore:    mockStore,
+		SessionDuration:    1 * time.Hour, // Request 1 hour
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-auth-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "test-auth-token")
+
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Should succeed via break-glass override
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	if mockProvider.CallCount() != 1 {
+		t.Fatalf("Expected 1 credential request, got %d", mockProvider.CallCount())
+	}
+
+	credReq := mockProvider.Calls[0]
+	// Break-glass remaining (5 min) is smaller than policy cap (10 min)
+	// so should be capped to ~5 minutes
+	if credReq.SessionDuration > 6*time.Minute {
+		t.Errorf("Expected session duration to be capped to ~5m (break-glass remaining), got %v", credReq.SessionDuration)
+	}
+}
+
+func TestSentinelServer_PolicyCapSmallerThanBreakGlass(t *testing.T) {
+	// Test when policy cap is smaller than break-glass remaining time
+	mockProvider := &MockCredentialProvider{}
+	mockLoader := testutil.NewMockPolicyLoader()
+	mockStore := testutil.NewMockBreakGlassStore()
+
+	// Policy caps at 3 minutes
+	mockLoader.Policies["/sentinel/policies/test"] = createPolicyWithMaxDuration(policy.EffectDeny, 3*time.Minute)
+
+	// Break-glass expires in 30 minutes (larger than policy cap)
+	bgExpiry := time.Now().Add(30 * time.Minute)
+	mockStore.ListByInvokerFunc = func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+		return []*breakglass.BreakGlassEvent{
+			{
+				ID:        "bg-larger-test",
+				Invoker:   "testuser",
+				Profile:   "test-profile",
+				Status:    breakglass.StatusActive,
+				ExpiresAt: bgExpiry,
+				CreatedAt: time.Now().Add(-5 * time.Minute),
+			},
+		}, nil
+	}
+
+	config := SentinelServerConfig{
+		ProfileName:        "test-profile",
+		PolicyParameter:    "/sentinel/policies/test",
+		User:               "testuser",
+		PolicyLoader:       mockLoader,
+		CredentialProvider: mockProvider,
+		BreakGlassStore:    mockStore,
+		SessionDuration:    1 * time.Hour, // Request 1 hour
+		LazyLoad:           true,
+	}
+
+	server, err := NewSentinelServer(context.Background(), config, "test-auth-token", 0)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "test-auth-token")
+
+	rec := httptest.NewRecorder()
+	server.DefaultRoute(rec, req)
+
+	// Should succeed via break-glass override
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	if mockProvider.CallCount() != 1 {
+		t.Fatalf("Expected 1 credential request, got %d", mockProvider.CallCount())
+	}
+
+	credReq := mockProvider.Calls[0]
+	// Policy cap (3 min) is applied first, which is smaller than break-glass remaining (30 min)
+	// So should be capped to 3 minutes from policy
+	if credReq.SessionDuration != 3*time.Minute {
+		t.Errorf("Expected session duration to be capped to 3m (policy cap), got %v", credReq.SessionDuration)
+	}
+}
+
 func TestSentinelServer_ModeCondition_EmptyModeAllowsServer(t *testing.T) {
 	// Policy with no mode condition (empty) should allow any mode including server
 	mockLoader := testutil.NewMockPolicyLoader()

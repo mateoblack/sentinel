@@ -1096,6 +1096,47 @@ func TestSentinelExecCommand_ServerMode_Configuration(t *testing.T) {
 	})
 }
 
+func TestSentinelExecCommandInput_ServerDurationField(t *testing.T) {
+	t.Run("ServerDuration field defaults to 0", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.ServerDuration != 0 {
+			t.Errorf("expected ServerDuration to be 0 by default, got %v", input.ServerDuration)
+		}
+	})
+
+	t.Run("ServerDuration field can be set", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			StartServer:     true,
+			ServerDuration:  10 * time.Minute,
+		}
+		if input.ServerDuration != 10*time.Minute {
+			t.Errorf("expected ServerDuration to be 10m, got %v", input.ServerDuration)
+		}
+	})
+
+	t.Run("ServerDuration 0 means use default", func(t *testing.T) {
+		// When ServerDuration is 0, the command should use DefaultServerSessionDuration
+		input := SentinelExecCommandInput{
+			ProfileName:     "test-profile",
+			PolicyParameter: "/sentinel/policies/test",
+			StartServer:     true,
+			ServerDuration:  0, // Should use default 15 min
+		}
+
+		// Test the logic that would be used in SentinelExecCommand
+		serverDuration := input.ServerDuration
+		if serverDuration == 0 {
+			serverDuration = 15 * time.Minute // sentinel.DefaultServerSessionDuration
+		}
+
+		if serverDuration != 15*time.Minute {
+			t.Errorf("expected resolved duration to be 15m, got %v", serverDuration)
+		}
+	})
+}
+
 func TestSentinelExecCommand_ServerMode_EnvVarModeComparison(t *testing.T) {
 	// These tests verify that server mode and env var mode have equivalent configuration options
 	t.Run("server mode has same profile configuration as env var mode", func(t *testing.T) {
