@@ -111,6 +111,55 @@ rules:
 - Examples: `America/New_York`, `Europe/London`, `UTC`
 - Omit to use local system timezone
 
+### mode
+
+The `mode` condition restricts when a rule applies based on how credentials are being requested. This enables different policies for server mode (per-request evaluation) versus CLI mode (one-time evaluation).
+
+**Valid modes:**
+- `server` - Credentials served via credential server (`sentinel exec --server`)
+- `cli` - Credentials served via exec command (`sentinel exec` without `--server`)
+- `credential_process` - Credentials served via credential_process (`sentinel credentials`)
+
+**Omit for wildcard:** If `mode` is not specified, the rule matches any mode (equivalent to specifying all three modes).
+
+**Examples:**
+
+```yaml
+# Only allow server mode (for real-time revocation control)
+rules:
+  - name: prod-server-only
+    effect: allow
+    conditions:
+      profiles: [production]
+      mode: [server]
+
+# Allow both CLI and credential_process (one-time evaluation modes)
+rules:
+  - name: dev-one-time
+    effect: allow
+    conditions:
+      profiles: [development]
+      mode: [cli, credential_process]
+
+# Allow any mode (omit mode condition)
+rules:
+  - name: staging-any-mode
+    effect: allow
+    conditions:
+      profiles: [staging]
+      # No mode condition = matches any mode
+```
+
+**Security considerations:**
+
+Server mode enables real-time policy enforcement because each credential request is evaluated against the current policy. This provides:
+
+1. **Instant revocation**: Change policy and new credential requests are immediately affected
+2. **Per-request audit**: Every credential fetch is logged with policy decision
+3. **Short-lived credentials**: Server can enforce shorter credential TTLs
+
+For sensitive profiles requiring instant revocation capability, use `mode: [server]` to ensure credentials are only issued through the credential server.
+
 ---
 
 ## Approval Policy
