@@ -18,12 +18,16 @@ CloudTrail tells you Alice deleted the prod database at 2am. She's a senior dev 
 go install github.com/byteness/aws-vault/v7/cmd/sentinel@latest
 
 # Bootstrap policy in SSM
-sentinel init bootstrap --profile dev --plan
-sentinel init bootstrap --profile dev
+sentinel init bootstrap --aws-profile dev --profile dev --plan
+sentinel init bootstrap --aws-profile dev --profile dev
 
 # Use it
 sentinel exec --profile dev --policy-parameter /sentinel/policies/dev \
   -- aws sts get-caller-identity
+
+# Or with server mode (real-time revocation)
+sentinel exec --server --profile dev --policy-parameter /sentinel/policies/dev \
+  -- terraform apply
 ```
 
 ## How It Works
@@ -42,36 +46,94 @@ Every credential issued through Sentinel is stamped with a `SourceIdentity` that
 
 ## Features
 
+### Core
+
 | Feature | Description |
 |---------|-------------|
 | **Policy evaluation** | Allow, deny, or require approval based on user, profile, time windows |
 | **SourceIdentity stamping** | Every session traceable to specific request |
+| **Time-based access** | Restrict access by day of week and hour (e.g., business hours only) |
+| **SSO integration** | Full AWS IAM Identity Center support with auto-login |
+
+### Access Control
+
+| Feature | Description |
+|---------|-------------|
 | **Approval workflows** | Require human approval for sensitive access |
-| **Break-glass access** | Emergency bypass with mandatory justification |
-| **Trust policy enforcement** | AWS rejects bypass attempts |
+| **Break-glass access** | Emergency bypass with mandatory justification and rate limiting |
+| **Trust policy enforcement** | AWS rejects bypass attempts via IAM conditions |
 | **SCP enforcement** | Dangerous actions require Sentinel org-wide |
+
+### Real-time Revocation (Server Mode)
+
+| Feature | Description |
+|---------|-------------|
+| **Server mode** | `--server` flag for per-request policy evaluation |
+| **Instant revocation** | Change policy or revoke session, next request denied |
+| **Session tracking** | Track active sessions in DynamoDB |
+| **require_server effect** | Force server mode for sensitive profiles |
+
+```bash
+# Long-running process with revocation capability
+sentinel exec --server --session-table sentinel-sessions \
+  --profile prod --policy-parameter /sentinel/policies/prod \
+  -- terraform apply
+
+# Revoke a session instantly
+sentinel server-revoke SESSION_ID --reason "Suspicious activity" \
+  --table sentinel-sessions --region us-east-1
+```
+
+### Operations & Onboarding
+
+| Feature | Description |
+|---------|-------------|
+| **Bootstrap commands** | `sentinel init bootstrap` creates SSM parameters |
+| **Init wizard** | `sentinel init wizard` for interactive setup |
+| **Permissions discovery** | `sentinel permissions` shows required IAM with Terraform/CloudFormation output |
+| **Permission validation** | `sentinel permissions check` validates your credentials |
+| **Config validation** | `sentinel config validate` checks policy YAML before deploy |
+| **Quick start templates** | `sentinel config generate` creates starter policies |
+| **Audit verify** | `sentinel audit verify` checks CloudTrail for non-Sentinel sessions |
+| **Identity debugging** | `sentinel whoami` shows your AWS identity and policy username |
 
 ## Example Policy
 
 ```yaml
 version: "1"
 rules:
+  # Developers get dev access anytime
   - name: dev-allow
     effect: allow
     conditions:
       profiles: [dev, staging]
     reason: Development access
 
-  - name: prod-approval
-    effect: require_approval
+  # AI agents only during business hours
+  - name: ai-business-hours
+    effect: allow
+    conditions:
+      profiles: [ai-readonly]
+      time:
+        days: [monday, tuesday, wednesday, thursday, friday]
+        hours:
+          start: "09:00"
+          end: "17:00"
+        timezone: America/New_York
+    reason: AI access during business hours only
+
+  # Production requires server mode (instant revocation)
+  - name: prod-server-only
+    effect: require_server
     conditions:
       profiles: [prod]
-    reason: Production requires approval
+    reason: Production requires server mode
 
-  - name: default-deny
-    effect: deny
+  # Everything else needs approval
+  - name: default-approval
+    effect: require_approval
     conditions: {}
-    reason: No matching rule
+    reason: Requires approval
 ```
 
 ## Documentation
@@ -79,12 +141,15 @@ rules:
 | Guide | Description |
 |-------|-------------|
 | **[Why Sentinel?](docs/WHY.md)** | The problem we're solving and how |
+| [Quick Start](docs/QUICKSTART.md) | 5-minute setup guide |
 | [Getting Started](docs/guide/getting-started.md) | Installation and first policy |
-| [CLI Reference](docs/guide/commands.md) | All 17 commands documented |
+| [CLI Reference](docs/guide/commands.md) | All commands documented |
 | [Policy Reference](docs/guide/policy-reference.md) | Full YAML schema |
+| [Permissions](docs/PERMISSIONS.md) | IAM permissions matrix |
 | [Approval Workflows](docs/guide/approval-workflows.md) | Request/approve flow |
 | [Break-Glass Access](docs/guide/break-glass.md) | Emergency access |
 | [Enforcement Patterns](docs/ENFORCEMENT.md) | Trust policies and SCPs |
+| [Troubleshooting](docs/guide/troubleshooting.md) | Common issues and fixes |
 
 ## Built On
 
@@ -102,9 +167,8 @@ Sentinel extends [aws-vault](https://github.com/99designs/aws-vault), adding pol
 
 ## Limitations
 
-- **Session duration** is bounded by AWS role limits, not policy. Policy-level `max_duration` planned for v1.8.
 - **Console access** is not controlled by Sentinel. Use trust policies requiring SourceIdentity to block console from sensitive roles.
-- **Session revocation** not yet supported. Credentials are valid until expiry (default 1h, break-glass max 4h).
+- **Standard exec/credentials mode** issues credentials valid until expiry. Use server mode (`--server`) for instant revocation capability.
 
 ## License
 
