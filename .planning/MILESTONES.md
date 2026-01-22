@@ -1,5 +1,31 @@
 # Project Milestones: Sentinel
 
+## v1.12 Infrastructure Provisioning (Shipped: 2026-01-22)
+
+**Delivered:** Automated DynamoDB table provisioning for all Sentinel workflows (approvals, break-glass, sessions) with self-service CLI commands, unified bootstrap extension, and graceful permission-less onboarding.
+
+**Phases completed:** 88-93 (15 plans total, including 1 fix plan)
+
+**Key accomplishments:**
+- `init approvals`, `init breakglass`, `init sessions` commands for DynamoDB table provisioning with --plan dry-run and --generate-iam IAM policy output
+- Unified bootstrap extension with `--with-approvals`, `--with-breakglass`, `--with-sessions`, `--all` flags for all-at-once infrastructure provisioning
+- Enhanced `init status --check-tables` for infrastructure health monitoring showing table status (ACTIVE, NOT_FOUND, UNKNOWN)
+- Graceful degradation for permission-less onboarding (--plan works without DynamoDB permissions, access denied shows UNKNOWN status)
+- IAM policy generation via --generate-iam flag outputs even after user cancels at confirmation prompt
+- Complete documentation in QUICKSTART.md, BOOTSTRAP.md, and commands.md with table schemas and IAM examples
+
+**Stats:**
+- 19 files created/modified
+- 107,430 lines of Go (total codebase, +6,329 from v1.11)
+- 6 phases, 15 plans
+- 1 day (2026-01-22)
+
+**Git range:** `feat(88-01)` → `docs(93-03)`
+
+**What's next:** Production deployment ready. All Sentinel infrastructure can now be self-provisioned via CLI commands.
+
+---
+
 ## v1.11 Shell Integration (Shipped: 2026-01-20)
 
 **Delivered:** Developer UX improvement with `sentinel shell init` command that auto-generates shell wrapper functions for all configured Sentinel profiles, reducing daily boilerplate.

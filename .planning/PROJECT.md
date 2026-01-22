@@ -80,10 +80,17 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ SSM-based profile discovery from /sentinel/policies/* for shell functions — v1.11
 - ✓ Server mode variants with --include-server flag for shell integration — v1.11
 - ✓ Bash and zsh tab completion for generated shell functions — v1.11
+- ✓ DynamoDB table provisioning for approval workflows via `sentinel init approvals` — v1.12
+- ✓ DynamoDB table provisioning for break-glass via `sentinel init breakglass` — v1.12
+- ✓ DynamoDB table provisioning for sessions via `sentinel init sessions` — v1.12
+- ✓ Unified bootstrap with `--with-approvals`, `--with-breakglass`, `--with-sessions`, `--all` flags — v1.12
+- ✓ Enhanced `init status --check-tables` for infrastructure health monitoring — v1.12
+- ✓ Graceful degradation for permission-less onboarding (--plan without DynamoDB permissions) — v1.12
+- ✓ IAM policy generation via `--generate-iam` flag for all table provisioning commands — v1.12
 
 ### Active
 
-(None — all v1.11 requirements validated)
+(None — all v1.12 requirements validated)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -92,7 +99,7 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.11 with 101,101 LOC Go.
+Shipped v1.12 with 107,430 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -197,6 +204,14 @@ v1.11 adds shell integration for developer UX:
 - Bash and zsh tab completion registrations for all generated functions
 - Shell integration documentation in commands.md and QUICKSTART.md
 
+v1.12 adds infrastructure provisioning for self-service setup:
+- DynamoDB table provisioning for all three Sentinel workflows (approvals, break-glass, sessions)
+- `init approvals`, `init breakglass`, `init sessions` commands with --plan dry-run and --generate-iam IAM policy output
+- Unified bootstrap extension with --with-approvals, --with-breakglass, --with-sessions, --all flags
+- Enhanced `init status --check-tables` for infrastructure health monitoring
+- Graceful degradation: --plan works without DynamoDB permissions, access denied shows UNKNOWN status
+- IAM policy generation outputs even after user cancels at confirmation prompt
+
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
 ## Constraints
@@ -274,4 +289,4 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Completion via compdef _command_names (zsh) | Standard zsh completion approach | ✓ Good |
 
 ---
-*Last updated: 2026-01-20 after v1.11 milestone*
+*Last updated: 2026-01-22 after v1.12 milestone*

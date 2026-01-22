@@ -20,7 +20,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.10.1 SSO Credential Fixes** — [milestones/v1.10.1-ROADMAP.md](milestones/v1.10.1-ROADMAP.md) (Phase 78.1, shipped 2026-01-19)
 - ✅ **v1.10 Real-time Revocation** — [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) (Phases 78-83, shipped 2026-01-20)
 - ✅ **v1.11 Shell Integration** — [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) (Phases 84-87, shipped 2026-01-20)
-- 🚧 **v1.12 Infrastructure Provisioning** — [milestones/v1.12-ROADMAP.md](milestones/v1.12-ROADMAP.md) (Phases 88-93, planning)
+- ✅ **v1.12 Infrastructure Provisioning** — [milestones/v1.12-ROADMAP.md](milestones/v1.12-ROADMAP.md) (Phases 88-93, shipped 2026-01-22)
 
 ## Completed Milestones
 
@@ -413,6 +413,20 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
+<details>
+<summary>✅ v1.12 Infrastructure Provisioning (Phases 88-93) — SHIPPED 2026-01-22</summary>
+
+- [x] Phase 88: Approval Table Provisioning (3/3 plans + 1 fix plan) — completed 2026-01-22
+- [x] Phase 89: Breakglass Table Provisioning (2/2 plans) — completed 2026-01-22
+- [x] Phase 90: Session Table Provisioning (2/2 plans) — completed 2026-01-22
+- [x] Phase 91: Unified Bootstrap Extension (2/2 plans) — completed 2026-01-22
+- [x] Phase 92: Enhanced Init Status (2/2 plans) — completed 2026-01-22
+- [x] Phase 93: Documentation Validation (3/3 plans) — completed 2026-01-22
+
+See [milestones/v1.12-ROADMAP.md](milestones/v1.12-ROADMAP.md) for full details.
+
+</details>
+
 ## Progress (All Milestones)
 
 | Milestone | Phases | Plans | Status | Shipped |
@@ -431,6 +445,6 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 | v1.10 Real-time Revocation | 78-83 | 15/15 | ✅ Complete | 2026-01-20 |
 | v1.11 Shell Integration | 84-87 | 4/4 | ✅ Complete | 2026-01-20 |
-| v1.12 Infrastructure Provisioning | 88-93 | 11/14 | 🚧 In Progress | - |
+| v1.12 Infrastructure Provisioning | 88-93 | 15/15 | ✅ Complete | 2026-01-22 |
 
-**Totals:** 14 milestones shipped (87 phases, 160 plans)
+**Totals:** 15 milestones shipped (93 phases, 176 plans)
