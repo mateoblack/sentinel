@@ -207,3 +207,40 @@ func ApprovalTableSchema(tableName string) TableSchema {
 		BillingMode:  BillingModePayPerRequest,
 	}
 }
+
+// BreakGlassTableSchema returns the schema for the sentinel-breakglass table.
+// This matches the schema expected by breakglass/dynamodb.go:
+//   - Partition key: id (S)
+//   - GSIs: gsi-invoker, gsi-status, gsi-profile (each with created_at sort key)
+//   - TTL attribute: ttl
+//   - Billing: PAY_PER_REQUEST
+func BreakGlassTableSchema(tableName string) TableSchema {
+	createdAtSortKey := &KeyAttribute{Name: "created_at", Type: KeyTypeString}
+
+	return TableSchema{
+		TableName:    tableName,
+		PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+		GlobalSecondaryIndexes: []GSISchema{
+			{
+				IndexName:    "gsi-invoker",
+				PartitionKey: KeyAttribute{Name: "invoker", Type: KeyTypeString},
+				SortKey:      createdAtSortKey,
+				Projection:   ProjectionAll,
+			},
+			{
+				IndexName:    "gsi-status",
+				PartitionKey: KeyAttribute{Name: "status", Type: KeyTypeString},
+				SortKey:      createdAtSortKey,
+				Projection:   ProjectionAll,
+			},
+			{
+				IndexName:    "gsi-profile",
+				PartitionKey: KeyAttribute{Name: "profile", Type: KeyTypeString},
+				SortKey:      createdAtSortKey,
+				Projection:   ProjectionAll,
+			},
+		},
+		TTLAttribute: "ttl",
+		BillingMode:  BillingModePayPerRequest,
+	}
+}
