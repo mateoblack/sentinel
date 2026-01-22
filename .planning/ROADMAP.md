@@ -20,6 +20,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.10.1 SSO Credential Fixes** — [milestones/v1.10.1-ROADMAP.md](milestones/v1.10.1-ROADMAP.md) (Phase 78.1, shipped 2026-01-19)
 - ✅ **v1.10 Real-time Revocation** — [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) (Phases 78-83, shipped 2026-01-20)
 - ✅ **v1.11 Shell Integration** — [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) (Phases 84-87, shipped 2026-01-20)
+- 🚧 **v1.12 Infrastructure Provisioning** — [milestones/v1.12-ROADMAP.md](milestones/v1.12-ROADMAP.md) (Phases 88-93, planning)
 
 ## Completed Milestones
 
@@ -430,5 +431,6 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 | v1.10 Real-time Revocation | 78-83 | 15/15 | ✅ Complete | 2026-01-20 |
 | v1.11 Shell Integration | 84-87 | 4/4 | ✅ Complete | 2026-01-20 |
+| v1.12 Infrastructure Provisioning | 88-93 | 0/16 | 🚧 Planning | - |
 
 **Totals:** 14 milestones shipped (87 phases, 153 plans)
