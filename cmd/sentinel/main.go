@@ -34,6 +34,7 @@ func main() {
 	cli.ConfigureStatusCommand(app, s)
 	cli.ConfigureInitWizardCommand(app, s)
 	cli.ConfigureInitApprovalsCommand(app, s)
+	cli.ConfigureInitBreakGlassCommand(app, s)
 
 	// Enforcement commands
 	cli.ConfigureEnforcePlanCommand(app, s)
