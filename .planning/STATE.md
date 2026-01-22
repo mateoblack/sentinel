@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 ## Current Position
 
 Phase: 93 of 93 (Documentation Validation)
-Plan: 1 of 3 in current phase
-Status: In progress
-Last activity: 2026-01-22 — Completed 93-01-PLAN.md
+Plan: 3 of 3 in current phase
+Status: Complete
+Last activity: 2026-01-22 — Completed 93-03-PLAN.md (Documentation Validation)
 
-Progress: ███████░░░ 75% (v1.12 Infrastructure Provisioning)
+Progress: ██████████ 100% (v1.12 Infrastructure Provisioning)
 
 ## Milestone Summary
 
@@ -553,6 +553,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Shell type detected from SHELL env var (~/.zshrc for zsh, ~/.bashrc otherwise)
 - JSON output always includes suggestions array (empty when no suggestions)
 
+**v1.12 Documentation Validation decisions (Phase 93-03):**
+- CLI flags verified by reviewing Go source code directly when Go toolchain unavailable
+- Fixed BOOTSTRAP.md table schema docs: GSI names use gsi- prefix, TTL attribute is "ttl"
+- Schema docs now match infrastructure/schema.go exactly (gsi-requester, gsi-status, gsi-profile, ttl)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -564,9 +569,9 @@ None — clean start for v1.12.
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 93-01-PLAN.md
+Stopped at: Completed 93-03-PLAN.md
 Resume file: None
-Next: Execute 93-02-PLAN.md
+Next: Complete v1.12 milestone
 
 ## Roadmap Evolution
 
