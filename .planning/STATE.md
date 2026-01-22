@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 ## Current Position
 
 Phase: 92 of 93 (Enhanced Init Status)
-Plan: 1 of 2 in current phase
-Status: Plan 92-01 complete
-Last activity: 2026-01-22 — Completed 92-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase 92 complete
+Last activity: 2026-01-22 — Completed 92-02-PLAN.md
 
-Progress: ██████░░░░ 65% (v1.12 Infrastructure Provisioning)
+Progress: ███████░░░ 70% (v1.12 Infrastructure Provisioning)
 
 ## Milestone Summary
 
@@ -547,6 +547,12 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - CombinedStatusResult embeds StatusResult for JSON compatibility
 - Testable command wrapper pattern using abstract interfaces for CLI testing without CGO
 
+**v1.12 Status Suggestions decisions (Phase 92-02):**
+- Suggestions only generated for NOT_FOUND tables (not CREATING or other states)
+- Shell integration hint requires --aws-profile flag (indicates user is using profiles)
+- Shell type detected from SHELL env var (~/.zshrc for zsh, ~/.bashrc otherwise)
+- JSON output always includes suggestions array (empty when no suggestions)
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -558,9 +564,9 @@ None — clean start for v1.12.
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 92-01-PLAN.md
+Stopped at: Completed 92-02-PLAN.md (Phase 92 complete)
 Resume file: None
-Next: Execute 92-02-PLAN.md or complete Phase 92
+Next: Plan Phase 93 or complete milestone
 
 ## Roadmap Evolution
 
