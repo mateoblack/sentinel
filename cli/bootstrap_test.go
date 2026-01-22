@@ -1621,7 +1621,10 @@ func TestBootstrapCommand_TablePlanOnly(t *testing.T) {
 	}
 }
 
-func TestBootstrapCommand_TableExistsInPlanMode(t *testing.T) {
+func TestBootstrapCommand_TablePlanShowsFullSchema(t *testing.T) {
+	// Plan mode now always shows WouldCreate=true because Plan() no longer
+	// queries DynamoDB. This allows users to see the full schema before
+	// they have permissions. The actual table existence is checked at apply time.
 	stdout, stderr, cleanup := createTestFiles(t)
 	defer cleanup()
 
@@ -1639,11 +1642,14 @@ func TestBootstrapCommand_TableExistsInPlanMode(t *testing.T) {
 	ssmPlanner := &mockPlannerImpl{plan: plan}
 	ssmExecutor := &mockExecutorImpl{}
 
-	// Mock DynamoDB provisioner - table already exists
+	// Mock DynamoDB provisioner - Plan() always returns WouldCreate=true
 	mockProvisioner := &mockTableProvisioner{
 		PlanResult: &infrastructure.ProvisionPlan{
-			TableName:   "sentinel-requests",
-			WouldCreate: false, // Already exists
+			TableName:    "sentinel-requests",
+			WouldCreate:  true, // Plan always assumes create (doesn't query DynamoDB)
+			GSIs:         []string{"gsi-requester", "gsi-status", "gsi-profile"},
+			TTLAttribute: "ttl",
+			BillingMode:  "PAY_PER_REQUEST",
 		},
 	}
 
@@ -1665,8 +1671,9 @@ func TestBootstrapCommand_TableExistsInPlanMode(t *testing.T) {
 	}
 
 	output := readFile(t, stdout)
-	if !strings.Contains(output, "= Approvals table") || !strings.Contains(output, "(exists)") {
-		t.Error("expected output to show table already exists")
+	// Plan mode now shows table would be created (since we can't check without permissions)
+	if !strings.Contains(output, "+ Approvals table") {
+		t.Error("expected output to show table would be created")
 	}
 }
 

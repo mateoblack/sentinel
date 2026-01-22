@@ -207,29 +207,28 @@ func (p *TableProvisioner) Create(ctx context.Context, schema TableSchema) (*Pro
 }
 
 // Plan returns what would be created for the given schema without making changes.
+// Plan shows what WOULD be created without checking table status.
+// This allows users to see the schema before they have DynamoDB permissions.
+// The plan always shows WouldCreate=true since we cannot check without permissions.
 func (p *TableProvisioner) Plan(ctx context.Context, schema TableSchema) (*ProvisionPlan, error) {
 	if err := schema.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid schema: %w", err)
 	}
 
-	status, _, err := p.getTableStatus(ctx, schema.TableName)
-	if err != nil {
-		return nil, err
-	}
-
+	// Plan shows what WOULD be created without checking table status.
+	// This allows users to see the schema before they have DynamoDB permissions.
+	// We always assume the table would be created since we can't check without permissions.
 	plan := &ProvisionPlan{
-		TableName:   schema.TableName,
-		WouldCreate: status == "NOT_FOUND",
+		TableName:    schema.TableName,
+		WouldCreate:  true, // Cannot check without permissions, show full schema
+		GSIs:         schema.GSINames(),
+		TTLAttribute: schema.TTLAttribute,
 	}
 
-	if plan.WouldCreate {
-		plan.GSIs = schema.GSINames()
-		plan.TTLAttribute = schema.TTLAttribute
-		if schema.BillingMode != "" {
-			plan.BillingMode = string(schema.BillingMode)
-		} else {
-			plan.BillingMode = string(BillingModePayPerRequest) // Default
-		}
+	if schema.BillingMode != "" {
+		plan.BillingMode = string(schema.BillingMode)
+	} else {
+		plan.BillingMode = string(BillingModePayPerRequest) // Default
 	}
 
 	return plan, nil

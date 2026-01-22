@@ -421,12 +421,10 @@ func TestTableProvisioner_Create_TableDeleting(t *testing.T) {
 // Plan() Tests
 // ============================================================================
 
-func TestTableProvisioner_Plan_TableNotExists(t *testing.T) {
-	mock := &mockDynamoDBProvisionerClient{
-		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
-			return nil, &types.ResourceNotFoundException{}
-		},
-	}
+func TestTableProvisioner_Plan_ShowsSchema(t *testing.T) {
+	// Plan() now shows what WOULD be created without checking table status.
+	// This allows users to see the schema before they have DynamoDB permissions.
+	mock := &mockDynamoDBProvisionerClient{}
 
 	provisioner := newTableProvisionerWithClient(mock, "us-east-1")
 	plan, err := provisioner.Plan(context.Background(), validSchemaWithTTL())
@@ -434,6 +432,7 @@ func TestTableProvisioner_Plan_TableNotExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Plan() error = %v", err)
 	}
+	// Plan always shows WouldCreate=true since we can't check without permissions
 	if !plan.WouldCreate {
 		t.Error("expected WouldCreate=true")
 	}
@@ -446,20 +445,16 @@ func TestTableProvisioner_Plan_TableNotExists(t *testing.T) {
 	if plan.BillingMode != "PAY_PER_REQUEST" {
 		t.Errorf("expected billing mode PAY_PER_REQUEST, got %s", plan.BillingMode)
 	}
+	// Verify DescribeTable was NOT called (Plan() doesn't check table status)
+	if len(mock.describeTableCalls) != 0 {
+		t.Errorf("expected 0 DescribeTable calls, got %d", len(mock.describeTableCalls))
+	}
 }
 
-func TestTableProvisioner_Plan_TableExists(t *testing.T) {
-	mock := &mockDynamoDBProvisionerClient{
-		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
-			return &dynamodb.DescribeTableOutput{
-				Table: &types.TableDescription{
-					TableName:   params.TableName,
-					TableArn:    aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/test-table"),
-					TableStatus: types.TableStatusActive,
-				},
-			}, nil
-		},
-	}
+func TestTableProvisioner_Plan_AlwaysShowsFullSchema(t *testing.T) {
+	// Plan() no longer queries DynamoDB - it shows the full schema that WOULD be created.
+	// This is by design: users can see what will be created before they have permissions.
+	mock := &mockDynamoDBProvisionerClient{}
 
 	provisioner := newTableProvisionerWithClient(mock, "us-east-1")
 	plan, err := provisioner.Plan(context.Background(), validSchema())
@@ -467,21 +462,19 @@ func TestTableProvisioner_Plan_TableExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Plan() error = %v", err)
 	}
-	if plan.WouldCreate {
-		t.Error("expected WouldCreate=false")
+	// Plan always shows WouldCreate=true (cannot check without permissions)
+	if !plan.WouldCreate {
+		t.Error("expected WouldCreate=true (Plan always assumes create)")
 	}
-	// GSIs, TTL should be empty since table exists
-	if len(plan.GSIs) != 0 {
-		t.Errorf("expected empty GSIs, got %v", plan.GSIs)
+	// Verify DescribeTable was NOT called
+	if len(mock.describeTableCalls) != 0 {
+		t.Errorf("expected 0 DescribeTable calls, got %d", len(mock.describeTableCalls))
 	}
 }
 
 func TestTableProvisioner_Plan_WithGSIs(t *testing.T) {
-	mock := &mockDynamoDBProvisionerClient{
-		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
-			return nil, &types.ResourceNotFoundException{}
-		},
-	}
+	// Plan() shows GSI configuration without querying DynamoDB
+	mock := &mockDynamoDBProvisionerClient{}
 
 	schema := ApprovalTableSchema("sentinel-requests")
 	provisioner := newTableProvisionerWithClient(mock, "us-east-1")
@@ -496,20 +489,38 @@ func TestTableProvisioner_Plan_WithGSIs(t *testing.T) {
 	if len(plan.GSIs) != 3 {
 		t.Errorf("expected 3 GSIs, got %d", len(plan.GSIs))
 	}
+	// Verify DescribeTable was NOT called
+	if len(mock.describeTableCalls) != 0 {
+		t.Errorf("expected 0 DescribeTable calls, got %d", len(mock.describeTableCalls))
+	}
 }
 
-func TestTableProvisioner_Plan_DescribeTableError(t *testing.T) {
+func TestTableProvisioner_Plan_NoPermissionsRequired(t *testing.T) {
+	// Plan() should work even without DynamoDB permissions.
+	// This allows users to see the schema before requesting access.
 	mock := &mockDynamoDBProvisionerClient{
 		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			// This should NOT be called since Plan() doesn't query DynamoDB
 			return nil, errors.New("AccessDeniedException: Not authorized")
 		},
 	}
 
 	provisioner := newTableProvisionerWithClient(mock, "us-east-1")
-	_, err := provisioner.Plan(context.Background(), validSchema())
+	plan, err := provisioner.Plan(context.Background(), validSchema())
 
-	if err == nil {
-		t.Error("expected error")
+	// Plan should succeed without calling DynamoDB
+	if err != nil {
+		t.Errorf("Plan() should not require permissions, got error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected non-nil plan")
+	}
+	if !plan.WouldCreate {
+		t.Error("expected WouldCreate=true")
+	}
+	// Verify DescribeTable was NOT called
+	if len(mock.describeTableCalls) != 0 {
+		t.Errorf("expected 0 DescribeTable calls (Plan should not query DynamoDB), got %d", len(mock.describeTableCalls))
 	}
 }
 
