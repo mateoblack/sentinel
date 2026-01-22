@@ -35,6 +35,7 @@ func main() {
 	cli.ConfigureInitWizardCommand(app, s)
 	cli.ConfigureInitApprovalsCommand(app, s)
 	cli.ConfigureInitBreakGlassCommand(app, s)
+	cli.ConfigureInitSessionsCommand(app, s)
 
 	// Enforcement commands
 	cli.ConfigureEnforcePlanCommand(app, s)
