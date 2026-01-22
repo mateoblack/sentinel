@@ -431,6 +431,6 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 | v1.10.1 SSO Credential Fixes | 78.1 | 2/2 | ✅ Complete | 2026-01-19 |
 | v1.10 Real-time Revocation | 78-83 | 15/15 | ✅ Complete | 2026-01-20 |
 | v1.11 Shell Integration | 84-87 | 4/4 | ✅ Complete | 2026-01-20 |
-| v1.12 Infrastructure Provisioning | 88-93 | 6/14 | 🚧 In Progress | - |
+| v1.12 Infrastructure Provisioning | 88-93 | 7/14 | 🚧 In Progress | - |
 
-**Totals:** 14 milestones shipped (87 phases, 155 plans)
+**Totals:** 14 milestones shipped (87 phases, 156 plans)
