@@ -595,7 +595,7 @@ sentinel breakglass-close a1b2c3d4e5f67890 \
 
 ### init bootstrap
 
-Bootstrap SSM policy parameters.
+Bootstrap SSM policy parameters and optionally provision DynamoDB tables.
 
 **Usage:**
 ```bash
@@ -610,10 +610,14 @@ sentinel init bootstrap --profile PROFILE [flags]
 | `--plan` | Show plan without applying | No |
 | `--yes` / `-y` | Auto-approve, skip confirmation | No |
 | `--policy-root` | SSM parameter path prefix | No (default: `/sentinel/policies`) |
-| `--region` | AWS region for SSM | No |
+| `--region` | AWS region for SSM and DynamoDB | No |
 | `--generate-iam-policies` | Output IAM policy documents | No |
 | `--json` | Machine-readable JSON output | No |
 | `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
+| `--with-approvals` | Also create approval requests table | No |
+| `--with-breakglass` | Also create break-glass events table | No |
+| `--with-sessions` | Also create server sessions table | No |
+| `--all` | Enable all optional infrastructure | No |
 
 **Examples:**
 
@@ -629,13 +633,19 @@ sentinel init bootstrap --profile dev --profile staging --profile prod
 
 # Auto-approve with IAM policies
 sentinel init bootstrap --profile dev --yes --generate-iam-policies
+
+# Bootstrap with approval workflow table
+sentinel init bootstrap --profile dev --with-approvals --region us-east-1
+
+# Bootstrap with all optional infrastructure
+sentinel init bootstrap --profile dev --all --region us-east-1
 ```
 
 ---
 
 ### init status
 
-Show current Sentinel policy status.
+Show current Sentinel policy status and optionally DynamoDB table status.
 
 **Usage:**
 ```bash
@@ -647,31 +657,125 @@ sentinel init status [flags]
 | Flag | Description | Required |
 |------|-------------|----------|
 | `--policy-root` | SSM parameter path prefix | No (default: `/sentinel/policies`) |
-| `--region` | AWS region for SSM | No |
+| `--region` | AWS region for SSM and DynamoDB | No |
 | `--json` | Machine-readable JSON output | No |
 | `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
+| `--check-tables` | Check DynamoDB table status (requires --region) | No |
 
 **Examples:**
 
 ```bash
 sentinel init status
 sentinel init status --json
+sentinel init status --check-tables --region us-east-1
 ```
 
 **Output:**
 
 ```
-Sentinel Policy Status
-======================
+Sentinel Status
+===============
 
-Policy Root: /sentinel/policies
-
-Profiles:
-  dev        v3  (last modified: 2026-01-15 14:30:22)
-  staging    v1  (last modified: 2026-01-15 14:30:25)
-  prod       v5  (last modified: 2026-01-16 09:15:00)
+Policy Parameters (/sentinel/policies):
+  dev        v3  (2026-01-15 14:30:22)
+  staging    v1  (2026-01-15 14:30:25)
+  prod       v5  (2026-01-16 09:15:00)
 
 Total: 3 policy parameters
+```
+
+---
+
+### init approvals
+
+Provision the DynamoDB table for approval workflow requests.
+
+**Usage:**
+```bash
+sentinel init approvals --region REGION [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--table` | DynamoDB table name | `sentinel-requests` |
+| `--region` | AWS region for DynamoDB (required) | - |
+| `--aws-profile` | AWS profile for credentials | Default chain |
+| `--plan` | Preview without creating | false |
+| `--yes` / `-y` | Skip confirmation | false |
+| `--generate-iam` | Output IAM policy document | false |
+
+**Examples:**
+
+```bash
+# Preview table creation
+sentinel init approvals --plan --region us-east-1
+
+# Create with confirmation prompt
+sentinel init approvals --region us-east-1
+
+# Auto-approve for scripting
+sentinel init approvals --region us-east-1 --yes
+
+# Generate IAM policy
+sentinel init approvals --generate-iam --region us-east-1
+```
+
+---
+
+### init breakglass
+
+Provision the DynamoDB table for break-glass emergency access events.
+
+**Usage:**
+```bash
+sentinel init breakglass --region REGION [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--table` | DynamoDB table name | `sentinel-breakglass` |
+| `--region` | AWS region for DynamoDB (required) | - |
+| `--aws-profile` | AWS profile for credentials | Default chain |
+| `--plan` | Preview without creating | false |
+| `--yes` / `-y` | Skip confirmation | false |
+| `--generate-iam` | Output IAM policy document | false |
+
+**Examples:**
+
+```bash
+sentinel init breakglass --region us-east-1 --yes
+```
+
+---
+
+### init sessions
+
+Provision the DynamoDB table for server mode session tracking.
+
+**Usage:**
+```bash
+sentinel init sessions --region REGION [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--table` | DynamoDB table name | `sentinel-sessions` |
+| `--region` | AWS region for DynamoDB (required) | - |
+| `--aws-profile` | AWS profile for credentials | Default chain |
+| `--plan` | Preview without creating | false |
+| `--yes` / `-y` | Skip confirmation | false |
+| `--generate-iam` | Output IAM policy document | false |
+
+**Examples:**
+
+```bash
+sentinel init sessions --region us-east-1 --yes
 ```
 
 ---
