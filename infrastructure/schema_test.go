@@ -622,3 +622,112 @@ func TestApprovalTableSchemaGSINames(t *testing.T) {
 		}
 	}
 }
+
+// TestBreakGlassTableSchema tests the predefined break-glass table schema.
+func TestBreakGlassTableSchema(t *testing.T) {
+	tableName := "sentinel-breakglass"
+	schema := BreakGlassTableSchema(tableName)
+
+	// Test table name
+	if schema.TableName != tableName {
+		t.Errorf("TableName = %q, want %q", schema.TableName, tableName)
+	}
+
+	// Test partition key
+	if schema.PartitionKey.Name != "id" {
+		t.Errorf("PartitionKey.Name = %q, want %q", schema.PartitionKey.Name, "id")
+	}
+	if schema.PartitionKey.Type != KeyTypeString {
+		t.Errorf("PartitionKey.Type = %q, want %q", schema.PartitionKey.Type, KeyTypeString)
+	}
+
+	// Test no sort key on main table
+	if schema.SortKey != nil {
+		t.Errorf("SortKey = %v, want nil", schema.SortKey)
+	}
+
+	// Test TTL attribute
+	if schema.TTLAttribute != "ttl" {
+		t.Errorf("TTLAttribute = %q, want %q", schema.TTLAttribute, "ttl")
+	}
+
+	// Test billing mode
+	if schema.BillingMode != BillingModePayPerRequest {
+		t.Errorf("BillingMode = %q, want %q", schema.BillingMode, BillingModePayPerRequest)
+	}
+
+	// Test GSIs - key difference is gsi-invoker instead of gsi-requester
+	expectedGSIs := map[string]struct {
+		partitionKey string
+		sortKey      string
+	}{
+		"gsi-invoker": {partitionKey: "invoker", sortKey: "created_at"},
+		"gsi-status":  {partitionKey: "status", sortKey: "created_at"},
+		"gsi-profile": {partitionKey: "profile", sortKey: "created_at"},
+	}
+
+	if len(schema.GlobalSecondaryIndexes) != len(expectedGSIs) {
+		t.Errorf("GSI count = %d, want %d", len(schema.GlobalSecondaryIndexes), len(expectedGSIs))
+	}
+
+	for _, gsi := range schema.GlobalSecondaryIndexes {
+		expected, ok := expectedGSIs[gsi.IndexName]
+		if !ok {
+			t.Errorf("unexpected GSI %q", gsi.IndexName)
+			continue
+		}
+
+		if gsi.PartitionKey.Name != expected.partitionKey {
+			t.Errorf("GSI %q partition key = %q, want %q", gsi.IndexName, gsi.PartitionKey.Name, expected.partitionKey)
+		}
+		if gsi.PartitionKey.Type != KeyTypeString {
+			t.Errorf("GSI %q partition key type = %q, want %q", gsi.IndexName, gsi.PartitionKey.Type, KeyTypeString)
+		}
+
+		if gsi.SortKey == nil {
+			t.Errorf("GSI %q sort key = nil, want non-nil", gsi.IndexName)
+		} else {
+			if gsi.SortKey.Name != expected.sortKey {
+				t.Errorf("GSI %q sort key = %q, want %q", gsi.IndexName, gsi.SortKey.Name, expected.sortKey)
+			}
+			if gsi.SortKey.Type != KeyTypeString {
+				t.Errorf("GSI %q sort key type = %q, want %q", gsi.IndexName, gsi.SortKey.Type, KeyTypeString)
+			}
+		}
+
+		if gsi.Projection != ProjectionAll {
+			t.Errorf("GSI %q projection = %q, want %q", gsi.IndexName, gsi.Projection, ProjectionAll)
+		}
+	}
+
+	// Test that schema passes validation
+	if err := schema.Validate(); err != nil {
+		t.Errorf("BreakGlassTableSchema validation failed: %v", err)
+	}
+}
+
+// TestBreakGlassTableSchemaGSINames tests GSI names match breakglass/dynamodb.go constants.
+func TestBreakGlassTableSchemaGSINames(t *testing.T) {
+	schema := BreakGlassTableSchema("test-table")
+	gsiNames := schema.GSINames()
+
+	// These constants match breakglass/dynamodb.go: GSIInvoker, GSIStatus, GSIProfile
+	expectedNames := []string{"gsi-invoker", "gsi-status", "gsi-profile"}
+
+	if len(gsiNames) != len(expectedNames) {
+		t.Errorf("GSINames() returned %d names, want %d", len(gsiNames), len(expectedNames))
+		return
+	}
+
+	// Check each expected name is present
+	nameSet := make(map[string]bool)
+	for _, name := range gsiNames {
+		nameSet[name] = true
+	}
+
+	for _, expected := range expectedNames {
+		if !nameSet[expected] {
+			t.Errorf("GSINames() missing expected GSI %q", expected)
+		}
+	}
+}
