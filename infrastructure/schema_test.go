@@ -731,3 +731,149 @@ func TestBreakGlassTableSchemaGSINames(t *testing.T) {
 		}
 	}
 }
+
+// TestSessionTableSchema tests the predefined session table schema.
+func TestSessionTableSchema(t *testing.T) {
+	tableName := "sentinel-sessions"
+	schema := SessionTableSchema(tableName)
+
+	// Test table name
+	if schema.TableName != tableName {
+		t.Errorf("TableName = %q, want %q", schema.TableName, tableName)
+	}
+
+	// Test partition key
+	if schema.PartitionKey.Name != "id" {
+		t.Errorf("PartitionKey.Name = %q, want %q", schema.PartitionKey.Name, "id")
+	}
+	if schema.PartitionKey.Type != KeyTypeString {
+		t.Errorf("PartitionKey.Type = %q, want %q", schema.PartitionKey.Type, KeyTypeString)
+	}
+
+	// Test no sort key on main table
+	if schema.SortKey != nil {
+		t.Errorf("SortKey = %v, want nil", schema.SortKey)
+	}
+
+	// Test TTL attribute
+	if schema.TTLAttribute != "ttl" {
+		t.Errorf("TTLAttribute = %q, want %q", schema.TTLAttribute, "ttl")
+	}
+
+	// Test billing mode
+	if schema.BillingMode != BillingModePayPerRequest {
+		t.Errorf("BillingMode = %q, want %q", schema.BillingMode, BillingModePayPerRequest)
+	}
+
+	// Test GSI count - session table has 4 GSIs (1 more than approval/breakglass)
+	expectedGSICount := 4
+	if len(schema.GlobalSecondaryIndexes) != expectedGSICount {
+		t.Errorf("GSI count = %d, want %d", len(schema.GlobalSecondaryIndexes), expectedGSICount)
+	}
+
+	// Test GSIs - note gsi-server-instance has different sort key (status, not created_at)
+	expectedGSIs := map[string]struct {
+		partitionKey string
+		sortKey      string
+	}{
+		"gsi-user":            {partitionKey: "user", sortKey: "created_at"},
+		"gsi-status":          {partitionKey: "status", sortKey: "created_at"},
+		"gsi-profile":         {partitionKey: "profile", sortKey: "created_at"},
+		"gsi-server-instance": {partitionKey: "server_instance_id", sortKey: "status"},
+	}
+
+	for _, gsi := range schema.GlobalSecondaryIndexes {
+		expected, ok := expectedGSIs[gsi.IndexName]
+		if !ok {
+			t.Errorf("unexpected GSI %q", gsi.IndexName)
+			continue
+		}
+
+		if gsi.PartitionKey.Name != expected.partitionKey {
+			t.Errorf("GSI %q partition key = %q, want %q", gsi.IndexName, gsi.PartitionKey.Name, expected.partitionKey)
+		}
+		if gsi.PartitionKey.Type != KeyTypeString {
+			t.Errorf("GSI %q partition key type = %q, want %q", gsi.IndexName, gsi.PartitionKey.Type, KeyTypeString)
+		}
+
+		if gsi.SortKey == nil {
+			t.Errorf("GSI %q sort key = nil, want non-nil", gsi.IndexName)
+		} else {
+			if gsi.SortKey.Name != expected.sortKey {
+				t.Errorf("GSI %q sort key = %q, want %q", gsi.IndexName, gsi.SortKey.Name, expected.sortKey)
+			}
+			if gsi.SortKey.Type != KeyTypeString {
+				t.Errorf("GSI %q sort key type = %q, want %q", gsi.IndexName, gsi.SortKey.Type, KeyTypeString)
+			}
+		}
+
+		if gsi.Projection != ProjectionAll {
+			t.Errorf("GSI %q projection = %q, want %q", gsi.IndexName, gsi.Projection, ProjectionAll)
+		}
+	}
+
+	// Test that schema passes validation
+	if err := schema.Validate(); err != nil {
+		t.Errorf("SessionTableSchema validation failed: %v", err)
+	}
+}
+
+// TestSessionTableSchemaGSINames tests GSI names match session/dynamodb.go constants.
+func TestSessionTableSchemaGSINames(t *testing.T) {
+	schema := SessionTableSchema("test-table")
+	gsiNames := schema.GSINames()
+
+	// These constants match session/dynamodb.go: GSIUser, GSIStatus, GSIProfile, GSIServerInstance
+	expectedNames := []string{"gsi-user", "gsi-status", "gsi-profile", "gsi-server-instance"}
+
+	if len(gsiNames) != len(expectedNames) {
+		t.Errorf("GSINames() returned %d names, want %d", len(gsiNames), len(expectedNames))
+		return
+	}
+
+	// Check each expected name is present
+	nameSet := make(map[string]bool)
+	for _, name := range gsiNames {
+		nameSet[name] = true
+	}
+
+	for _, expected := range expectedNames {
+		if !nameSet[expected] {
+			t.Errorf("GSINames() missing expected GSI %q", expected)
+		}
+	}
+}
+
+// TestSessionTableSchemaGSIServerInstanceSortKey tests the unique sort key for gsi-server-instance.
+// This GSI uses status as sort key (not created_at like other GSIs) for FindActiveByServerInstance queries.
+func TestSessionTableSchemaGSIServerInstanceSortKey(t *testing.T) {
+	schema := SessionTableSchema("test-table")
+
+	// Find gsi-server-instance
+	var serverInstanceGSI *GSISchema
+	for i := range schema.GlobalSecondaryIndexes {
+		if schema.GlobalSecondaryIndexes[i].IndexName == "gsi-server-instance" {
+			serverInstanceGSI = &schema.GlobalSecondaryIndexes[i]
+			break
+		}
+	}
+
+	if serverInstanceGSI == nil {
+		t.Fatal("gsi-server-instance not found in schema")
+	}
+
+	// Verify partition key is server_instance_id
+	if serverInstanceGSI.PartitionKey.Name != "server_instance_id" {
+		t.Errorf("gsi-server-instance partition key = %q, want %q",
+			serverInstanceGSI.PartitionKey.Name, "server_instance_id")
+	}
+
+	// Verify sort key is status (not created_at)
+	if serverInstanceGSI.SortKey == nil {
+		t.Fatal("gsi-server-instance sort key = nil, want non-nil")
+	}
+	if serverInstanceGSI.SortKey.Name != "status" {
+		t.Errorf("gsi-server-instance sort key = %q, want %q",
+			serverInstanceGSI.SortKey.Name, "status")
+	}
+}
