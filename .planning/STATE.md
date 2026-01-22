@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Current Position
 
-Phase: 91 of 93 (Unified Bootstrap Extension)
-Plan: 2 of 2 in current phase (phase complete)
-Status: Phase complete
-Last activity: 2026-01-22 — Completed 91-02-PLAN.md
+Phase: 92 of 93 (Enhanced Init Status)
+Plan: 1 of 2 in current phase
+Status: Plan 92-01 complete
+Last activity: 2026-01-22 — Completed 92-01-PLAN.md
 
-Progress: ██████░░░░ 62% (v1.12 Infrastructure Provisioning)
+Progress: ██████░░░░ 65% (v1.12 Infrastructure Provisioning)
 
 ## Milestone Summary
 
@@ -538,6 +538,15 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - DefaultApprovalTableName = "sentinel-requests" for consistency with request package
 - Follow bootstrap.go patterns for AWS config loading and confirmation prompts
 
+**v1.12 Enhanced Init Status decisions (Phase 92-01):**
+- InfrastructureChecker type with separate dynamoDBStatusAPI interface for testability
+- --check-tables requires --region flag (validation rather than silent skip)
+- Default table names: sentinel-requests, sentinel-breakglass, sentinel-sessions
+- Status values use raw DynamoDB strings (ACTIVE, NOT_FOUND, CREATING)
+- Combined status header changed from "Sentinel Policy Status" to "Sentinel Status"
+- CombinedStatusResult embeds StatusResult for JSON compatibility
+- Testable command wrapper pattern using abstract interfaces for CLI testing without CGO
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -549,9 +558,9 @@ None — clean start for v1.12.
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 91-02-PLAN.md (Phase 91 complete)
+Stopped at: Completed 92-01-PLAN.md
 Resume file: None
-Next: Execute Phase 92 or plan Phase 93
+Next: Execute 92-02-PLAN.md or complete Phase 92
 
 ## Roadmap Evolution
 
