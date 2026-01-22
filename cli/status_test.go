@@ -110,6 +110,15 @@ func testableStatusCommandWithInfra(
 		}
 	}
 
+	// Generate suggestions based on status
+	sg := bootstrap.NewSuggestionGenerator()
+	var suggestions []bootstrap.Suggestion
+
+	// Generate infrastructure suggestions for missing tables
+	if infraStatus != nil && input.Region != "" {
+		suggestions = append(suggestions, sg.GenerateInfrastructureSuggestions(infraStatus.Tables, input.Region)...)
+	}
+
 	// Output results
 	if input.JSONOutput {
 		// For testing, output a simple JSON structure
@@ -125,6 +134,15 @@ func testableStatusCommandWithInfra(
 			}
 			_, _ = stdout.WriteString("]}")
 		}
+		// Output suggestions in JSON
+		_, _ = stdout.WriteString(`,"suggestions":[`)
+		for i, s := range suggestions {
+			if i > 0 {
+				_, _ = stdout.WriteString(",")
+			}
+			_, _ = stdout.WriteString(`{"type":"` + s.Type + `","message":"` + s.Message + `","command":"` + s.Command + `"}`)
+		}
+		_, _ = stdout.WriteString("]")
 		_, _ = stdout.WriteString("}\n")
 	} else {
 		_, _ = stdout.WriteString("Sentinel Status\n")
@@ -153,6 +171,26 @@ func testableStatusCommandWithInfra(
 			for _, t := range infraStatus.Tables {
 				_, _ = stdout.WriteString("  " + t.TableName + "    " + t.Purpose + "    " + t.Status + "\n")
 			}
+		}
+
+		// Output suggestions if any
+		if len(suggestions) > 0 {
+			_, _ = stdout.WriteString("\nSuggestions:\n")
+			for _, s := range suggestions {
+				if s.Type == "command" {
+					_, _ = stdout.WriteString("  Run: " + s.Command + "\n")
+				} else {
+					_, _ = stdout.WriteString("  " + s.Message + "\n")
+				}
+			}
+		}
+
+		// Show shell integration hint if --aws-profile was provided
+		if input.AWSProfile != "" {
+			shellHint := sg.GenerateShellSuggestion(input.AWSProfile)
+			rcFile := bootstrap.GetShellRCFile()
+			_, _ = stdout.WriteString("\nShell Integration:\n")
+			_, _ = stdout.WriteString("  Add to " + rcFile + ": " + shellHint.Command + "\n")
 		}
 	}
 
@@ -825,4 +863,319 @@ func TestStatusCommand_ActualCommand_WithMock(t *testing.T) {
 
 	// Run command (will likely fail without AWS)
 	_ = StatusCommand(context.Background(), input)
+}
+
+// ============================================================================
+// Suggestions Tests
+// ============================================================================
+
+func TestStatusCommand_Suggestions_MissingInfrastructure(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	infraResult := &bootstrap.InfrastructureStatus{
+		Tables: []bootstrap.TableInfo{
+			{TableName: "sentinel-requests", Status: "ACTIVE", Region: "us-east-1", Purpose: "approvals"},
+			{TableName: "sentinel-breakglass", Status: "NOT_FOUND", Region: "us-east-1", Purpose: "breakglass"},
+			{TableName: "sentinel-sessions", Status: "NOT_FOUND", Region: "us-east-1", Purpose: "sessions"},
+		},
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+	infraChecker := &mockInfrastructureCheckerImpl{result: infraResult}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		Region:      "us-east-1",
+		CheckTables: true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, infraChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Check suggestions section appears
+	if !strings.Contains(output, "Suggestions:") {
+		t.Error("expected output to contain 'Suggestions:'")
+	}
+	// Check specific suggestions for missing tables
+	if !strings.Contains(output, "sentinel init breakglass --region us-east-1") {
+		t.Error("expected suggestion for breakglass table")
+	}
+	if !strings.Contains(output, "sentinel init sessions --region us-east-1") {
+		t.Error("expected suggestion for sessions table")
+	}
+	// Active table should NOT have suggestion
+	if strings.Contains(output, "sentinel init approvals") {
+		t.Error("should not suggest init for active approvals table")
+	}
+}
+
+func TestStatusCommand_Suggestions_NoSuggestionsWhenAllPresent(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{
+			{
+				Name:         "production",
+				Path:         "/sentinel/policies/production",
+				Version:      1,
+				LastModified: time.Date(2026, 1, 20, 10, 0, 0, 0, time.UTC),
+				Type:         "String",
+			},
+		},
+		Count: 1,
+	}
+
+	infraResult := &bootstrap.InfrastructureStatus{
+		Tables: []bootstrap.TableInfo{
+			{TableName: "sentinel-requests", Status: "ACTIVE", Region: "us-east-1", Purpose: "approvals"},
+			{TableName: "sentinel-breakglass", Status: "ACTIVE", Region: "us-east-1", Purpose: "breakglass"},
+			{TableName: "sentinel-sessions", Status: "ACTIVE", Region: "us-east-1", Purpose: "sessions"},
+		},
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+	infraChecker := &mockInfrastructureCheckerImpl{result: infraResult}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		Region:      "us-east-1",
+		CheckTables: true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, infraChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// No suggestions section when all infrastructure is present
+	if strings.Contains(output, "Suggestions:") {
+		t.Error("should not have Suggestions section when all infrastructure is present")
+	}
+}
+
+func TestStatusCommand_Suggestions_JSON(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	infraResult := &bootstrap.InfrastructureStatus{
+		Tables: []bootstrap.TableInfo{
+			{TableName: "sentinel-requests", Status: "NOT_FOUND", Region: "us-west-2", Purpose: "approvals"},
+			{TableName: "sentinel-breakglass", Status: "ACTIVE", Region: "us-west-2", Purpose: "breakglass"},
+		},
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+	infraChecker := &mockInfrastructureCheckerImpl{result: infraResult}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		Region:      "us-west-2",
+		CheckTables: true,
+		JSONOutput:  true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, infraChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Check JSON output contains suggestions
+	if !strings.Contains(output, `"suggestions"`) {
+		t.Error("expected JSON output to contain 'suggestions' field")
+	}
+	if !strings.Contains(output, `"type":"command"`) {
+		t.Error("expected JSON output to contain suggestion type")
+	}
+	if !strings.Contains(output, `sentinel init approvals --region us-west-2`) {
+		t.Error("expected JSON output to contain approvals suggestion command")
+	}
+}
+
+func TestStatusCommand_Suggestions_JSONEmptyArray(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	infraResult := &bootstrap.InfrastructureStatus{
+		Tables: []bootstrap.TableInfo{
+			{TableName: "sentinel-requests", Status: "ACTIVE", Region: "us-east-1", Purpose: "approvals"},
+			{TableName: "sentinel-breakglass", Status: "ACTIVE", Region: "us-east-1", Purpose: "breakglass"},
+		},
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+	infraChecker := &mockInfrastructureCheckerImpl{result: infraResult}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		Region:      "us-east-1",
+		CheckTables: true,
+		JSONOutput:  true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, infraChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Check JSON output contains empty suggestions array
+	if !strings.Contains(output, `"suggestions":[]`) {
+		t.Error("expected JSON output to contain empty suggestions array")
+	}
+}
+
+// ============================================================================
+// Shell Integration Hint Tests
+// ============================================================================
+
+func TestStatusCommand_ShellIntegration_WithProfile(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{
+			{
+				Name:         "production",
+				Path:         "/sentinel/policies/production",
+				Version:      1,
+				LastModified: time.Date(2026, 1, 20, 10, 0, 0, 0, time.UTC),
+				Type:         "String",
+			},
+		},
+		Count: 1,
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+
+	input := StatusCommandInput{
+		PolicyRoot: "/sentinel/policies",
+		AWSProfile: "dev",
+		Stdout:     stdout,
+		Stderr:     stderr,
+	}
+
+	err := testableStatusCommand(context.Background(), input, policyChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Check shell integration hint appears when --aws-profile is provided
+	if !strings.Contains(output, "Shell Integration:") {
+		t.Error("expected output to contain 'Shell Integration:'")
+	}
+	if !strings.Contains(output, `sentinel shell init --aws-profile dev`) {
+		t.Error("expected shell integration hint with profile")
+	}
+}
+
+func TestStatusCommand_ShellIntegration_WithoutProfile(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+
+	input := StatusCommandInput{
+		PolicyRoot: "/sentinel/policies",
+		AWSProfile: "", // No profile
+		Stdout:     stdout,
+		Stderr:     stderr,
+	}
+
+	err := testableStatusCommand(context.Background(), input, policyChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Shell integration hint should NOT appear when --aws-profile is not provided
+	if strings.Contains(output, "Shell Integration:") {
+		t.Error("should not show shell integration hint without --aws-profile")
+	}
+}
+
+func TestStatusCommand_ShellIntegration_DetectsShell(t *testing.T) {
+	// Save and restore SHELL env
+	origShell := os.Getenv("SHELL")
+	defer os.Setenv("SHELL", origShell)
+
+	// Test zsh detection
+	os.Setenv("SHELL", "/bin/zsh")
+
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+
+	input := StatusCommandInput{
+		PolicyRoot: "/sentinel/policies",
+		AWSProfile: "test",
+		Stdout:     stdout,
+		Stderr:     stderr,
+	}
+
+	err := testableStatusCommand(context.Background(), input, policyChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Check that zsh rc file is suggested
+	if !strings.Contains(output, "~/.zshrc") {
+		t.Error("expected ~/.zshrc for zsh shell")
+	}
 }

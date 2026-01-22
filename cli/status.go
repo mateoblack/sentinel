@@ -98,6 +98,7 @@ func ConfigureStatusCommand(app *kingpin.Application, s *Sentinel) {
 type CombinedStatusResult struct {
 	*bootstrap.StatusResult
 	Infrastructure *bootstrap.InfrastructureStatus `json:"infrastructure,omitempty"`
+	Suggestions    []bootstrap.Suggestion          `json:"suggestions,omitempty"`
 }
 
 // StatusCommand executes the status command logic.
@@ -164,11 +165,21 @@ func StatusCommand(ctx context.Context, input StatusCommandInput) error {
 		}
 	}
 
+	// Generate suggestions based on status
+	sg := bootstrap.NewSuggestionGenerator()
+	var suggestions []bootstrap.Suggestion
+
+	// Generate infrastructure suggestions for missing tables
+	if infraStatus != nil && input.Region != "" {
+		suggestions = append(suggestions, sg.GenerateInfrastructureSuggestions(infraStatus.Tables, input.Region)...)
+	}
+
 	// Output results
 	if input.JSONOutput {
 		combined := &CombinedStatusResult{
 			StatusResult:   result,
 			Infrastructure: infraStatus,
+			Suggestions:    suggestions,
 		}
 		jsonBytes, err := json.MarshalIndent(combined, "", "  ")
 		if err != nil {
@@ -232,6 +243,28 @@ func StatusCommand(ctx context.Context, input StatusCommandInput) error {
 				fmt.Fprintf(stdout, "  %s%s    %s%s    %s\n",
 					t.TableName, tablePadding, t.Purpose, purposePadding, t.Status)
 			}
+		}
+
+		// Output suggestions if any
+		if len(suggestions) > 0 {
+			fmt.Fprintln(stdout)
+			fmt.Fprintln(stdout, "Suggestions:")
+			for _, s := range suggestions {
+				if s.Type == "command" {
+					fmt.Fprintf(stdout, "  Run: %s\n", s.Command)
+				} else {
+					fmt.Fprintf(stdout, "  %s\n", s.Message)
+				}
+			}
+		}
+
+		// Show shell integration hint if --aws-profile was provided
+		if input.AWSProfile != "" {
+			shellHint := sg.GenerateShellSuggestion(input.AWSProfile)
+			rcFile := bootstrap.GetShellRCFile()
+			fmt.Fprintln(stdout)
+			fmt.Fprintln(stdout, "Shell Integration:")
+			fmt.Fprintf(stdout, "  Add to %s: %s\n", rcFile, shellHint.Command)
 		}
 	}
 
