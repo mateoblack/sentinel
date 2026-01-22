@@ -158,7 +158,7 @@ func testableBootstrapCommand(
 	// If plan-only mode, output IAM policies if requested and return
 	if input.PlanOnly {
 		if input.GenerateIAMPolicies && !input.JSONOutput {
-			outputIAMPolicies(stdout, cfg.PolicyRoot)
+			outputCombinedIAMPolicies(stdout, input)
 		}
 		return nil
 	}
@@ -220,7 +220,7 @@ func testableBootstrapCommand(
 		}
 
 		if input.GenerateIAMPolicies {
-			outputIAMPolicies(stdout, cfg.PolicyRoot)
+			outputCombinedIAMPolicies(stdout, input)
 		}
 	}
 

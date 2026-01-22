@@ -222,7 +222,7 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 			return err
 		}
 		if input.GenerateIAMPolicies && !input.JSONOutput {
-			outputIAMPolicies(stdout, cfg.PolicyRoot)
+			outputCombinedIAMPolicies(stdout, input)
 		}
 		return nil
 	}
@@ -313,7 +313,7 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 
 		// Output IAM policies if requested
 		if input.GenerateIAMPolicies {
-			outputIAMPolicies(stdout, cfg.PolicyRoot)
+			outputCombinedIAMPolicies(stdout, input)
 		}
 	}
 
@@ -497,23 +497,46 @@ func generateCombinedIAMPolicies(input BootstrapCommandInput) CombinedIAMPolicy 
 	return result
 }
 
-// outputIAMPolicies prints IAM policy documents to stdout.
-func outputIAMPolicies(stdout *os.File, policyRoot string) {
+// outputCombinedIAMPolicies prints all IAM policy documents to stdout.
+func outputCombinedIAMPolicies(stdout *os.File, input BootstrapCommandInput) {
+	policies := generateCombinedIAMPolicies(input)
+
 	fmt.Fprintln(stdout, "\n"+strings.Repeat("=", 60))
 	fmt.Fprintln(stdout, "IAM Policy Documents")
 	fmt.Fprintln(stdout, strings.Repeat("=", 60))
 
-	// Reader policy
+	// SSM Reader policy
 	fmt.Fprintln(stdout, "\n--- SentinelPolicyReader ---")
 	fmt.Fprintln(stdout, "Attach to: Roles that need to read Sentinel policies (e.g., Sentinel CLI)")
-	readerPolicy := bootstrap.GenerateReaderPolicy(policyRoot)
-	readerJSON, _ := bootstrap.FormatIAMPolicy(readerPolicy)
-	fmt.Fprintln(stdout, readerJSON)
+	fmt.Fprintln(stdout, policies.SSMReader)
 
-	// Admin policy
+	// SSM Admin policy
 	fmt.Fprintln(stdout, "\n--- SentinelPolicyAdmin ---")
 	fmt.Fprintln(stdout, "Attach to: Roles that manage Sentinel policies (e.g., CI/CD pipelines)")
-	adminPolicy := bootstrap.GenerateAdminPolicy(policyRoot)
-	adminJSON, _ := bootstrap.FormatIAMPolicy(adminPolicy)
-	fmt.Fprintln(stdout, adminJSON)
+	fmt.Fprintln(stdout, policies.SSMAdmin)
+
+	// DynamoDB table policies
+	withApprovals := input.WithApprovals || input.WithAll
+	withBreakGlass := input.WithBreakGlass || input.WithAll
+	withSessions := input.WithSessions || input.WithAll
+
+	tableIndex := 0
+	if withApprovals {
+		fmt.Fprintln(stdout, "\n--- SentinelApprovalTable ---")
+		fmt.Fprintf(stdout, "Attach to: Roles that use approval workflows (table: %s)\n", input.ApprovalTableName)
+		fmt.Fprintln(stdout, policies.DynamoDBTables[tableIndex])
+		tableIndex++
+	}
+	if withBreakGlass {
+		fmt.Fprintln(stdout, "\n--- SentinelBreakGlassTable ---")
+		fmt.Fprintf(stdout, "Attach to: Roles that use break-glass access (table: %s)\n", input.BreakGlassTableName)
+		fmt.Fprintln(stdout, policies.DynamoDBTables[tableIndex])
+		tableIndex++
+	}
+	if withSessions {
+		fmt.Fprintln(stdout, "\n--- SentinelSessionTable ---")
+		fmt.Fprintf(stdout, "Attach to: Roles that use server mode sessions (table: %s)\n", input.SessionTableName)
+		fmt.Fprintln(stdout, policies.DynamoDBTables[tableIndex])
+		tableIndex++
+	}
 }
