@@ -11,6 +11,9 @@ import (
 	"github.com/byteness/aws-vault/v7/bootstrap"
 )
 
+// Note: Full CLI integration tests require CGO (1password-sdk-go dependency).
+// These tests validate logic and formatting without full CLI execution.
+
 // ============================================================================
 // Test Interfaces and Mocks
 // ============================================================================
@@ -33,6 +36,24 @@ func (m *mockStatusCheckerImpl) GetStatus(ctx context.Context, policyRoot string
 	return m.result, nil
 }
 
+// InfrastructureCheckerInterface defines the infrastructure checking interface for testing.
+type InfrastructureCheckerInterface interface {
+	GetInfrastructureStatus(ctx context.Context, approvalTable, breakglassTable, sessionTable string) (*bootstrap.InfrastructureStatus, error)
+}
+
+// mockInfrastructureCheckerImpl implements InfrastructureCheckerInterface for testing.
+type mockInfrastructureCheckerImpl struct {
+	result *bootstrap.InfrastructureStatus
+	err    error
+}
+
+func (m *mockInfrastructureCheckerImpl) GetInfrastructureStatus(ctx context.Context, approvalTable, breakglassTable, sessionTable string) (*bootstrap.InfrastructureStatus, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.result, nil
+}
+
 // ============================================================================
 // Testable Command Using Interfaces
 // ============================================================================
@@ -42,6 +63,16 @@ func testableStatusCommand(
 	ctx context.Context,
 	input StatusCommandInput,
 	checker StatusCheckerInterface,
+) error {
+	return testableStatusCommandWithInfra(ctx, input, checker, nil)
+}
+
+// testableStatusCommandWithInfra is a testable version that accepts both interfaces.
+func testableStatusCommandWithInfra(
+	ctx context.Context,
+	input StatusCommandInput,
+	checker StatusCheckerInterface,
+	infraChecker InfrastructureCheckerInterface,
 ) error {
 	// Set up I/O
 	stdout := input.Stdout
@@ -53,6 +84,12 @@ func testableStatusCommand(
 		stderr = os.Stderr
 	}
 
+	// Validate: --check-tables requires --region (unless we have mock checker)
+	if input.CheckTables && input.Region == "" && infraChecker == nil {
+		_, _ = stderr.WriteString("Error: --check-tables requires --region to be specified\n")
+		return errors.New("--check-tables requires --region")
+	}
+
 	// Get status
 	result, err := checker.GetStatus(ctx, input.PolicyRoot)
 	if err != nil {
@@ -60,20 +97,43 @@ func testableStatusCommand(
 		return err
 	}
 
+	// Get infrastructure status if requested
+	var infraStatus *bootstrap.InfrastructureStatus
+	if input.CheckTables && infraChecker != nil {
+		infraStatus, err = infraChecker.GetInfrastructureStatus(ctx,
+			input.ApprovalTableName,
+			input.BreakGlassTableName,
+			input.SessionTableName)
+		if err != nil {
+			_, _ = stderr.WriteString("Failed to get infrastructure status: " + err.Error() + "\n")
+			return err
+		}
+	}
+
 	// Output results
 	if input.JSONOutput {
 		// For testing, output a simple JSON structure
 		_, _ = stdout.WriteString(`{"policy_root":"` + result.PolicyRoot + `","count":`)
-		_, _ = stdout.WriteString(string(rune('0'+result.Count)) + "}\n")
+		_, _ = stdout.WriteString(string(rune('0' + result.Count)))
+		if infraStatus != nil {
+			_, _ = stdout.WriteString(`,"infrastructure":{"tables":[`)
+			for i, t := range infraStatus.Tables {
+				if i > 0 {
+					_, _ = stdout.WriteString(",")
+				}
+				_, _ = stdout.WriteString(`{"table_name":"` + t.TableName + `","status":"` + t.Status + `","purpose":"` + t.Purpose + `"}`)
+			}
+			_, _ = stdout.WriteString("]}")
+		}
+		_, _ = stdout.WriteString("}\n")
 	} else {
-		_, _ = stdout.WriteString("Sentinel Policy Status\n")
-		_, _ = stdout.WriteString("======================\n\n")
-		_, _ = stdout.WriteString("Policy Root: " + result.PolicyRoot + "\n\n")
+		_, _ = stdout.WriteString("Sentinel Status\n")
+		_, _ = stdout.WriteString("===============\n\n")
+		_, _ = stdout.WriteString("Policy Parameters (" + result.PolicyRoot + "):\n")
 
 		if len(result.Parameters) == 0 {
-			_, _ = stdout.WriteString("Profiles:\n  (none)\n")
+			_, _ = stdout.WriteString("  (none)\n")
 		} else {
-			_, _ = stdout.WriteString("Profiles:\n")
 			for _, p := range result.Parameters {
 				timeStr := p.LastModified.Format("2006-01-02 15:04:05")
 				line := "  " + p.Name + "    v" + string(rune('0'+int(p.Version))) + "  (last modified: " + timeStr + ")\n"
@@ -86,6 +146,14 @@ func testableStatusCommand(
 			_, _ = stdout.WriteString("s")
 		}
 		_, _ = stdout.WriteString("\n")
+
+		// Output infrastructure status if available
+		if infraStatus != nil {
+			_, _ = stdout.WriteString("\nInfrastructure:\n")
+			for _, t := range infraStatus.Tables {
+				_, _ = stdout.WriteString("  " + t.TableName + "    " + t.Purpose + "    " + t.Status + "\n")
+			}
+		}
 	}
 
 	return nil
@@ -120,8 +188,8 @@ func TestStatusCommand_EmptyResults(t *testing.T) {
 
 	output := readFile(t, stdout)
 
-	if !strings.Contains(output, "Sentinel Policy Status") {
-		t.Error("expected output to contain 'Sentinel Policy Status'")
+	if !strings.Contains(output, "Sentinel Status") {
+		t.Error("expected output to contain 'Sentinel Status'")
 	}
 	if !strings.Contains(output, "/sentinel/policies") {
 		t.Error("expected output to contain policy root")
@@ -386,7 +454,7 @@ func TestStatusCommand_CustomRegion(t *testing.T) {
 
 	// Region is used for AWS config, not displayed in output
 	output := readFile(t, stdout)
-	if !strings.Contains(output, "Sentinel Policy Status") {
+	if !strings.Contains(output, "Sentinel Status") {
 		t.Error("expected output to contain header")
 	}
 }
@@ -421,6 +489,279 @@ func TestStatusCommand_CustomPolicyRoot(t *testing.T) {
 	output := readFile(t, stdout)
 	if !strings.Contains(output, "/custom/path/policies") {
 		t.Error("expected output to contain custom policy root")
+	}
+}
+
+// ============================================================================
+// Infrastructure Status Tests
+// ============================================================================
+
+func TestStatusCommand_WithInfrastructure_AllActive(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	infraResult := &bootstrap.InfrastructureStatus{
+		Tables: []bootstrap.TableInfo{
+			{TableName: "sentinel-requests", Status: "ACTIVE", Region: "us-east-1", Purpose: "approvals"},
+			{TableName: "sentinel-breakglass", Status: "ACTIVE", Region: "us-east-1", Purpose: "breakglass"},
+			{TableName: "sentinel-sessions", Status: "ACTIVE", Region: "us-east-1", Purpose: "sessions"},
+		},
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+	infraChecker := &mockInfrastructureCheckerImpl{result: infraResult}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		Region:      "us-east-1",
+		CheckTables: true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, infraChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Check header changed to "Sentinel Status"
+	if !strings.Contains(output, "Sentinel Status") {
+		t.Error("expected output to contain 'Sentinel Status'")
+	}
+	// Check infrastructure section
+	if !strings.Contains(output, "Infrastructure:") {
+		t.Error("expected output to contain 'Infrastructure:'")
+	}
+	if !strings.Contains(output, "sentinel-requests") {
+		t.Error("expected output to contain 'sentinel-requests'")
+	}
+	if !strings.Contains(output, "ACTIVE") {
+		t.Error("expected output to contain 'ACTIVE'")
+	}
+	if !strings.Contains(output, "approvals") {
+		t.Error("expected output to contain 'approvals'")
+	}
+}
+
+func TestStatusCommand_WithInfrastructure_SomeMissing(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{
+			{
+				Name:         "production",
+				Path:         "/sentinel/policies/production",
+				Version:      1,
+				LastModified: time.Date(2026, 1, 20, 10, 0, 0, 0, time.UTC),
+				Type:         "String",
+			},
+		},
+		Count: 1,
+	}
+
+	infraResult := &bootstrap.InfrastructureStatus{
+		Tables: []bootstrap.TableInfo{
+			{TableName: "sentinel-requests", Status: "ACTIVE", Region: "us-east-1", Purpose: "approvals"},
+			{TableName: "sentinel-breakglass", Status: "NOT_FOUND", Region: "us-east-1", Purpose: "breakglass"},
+			{TableName: "sentinel-sessions", Status: "NOT_FOUND", Region: "us-east-1", Purpose: "sessions"},
+		},
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+	infraChecker := &mockInfrastructureCheckerImpl{result: infraResult}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		Region:      "us-east-1",
+		CheckTables: true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, infraChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Check infrastructure section shows both statuses
+	if !strings.Contains(output, "ACTIVE") {
+		t.Error("expected output to contain 'ACTIVE'")
+	}
+	if !strings.Contains(output, "NOT_FOUND") {
+		t.Error("expected output to contain 'NOT_FOUND'")
+	}
+}
+
+func TestStatusCommand_WithInfrastructure_JSON(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	infraResult := &bootstrap.InfrastructureStatus{
+		Tables: []bootstrap.TableInfo{
+			{TableName: "sentinel-requests", Status: "ACTIVE", Region: "us-east-1", Purpose: "approvals"},
+			{TableName: "sentinel-breakglass", Status: "CREATING", Region: "us-east-1", Purpose: "breakglass"},
+		},
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+	infraChecker := &mockInfrastructureCheckerImpl{result: infraResult}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		Region:      "us-east-1",
+		CheckTables: true,
+		JSONOutput:  true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, infraChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Check JSON output contains infrastructure
+	if !strings.Contains(output, `"infrastructure"`) {
+		t.Error("expected JSON output to contain 'infrastructure' field")
+	}
+	if !strings.Contains(output, `"tables"`) {
+		t.Error("expected JSON output to contain 'tables' field")
+	}
+	if !strings.Contains(output, `"sentinel-requests"`) {
+		t.Error("expected JSON output to contain table name")
+	}
+	if !strings.Contains(output, `"ACTIVE"`) {
+		t.Error("expected JSON output to contain status")
+	}
+	if !strings.Contains(output, `"CREATING"`) {
+		t.Error("expected JSON output to contain CREATING status")
+	}
+}
+
+func TestStatusCommand_CheckTables_RequiresRegion(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		Region:      "", // No region
+		CheckTables: true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	// No infrastructure checker - should fail due to missing region
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, nil)
+	if err == nil {
+		t.Fatal("expected error due to missing region")
+	}
+
+	errOutput := readFile(t, stderr)
+	if !strings.Contains(errOutput, "--check-tables requires --region") {
+		t.Errorf("expected error about region requirement, got: %s", errOutput)
+	}
+}
+
+func TestStatusCommand_InfrastructureError(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+	infraChecker := &mockInfrastructureCheckerImpl{err: errors.New("AccessDeniedException: not authorized")}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		Region:      "us-east-1",
+		CheckTables: true,
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, infraChecker)
+	if err == nil {
+		t.Fatal("expected error from infrastructure checker")
+	}
+
+	errOutput := readFile(t, stderr)
+	if !strings.Contains(errOutput, "Failed to get infrastructure status") {
+		t.Error("expected stderr to contain infrastructure error message")
+	}
+}
+
+func TestStatusCommand_WithoutCheckTables_NoInfrastructure(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	policyResult := &bootstrap.StatusResult{
+		PolicyRoot: "/sentinel/policies",
+		Parameters: []bootstrap.ParameterInfo{},
+		Count:      0,
+	}
+
+	policyChecker := &mockStatusCheckerImpl{result: policyResult}
+	// Even with infra checker available, if CheckTables is false, it should not be called
+	infraChecker := &mockInfrastructureCheckerImpl{
+		result: &bootstrap.InfrastructureStatus{
+			Tables: []bootstrap.TableInfo{
+				{TableName: "should-not-appear", Status: "ACTIVE", Purpose: "test"},
+			},
+		},
+	}
+
+	input := StatusCommandInput{
+		PolicyRoot:  "/sentinel/policies",
+		CheckTables: false, // Disabled
+		Stdout:      stdout,
+		Stderr:      stderr,
+	}
+
+	err := testableStatusCommandWithInfra(context.Background(), input, policyChecker, infraChecker)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Should NOT contain infrastructure section
+	if strings.Contains(output, "Infrastructure:") {
+		t.Error("expected output to NOT contain infrastructure section when CheckTables is false")
+	}
+	if strings.Contains(output, "should-not-appear") {
+		t.Error("expected infra checker to not be called when CheckTables is false")
 	}
 }
 

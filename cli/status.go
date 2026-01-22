@@ -19,9 +19,22 @@ type StatusCommandInput struct {
 	AWSProfile string // Optional AWS profile for credentials
 	JSONOutput bool
 
+	// CheckTables enables checking DynamoDB table status.
+	// Defaults to true when region is provided, false otherwise.
+	CheckTables bool
+
+	// Table names (use defaults if empty)
+	ApprovalTableName   string
+	BreakGlassTableName string
+	SessionTableName    string
+
 	// StatusChecker is an optional StatusChecker implementation for testing.
 	// If nil, a new StatusChecker will be created using AWS config.
 	StatusChecker *bootstrap.StatusChecker
+
+	// InfrastructureChecker is an optional InfrastructureChecker implementation for testing.
+	// If nil, a new InfrastructureChecker will be created using AWS config.
+	InfrastructureChecker *bootstrap.InfrastructureChecker
 
 	// Stdout is an optional writer for output (for testing).
 	// If nil, os.Stdout will be used.
@@ -50,7 +63,7 @@ func ConfigureStatusCommand(app *kingpin.Application, s *Sentinel) {
 		Default(bootstrap.DefaultPolicyRoot).
 		StringVar(&input.PolicyRoot)
 
-	cmd.Flag("region", "AWS region for SSM operations").
+	cmd.Flag("region", "AWS region for SSM and DynamoDB operations").
 		StringVar(&input.Region)
 
 	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
@@ -59,6 +72,21 @@ func ConfigureStatusCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("json", "Output in JSON format").
 		BoolVar(&input.JSONOutput)
 
+	cmd.Flag("check-tables", "Check DynamoDB table status (requires --region)").
+		BoolVar(&input.CheckTables)
+
+	cmd.Flag("approval-table", "Name of the approval table").
+		Default(bootstrap.DefaultApprovalTableName).
+		StringVar(&input.ApprovalTableName)
+
+	cmd.Flag("breakglass-table", "Name of the break-glass table").
+		Default(bootstrap.DefaultBreakGlassTableName).
+		StringVar(&input.BreakGlassTableName)
+
+	cmd.Flag("session-table", "Name of the session table").
+		Default(bootstrap.DefaultSessionTableName).
+		StringVar(&input.SessionTableName)
+
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := StatusCommand(context.Background(), input)
 		app.FatalIfError(err, "status")
@@ -66,8 +94,14 @@ func ConfigureStatusCommand(app *kingpin.Application, s *Sentinel) {
 	})
 }
 
+// CombinedStatusResult holds both policy and infrastructure status for JSON output.
+type CombinedStatusResult struct {
+	*bootstrap.StatusResult
+	Infrastructure *bootstrap.InfrastructureStatus `json:"infrastructure,omitempty"`
+}
+
 // StatusCommand executes the status command logic.
-// It queries SSM for existing Sentinel policy parameters and displays their status.
+// It queries SSM for existing Sentinel policy parameters and optionally DynamoDB tables.
 // On success, outputs status to stdout. On failure, outputs error to stderr and returns error.
 func StatusCommand(ctx context.Context, input StatusCommandInput) error {
 	// Set up I/O
@@ -80,53 +114,77 @@ func StatusCommand(ctx context.Context, input StatusCommandInput) error {
 		stderr = os.Stderr
 	}
 
+	// Validate: --check-tables requires --region
+	if input.CheckTables && input.Region == "" && input.InfrastructureChecker == nil {
+		fmt.Fprintln(stderr, "Error: --check-tables requires --region to be specified")
+		return fmt.Errorf("--check-tables requires --region")
+	}
+
+	// Load AWS config
+	awsCfgOpts := []func(*config.LoadOptions) error{}
+	if input.AWSProfile != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
+	}
+	if input.Region != "" {
+		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+	}
+	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
+	if err != nil {
+		fmt.Fprintf(stderr, "Failed to load AWS config: %v\n", err)
+		return err
+	}
+
 	// Get or create StatusChecker
 	checker := input.StatusChecker
 	if checker == nil {
-		// Load AWS config
-		awsCfgOpts := []func(*config.LoadOptions) error{}
-		if input.AWSProfile != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(input.AWSProfile))
-		}
-		if input.Region != "" {
-			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
-		}
-		awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
-		if err != nil {
-			fmt.Fprintf(stderr, "Failed to load AWS config: %v\n", err)
-			return err
-		}
 		checker = bootstrap.NewStatusChecker(awsCfg)
 	}
 
-	// Get status
+	// Get policy status
 	result, err := checker.GetStatus(ctx, input.PolicyRoot)
 	if err != nil {
 		fmt.Fprintf(stderr, "Failed to get status: %v\n", err)
 		return err
 	}
 
+	// Get infrastructure status if requested
+	var infraStatus *bootstrap.InfrastructureStatus
+	if input.CheckTables {
+		infraChecker := input.InfrastructureChecker
+		if infraChecker == nil {
+			infraChecker = bootstrap.NewInfrastructureChecker(awsCfg, input.Region)
+		}
+		infraStatus, err = infraChecker.GetInfrastructureStatus(ctx,
+			input.ApprovalTableName,
+			input.BreakGlassTableName,
+			input.SessionTableName)
+		if err != nil {
+			fmt.Fprintf(stderr, "Failed to get infrastructure status: %v\n", err)
+			return err
+		}
+	}
+
 	// Output results
 	if input.JSONOutput {
-		jsonBytes, err := json.MarshalIndent(result, "", "  ")
+		combined := &CombinedStatusResult{
+			StatusResult:   result,
+			Infrastructure: infraStatus,
+		}
+		jsonBytes, err := json.MarshalIndent(combined, "", "  ")
 		if err != nil {
 			fmt.Fprintf(stderr, "Failed to format status as JSON: %v\n", err)
 			return err
 		}
 		fmt.Fprintln(stdout, string(jsonBytes))
 	} else {
-		fmt.Fprintln(stdout, "Sentinel Policy Status")
-		fmt.Fprintln(stdout, "======================")
+		fmt.Fprintln(stdout, "Sentinel Status")
+		fmt.Fprintln(stdout, "===============")
 		fmt.Fprintln(stdout)
-		fmt.Fprintf(stdout, "Policy Root: %s\n", result.PolicyRoot)
-		fmt.Fprintln(stdout)
+		fmt.Fprintf(stdout, "Policy Parameters (%s):\n", result.PolicyRoot)
 
 		if len(result.Parameters) == 0 {
-			fmt.Fprintln(stdout, "Profiles:")
 			fmt.Fprintln(stdout, "  (none)")
 		} else {
-			fmt.Fprintln(stdout, "Profiles:")
-
 			// Find max name length for alignment
 			maxNameLen := 0
 			for _, p := range result.Parameters {
@@ -150,6 +208,31 @@ func StatusCommand(ctx context.Context, input StatusCommandInput) error {
 			fmt.Fprint(stdout, "s")
 		}
 		fmt.Fprintln(stdout)
+
+		// Output infrastructure status if available
+		if infraStatus != nil {
+			fmt.Fprintln(stdout)
+			fmt.Fprintln(stdout, "Infrastructure:")
+
+			// Find max table name length for alignment
+			maxTableLen := 0
+			maxPurposeLen := 0
+			for _, t := range infraStatus.Tables {
+				if len(t.TableName) > maxTableLen {
+					maxTableLen = len(t.TableName)
+				}
+				if len(t.Purpose) > maxPurposeLen {
+					maxPurposeLen = len(t.Purpose)
+				}
+			}
+
+			for _, t := range infraStatus.Tables {
+				tablePadding := strings.Repeat(" ", maxTableLen-len(t.TableName))
+				purposePadding := strings.Repeat(" ", maxPurposeLen-len(t.Purpose))
+				fmt.Fprintf(stdout, "  %s%s    %s%s    %s\n",
+					t.TableName, tablePadding, t.Purpose, purposePadding, t.Status)
+			}
+		}
 	}
 
 	return nil
