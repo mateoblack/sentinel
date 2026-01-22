@@ -33,6 +33,7 @@ func main() {
 	cli.ConfigureBootstrapCommand(app, s)
 	cli.ConfigureStatusCommand(app, s)
 	cli.ConfigureInitWizardCommand(app, s)
+	cli.ConfigureInitApprovalsCommand(app, s)
 
 	// Enforcement commands
 	cli.ConfigureEnforcePlanCommand(app, s)
