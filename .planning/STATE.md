@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Current Position
 
-Phase: 93 of 93 (Documentation Validation)
-Plan: 3 of 3 in current phase
+Phase: 88-FIX (UAT Issues Fix)
+Plan: 88-03-FIX completed
 Status: Complete
-Last activity: 2026-01-22 — Completed 93-03-PLAN.md (Documentation Validation)
+Last activity: 2026-01-22 — Completed 88-03-FIX.md (UAT Issues Fix)
 
 Progress: ██████████ 100% (v1.12 Infrastructure Provisioning)
 
@@ -558,6 +558,11 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Fixed BOOTSTRAP.md table schema docs: GSI names use gsi- prefix, TTL attribute is "ttl"
 - Schema docs now match infrastructure/schema.go exactly (gsi-requester, gsi-status, gsi-profile, ttl)
 
+**v1.12 UAT Issues Fix decisions (Phase 88-03-FIX):**
+- Plan() always returns WouldCreate=true - dry-run works without DynamoDB permissions
+- Access denied errors return "UNKNOWN" status (not error) - allows graceful degradation
+- IAM policies shown after cancellation - users need them to request permissions
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -569,9 +574,9 @@ None — clean start for v1.12.
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 93-03-PLAN.md
+Stopped at: Completed 88-03-FIX.md (UAT Issues Fix)
 Resume file: None
-Next: Complete v1.12 milestone
+Next: v1.12 UAT re-testing
 
 ## Roadmap Evolution
 
