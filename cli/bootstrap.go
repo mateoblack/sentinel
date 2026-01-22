@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/bootstrap"
+	"github.com/byteness/aws-vault/v7/infrastructure"
 )
 
 // BootstrapCommandInput contains the input for the bootstrap command.
@@ -25,6 +26,15 @@ type BootstrapCommandInput struct {
 	JSONOutput          bool
 	Description         string
 
+	// DynamoDB table provisioning flags
+	WithApprovals       bool   // Creates sentinel-requests table
+	WithBreakGlass      bool   // Creates sentinel-breakglass table
+	WithSessions        bool   // Creates sentinel-sessions table
+	WithAll             bool   // Shorthand for enabling all three
+	ApprovalTableName   string // Custom name for approval requests table
+	BreakGlassTableName string // Custom name for break-glass events table
+	SessionTableName    string // Custom name for server sessions table
+
 	// Planner is an optional Planner implementation for testing.
 	// If nil, a new Planner will be created using AWS config.
 	Planner *bootstrap.Planner
@@ -32,6 +42,10 @@ type BootstrapCommandInput struct {
 	// Executor is an optional Executor implementation for testing.
 	// If nil, a new Executor will be created using AWS config.
 	Executor *bootstrap.Executor
+
+	// Provisioner is an optional TableProvisioner for testing.
+	// If nil, a new TableProvisioner will be created using AWS config.
+	Provisioner TableProvisionerInterface
 
 	// Stdin is an optional reader for confirmation prompts (for testing).
 	// If nil, os.Stdin will be used.
@@ -44,6 +58,12 @@ type BootstrapCommandInput struct {
 	// Stderr is an optional writer for errors (for testing).
 	// If nil, os.Stderr will be used.
 	Stderr *os.File
+}
+
+// TableProvisionerInterface defines the table provisioning interface for testing.
+type TableProvisionerInterface interface {
+	Plan(ctx context.Context, schema infrastructure.TableSchema) (*infrastructure.ProvisionPlan, error)
+	Create(ctx context.Context, schema infrastructure.TableSchema) (*infrastructure.ProvisionResult, error)
 }
 
 // ConfigureBootstrapCommand sets up the bootstrap command as a subcommand of init.
@@ -85,6 +105,30 @@ func ConfigureBootstrapCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("description", "Description for generated policies").
 		StringVar(&input.Description)
+
+	cmd.Flag("with-approvals", "Also create DynamoDB approval requests table").
+		BoolVar(&input.WithApprovals)
+
+	cmd.Flag("with-breakglass", "Also create DynamoDB break-glass events table").
+		BoolVar(&input.WithBreakGlass)
+
+	cmd.Flag("with-sessions", "Also create DynamoDB server sessions table").
+		BoolVar(&input.WithSessions)
+
+	cmd.Flag("all", "Create all optional DynamoDB tables (approvals, breakglass, sessions)").
+		BoolVar(&input.WithAll)
+
+	cmd.Flag("approval-table", "Name for approval requests table").
+		Default(DefaultApprovalTableName).
+		StringVar(&input.ApprovalTableName)
+
+	cmd.Flag("breakglass-table", "Name for break-glass events table").
+		Default(DefaultBreakGlassTableName).
+		StringVar(&input.BreakGlassTableName)
+
+	cmd.Flag("session-table", "Name for server sessions table").
+		Default(DefaultSessionTableName).
+		StringVar(&input.SessionTableName)
 
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := BootstrapCommand(context.Background(), input)
