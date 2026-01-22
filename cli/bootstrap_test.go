@@ -1775,3 +1775,184 @@ func TestBootstrapCommand_CustomTableNames(t *testing.T) {
 		t.Error("expected custom-sessions table")
 	}
 }
+
+// ============================================================================
+// Combined IAM Policy Generation Tests
+// ============================================================================
+
+func TestGenerateCombinedIAMPolicies_SSMOnly(t *testing.T) {
+	input := BootstrapCommandInput{
+		PolicyRoot: "/sentinel/policies",
+		Region:     "us-east-1",
+	}
+
+	result := generateCombinedIAMPolicies(input)
+
+	if result.SSMReader == "" {
+		t.Error("SSMReader policy should not be empty")
+	}
+	if result.SSMAdmin == "" {
+		t.Error("SSMAdmin policy should not be empty")
+	}
+	if len(result.DynamoDBTables) != 0 {
+		t.Errorf("DynamoDBTables should be empty without --with-* flags, got %d", len(result.DynamoDBTables))
+	}
+
+	// Verify SSM policies contain expected content
+	if !strings.Contains(result.SSMReader, "ssm:GetParameter") {
+		t.Error("SSMReader should contain ssm:GetParameter")
+	}
+	if !strings.Contains(result.SSMAdmin, "ssm:PutParameter") {
+		t.Error("SSMAdmin should contain ssm:PutParameter")
+	}
+}
+
+func TestGenerateCombinedIAMPolicies_WithApprovals(t *testing.T) {
+	input := BootstrapCommandInput{
+		PolicyRoot:        "/sentinel/policies",
+		Region:            "us-east-1",
+		WithApprovals:     true,
+		ApprovalTableName: "my-requests",
+	}
+
+	result := generateCombinedIAMPolicies(input)
+
+	if len(result.DynamoDBTables) != 1 {
+		t.Errorf("Expected 1 DynamoDB policy, got %d", len(result.DynamoDBTables))
+	}
+	if !strings.Contains(result.DynamoDBTables[0], "my-requests") {
+		t.Error("Approval table policy should contain table name")
+	}
+	if !strings.Contains(result.DynamoDBTables[0], "dynamodb:GetItem") {
+		t.Error("Approval table policy should contain DynamoDB operations")
+	}
+}
+
+func TestGenerateCombinedIAMPolicies_WithAll(t *testing.T) {
+	input := BootstrapCommandInput{
+		PolicyRoot:          "/sentinel/policies",
+		Region:              "us-east-1",
+		WithAll:             true,
+		ApprovalTableName:   "sentinel-requests",
+		BreakGlassTableName: "sentinel-breakglass",
+		SessionTableName:    "sentinel-sessions",
+	}
+
+	result := generateCombinedIAMPolicies(input)
+
+	if len(result.DynamoDBTables) != 3 {
+		t.Errorf("Expected 3 DynamoDB policies with --all, got %d", len(result.DynamoDBTables))
+	}
+
+	// Verify each table name appears in its corresponding policy
+	if !strings.Contains(result.DynamoDBTables[0], "sentinel-requests") {
+		t.Error("First policy should be for sentinel-requests")
+	}
+	if !strings.Contains(result.DynamoDBTables[1], "sentinel-breakglass") {
+		t.Error("Second policy should be for sentinel-breakglass")
+	}
+	if !strings.Contains(result.DynamoDBTables[2], "sentinel-sessions") {
+		t.Error("Third policy should be for sentinel-sessions")
+	}
+}
+
+func TestGenerateCombinedIAMPolicies_WithBreakGlass(t *testing.T) {
+	input := BootstrapCommandInput{
+		PolicyRoot:          "/sentinel/policies",
+		Region:              "us-east-1",
+		WithBreakGlass:      true,
+		BreakGlassTableName: "custom-breakglass",
+	}
+
+	result := generateCombinedIAMPolicies(input)
+
+	if len(result.DynamoDBTables) != 1 {
+		t.Errorf("Expected 1 DynamoDB policy, got %d", len(result.DynamoDBTables))
+	}
+	if !strings.Contains(result.DynamoDBTables[0], "custom-breakglass") {
+		t.Error("BreakGlass table policy should contain custom table name")
+	}
+}
+
+func TestGenerateCombinedIAMPolicies_WithSessions(t *testing.T) {
+	input := BootstrapCommandInput{
+		PolicyRoot:       "/sentinel/policies",
+		Region:           "us-east-1",
+		WithSessions:     true,
+		SessionTableName: "custom-sessions",
+	}
+
+	result := generateCombinedIAMPolicies(input)
+
+	if len(result.DynamoDBTables) != 1 {
+		t.Errorf("Expected 1 DynamoDB policy, got %d", len(result.DynamoDBTables))
+	}
+	if !strings.Contains(result.DynamoDBTables[0], "custom-sessions") {
+		t.Error("Sessions table policy should contain custom table name")
+	}
+}
+
+func TestGenerateCombinedIAMPolicies_MixedFlags(t *testing.T) {
+	// Test combining specific flags (not --all)
+	input := BootstrapCommandInput{
+		PolicyRoot:          "/sentinel/policies",
+		Region:              "us-east-1",
+		WithApprovals:       true,
+		WithSessions:        true,
+		ApprovalTableName:   "my-approvals",
+		SessionTableName:    "my-sessions",
+		BreakGlassTableName: "sentinel-breakglass", // Not used since WithBreakGlass=false
+	}
+
+	result := generateCombinedIAMPolicies(input)
+
+	if len(result.DynamoDBTables) != 2 {
+		t.Errorf("Expected 2 DynamoDB policies, got %d", len(result.DynamoDBTables))
+	}
+
+	// Verify only approvals and sessions are included (not breakglass)
+	combinedPolicies := strings.Join(result.DynamoDBTables, " ")
+	if !strings.Contains(combinedPolicies, "my-approvals") {
+		t.Error("Should contain approvals table")
+	}
+	if !strings.Contains(combinedPolicies, "my-sessions") {
+		t.Error("Should contain sessions table")
+	}
+	if strings.Contains(combinedPolicies, "sentinel-breakglass") {
+		t.Error("Should NOT contain breakglass table when flag not set")
+	}
+}
+
+func TestGenerateCombinedIAMPolicies_DefaultPolicyRoot(t *testing.T) {
+	// Test that empty policy root uses default
+	input := BootstrapCommandInput{
+		PolicyRoot: "", // Empty - should use default
+		Region:     "us-east-1",
+	}
+
+	result := generateCombinedIAMPolicies(input)
+
+	// Should still generate valid SSM policies
+	if result.SSMReader == "" {
+		t.Error("SSMReader should not be empty even with empty PolicyRoot")
+	}
+	if !strings.Contains(result.SSMReader, "/sentinel/policies") {
+		t.Error("Should use default policy root (/sentinel/policies)")
+	}
+}
+
+func TestGenerateCombinedIAMPolicies_RegionInPolicy(t *testing.T) {
+	input := BootstrapCommandInput{
+		PolicyRoot:        "/sentinel/policies",
+		Region:            "eu-west-1",
+		WithApprovals:     true,
+		ApprovalTableName: "test-table",
+	}
+
+	result := generateCombinedIAMPolicies(input)
+
+	// DynamoDB table ARN should include the region
+	if !strings.Contains(result.DynamoDBTables[0], "eu-west-1") {
+		t.Error("DynamoDB policy should include region in ARN")
+	}
+}
