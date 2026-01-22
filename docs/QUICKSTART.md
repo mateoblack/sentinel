@@ -60,6 +60,58 @@ Add to `~/.aws/config` for seamless SDK integration:
 credential_process = sentinel credentials --profile dev --policy-parameter /sentinel/policies/dev
 ```
 
+## Optional: Set Up DynamoDB Tables
+
+If you plan to use approval workflows, break-glass access, or server mode with session tracking, create the required DynamoDB tables:
+
+### Approval Workflows
+
+```bash
+# Preview what will be created
+sentinel init approvals --plan --region us-east-1
+
+# Create the approval requests table
+sentinel init approvals --region us-east-1
+```
+
+### Break-Glass Emergency Access
+
+```bash
+sentinel init breakglass --region us-east-1
+```
+
+### Server Mode Session Tracking
+
+```bash
+sentinel init sessions --region us-east-1
+```
+
+### All Tables at Once
+
+Use the unified bootstrap command with `--with-*` flags:
+
+```bash
+sentinel init bootstrap --profile dev \
+  --with-approvals \
+  --with-breakglass \
+  --with-sessions \
+  --region us-east-1
+```
+
+Or use `--all` to enable all optional infrastructure:
+
+```bash
+sentinel init bootstrap --profile dev --all --region us-east-1
+```
+
+### Generate IAM Policies
+
+Each init command can generate the required IAM policy:
+
+```bash
+sentinel init approvals --generate-iam --region us-east-1
+```
+
 ## Verify Permissions
 
 Check your IAM permissions are sufficient:
