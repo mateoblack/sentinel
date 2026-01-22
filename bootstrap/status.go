@@ -2,10 +2,13 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 )
 
@@ -125,4 +128,127 @@ func extractProfileName(policyRoot, paramPath string) string {
 	name = strings.TrimPrefix(name, "/")
 
 	return name
+}
+
+// ============================================================================
+// Infrastructure Status Types and Checker
+// ============================================================================
+
+// Default table names for Sentinel infrastructure.
+const (
+	DefaultApprovalTableName   = "sentinel-requests"
+	DefaultBreakGlassTableName = "sentinel-breakglass"
+	DefaultSessionTableName    = "sentinel-sessions"
+)
+
+// TableInfo holds status information about a DynamoDB table.
+type TableInfo struct {
+	// TableName is the name of the DynamoDB table.
+	TableName string `json:"table_name"`
+	// Status is the table status (ACTIVE, NOT_FOUND, CREATING, etc.).
+	Status string `json:"status"`
+	// Region is the AWS region where the table is located.
+	Region string `json:"region"`
+	// Purpose describes the table's role (approvals, breakglass, sessions).
+	Purpose string `json:"purpose"`
+}
+
+// InfrastructureStatus holds status of all infrastructure components.
+type InfrastructureStatus struct {
+	// Tables contains status information for each DynamoDB table.
+	Tables []TableInfo `json:"tables"`
+}
+
+// dynamoDBStatusAPI defines operations for checking table status.
+type dynamoDBStatusAPI interface {
+	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+}
+
+// InfrastructureChecker queries DynamoDB for table status.
+type InfrastructureChecker struct {
+	client dynamoDBStatusAPI
+	region string
+}
+
+// NewInfrastructureChecker creates a new InfrastructureChecker using the provided AWS configuration.
+func NewInfrastructureChecker(cfg aws.Config, region string) *InfrastructureChecker {
+	return &InfrastructureChecker{
+		client: dynamodb.NewFromConfig(cfg),
+		region: region,
+	}
+}
+
+// newInfrastructureCheckerWithClient creates an InfrastructureChecker with a custom client.
+// This is primarily used for testing with mock clients.
+func newInfrastructureCheckerWithClient(client dynamoDBStatusAPI, region string) *InfrastructureChecker {
+	return &InfrastructureChecker{
+		client: client,
+		region: region,
+	}
+}
+
+// GetInfrastructureStatus queries status of all Sentinel DynamoDB tables.
+// It checks sentinel-requests (approvals), sentinel-breakglass (breakglass),
+// and sentinel-sessions (sessions) tables.
+func (c *InfrastructureChecker) GetInfrastructureStatus(ctx context.Context, approvalTable, breakglassTable, sessionTable string) (*InfrastructureStatus, error) {
+	// Use defaults if not specified
+	if approvalTable == "" {
+		approvalTable = DefaultApprovalTableName
+	}
+	if breakglassTable == "" {
+		breakglassTable = DefaultBreakGlassTableName
+	}
+	if sessionTable == "" {
+		sessionTable = DefaultSessionTableName
+	}
+
+	tables := []struct {
+		name    string
+		purpose string
+	}{
+		{approvalTable, "approvals"},
+		{breakglassTable, "breakglass"},
+		{sessionTable, "sessions"},
+	}
+
+	result := &InfrastructureStatus{
+		Tables: make([]TableInfo, 0, len(tables)),
+	}
+
+	for _, t := range tables {
+		status, err := c.getTableStatus(ctx, t.name)
+		if err != nil {
+			return nil, err
+		}
+
+		result.Tables = append(result.Tables, TableInfo{
+			TableName: t.name,
+			Status:    status,
+			Region:    c.region,
+			Purpose:   t.purpose,
+		})
+	}
+
+	return result, nil
+}
+
+// getTableStatus checks if a table exists and returns its status.
+// Returns "NOT_FOUND" if the table doesn't exist.
+func (c *InfrastructureChecker) getTableStatus(ctx context.Context, tableName string) (string, error) {
+	output, err := c.client.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(tableName),
+	})
+	if err != nil {
+		var rnf *types.ResourceNotFoundException
+		if errors.As(err, &rnf) {
+			return "NOT_FOUND", nil
+		}
+		return "", err
+	}
+
+	if output.Table == nil {
+		return "NOT_FOUND", nil
+	}
+
+	return string(output.Table.TableStatus), nil
 }

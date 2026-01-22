@@ -1,6 +1,6 @@
 module github.com/byteness/aws-vault/v7
 
-go 1.22
+go 1.25
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -17,6 +17,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.9
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.13
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.6
+	github.com/aws/smithy-go v1.24.0
 	github.com/byteness/keyring v1.6.1
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.0
@@ -25,6 +26,7 @@ require (
 	github.com/mattn/go-tty v0.0.7
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	golang.org/x/term v0.39.0
+	golang.org/x/time v0.14.0
 	gopkg.in/ini.v1 v1.67.1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -43,7 +45,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.11.17 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.17 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.5 // indirect
-	github.com/aws/smithy-go v1.24.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/byteness/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/byteness/go-libsecret v0.0.0-20260108215642-107379d3dee0 // indirect
@@ -93,6 +94,5 @@ require (
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
-	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	dynamodbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
@@ -758,5 +760,359 @@ func TestStatusChecker_GetStatus_ErrorDuringPagination(t *testing.T) {
 	}
 	if callCount != 2 {
 		t.Errorf("expected 2 calls (first success, second fail), got %d", callCount)
+	}
+}
+
+// ============================================================================
+// Infrastructure Checker Tests
+// ============================================================================
+
+// mockDynamoDBStatusAPI implements dynamoDBStatusAPI for testing.
+type mockDynamoDBStatusAPI struct {
+	describeTableFunc func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+	calls             []string
+}
+
+func (m *mockDynamoDBStatusAPI) DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+	m.calls = append(m.calls, aws.ToString(params.TableName))
+	if m.describeTableFunc != nil {
+		return m.describeTableFunc(ctx, params, optFns...)
+	}
+	return nil, &dynamodbtypes.ResourceNotFoundException{}
+}
+
+func TestInfrastructureChecker_AllTablesExist_Active(t *testing.T) {
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			return &dynamodb.DescribeTableOutput{
+				Table: &dynamodbtypes.TableDescription{
+					TableName:   params.TableName,
+					TableStatus: dynamodbtypes.TableStatusActive,
+				},
+			}, nil
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+	result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	if err != nil {
+		t.Fatalf("GetInfrastructureStatus() error = %v", err)
+	}
+	if len(result.Tables) != 3 {
+		t.Fatalf("expected 3 tables, got %d", len(result.Tables))
+	}
+
+	// Verify all tables are ACTIVE
+	for _, table := range result.Tables {
+		if table.Status != "ACTIVE" {
+			t.Errorf("expected table %s status ACTIVE, got %s", table.TableName, table.Status)
+		}
+		if table.Region != "us-east-1" {
+			t.Errorf("expected region us-east-1, got %s", table.Region)
+		}
+	}
+
+	// Verify default table names were used
+	tableNames := make(map[string]bool)
+	for _, table := range result.Tables {
+		tableNames[table.TableName] = true
+	}
+	if !tableNames[DefaultApprovalTableName] {
+		t.Errorf("expected %s in results", DefaultApprovalTableName)
+	}
+	if !tableNames[DefaultBreakGlassTableName] {
+		t.Errorf("expected %s in results", DefaultBreakGlassTableName)
+	}
+	if !tableNames[DefaultSessionTableName] {
+		t.Errorf("expected %s in results", DefaultSessionTableName)
+	}
+}
+
+func TestInfrastructureChecker_SomeTablesMissing(t *testing.T) {
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			tableName := aws.ToString(params.TableName)
+			// Only approval table exists
+			if tableName == DefaultApprovalTableName {
+				return &dynamodb.DescribeTableOutput{
+					Table: &dynamodbtypes.TableDescription{
+						TableName:   params.TableName,
+						TableStatus: dynamodbtypes.TableStatusActive,
+					},
+				}, nil
+			}
+			// Other tables don't exist
+			return nil, &dynamodbtypes.ResourceNotFoundException{}
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-west-2")
+	result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	if err != nil {
+		t.Fatalf("GetInfrastructureStatus() error = %v", err)
+	}
+	if len(result.Tables) != 3 {
+		t.Fatalf("expected 3 tables, got %d", len(result.Tables))
+	}
+
+	// Check individual table statuses
+	for _, table := range result.Tables {
+		if table.TableName == DefaultApprovalTableName {
+			if table.Status != "ACTIVE" {
+				t.Errorf("expected %s status ACTIVE, got %s", table.TableName, table.Status)
+			}
+			if table.Purpose != "approvals" {
+				t.Errorf("expected purpose 'approvals', got %s", table.Purpose)
+			}
+		} else {
+			if table.Status != "NOT_FOUND" {
+				t.Errorf("expected %s status NOT_FOUND, got %s", table.TableName, table.Status)
+			}
+		}
+	}
+}
+
+func TestInfrastructureChecker_TableCreating(t *testing.T) {
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			tableName := aws.ToString(params.TableName)
+			if tableName == DefaultBreakGlassTableName {
+				return &dynamodb.DescribeTableOutput{
+					Table: &dynamodbtypes.TableDescription{
+						TableName:   params.TableName,
+						TableStatus: dynamodbtypes.TableStatusCreating,
+					},
+				}, nil
+			}
+			return &dynamodb.DescribeTableOutput{
+				Table: &dynamodbtypes.TableDescription{
+					TableName:   params.TableName,
+					TableStatus: dynamodbtypes.TableStatusActive,
+				},
+			}, nil
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "eu-west-1")
+	result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	if err != nil {
+		t.Fatalf("GetInfrastructureStatus() error = %v", err)
+	}
+
+	// Find the breakglass table and verify CREATING status
+	for _, table := range result.Tables {
+		if table.TableName == DefaultBreakGlassTableName {
+			if table.Status != "CREATING" {
+				t.Errorf("expected %s status CREATING, got %s", table.TableName, table.Status)
+			}
+			if table.Purpose != "breakglass" {
+				t.Errorf("expected purpose 'breakglass', got %s", table.Purpose)
+			}
+		}
+	}
+}
+
+func TestInfrastructureChecker_APIError(t *testing.T) {
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			return nil, errors.New("AccessDeniedException: User is not authorized")
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+	_, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestInfrastructureChecker_CustomTableNames(t *testing.T) {
+	var calledTables []string
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			calledTables = append(calledTables, aws.ToString(params.TableName))
+			return &dynamodb.DescribeTableOutput{
+				Table: &dynamodbtypes.TableDescription{
+					TableName:   params.TableName,
+					TableStatus: dynamodbtypes.TableStatusActive,
+				},
+			}, nil
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+	result, err := checker.GetInfrastructureStatus(context.Background(),
+		"custom-approvals", "custom-breakglass", "custom-sessions")
+
+	if err != nil {
+		t.Fatalf("GetInfrastructureStatus() error = %v", err)
+	}
+
+	// Verify custom table names were used
+	expectedTables := map[string]bool{
+		"custom-approvals":  false,
+		"custom-breakglass": false,
+		"custom-sessions":   false,
+	}
+
+	for _, table := range result.Tables {
+		if _, ok := expectedTables[table.TableName]; ok {
+			expectedTables[table.TableName] = true
+		}
+	}
+
+	for name, found := range expectedTables {
+		if !found {
+			t.Errorf("expected custom table name %s not found in results", name)
+		}
+	}
+
+	// Verify the tables were called with custom names
+	for _, name := range calledTables {
+		if name != "custom-approvals" && name != "custom-breakglass" && name != "custom-sessions" {
+			t.Errorf("unexpected table name called: %s", name)
+		}
+	}
+}
+
+func TestInfrastructureChecker_TablePurposes(t *testing.T) {
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			return &dynamodb.DescribeTableOutput{
+				Table: &dynamodbtypes.TableDescription{
+					TableName:   params.TableName,
+					TableStatus: dynamodbtypes.TableStatusActive,
+				},
+			}, nil
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+	result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	if err != nil {
+		t.Fatalf("GetInfrastructureStatus() error = %v", err)
+	}
+
+	// Verify purposes are correctly assigned
+	purposes := make(map[string]string)
+	for _, table := range result.Tables {
+		purposes[table.TableName] = table.Purpose
+	}
+
+	if purposes[DefaultApprovalTableName] != "approvals" {
+		t.Errorf("expected %s purpose 'approvals', got %s", DefaultApprovalTableName, purposes[DefaultApprovalTableName])
+	}
+	if purposes[DefaultBreakGlassTableName] != "breakglass" {
+		t.Errorf("expected %s purpose 'breakglass', got %s", DefaultBreakGlassTableName, purposes[DefaultBreakGlassTableName])
+	}
+	if purposes[DefaultSessionTableName] != "sessions" {
+		t.Errorf("expected %s purpose 'sessions', got %s", DefaultSessionTableName, purposes[DefaultSessionTableName])
+	}
+}
+
+func TestInfrastructureChecker_NilTableOutput(t *testing.T) {
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			return &dynamodb.DescribeTableOutput{
+				Table: nil, // Edge case: nil table in output
+			}, nil
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+	result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	if err != nil {
+		t.Fatalf("GetInfrastructureStatus() error = %v", err)
+	}
+
+	// All tables should be NOT_FOUND due to nil Table
+	for _, table := range result.Tables {
+		if table.Status != "NOT_FOUND" {
+			t.Errorf("expected status NOT_FOUND for nil table, got %s", table.Status)
+		}
+	}
+}
+
+func TestInfrastructureChecker_Constructor(t *testing.T) {
+	mock := &mockDynamoDBStatusAPI{}
+	checker := newInfrastructureCheckerWithClient(mock, "ap-southeast-1")
+
+	if checker.client != mock {
+		t.Error("expected mock client to be set")
+	}
+	if checker.region != "ap-southeast-1" {
+		t.Errorf("expected region ap-southeast-1, got %s", checker.region)
+	}
+}
+
+func TestInfrastructureChecker_AllTablesNotFound(t *testing.T) {
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			return nil, &dynamodbtypes.ResourceNotFoundException{}
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+	result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	if err != nil {
+		t.Fatalf("GetInfrastructureStatus() error = %v", err)
+	}
+
+	// All tables should be NOT_FOUND
+	for _, table := range result.Tables {
+		if table.Status != "NOT_FOUND" {
+			t.Errorf("expected %s status NOT_FOUND, got %s", table.TableName, table.Status)
+		}
+	}
+}
+
+func TestInfrastructureChecker_TableStatusVariations(t *testing.T) {
+	tests := []struct {
+		name           string
+		tableStatus    dynamodbtypes.TableStatus
+		expectedStatus string
+	}{
+		{"Active", dynamodbtypes.TableStatusActive, "ACTIVE"},
+		{"Creating", dynamodbtypes.TableStatusCreating, "CREATING"},
+		{"Updating", dynamodbtypes.TableStatusUpdating, "UPDATING"},
+		{"Deleting", dynamodbtypes.TableStatusDeleting, "DELETING"},
+		{"Inaccessible", dynamodbtypes.TableStatusInaccessibleEncryptionCredentials, "INACCESSIBLE_ENCRYPTION_CREDENTIALS"},
+		{"Archiving", dynamodbtypes.TableStatusArchiving, "ARCHIVING"},
+		{"Archived", dynamodbtypes.TableStatusArchived, "ARCHIVED"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockDynamoDBStatusAPI{
+				describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+					return &dynamodb.DescribeTableOutput{
+						Table: &dynamodbtypes.TableDescription{
+							TableName:   params.TableName,
+							TableStatus: tt.tableStatus,
+						},
+					}, nil
+				},
+			}
+
+			checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+			result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+			if err != nil {
+				t.Fatalf("GetInfrastructureStatus() error = %v", err)
+			}
+
+			for _, table := range result.Tables {
+				if table.Status != tt.expectedStatus {
+					t.Errorf("expected status %s, got %s", tt.expectedStatus, table.Status)
+				}
+			}
+		})
 	}
 }
