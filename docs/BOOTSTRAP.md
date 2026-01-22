@@ -333,6 +333,115 @@ Apply complete:
   Failed:  0
 ```
 
+## DynamoDB Table Provisioning
+
+Sentinel features like approval workflows, break-glass access, and server mode session tracking require DynamoDB tables. These can be provisioned individually or as part of bootstrap.
+
+### Individual Table Commands
+
+#### `sentinel init approvals`
+
+Creates the approval requests table for the approval workflow feature.
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--table` | DynamoDB table name | `sentinel-requests` |
+| `--region` | AWS region (required) | - |
+| `--aws-profile` | AWS profile for credentials | Default chain |
+| `--plan` | Show what would be created (dry-run) | false |
+| `--yes` / `-y` | Skip confirmation prompt | false |
+| `--generate-iam` | Output IAM policy document | false |
+
+**Examples:**
+
+```bash
+# Preview table creation
+sentinel init approvals --plan --region us-east-1
+
+# Create with confirmation prompt
+sentinel init approvals --region us-east-1
+
+# Auto-approve for scripting
+sentinel init approvals --region us-east-1 --yes
+
+# Generate IAM policy for table access
+sentinel init approvals --generate-iam --region us-east-1
+```
+
+#### `sentinel init breakglass`
+
+Creates the break-glass events table for emergency access tracking.
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--table` | DynamoDB table name | `sentinel-breakglass` |
+| `--region` | AWS region (required) | - |
+| `--aws-profile` | AWS profile for credentials | Default chain |
+| `--plan` | Show what would be created (dry-run) | false |
+| `--yes` / `-y` | Skip confirmation prompt | false |
+| `--generate-iam` | Output IAM policy document | false |
+
+**Example:**
+
+```bash
+sentinel init breakglass --region us-east-1 --yes
+```
+
+#### `sentinel init sessions`
+
+Creates the server sessions table for server mode session tracking and revocation.
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--table` | DynamoDB table name | `sentinel-sessions` |
+| `--region` | AWS region (required) | - |
+| `--aws-profile` | AWS profile for credentials | Default chain |
+| `--plan` | Show what would be created (dry-run) | false |
+| `--yes` / `-y` | Skip confirmation prompt | false |
+| `--generate-iam` | Output IAM policy document | false |
+
+**Example:**
+
+```bash
+sentinel init sessions --region us-east-1 --yes
+```
+
+### Unified Bootstrap with Tables
+
+The `sentinel init bootstrap` command supports `--with-*` flags to create DynamoDB tables alongside SSM policy parameters:
+
+| Flag | Description |
+|------|-------------|
+| `--with-approvals` | Also create approval requests table |
+| `--with-breakglass` | Also create break-glass events table |
+| `--with-sessions` | Also create server sessions table |
+| `--all` | Enable all optional infrastructure (equivalent to all --with-* flags) |
+
+**Examples:**
+
+```bash
+# Bootstrap profile with approval table
+sentinel init bootstrap --profile dev --with-approvals --region us-east-1
+
+# Bootstrap with all optional infrastructure
+sentinel init bootstrap --profile dev --all --region us-east-1
+
+# Multiple profiles with all tables
+sentinel init bootstrap --profile dev --profile staging --all --region us-east-1 --yes
+```
+
+### Table Schemas
+
+Each table follows a consistent pattern:
+
+| Table | Partition Key | GSIs | TTL |
+|-------|---------------|------|-----|
+| sentinel-requests | id (S) | requester-index, status-index, profile-index | expires_at |
+| sentinel-breakglass | id (S) | invoker-index, status-index, profile-index | expires_at |
+| sentinel-sessions | id (S) | user-index, status-index, server-instance-index | expires_at |
+
+All tables use PAY_PER_REQUEST (on-demand) billing mode.
+
 ## Custom Policy Root
 
 Organizations can use a custom path prefix:
