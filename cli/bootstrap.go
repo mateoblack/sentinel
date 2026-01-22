@@ -215,8 +215,12 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 		fmt.Fprint(stdout, bootstrap.FormatPlan(plan))
 	}
 
-	// If plan-only mode, output IAM policies if requested and return
+	// If plan-only mode, show table plans and IAM policies if requested, then return
 	if input.PlanOnly {
+		// Show DynamoDB table plans if any --with-* flags are set
+		if err := provisionTables(ctx, input, stdout, stderr); err != nil {
+			return err
+		}
 		if input.GenerateIAMPolicies && !input.JSONOutput {
 			outputIAMPolicies(stdout, cfg.PolicyRoot)
 		}
@@ -316,6 +320,136 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 	// Return error if any failures occurred
 	if len(result.Failed) > 0 {
 		return fmt.Errorf("%d parameter(s) failed to create/update", len(result.Failed))
+	}
+
+	// Provision DynamoDB tables if requested
+	if err := provisionTables(ctx, input, stdout, stderr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// provisionTables provisions DynamoDB tables when --with-* flags are set.
+// It requires --region to be set when any --with-* flag is used.
+func provisionTables(ctx context.Context, input BootstrapCommandInput, stdout, stderr *os.File) error {
+	// Resolve --all flag into individual flags
+	if input.WithAll {
+		input.WithApprovals = true
+		input.WithBreakGlass = true
+		input.WithSessions = true
+	}
+
+	// Check if any table provisioning is requested
+	if !input.WithApprovals && !input.WithBreakGlass && !input.WithSessions {
+		return nil
+	}
+
+	// Region is required for DynamoDB table provisioning
+	if input.Region == "" {
+		fmt.Fprintln(stderr, "Error: --region is required when provisioning DynamoDB tables")
+		return fmt.Errorf("--region is required when provisioning DynamoDB tables")
+	}
+
+	// Print DynamoDB Tables header
+	if !input.JSONOutput {
+		fmt.Fprintln(stdout, "\n"+strings.Repeat("=", 60))
+		fmt.Fprintln(stdout, "DynamoDB Tables")
+		fmt.Fprintln(stdout, strings.Repeat("=", 60))
+	}
+
+	// Get or create provisioner
+	provisioner := input.Provisioner
+	if provisioner == nil {
+		// Load AWS config
+		credentialProfile := input.AWSProfile
+		if credentialProfile == "" && len(input.Profiles) > 0 {
+			credentialProfile = input.Profiles[0]
+		}
+		awsCfgOpts := []func(*config.LoadOptions) error{}
+		if credentialProfile != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithSharedConfigProfile(credentialProfile))
+		}
+		if input.Region != "" {
+			awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
+		}
+		awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
+		if err != nil {
+			fmt.Fprintf(stderr, "Failed to load AWS config for DynamoDB: %v\n", err)
+			return err
+		}
+		provisioner = infrastructure.NewTableProvisioner(awsCfg, input.Region)
+	}
+
+	// Track table provisioning errors (don't fail entire operation)
+	var tableErrors []error
+
+	// Provision each requested table
+	if input.WithApprovals {
+		err := provisionTable(ctx, provisioner, infrastructure.ApprovalTableSchema(input.ApprovalTableName),
+			"Approvals", input.PlanOnly, stdout, stderr)
+		if err != nil {
+			tableErrors = append(tableErrors, err)
+		}
+	}
+
+	if input.WithBreakGlass {
+		err := provisionTable(ctx, provisioner, infrastructure.BreakGlassTableSchema(input.BreakGlassTableName),
+			"Break-Glass", input.PlanOnly, stdout, stderr)
+		if err != nil {
+			tableErrors = append(tableErrors, err)
+		}
+	}
+
+	if input.WithSessions {
+		err := provisionTable(ctx, provisioner, infrastructure.SessionTableSchema(input.SessionTableName),
+			"Sessions", input.PlanOnly, stdout, stderr)
+		if err != nil {
+			tableErrors = append(tableErrors, err)
+		}
+	}
+
+	// Report any table errors but don't fail the whole operation
+	if len(tableErrors) > 0 && !input.JSONOutput {
+		fmt.Fprintf(stderr, "\nWarning: %d table(s) failed to provision\n", len(tableErrors))
+	}
+
+	return nil
+}
+
+// provisionTable provisions a single DynamoDB table.
+// Returns nil on success or table-already-exists, error on failure.
+func provisionTable(ctx context.Context, provisioner TableProvisionerInterface,
+	schema infrastructure.TableSchema, label string, planOnly bool, stdout, stderr *os.File) error {
+
+	if planOnly {
+		plan, err := provisioner.Plan(ctx, schema)
+		if err != nil {
+			fmt.Fprintf(stderr, "  X %s: failed to plan: %v\n", label, err)
+			return err
+		}
+		if plan.WouldCreate {
+			fmt.Fprintf(stdout, "  + %s table: %s\n", label, plan.TableName)
+		} else {
+			fmt.Fprintf(stdout, "  = %s table: %s (exists)\n", label, plan.TableName)
+		}
+		return nil
+	}
+
+	result, err := provisioner.Create(ctx, schema)
+	if err != nil {
+		fmt.Fprintf(stderr, "  X %s table: %v\n", label, err)
+		return err
+	}
+
+	switch result.Status {
+	case infrastructure.StatusCreated:
+		fmt.Fprintf(stdout, "  + %s table: %s (created)\n", label, schema.TableName)
+	case infrastructure.StatusExists:
+		fmt.Fprintf(stdout, "  = %s table: %s (exists)\n", label, schema.TableName)
+	case infrastructure.StatusFailed:
+		fmt.Fprintf(stderr, "  X %s table: %v\n", label, result.Error)
+		return result.Error
 	}
 
 	return nil
