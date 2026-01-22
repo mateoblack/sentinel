@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/byteness/aws-vault/v7/bootstrap"
+	"github.com/byteness/aws-vault/v7/infrastructure"
 	"github.com/byteness/aws-vault/v7/vault"
 )
 
@@ -905,7 +906,7 @@ func TestBootstrapCommand_OutputFormat(t *testing.T) {
 				Description: "Policy parameter for profile dev",
 			},
 		},
-		Summary: bootstrap.PlanSummary{ToCreate: 1, Total: 1},
+		Summary:     bootstrap.PlanSummary{ToCreate: 1, Total: 1},
 		GeneratedAt: time.Now(),
 	}
 
@@ -1312,4 +1313,465 @@ region = us-west-2
 			t.Errorf("expected AWSProfile 'admin-sso', got %q", input.AWSProfile)
 		}
 	})
+}
+
+// ============================================================================
+// DynamoDB Table Provisioning Tests
+// ============================================================================
+
+// mockTableProvisioner implements TableProvisionerInterface for testing.
+type mockTableProvisioner struct {
+	PlanResult   *infrastructure.ProvisionPlan
+	PlanErr      error
+	CreateResult *infrastructure.ProvisionResult
+	CreateErr    error
+	PlanCalls    []infrastructure.TableSchema
+	CreateCalls  []infrastructure.TableSchema
+}
+
+func (m *mockTableProvisioner) Plan(ctx context.Context, schema infrastructure.TableSchema) (*infrastructure.ProvisionPlan, error) {
+	m.PlanCalls = append(m.PlanCalls, schema)
+	if m.PlanErr != nil {
+		return nil, m.PlanErr
+	}
+	if m.PlanResult != nil {
+		return m.PlanResult, nil
+	}
+	// Default: return plan indicating table would be created
+	return &infrastructure.ProvisionPlan{
+		TableName:    schema.TableName,
+		WouldCreate:  true,
+		GSIs:         schema.GSINames(),
+		TTLAttribute: schema.TTLAttribute,
+		BillingMode:  string(schema.BillingMode),
+	}, nil
+}
+
+func (m *mockTableProvisioner) Create(ctx context.Context, schema infrastructure.TableSchema) (*infrastructure.ProvisionResult, error) {
+	m.CreateCalls = append(m.CreateCalls, schema)
+	if m.CreateErr != nil {
+		return nil, m.CreateErr
+	}
+	if m.CreateResult != nil {
+		return m.CreateResult, nil
+	}
+	// Default: return success with created status
+	return &infrastructure.ProvisionResult{
+		TableName: schema.TableName,
+		Status:    infrastructure.StatusCreated,
+		ARN:       fmt.Sprintf("arn:aws:dynamodb:us-east-1:123456789012:table/%s", schema.TableName),
+	}, nil
+}
+
+// testableBootstrapCommandWithProvisioner is a test helper that uses the testable command with provisioner.
+func testableBootstrapCommandWithProvisioner(
+	t *testing.T,
+	input BootstrapCommandInput,
+	planner PlannerInterface,
+	executor ExecutorInterface,
+) error {
+	t.Helper()
+	return testableBootstrapCommand(context.Background(), input, planner, executor)
+}
+
+func TestBootstrapCommand_WithApprovalsFlag(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Mock SSM planner - no SSM changes needed
+	plan := &bootstrap.BootstrapPlan{
+		Config: bootstrap.BootstrapConfig{
+			PolicyRoot: "/sentinel/policies",
+			Profiles:   []bootstrap.ProfileConfig{{Name: "dev"}},
+		},
+		Resources: []bootstrap.ResourceSpec{
+			{Type: bootstrap.ResourceTypeSSMParameter, Name: "/sentinel/policies/dev", State: bootstrap.StateExists},
+		},
+		Summary: bootstrap.PlanSummary{ToCreate: 0, ToSkip: 1, Total: 1},
+	}
+	ssmPlanner := &mockPlannerImpl{plan: plan}
+	ssmExecutor := &mockExecutorImpl{}
+
+	// Mock DynamoDB provisioner
+	mockProvisioner := &mockTableProvisioner{
+		CreateResult: &infrastructure.ProvisionResult{
+			TableName: "sentinel-requests",
+			Status:    infrastructure.StatusCreated,
+			ARN:       "arn:aws:dynamodb:us-east-1:123456789012:table/sentinel-requests",
+		},
+	}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:        "/sentinel/policies",
+		Profiles:          []string{"dev"},
+		Region:            "us-east-1",
+		AutoApprove:       true,
+		WithApprovals:     true,
+		ApprovalTableName: "sentinel-requests",
+		Provisioner:       mockProvisioner,
+		Stdout:            stdout,
+		Stderr:            stderr,
+	}
+
+	err := testableBootstrapCommandWithProvisioner(t, input, ssmPlanner, ssmExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify provisioner was called for approvals table
+	if len(mockProvisioner.CreateCalls) != 1 {
+		t.Errorf("expected 1 Create call, got %d", len(mockProvisioner.CreateCalls))
+	}
+	if len(mockProvisioner.CreateCalls) > 0 && mockProvisioner.CreateCalls[0].TableName != "sentinel-requests" {
+		t.Errorf("expected table name 'sentinel-requests', got %q", mockProvisioner.CreateCalls[0].TableName)
+	}
+
+	output := readFile(t, stdout)
+	if !strings.Contains(output, "DynamoDB Tables") {
+		t.Error("expected output to contain 'DynamoDB Tables'")
+	}
+	if !strings.Contains(output, "Approvals table") {
+		t.Error("expected output to contain 'Approvals table'")
+	}
+}
+
+func TestBootstrapCommand_WithAllFlag(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Mock SSM planner - no SSM changes needed
+	plan := &bootstrap.BootstrapPlan{
+		Config: bootstrap.BootstrapConfig{
+			PolicyRoot: "/sentinel/policies",
+			Profiles:   []bootstrap.ProfileConfig{{Name: "dev"}},
+		},
+		Resources: []bootstrap.ResourceSpec{
+			{Type: bootstrap.ResourceTypeSSMParameter, Name: "/sentinel/policies/dev", State: bootstrap.StateExists},
+		},
+		Summary: bootstrap.PlanSummary{ToCreate: 0, ToSkip: 1, Total: 1},
+	}
+	ssmPlanner := &mockPlannerImpl{plan: plan}
+	ssmExecutor := &mockExecutorImpl{}
+
+	// Mock DynamoDB provisioner
+	mockProvisioner := &mockTableProvisioner{}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:          "/sentinel/policies",
+		Profiles:            []string{"dev"},
+		Region:              "us-east-1",
+		AutoApprove:         true,
+		WithAll:             true,
+		ApprovalTableName:   "sentinel-requests",
+		BreakGlassTableName: "sentinel-breakglass",
+		SessionTableName:    "sentinel-sessions",
+		Provisioner:         mockProvisioner,
+		Stdout:              stdout,
+		Stderr:              stderr,
+	}
+
+	err := testableBootstrapCommandWithProvisioner(t, input, ssmPlanner, ssmExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify provisioner was called for all three tables
+	if len(mockProvisioner.CreateCalls) != 3 {
+		t.Errorf("expected 3 Create calls, got %d", len(mockProvisioner.CreateCalls))
+	}
+
+	// Verify table names
+	tableNames := make(map[string]bool)
+	for _, call := range mockProvisioner.CreateCalls {
+		tableNames[call.TableName] = true
+	}
+	if !tableNames["sentinel-requests"] {
+		t.Error("expected sentinel-requests table to be created")
+	}
+	if !tableNames["sentinel-breakglass"] {
+		t.Error("expected sentinel-breakglass table to be created")
+	}
+	if !tableNames["sentinel-sessions"] {
+		t.Error("expected sentinel-sessions table to be created")
+	}
+
+	output := readFile(t, stdout)
+	if !strings.Contains(output, "Approvals table") {
+		t.Error("expected output to contain 'Approvals table'")
+	}
+	if !strings.Contains(output, "Break-Glass table") {
+		t.Error("expected output to contain 'Break-Glass table'")
+	}
+	if !strings.Contains(output, "Sessions table") {
+		t.Error("expected output to contain 'Sessions table'")
+	}
+}
+
+func TestBootstrapCommand_TableRequiresRegion(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Mock SSM planner - no SSM changes needed
+	plan := &bootstrap.BootstrapPlan{
+		Config: bootstrap.BootstrapConfig{
+			PolicyRoot: "/sentinel/policies",
+			Profiles:   []bootstrap.ProfileConfig{{Name: "dev"}},
+		},
+		Resources: []bootstrap.ResourceSpec{
+			{Type: bootstrap.ResourceTypeSSMParameter, Name: "/sentinel/policies/dev", State: bootstrap.StateExists},
+		},
+		Summary: bootstrap.PlanSummary{ToCreate: 0, ToSkip: 1, Total: 1},
+	}
+	ssmPlanner := &mockPlannerImpl{plan: plan}
+	ssmExecutor := &mockExecutorImpl{}
+
+	// Mock DynamoDB provisioner (shouldn't be called)
+	mockProvisioner := &mockTableProvisioner{}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:    "/sentinel/policies",
+		Profiles:      []string{"dev"},
+		Region:        "", // No region - should fail
+		AutoApprove:   true,
+		WithApprovals: true,
+		Provisioner:   mockProvisioner,
+		Stdout:        stdout,
+		Stderr:        stderr,
+	}
+
+	err := testableBootstrapCommandWithProvisioner(t, input, ssmPlanner, ssmExecutor)
+	if err == nil {
+		t.Fatal("expected error for missing region")
+	}
+	if !strings.Contains(err.Error(), "--region is required") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+
+	// Verify provisioner was NOT called
+	if len(mockProvisioner.CreateCalls) != 0 {
+		t.Errorf("expected 0 Create calls, got %d", len(mockProvisioner.CreateCalls))
+	}
+
+	errOutput := readFile(t, stderr)
+	if !strings.Contains(errOutput, "--region is required") {
+		t.Error("expected stderr to contain region error message")
+	}
+}
+
+func TestBootstrapCommand_TablePlanOnly(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Mock SSM planner
+	plan := &bootstrap.BootstrapPlan{
+		Config: bootstrap.BootstrapConfig{
+			PolicyRoot: "/sentinel/policies",
+			Profiles:   []bootstrap.ProfileConfig{{Name: "dev"}},
+		},
+		Resources: []bootstrap.ResourceSpec{
+			{Type: bootstrap.ResourceTypeSSMParameter, Name: "/sentinel/policies/dev", State: bootstrap.StateCreate},
+		},
+		Summary: bootstrap.PlanSummary{ToCreate: 1, Total: 1},
+	}
+	ssmPlanner := &mockPlannerImpl{plan: plan}
+	ssmExecutor := &mockExecutorImpl{}
+
+	// Mock DynamoDB provisioner
+	mockProvisioner := &mockTableProvisioner{
+		PlanResult: &infrastructure.ProvisionPlan{
+			TableName:    "sentinel-requests",
+			WouldCreate:  true,
+			GSIs:         []string{"gsi-requester", "gsi-status", "gsi-profile"},
+			TTLAttribute: "ttl",
+			BillingMode:  "PAY_PER_REQUEST",
+		},
+	}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:        "/sentinel/policies",
+		Profiles:          []string{"dev"},
+		Region:            "us-east-1",
+		PlanOnly:          true,
+		WithApprovals:     true,
+		ApprovalTableName: "sentinel-requests",
+		Provisioner:       mockProvisioner,
+		Stdout:            stdout,
+		Stderr:            stderr,
+	}
+
+	err := testableBootstrapCommandWithProvisioner(t, input, ssmPlanner, ssmExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify Plan was called (not Create)
+	if len(mockProvisioner.PlanCalls) != 1 {
+		t.Errorf("expected 1 Plan call, got %d", len(mockProvisioner.PlanCalls))
+	}
+	if len(mockProvisioner.CreateCalls) != 0 {
+		t.Errorf("expected 0 Create calls in plan mode, got %d", len(mockProvisioner.CreateCalls))
+	}
+
+	output := readFile(t, stdout)
+	if !strings.Contains(output, "DynamoDB Tables") {
+		t.Error("expected output to contain 'DynamoDB Tables'")
+	}
+	if !strings.Contains(output, "+ Approvals table") {
+		t.Error("expected output to show table would be created")
+	}
+}
+
+func TestBootstrapCommand_TableExistsInPlanMode(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Mock SSM planner
+	plan := &bootstrap.BootstrapPlan{
+		Config: bootstrap.BootstrapConfig{
+			PolicyRoot: "/sentinel/policies",
+			Profiles:   []bootstrap.ProfileConfig{{Name: "dev"}},
+		},
+		Resources: []bootstrap.ResourceSpec{
+			{Type: bootstrap.ResourceTypeSSMParameter, Name: "/sentinel/policies/dev", State: bootstrap.StateExists},
+		},
+		Summary: bootstrap.PlanSummary{ToSkip: 1, Total: 1},
+	}
+	ssmPlanner := &mockPlannerImpl{plan: plan}
+	ssmExecutor := &mockExecutorImpl{}
+
+	// Mock DynamoDB provisioner - table already exists
+	mockProvisioner := &mockTableProvisioner{
+		PlanResult: &infrastructure.ProvisionPlan{
+			TableName:   "sentinel-requests",
+			WouldCreate: false, // Already exists
+		},
+	}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:        "/sentinel/policies",
+		Profiles:          []string{"dev"},
+		Region:            "us-east-1",
+		PlanOnly:          true,
+		WithApprovals:     true,
+		ApprovalTableName: "sentinel-requests",
+		Provisioner:       mockProvisioner,
+		Stdout:            stdout,
+		Stderr:            stderr,
+	}
+
+	err := testableBootstrapCommandWithProvisioner(t, input, ssmPlanner, ssmExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+	if !strings.Contains(output, "= Approvals table") || !strings.Contains(output, "(exists)") {
+		t.Error("expected output to show table already exists")
+	}
+}
+
+func TestBootstrapCommand_TableAlreadyExists(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Mock SSM planner - no changes
+	plan := &bootstrap.BootstrapPlan{
+		Config: bootstrap.BootstrapConfig{
+			PolicyRoot: "/sentinel/policies",
+			Profiles:   []bootstrap.ProfileConfig{{Name: "dev"}},
+		},
+		Resources: []bootstrap.ResourceSpec{
+			{Type: bootstrap.ResourceTypeSSMParameter, Name: "/sentinel/policies/dev", State: bootstrap.StateExists},
+		},
+		Summary: bootstrap.PlanSummary{ToSkip: 1, Total: 1},
+	}
+	ssmPlanner := &mockPlannerImpl{plan: plan}
+	ssmExecutor := &mockExecutorImpl{}
+
+	// Mock DynamoDB provisioner - table already exists
+	mockProvisioner := &mockTableProvisioner{
+		CreateResult: &infrastructure.ProvisionResult{
+			TableName: "sentinel-requests",
+			Status:    infrastructure.StatusExists,
+			ARN:       "arn:aws:dynamodb:us-east-1:123456789012:table/sentinel-requests",
+		},
+	}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:        "/sentinel/policies",
+		Profiles:          []string{"dev"},
+		Region:            "us-east-1",
+		AutoApprove:       true,
+		WithApprovals:     true,
+		ApprovalTableName: "sentinel-requests",
+		Provisioner:       mockProvisioner,
+		Stdout:            stdout,
+		Stderr:            stderr,
+	}
+
+	err := testableBootstrapCommandWithProvisioner(t, input, ssmPlanner, ssmExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+	if !strings.Contains(output, "= Approvals table") || !strings.Contains(output, "(exists)") {
+		t.Error("expected output to show table already exists")
+	}
+}
+
+func TestBootstrapCommand_CustomTableNames(t *testing.T) {
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Mock SSM planner
+	plan := &bootstrap.BootstrapPlan{
+		Config: bootstrap.BootstrapConfig{
+			PolicyRoot: "/sentinel/policies",
+			Profiles:   []bootstrap.ProfileConfig{{Name: "dev"}},
+		},
+		Resources: []bootstrap.ResourceSpec{
+			{Type: bootstrap.ResourceTypeSSMParameter, Name: "/sentinel/policies/dev", State: bootstrap.StateExists},
+		},
+		Summary: bootstrap.PlanSummary{ToSkip: 1, Total: 1},
+	}
+	ssmPlanner := &mockPlannerImpl{plan: plan}
+	ssmExecutor := &mockExecutorImpl{}
+
+	// Mock DynamoDB provisioner
+	mockProvisioner := &mockTableProvisioner{}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:          "/sentinel/policies",
+		Profiles:            []string{"dev"},
+		Region:              "us-east-1",
+		AutoApprove:         true,
+		WithAll:             true,
+		ApprovalTableName:   "custom-approvals",
+		BreakGlassTableName: "custom-breakglass",
+		SessionTableName:    "custom-sessions",
+		Provisioner:         mockProvisioner,
+		Stdout:              stdout,
+		Stderr:              stderr,
+	}
+
+	err := testableBootstrapCommandWithProvisioner(t, input, ssmPlanner, ssmExecutor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify custom table names were used
+	tableNames := make(map[string]bool)
+	for _, call := range mockProvisioner.CreateCalls {
+		tableNames[call.TableName] = true
+	}
+	if !tableNames["custom-approvals"] {
+		t.Error("expected custom-approvals table")
+	}
+	if !tableNames["custom-breakglass"] {
+		t.Error("expected custom-breakglass table")
+	}
+	if !tableNames["custom-sessions"] {
+		t.Error("expected custom-sessions table")
+	}
 }
