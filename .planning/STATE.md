@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 ## Current Position
 
 Phase: 88 of 93 (Approval Table Provisioning)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-01-22 — Completed 88-02-PLAN.md
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-01-22 — Completed 88-03-PLAN.md
 
-Progress: ██░░░░░░░░ 11% (v1.12 Infrastructure Provisioning)
+Progress: ███░░░░░░░ 19% (v1.12 Infrastructure Provisioning)
 
 ## Milestone Summary
 
@@ -528,6 +528,16 @@ Key decisions from v1.0, v1.1, and v1.2 logged in PROJECT.md Key Decisions table
 - Script output to stdout, status messages to stderr for eval compatibility
 - ssmShellAPI interface follows same pattern as ssmStatusAPI for testability
 
+**v1.12 Infrastructure Provisioning decisions (Phase 88):**
+- TableSchema types in infrastructure/ package for reusable schema definitions
+- ApprovalTableSchema() function returns complete schema for sentinel-requests table
+- TableProvisioner with Create(), Plan(), TableStatus() methods for idempotent provisioning
+- Create() returns EXISTS status (not error) when table already active
+- IAM policy uses * for account ID placeholder - user must substitute actual account ID
+- Separate IAM statements: SentinelApprovalTableProvisioning vs SentinelApprovalTableOperations
+- DefaultApprovalTableName = "sentinel-requests" for consistency with request package
+- Follow bootstrap.go patterns for AWS config loading and confirmation prompts
+
 ### Deferred Issues
 
 None — clean implementation across all milestones.
@@ -539,9 +549,9 @@ None — clean start for v1.12.
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 88-02-PLAN.md
+Stopped at: Completed 88-03-PLAN.md (Phase 88 complete)
 Resume file: None
-Next: /gsd:execute-plan 88-03 to continue phase
+Next: /gsd:plan-phase 89 for break-glass table provisioning
 
 ## Roadmap Evolution
 
