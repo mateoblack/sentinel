@@ -112,6 +112,14 @@ Each init command can generate the required IAM policy:
 sentinel init approvals --generate-iam --region us-east-1
 ```
 
+### Check Infrastructure Status
+
+View the status of your Sentinel deployment including DynamoDB tables:
+
+```bash
+sentinel init status --check-tables --region us-east-1
+```
+
 ## Verify Permissions
 
 Check your IAM permissions are sufficient:
