@@ -461,9 +461,9 @@ Each table follows a consistent pattern:
 
 | Table | Partition Key | GSIs | TTL |
 |-------|---------------|------|-----|
-| sentinel-requests | id (S) | requester-index, status-index, profile-index | expires_at |
-| sentinel-breakglass | id (S) | invoker-index, status-index, profile-index | expires_at |
-| sentinel-sessions | id (S) | user-index, status-index, server-instance-index | expires_at |
+| sentinel-requests | id (S) | gsi-requester, gsi-status, gsi-profile | ttl |
+| sentinel-breakglass | id (S) | gsi-invoker, gsi-status, gsi-profile | ttl |
+| sentinel-sessions | id (S) | gsi-user, gsi-status, gsi-profile, gsi-server-instance | ttl |
 
 All tables use PAY_PER_REQUEST (on-demand) billing mode.
 
