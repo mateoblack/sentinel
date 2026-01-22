@@ -234,6 +234,7 @@ func (c *InfrastructureChecker) GetInfrastructureStatus(ctx context.Context, app
 
 // getTableStatus checks if a table exists and returns its status.
 // Returns "NOT_FOUND" if the table doesn't exist.
+// Returns "UNKNOWN" if access is denied (allows graceful degradation).
 func (c *InfrastructureChecker) getTableStatus(ctx context.Context, tableName string) (string, error) {
 	output, err := c.client.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 		TableName: aws.String(tableName),
@@ -242,6 +243,13 @@ func (c *InfrastructureChecker) getTableStatus(ctx context.Context, tableName st
 		var rnf *types.ResourceNotFoundException
 		if errors.As(err, &rnf) {
 			return "NOT_FOUND", nil
+		}
+		// Handle access denied gracefully - return UNKNOWN instead of failing
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "AccessDenied") ||
+			strings.Contains(errMsg, "not authorized") ||
+			strings.Contains(errMsg, "UnrecognizedClientException") {
+			return "UNKNOWN", nil
 		}
 		return "", err
 	}

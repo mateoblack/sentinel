@@ -915,7 +915,9 @@ func TestInfrastructureChecker_TableCreating(t *testing.T) {
 	}
 }
 
-func TestInfrastructureChecker_APIError(t *testing.T) {
+func TestInfrastructureChecker_AccessDenied_ReturnsUnknown(t *testing.T) {
+	// Access denied errors should return UNKNOWN status instead of failing.
+	// This allows graceful degradation when the user doesn't have DynamoDB permissions.
 	mock := &mockDynamoDBStatusAPI{
 		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
 			return nil, errors.New("AccessDeniedException: User is not authorized")
@@ -923,10 +925,78 @@ func TestInfrastructureChecker_APIError(t *testing.T) {
 	}
 
 	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+	result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	// Should NOT return error - graceful degradation
+	if err != nil {
+		t.Fatalf("expected no error with AccessDenied (graceful degradation), got: %v", err)
+	}
+
+	// All tables should have UNKNOWN status
+	for _, table := range result.Tables {
+		if table.Status != "UNKNOWN" {
+			t.Errorf("expected table %s status UNKNOWN, got %s", table.TableName, table.Status)
+		}
+	}
+}
+
+func TestInfrastructureChecker_NotAuthorized_ReturnsUnknown(t *testing.T) {
+	// "not authorized" in error message should also return UNKNOWN
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			return nil, errors.New("User is not authorized to perform: dynamodb:DescribeTable")
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+	result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	if err != nil {
+		t.Fatalf("expected no error with 'not authorized' (graceful degradation), got: %v", err)
+	}
+
+	for _, table := range result.Tables {
+		if table.Status != "UNKNOWN" {
+			t.Errorf("expected table %s status UNKNOWN, got %s", table.TableName, table.Status)
+		}
+	}
+}
+
+func TestInfrastructureChecker_UnrecognizedClient_ReturnsUnknown(t *testing.T) {
+	// UnrecognizedClientException should also return UNKNOWN
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			return nil, errors.New("UnrecognizedClientException: The security token included in the request is invalid")
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
+	result, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
+
+	if err != nil {
+		t.Fatalf("expected no error with UnrecognizedClientException (graceful degradation), got: %v", err)
+	}
+
+	for _, table := range result.Tables {
+		if table.Status != "UNKNOWN" {
+			t.Errorf("expected table %s status UNKNOWN, got %s", table.TableName, table.Status)
+		}
+	}
+}
+
+func TestInfrastructureChecker_OtherAPIError_ReturnsError(t *testing.T) {
+	// Non-auth related errors should still return an error
+	mock := &mockDynamoDBStatusAPI{
+		describeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+			return nil, errors.New("InternalServerError: Service unavailable")
+		},
+	}
+
+	checker := newInfrastructureCheckerWithClient(mock, "us-east-1")
 	_, err := checker.GetInfrastructureStatus(context.Background(), "", "", "")
 
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		t.Fatal("expected error for non-auth API error, got nil")
 	}
 }
 
