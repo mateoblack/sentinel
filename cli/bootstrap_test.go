@@ -456,6 +456,68 @@ func TestBootstrapCommand_Apply_ConfirmationRejected(t *testing.T) {
 	}
 }
 
+func TestBootstrapCommand_GenerateIAMPolicies_ShowsAfterCancel(t *testing.T) {
+	// When user cancels, IAM policies should still be shown if requested.
+	// This is important because users need the policies to request permissions.
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	plan := &bootstrap.BootstrapPlan{
+		Config: bootstrap.BootstrapConfig{
+			PolicyRoot: "/sentinel/policies",
+			Profiles:   []bootstrap.ProfileConfig{{Name: "dev"}},
+		},
+		Resources: []bootstrap.ResourceSpec{
+			{Type: bootstrap.ResourceTypeSSMParameter, Name: "/sentinel/policies/dev", State: bootstrap.StateCreate},
+		},
+		Summary: bootstrap.PlanSummary{ToCreate: 1, Total: 1},
+	}
+
+	planner := &mockPlannerImpl{plan: plan}
+	executor := &mockExecutorImpl{}
+
+	// Simulate user typing "no" to cancel
+	stdinReader := bufio.NewScanner(strings.NewReader("no\n"))
+
+	input := BootstrapCommandInput{
+		PolicyRoot:          "/sentinel/policies",
+		Profiles:            []string{"dev"},
+		Region:              "us-east-1",
+		GenerateIAMPolicies: true,
+		WithApprovals:       true,
+		ApprovalTableName:   "sentinel-requests",
+		Stdin:               stdinReader,
+		Stdout:              stdout,
+		Stderr:              stderr,
+	}
+
+	err := testableBootstrapCommand(context.Background(), input, planner, executor)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := readFile(t, stdout)
+
+	// Verify cancelled message
+	if !strings.Contains(output, "Cancelled") {
+		t.Error("expected output to contain 'Cancelled'")
+	}
+
+	// Verify IAM policies are STILL shown even after cancel
+	if !strings.Contains(output, "IAM Policy Documents") {
+		t.Error("expected IAM policies to be shown after cancel")
+	}
+	if !strings.Contains(output, "SentinelPolicyReader") {
+		t.Error("expected SSM reader policy to be shown")
+	}
+	if !strings.Contains(output, "SentinelApprovalTable") {
+		t.Error("expected DynamoDB approval table policy to be shown")
+	}
+	if !strings.Contains(output, "dynamodb:GetItem") {
+		t.Error("expected DynamoDB operations in policy")
+	}
+}
+
 func TestBootstrapCommand_Apply_ConfirmationAccepted(t *testing.T) {
 	stdout, stderr, cleanup := createTestFiles(t)
 	defer cleanup()

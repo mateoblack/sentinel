@@ -252,6 +252,10 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 		response := strings.TrimSpace(strings.ToLower(scanner.Text()))
 		if response != "y" && response != "yes" {
 			fmt.Fprintln(stdout, "Cancelled.")
+			// Still show IAM policies even when cancelled - user needs them for setup
+			if input.GenerateIAMPolicies {
+				outputCombinedIAMPolicies(stdout, input)
+			}
 			return nil
 		}
 	}
