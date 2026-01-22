@@ -91,14 +91,15 @@ sentinel init bootstrap --profile myapp --json
 
 ### `sentinel init status`
 
-Shows current Sentinel policy status from SSM.
+Shows current Sentinel policy status from SSM and optionally DynamoDB tables.
 
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--policy-root` | SSM parameter path prefix | `/sentinel/policies` |
-| `--region` | AWS region for SSM operations | AWS default |
+| `--region` | AWS region for SSM and DynamoDB operations | AWS default |
 | `--json` | Machine-readable JSON output | false |
 | `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | - |
+| `--check-tables` | Check DynamoDB table status (requires --region) | false |
 
 **Examples:**
 
@@ -111,22 +112,46 @@ sentinel init status --json
 
 # Check custom policy root
 sentinel init status --policy-root /myorg/sentinel/policies
+
+# Check infrastructure status including DynamoDB tables
+sentinel init status --check-tables --region us-east-1
 ```
 
 **Sample Output:**
 
 ```
-Sentinel Policy Status
-======================
+Sentinel Status
+===============
 
-Policy Root: /sentinel/policies
-
-Profiles:
-  dev        v3  (last modified: 2026-01-15 14:30:22)
-  staging    v1  (last modified: 2026-01-15 14:30:25)
-  prod       v5  (last modified: 2026-01-16 09:15:00)
+Policy Parameters (/sentinel/policies):
+  dev            v3  (2026-01-15 14:30:22)
+  staging        v1  (2026-01-15 14:30:25)
+  prod           v5  (2026-01-16 09:15:00)
 
 Total: 3 policy parameters
+```
+
+**With `--check-tables`:**
+
+```
+Sentinel Status
+===============
+
+Policy Parameters (/sentinel/policies):
+  dev            v3  (2026-01-15 14:30:22)
+  staging        v1  (2026-01-15 14:30:25)
+  prod           v5  (2026-01-16 09:15:00)
+
+Total: 3 policy parameters
+
+Infrastructure:
+  sentinel-requests    Approvals      ACTIVE
+  sentinel-breakglass  Break-Glass    NOT_FOUND
+  sentinel-sessions    Sessions       NOT_FOUND
+
+Suggestions:
+  Run: sentinel init breakglass --region us-east-1
+  Run: sentinel init sessions --region us-east-1
 ```
 
 ## What Gets Created
