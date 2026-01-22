@@ -244,3 +244,47 @@ func BreakGlassTableSchema(tableName string) TableSchema {
 		BillingMode:  BillingModePayPerRequest,
 	}
 }
+
+// SessionTableSchema returns the schema for the sentinel-sessions table.
+// This matches the schema expected by session/dynamodb.go:
+//   - Partition key: id (S)
+//   - GSIs: gsi-user, gsi-status, gsi-profile (each with created_at sort key)
+//   - GSI: gsi-server-instance (server_instance_id PK, status SK - different sort key!)
+//   - TTL attribute: ttl
+//   - Billing: PAY_PER_REQUEST
+func SessionTableSchema(tableName string) TableSchema {
+	createdAtSortKey := &KeyAttribute{Name: "created_at", Type: KeyTypeString}
+
+	return TableSchema{
+		TableName:    tableName,
+		PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+		GlobalSecondaryIndexes: []GSISchema{
+			{
+				IndexName:    "gsi-user",
+				PartitionKey: KeyAttribute{Name: "user", Type: KeyTypeString},
+				SortKey:      createdAtSortKey,
+				Projection:   ProjectionAll,
+			},
+			{
+				IndexName:    "gsi-status",
+				PartitionKey: KeyAttribute{Name: "status", Type: KeyTypeString},
+				SortKey:      createdAtSortKey,
+				Projection:   ProjectionAll,
+			},
+			{
+				IndexName:    "gsi-profile",
+				PartitionKey: KeyAttribute{Name: "profile", Type: KeyTypeString},
+				SortKey:      createdAtSortKey,
+				Projection:   ProjectionAll,
+			},
+			{
+				IndexName:    "gsi-server-instance",
+				PartitionKey: KeyAttribute{Name: "server_instance_id", Type: KeyTypeString},
+				SortKey:      &KeyAttribute{Name: "status", Type: KeyTypeString},
+				Projection:   ProjectionAll,
+			},
+		},
+		TTLAttribute: "ttl",
+		BillingMode:  BillingModePayPerRequest,
+	}
+}
