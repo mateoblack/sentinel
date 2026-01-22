@@ -455,6 +455,48 @@ func provisionTable(ctx context.Context, provisioner TableProvisionerInterface,
 	return nil
 }
 
+// CombinedIAMPolicy represents a combined IAM policy for all Sentinel resources.
+type CombinedIAMPolicy struct {
+	SSMReader      string   // JSON policy for reading SSM parameters
+	SSMAdmin       string   // JSON policy for managing SSM parameters
+	DynamoDBTables []string // JSON policies for each DynamoDB table
+}
+
+// generateCombinedIAMPolicies generates IAM policy documents for all configured resources.
+func generateCombinedIAMPolicies(input BootstrapCommandInput) CombinedIAMPolicy {
+	result := CombinedIAMPolicy{}
+
+	// SSM policies (always included)
+	policyRoot := input.PolicyRoot
+	if policyRoot == "" {
+		policyRoot = bootstrap.DefaultPolicyRoot
+	}
+	readerPolicy := bootstrap.GenerateReaderPolicy(policyRoot)
+	result.SSMReader, _ = bootstrap.FormatIAMPolicy(readerPolicy)
+	adminPolicy := bootstrap.GenerateAdminPolicy(policyRoot)
+	result.SSMAdmin, _ = bootstrap.FormatIAMPolicy(adminPolicy)
+
+	// DynamoDB table policies (conditional on --with-* flags)
+	withApprovals := input.WithApprovals || input.WithAll
+	withBreakGlass := input.WithBreakGlass || input.WithAll
+	withSessions := input.WithSessions || input.WithAll
+
+	if withApprovals {
+		policy := generateTableIAMPolicy(input.ApprovalTableName, input.Region)
+		result.DynamoDBTables = append(result.DynamoDBTables, policy)
+	}
+	if withBreakGlass {
+		policy := generateBreakGlassTableIAMPolicy(input.BreakGlassTableName, input.Region)
+		result.DynamoDBTables = append(result.DynamoDBTables, policy)
+	}
+	if withSessions {
+		policy := generateSessionTableIAMPolicy(input.SessionTableName, input.Region)
+		result.DynamoDBTables = append(result.DynamoDBTables, policy)
+	}
+
+	return result
+}
+
 // outputIAMPolicies prints IAM policy documents to stdout.
 func outputIAMPolicies(stdout *os.File, policyRoot string) {
 	fmt.Fprintln(stdout, "\n"+strings.Repeat("=", 60))
