@@ -12,10 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `require_server_session` policy effect enforcing server mode with session tracking
 - `session_table` field in policy rules for specifying session tracking table
 - Actionable error messages guiding users from credential_process to exec --server --session-table
+- `SENTINEL_SESSION_TABLE` environment variable for default session table (no need for `--session-table` every time)
+
+### Fixed
+
+- Server mode now correctly uses SSO credential profile (`--aws-profile`) instead of policy target profile
+  - Previously caused "InvalidClientTokenId" errors when using SSO credentials with `--server`
 
 ### Changed
 
 - Policy evaluation now checks session table presence for require_server_session effect
+- `sentinel init sessions` output now prioritizes env var suggestion over CLI flag
 
 ## [1.12.3] - 2026-01-24
 
