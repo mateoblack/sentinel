@@ -24,6 +24,7 @@ type RequestCommandInput struct {
 	Justification string
 	RequestTable  string
 	Region        string
+	AWSProfile    string // Optional AWS profile for credentials (SSO users)
 
 	// Store is an optional Store implementation for testing.
 	// If nil, a DynamoDB store will be created using the RequestTable and Region.
@@ -80,6 +81,9 @@ func ConfigureRequestCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("region", "AWS region for DynamoDB").
 		StringVar(&input.Region)
 
+	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses --profile if not specified)").
+		StringVar(&input.AWSProfile)
+
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := RequestCommand(context.Background(), input, s)
 		app.FatalIfError(err, "request")
@@ -105,8 +109,13 @@ func RequestCommand(ctx context.Context, input RequestCommandInput, s *Sentinel)
 	}
 
 	// 3. Load AWS config (needed for STS and DynamoDB)
+	// Use --aws-profile for credentials if specified, otherwise use --profile
+	credentialProfile := input.AWSProfile
+	if credentialProfile == "" {
+		credentialProfile = input.ProfileName
+	}
 	awsCfgOpts := []func(*config.LoadOptions) error{
-		config.WithSharedConfigProfile(input.ProfileName),
+		config.WithSharedConfigProfile(credentialProfile),
 	}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))

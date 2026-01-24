@@ -32,9 +32,12 @@ type SentinelExecCommandInput struct {
 	Command          string
 	Args             []string
 	Region           string
+	AWSProfile       string // Optional AWS profile for credentials (SSO users)
 	NoSession        bool
 	SessionDuration  time.Duration
 	ServerDuration   time.Duration     // Duration for server mode sessions (0 = use default 15m)
+	RequestTable     string            // Optional: DynamoDB table for approved request checking
+	BreakGlassTable  string            // Optional: DynamoDB table for break-glass checking
 	LogFile          string            // Path to log file (empty = no file logging)
 	LogStderr        bool              // Log to stderr (default: false)
 	Store            request.Store     // Optional: for approved request checking (nil = no checking)
@@ -103,6 +106,15 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("session-table", "DynamoDB table for session tracking (optional, server mode only)").
 		StringVar(&input.SessionTableName)
 
+	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses --profile if not specified)").
+		StringVar(&input.AWSProfile)
+
+	cmd.Flag("request-table", "DynamoDB table for approved request checking (enables approval workflow)").
+		StringVar(&input.RequestTable)
+
+	cmd.Flag("breakglass-table", "DynamoDB table for break-glass checking (enables break-glass workflow)").
+		StringVar(&input.BreakGlassTable)
+
 	cmd.Arg("cmd", "Command to execute, defaults to $SHELL").
 		StringVar(&input.Command)
 
@@ -170,9 +182,13 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	}
 
 	// 2. Create AWS config for SSM and STS
-	// Include profile to enable SSO credential loading from the specified profile
+	// Use --aws-profile for credentials if specified, otherwise use --profile
+	credentialProfile := input.AWSProfile
+	if credentialProfile == "" {
+		credentialProfile = input.ProfileName
+	}
 	awsCfgOpts := []func(*config.LoadOptions) error{
-		config.WithSharedConfigProfile(input.ProfileName),
+		config.WithSharedConfigProfile(credentialProfile),
 	}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
@@ -223,6 +239,14 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		return 1, identityErr
 	}
 
+	// 3.5. Create approval stores if configured (and not injected for testing)
+	if input.Store == nil && input.RequestTable != "" {
+		input.Store = request.NewDynamoDBStore(awsCfg, input.RequestTable)
+	}
+	if input.BreakGlassStore == nil && input.BreakGlassTable != "" {
+		input.BreakGlassStore = breakglass.NewDynamoDBStore(awsCfg, input.BreakGlassTable)
+	}
+
 	// 4. Create policy loader chain
 	loader := policy.NewLoader(awsCfg)
 	cachedLoader := policy.NewCachedLoader(loader, 5*time.Minute)
@@ -245,10 +269,10 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	// 7. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 8. Handle deny decision - check for require_server mode first, then approved request or break-glass
+	// 8. Handle deny or require_approval decision - check for require_server mode first, then approved request or break-glass
 	var approvedReq *request.Request
 	var activeBreakGlass *breakglass.BreakGlassEvent
-	if decision.Effect == policy.EffectDeny {
+	if decision.Effect == policy.EffectDeny || decision.Effect == policy.EffectRequireApproval {
 		// Check if denial is due to server mode requirement - this cannot be bypassed
 		if decision.RequiresServerMode {
 			if logger != nil {

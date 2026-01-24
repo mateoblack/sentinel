@@ -304,10 +304,17 @@ func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, ke
 		effectiveLimit = MaxQueryLimit
 	}
 
+	// Use expression attribute names for reserved words (e.g., "status")
+	keyCondition := "#pk = :v"
+	exprAttrNames := map[string]string{
+		"#pk": keyAttr,
+	}
+
 	output, err := s.client.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(s.tableName),
-		IndexName:              aws.String(indexName),
-		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :v", keyAttr)),
+		TableName:                 aws.String(s.tableName),
+		IndexName:                 aws.String(indexName),
+		KeyConditionExpression:    aws.String(keyCondition),
+		ExpressionAttributeNames:  exprAttrNames,
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":v": &types.AttributeValueMemberS{Value: keyValue},
 		},

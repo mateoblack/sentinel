@@ -29,8 +29,11 @@ type CredentialsCommandInput struct {
 	ProfileName     string
 	PolicyParameter string // SSM parameter path, e.g., /sentinel/policies/default
 	Region          string
+	AWSProfile      string // Optional AWS profile for credentials (SSO users)
 	NoSession       bool
 	SessionDuration time.Duration
+	RequestTable    string               // Optional: DynamoDB table for approved request checking
+	BreakGlassTable string               // Optional: DynamoDB table for break-glass checking
 	Logger          logging.Logger       // nil means no logging
 	LogFile         string               // Path to log file (empty = no file logging)
 	LogStderr       bool                 // Log to stderr (default: false)
@@ -95,6 +98,15 @@ func ConfigureCredentialsCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("stdout", "Print SSO URL instead of opening browser (used with --auto-login)").
 		BoolVar(&input.UseStdout)
 
+	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses --profile if not specified)").
+		StringVar(&input.AWSProfile)
+
+	cmd.Flag("request-table", "DynamoDB table for approved request checking (enables approval workflow)").
+		StringVar(&input.RequestTable)
+
+	cmd.Flag("breakglass-table", "DynamoDB table for break-glass checking (enables break-glass workflow)").
+		StringVar(&input.BreakGlassTable)
+
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := CredentialsCommand(context.Background(), input, s)
 		app.FatalIfError(err, "credentials")
@@ -148,9 +160,13 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	}
 
 	// 2. Create AWS config for SSM and STS
-	// Include profile to enable SSO credential loading from the specified profile
+	// Use --aws-profile for credentials if specified, otherwise use --profile
+	credentialProfile := input.AWSProfile
+	if credentialProfile == "" {
+		credentialProfile = input.ProfileName
+	}
 	awsCfgOpts := []func(*config.LoadOptions) error{
-		config.WithSharedConfigProfile(input.ProfileName),
+		config.WithSharedConfigProfile(credentialProfile),
 	}
 	if input.Region != "" {
 		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
@@ -201,6 +217,14 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		return identityErr
 	}
 
+	// 3.5. Create approval stores if configured (and not injected for testing)
+	if input.Store == nil && input.RequestTable != "" {
+		input.Store = request.NewDynamoDBStore(awsCfg, input.RequestTable)
+	}
+	if input.BreakGlassStore == nil && input.BreakGlassTable != "" {
+		input.BreakGlassStore = breakglass.NewDynamoDBStore(awsCfg, input.BreakGlassTable)
+	}
+
 	// 4. Create policy loader chain
 	loader := policy.NewLoader(awsCfg)
 	cachedLoader := policy.NewCachedLoader(loader, 5*time.Minute)
@@ -223,10 +247,10 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	// 7. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// 8. Handle deny decision - check for require_server mode first, then approved request or break-glass
+	// 8. Handle deny or require_approval decision - check for require_server mode first, then approved request or break-glass
 	var approvedReq *request.Request
 	var activeBreakGlass *breakglass.BreakGlassEvent
-	if decision.Effect == policy.EffectDeny {
+	if decision.Effect == policy.EffectDeny || decision.Effect == policy.EffectRequireApproval {
 		// Check if denial is due to server mode requirement - this cannot be bypassed
 		if decision.RequiresServerMode {
 			if input.Logger != nil {
