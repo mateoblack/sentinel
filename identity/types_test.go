@@ -8,42 +8,62 @@ import (
 
 func TestSourceIdentity_Format(t *testing.T) {
 	var testCases = []struct {
-		name      string
-		user      string
-		requestID string
-		want      string
+		name       string
+		user       string
+		approvalID string
+		requestID  string
+		want       string
 	}{
 		{
-			name:      "standard user and request-id",
-			user:      "alice",
-			requestID: "a1b2c3d4",
-			want:      "sentinel:alice:a1b2c3d4",
+			name:       "direct access (no approval)",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			want:       "sentinel:alice:direct:a1b2c3d4",
 		},
 		{
-			name:      "maximum length user",
-			user:      "abcdefghij0123456789",
-			requestID: "12345678",
-			want:      "sentinel:abcdefghij0123456789:12345678",
+			name:       "approved access with approval ID",
+			user:       "alice",
+			approvalID: "abcd1234",
+			requestID:  "a1b2c3d4",
+			want:       "sentinel:alice:abcd1234:a1b2c3d4",
 		},
 		{
-			name:      "single character user",
-			user:      "a",
-			requestID: "deadbeef",
-			want:      "sentinel:a:deadbeef",
+			name:       "maximum length user with direct access",
+			user:       "abcdefghij0123456789",
+			approvalID: "",
+			requestID:  "12345678",
+			want:       "sentinel:abcdefghij0123456789:direct:12345678",
 		},
 		{
-			name:      "numeric user",
-			user:      "12345",
-			requestID: "00000000",
-			want:      "sentinel:12345:00000000",
+			name:       "maximum length user with approval",
+			user:       "abcdefghij0123456789",
+			approvalID: "deadbeef",
+			requestID:  "12345678",
+			want:       "sentinel:abcdefghij0123456789:deadbeef:12345678",
+		},
+		{
+			name:       "single character user",
+			user:       "a",
+			approvalID: "",
+			requestID:  "deadbeef",
+			want:       "sentinel:a:direct:deadbeef",
+		},
+		{
+			name:       "numeric user",
+			user:       "12345",
+			approvalID: "",
+			requestID:  "00000000",
+			want:       "sentinel:12345:direct:00000000",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			si := &SourceIdentity{
-				User:      tc.user,
-				RequestID: tc.requestID,
+				User:       tc.user,
+				ApprovalID: tc.approvalID,
+				RequestID:  tc.requestID,
 			}
 
 			got := si.Format()
@@ -61,110 +81,165 @@ func TestSourceIdentity_Format(t *testing.T) {
 
 func TestSourceIdentity_IsValid(t *testing.T) {
 	var testCases = []struct {
-		name      string
-		user      string
-		requestID string
-		wantValid bool
-		wantErr   string
+		name       string
+		user       string
+		approvalID string
+		requestID  string
+		wantValid  bool
+		wantErr    string
 	}{
 		{
-			name:      "valid - standard",
-			user:      "alice",
-			requestID: "a1b2c3d4",
-			wantValid: true,
-			wantErr:   "",
+			name:       "valid - standard with direct access",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantValid:  true,
+			wantErr:    "",
 		},
 		{
-			name:      "valid - max length user",
-			user:      "abcdefghij0123456789",
-			requestID: "12345678",
-			wantValid: true,
-			wantErr:   "",
+			name:       "valid - standard with approval ID",
+			user:       "alice",
+			approvalID: "abcd1234",
+			requestID:  "a1b2c3d4",
+			wantValid:  true,
+			wantErr:    "",
 		},
 		{
-			name:      "invalid - empty user",
-			user:      "",
-			requestID: "a1b2c3d4",
-			wantValid: false,
-			wantErr:   "empty",
+			name:       "valid - max length user",
+			user:       "abcdefghij0123456789",
+			approvalID: "",
+			requestID:  "12345678",
+			wantValid:  true,
+			wantErr:    "",
 		},
 		{
-			name:      "invalid - user too long",
-			user:      "abcdefghij01234567890",
-			requestID: "a1b2c3d4",
-			wantValid: false,
-			wantErr:   "exceeds maximum",
+			name:       "invalid - empty user",
+			user:       "",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "empty",
 		},
 		{
-			name:      "invalid - user with special chars underscore",
-			user:      "alice_bob",
-			requestID: "a1b2c3d4",
-			wantValid: false,
-			wantErr:   "alphanumeric",
+			name:       "invalid - user too long",
+			user:       "abcdefghij01234567890",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "exceeds maximum",
 		},
 		{
-			name:      "invalid - user with special chars hyphen",
-			user:      "alice-bob",
-			requestID: "a1b2c3d4",
-			wantValid: false,
-			wantErr:   "alphanumeric",
+			name:       "invalid - user with special chars underscore",
+			user:       "alice_bob",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "alphanumeric",
 		},
 		{
-			name:      "invalid - user with special chars at",
-			user:      "alice@example",
-			requestID: "a1b2c3d4",
-			wantValid: false,
-			wantErr:   "alphanumeric",
+			name:       "invalid - user with special chars hyphen",
+			user:       "alice-bob",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "alphanumeric",
 		},
 		{
-			name:      "invalid - user with space",
-			user:      "alice bob",
-			requestID: "a1b2c3d4",
-			wantValid: false,
-			wantErr:   "alphanumeric",
+			name:       "invalid - user with special chars at",
+			user:       "alice@example",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "alphanumeric",
 		},
 		{
-			name:      "invalid - request-id too short",
-			user:      "alice",
-			requestID: "a1b2c3",
-			wantValid: false,
-			wantErr:   "request-id",
+			name:       "invalid - user with space",
+			user:       "alice bob",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "alphanumeric",
 		},
 		{
-			name:      "invalid - request-id too long",
-			user:      "alice",
-			requestID: "a1b2c3d4e5",
-			wantValid: false,
-			wantErr:   "request-id",
+			name:       "invalid - request-id too short",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "a1b2c3",
+			wantValid:  false,
+			wantErr:    "request-id",
 		},
 		{
-			name:      "invalid - request-id uppercase",
-			user:      "alice",
-			requestID: "A1B2C3D4",
-			wantValid: false,
-			wantErr:   "request-id",
+			name:       "invalid - request-id too long",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "a1b2c3d4e5",
+			wantValid:  false,
+			wantErr:    "request-id",
 		},
 		{
-			name:      "invalid - request-id non-hex",
-			user:      "alice",
-			requestID: "ghijklmn",
-			wantValid: false,
-			wantErr:   "request-id",
+			name:       "invalid - request-id uppercase",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "A1B2C3D4",
+			wantValid:  false,
+			wantErr:    "request-id",
 		},
 		{
-			name:      "invalid - empty request-id",
-			user:      "alice",
-			requestID: "",
-			wantValid: false,
-			wantErr:   "request-id",
+			name:       "invalid - request-id non-hex",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "ghijklmn",
+			wantValid:  false,
+			wantErr:    "request-id",
+		},
+		{
+			name:       "invalid - empty request-id",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "",
+			wantValid:  false,
+			wantErr:    "request-id",
+		},
+		{
+			name:       "invalid - approval-id too short",
+			user:       "alice",
+			approvalID: "abc123",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "approval-id",
+		},
+		{
+			name:       "invalid - approval-id too long",
+			user:       "alice",
+			approvalID: "abcd12345678",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "approval-id",
+		},
+		{
+			name:       "invalid - approval-id uppercase",
+			user:       "alice",
+			approvalID: "ABCD1234",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "approval-id",
+		},
+		{
+			name:       "invalid - approval-id non-hex",
+			user:       "alice",
+			approvalID: "ghijklmn",
+			requestID:  "a1b2c3d4",
+			wantValid:  false,
+			wantErr:    "approval-id",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			si := &SourceIdentity{
-				User:      tc.user,
-				RequestID: tc.requestID,
+				User:       tc.user,
+				ApprovalID: tc.approvalID,
+				RequestID:  tc.requestID,
 			}
 
 			gotValid := si.IsValid()
@@ -192,34 +267,64 @@ func TestSourceIdentity_IsValid(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	var testCases = []struct {
-		name      string
-		input     string
-		wantUser  string
-		wantReqID string
-		wantErr   string
+		name           string
+		input          string
+		wantUser       string
+		wantApprovalID string
+		wantReqID      string
+		wantErr        string
 	}{
+		// New format (4-part)
 		{
-			name:      "valid - standard",
-			input:     "sentinel:alice:a1b2c3d4",
-			wantUser:  "alice",
-			wantReqID: "a1b2c3d4",
-			wantErr:   "",
+			name:           "valid - new format with direct access",
+			input:          "sentinel:alice:direct:a1b2c3d4",
+			wantUser:       "alice",
+			wantApprovalID: "",
+			wantReqID:      "a1b2c3d4",
+			wantErr:        "",
 		},
 		{
-			name:      "valid - numeric user",
-			input:     "sentinel:12345:deadbeef",
-			wantUser:  "12345",
-			wantReqID: "deadbeef",
-			wantErr:   "",
+			name:           "valid - new format with approval ID",
+			input:          "sentinel:alice:abcd1234:a1b2c3d4",
+			wantUser:       "alice",
+			wantApprovalID: "abcd1234",
+			wantReqID:      "a1b2c3d4",
+			wantErr:        "",
 		},
+		{
+			name:           "valid - new format numeric user with approval",
+			input:          "sentinel:12345:deadbeef:12345678",
+			wantUser:       "12345",
+			wantApprovalID: "deadbeef",
+			wantReqID:      "12345678",
+			wantErr:        "",
+		},
+		// Legacy format (3-part) - backward compatibility
+		{
+			name:           "valid - legacy format",
+			input:          "sentinel:alice:a1b2c3d4",
+			wantUser:       "alice",
+			wantApprovalID: "",
+			wantReqID:      "a1b2c3d4",
+			wantErr:        "",
+		},
+		{
+			name:           "valid - legacy format numeric user",
+			input:          "sentinel:12345:deadbeef",
+			wantUser:       "12345",
+			wantApprovalID: "",
+			wantReqID:      "deadbeef",
+			wantErr:        "",
+		},
+		// Invalid formats
 		{
 			name:    "invalid - wrong prefix",
-			input:   "aws:alice:a1b2c3d4",
+			input:   "aws:alice:direct:a1b2c3d4",
 			wantErr: "start with 'sentinel:'",
 		},
 		{
 			name:    "invalid - missing prefix",
-			input:   "alice:a1b2c3d4",
+			input:   "alice:direct:a1b2c3d4",
 			wantErr: "start with 'sentinel:'",
 		},
 		{
@@ -229,7 +334,7 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name:    "invalid - too many parts",
-			input:   "sentinel:alice:a1b2c3d4:extra",
+			input:   "sentinel:alice:direct:a1b2c3d4:extra",
 			wantErr: "invalid SourceIdentity format",
 		},
 		{
@@ -238,14 +343,29 @@ func TestParse(t *testing.T) {
 			wantErr: "start with 'sentinel:'",
 		},
 		{
-			name:    "invalid - empty user in parsed string",
+			name:    "invalid - empty user in new format",
+			input:   "sentinel::direct:a1b2c3d4",
+			wantErr: "empty",
+		},
+		{
+			name:    "invalid - empty user in legacy format",
 			input:   "sentinel::a1b2c3d4",
 			wantErr: "empty",
 		},
 		{
-			name:    "invalid - bad request-id in parsed string",
+			name:    "invalid - bad request-id in new format",
+			input:   "sentinel:alice:direct:badid",
+			wantErr: "request-id",
+		},
+		{
+			name:    "invalid - bad request-id in legacy format",
 			input:   "sentinel:alice:badid",
 			wantErr: "request-id",
+		},
+		{
+			name:    "invalid - bad approval-id in new format",
+			input:   "sentinel:alice:BADAPPRV:a1b2c3d4",
+			wantErr: "approval-id",
 		},
 	}
 
@@ -272,6 +392,9 @@ func TestParse(t *testing.T) {
 			if si.User != tc.wantUser {
 				t.Errorf("User = %q, want %q", si.User, tc.wantUser)
 			}
+			if si.ApprovalID != tc.wantApprovalID {
+				t.Errorf("ApprovalID = %q, want %q", si.ApprovalID, tc.wantApprovalID)
+			}
 			if si.RequestID != tc.wantReqID {
 				t.Errorf("RequestID = %q, want %q", si.RequestID, tc.wantReqID)
 			}
@@ -280,82 +403,155 @@ func TestParse(t *testing.T) {
 }
 
 func TestParse_RoundTrip(t *testing.T) {
-	// Test that Format -> Parse -> Format produces identical result
-	original := &SourceIdentity{
-		User:      "alice",
-		RequestID: "a1b2c3d4",
-	}
-
-	formatted := original.Format()
-	parsed, err := Parse(formatted)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if parsed.User != original.User {
-		t.Errorf("User = %q, want %q", parsed.User, original.User)
-	}
-	if parsed.RequestID != original.RequestID {
-		t.Errorf("RequestID = %q, want %q", parsed.RequestID, original.RequestID)
-	}
-	if parsed.Format() != formatted {
-		t.Errorf("Format() = %q, want %q", parsed.Format(), formatted)
-	}
-}
-
-func TestSourceIdentity_LengthConstraint(t *testing.T) {
-	// AWS SourceIdentity max length is 64 characters
-	// Our format: sentinel:<user>:<request-id>
-	// Max: sentinel: (9) + user (20) + : (1) + request-id (8) = 38 chars
-
-	si := &SourceIdentity{
-		User:      "abcdefghij0123456789", // 20 chars (max)
-		RequestID: "12345678",             // 8 chars (fixed)
-	}
-
-	formatted := si.Format()
-
-	if len(formatted) > MaxSourceIdentityLength {
-		t.Errorf("Format() length %d exceeds AWS max %d", len(formatted), MaxSourceIdentityLength)
-	}
-
-	// Should be exactly 38 chars
-	expectedLen := len("sentinel:") + MaxUserLength + 1 + RequestIDLength
-	if len(formatted) != expectedLen {
-		t.Errorf("Format() length = %d, expected %d for max-length user", len(formatted), expectedLen)
-	}
-}
-
-func TestNew(t *testing.T) {
-	var testCases = []struct {
-		name      string
-		user      string
-		requestID string
-		wantErr   bool
+	testCases := []struct {
+		name     string
+		original *SourceIdentity
 	}{
 		{
-			name:      "valid creation",
-			user:      "alice",
-			requestID: "a1b2c3d4",
-			wantErr:   false,
+			name: "direct access (no approval)",
+			original: &SourceIdentity{
+				User:       "alice",
+				ApprovalID: "",
+				RequestID:  "a1b2c3d4",
+			},
 		},
 		{
-			name:      "invalid user",
-			user:      "",
-			requestID: "a1b2c3d4",
-			wantErr:   true,
+			name: "approved access",
+			original: &SourceIdentity{
+				User:       "alice",
+				ApprovalID: "abcd1234",
+				RequestID:  "a1b2c3d4",
+			},
 		},
 		{
-			name:      "invalid request-id",
-			user:      "alice",
-			requestID: "bad",
-			wantErr:   true,
+			name: "max length user with approval",
+			original: &SourceIdentity{
+				User:       "abcdefghij0123456789",
+				ApprovalID: "deadbeef",
+				RequestID:  "12345678",
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			si, err := New(tc.user, tc.requestID)
+			formatted := tc.original.Format()
+			parsed, err := Parse(formatted)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if parsed.User != tc.original.User {
+				t.Errorf("User = %q, want %q", parsed.User, tc.original.User)
+			}
+			if parsed.ApprovalID != tc.original.ApprovalID {
+				t.Errorf("ApprovalID = %q, want %q", parsed.ApprovalID, tc.original.ApprovalID)
+			}
+			if parsed.RequestID != tc.original.RequestID {
+				t.Errorf("RequestID = %q, want %q", parsed.RequestID, tc.original.RequestID)
+			}
+			if parsed.Format() != formatted {
+				t.Errorf("Format() = %q, want %q", parsed.Format(), formatted)
+			}
+		})
+	}
+}
+
+func TestSourceIdentity_LengthConstraint(t *testing.T) {
+	// AWS SourceIdentity max length is 64 characters
+	// Our new format: sentinel:<user>:<approval-marker>:<request-id>
+	// Max: sentinel: (9) + user (20) + : (1) + approval-id (8) + : (1) + request-id (8) = 47 chars
+	// (Note: "direct" is 6 chars, approval IDs are 8 chars, so approval ID is worst case)
+
+	t.Run("max length with approval ID", func(t *testing.T) {
+		si := &SourceIdentity{
+			User:       "abcdefghij0123456789", // 20 chars (max)
+			ApprovalID: "deadbeef",             // 8 chars
+			RequestID:  "12345678",             // 8 chars (fixed)
+		}
+
+		formatted := si.Format()
+
+		if len(formatted) > MaxSourceIdentityLength {
+			t.Errorf("Format() length %d exceeds AWS max %d", len(formatted), MaxSourceIdentityLength)
+		}
+
+		// sentinel:(9) + user(20) + :(1) + approval(8) + :(1) + request-id(8) = 47
+		expectedLen := len("sentinel:") + MaxUserLength + 1 + ApprovalIDLength + 1 + RequestIDLength
+		if len(formatted) != expectedLen {
+			t.Errorf("Format() length = %d, expected %d for max-length user with approval", len(formatted), expectedLen)
+		}
+	})
+
+	t.Run("max length with direct access", func(t *testing.T) {
+		si := &SourceIdentity{
+			User:       "abcdefghij0123456789", // 20 chars (max)
+			ApprovalID: "",                     // direct = 6 chars
+			RequestID:  "12345678",             // 8 chars (fixed)
+		}
+
+		formatted := si.Format()
+
+		if len(formatted) > MaxSourceIdentityLength {
+			t.Errorf("Format() length %d exceeds AWS max %d", len(formatted), MaxSourceIdentityLength)
+		}
+
+		// sentinel:(9) + user(20) + :(1) + "direct"(6) + :(1) + request-id(8) = 45
+		expectedLen := len("sentinel:") + MaxUserLength + 1 + len(DirectAccessMarker) + 1 + RequestIDLength
+		if len(formatted) != expectedLen {
+			t.Errorf("Format() length = %d, expected %d for max-length user with direct", len(formatted), expectedLen)
+		}
+	})
+}
+
+func TestNew(t *testing.T) {
+	var testCases = []struct {
+		name       string
+		user       string
+		approvalID string
+		requestID  string
+		wantErr    bool
+	}{
+		{
+			name:       "valid creation with direct access",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantErr:    false,
+		},
+		{
+			name:       "valid creation with approval ID",
+			user:       "alice",
+			approvalID: "abcd1234",
+			requestID:  "a1b2c3d4",
+			wantErr:    false,
+		},
+		{
+			name:       "invalid user",
+			user:       "",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantErr:    true,
+		},
+		{
+			name:       "invalid request-id",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "bad",
+			wantErr:    true,
+		},
+		{
+			name:       "invalid approval-id",
+			user:       "alice",
+			approvalID: "bad",
+			requestID:  "a1b2c3d4",
+			wantErr:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			si, err := New(tc.user, tc.approvalID, tc.requestID)
 
 			if tc.wantErr {
 				if err == nil {
@@ -474,11 +670,12 @@ func TestSanitizeUser(t *testing.T) {
 
 // TestSourceIdentity_AWSConstraintBoundary tests AWS SourceIdentity length constraints.
 func TestSourceIdentity_AWSConstraintBoundary(t *testing.T) {
-	t.Run("MaxSourceIdentityLength is never exceeded", func(t *testing.T) {
-		// Test with max-length user (20 chars) - this is the worst case
+	t.Run("MaxSourceIdentityLength is never exceeded with approval ID", func(t *testing.T) {
+		// Test with max-length user (20 chars) and approval ID - this is the worst case
 		si := &SourceIdentity{
-			User:      "abcdefghij0123456789", // 20 chars (max)
-			RequestID: "12345678",             // 8 chars (fixed)
+			User:       "abcdefghij0123456789", // 20 chars (max)
+			ApprovalID: "deadbeef",             // 8 chars
+			RequestID:  "12345678",             // 8 chars (fixed)
 		}
 
 		formatted := si.Format()
@@ -486,9 +683,28 @@ func TestSourceIdentity_AWSConstraintBoundary(t *testing.T) {
 			t.Errorf("Format() length %d exceeds AWS max %d", len(formatted), MaxSourceIdentityLength)
 		}
 
-		// Expected: sentinel:(9) + user(20) + :(1) + request-id(8) = 38
-		if len(formatted) != 38 {
-			t.Errorf("Max-length format is %d chars, expected 38", len(formatted))
+		// Expected: sentinel:(9) + user(20) + :(1) + approval(8) + :(1) + request-id(8) = 47
+		if len(formatted) != 47 {
+			t.Errorf("Max-length format is %d chars, expected 47", len(formatted))
+		}
+	})
+
+	t.Run("MaxSourceIdentityLength is never exceeded with direct access", func(t *testing.T) {
+		// Test with max-length user (20 chars) and direct marker
+		si := &SourceIdentity{
+			User:       "abcdefghij0123456789", // 20 chars (max)
+			ApprovalID: "",                     // "direct" = 6 chars
+			RequestID:  "12345678",             // 8 chars (fixed)
+		}
+
+		formatted := si.Format()
+		if len(formatted) > MaxSourceIdentityLength {
+			t.Errorf("Format() length %d exceeds AWS max %d", len(formatted), MaxSourceIdentityLength)
+		}
+
+		// Expected: sentinel:(9) + user(20) + :(1) + "direct"(6) + :(1) + request-id(8) = 45
+		if len(formatted) != 45 {
+			t.Errorf("Max-length format with direct is %d chars, expected 45", len(formatted))
 		}
 	})
 
@@ -497,12 +713,14 @@ func TestSourceIdentity_AWSConstraintBoundary(t *testing.T) {
 		for userLen := 1; userLen <= MaxUserLength; userLen++ {
 			user := strings.Repeat("a", userLen)
 			si := &SourceIdentity{
-				User:      user,
-				RequestID: "12345678",
+				User:       user,
+				ApprovalID: "deadbeef", // 8 chars
+				RequestID:  "12345678",
 			}
 
 			formatted := si.Format()
-			expectedLen := len("sentinel:") + userLen + 1 + RequestIDLength // +1 for second separator
+			// sentinel:(9) + user(userLen) + :(1) + approval(8) + :(1) + request-id(8)
+			expectedLen := len("sentinel:") + userLen + 1 + ApprovalIDLength + 1 + RequestIDLength
 
 			if len(formatted) != expectedLen {
 				t.Errorf("User length %d: format length = %d, expected %d", userLen, len(formatted), expectedLen)
@@ -543,34 +761,34 @@ func TestParse_SecurityInjection(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "separator injection - user containing colon",
-			input:   "sentinel:alice:bob:a1b2c3d4",
+			name:    "separator injection - 5 parts",
+			input:   "sentinel:alice:direct:a1b2c3d4:extra",
 			wantErr: "invalid SourceIdentity format",
 		},
 		{
-			name:    "separator injection - empty middle part",
-			input:   "sentinel::alice:a1b2c3d4",
-			wantErr: "invalid SourceIdentity format",
+			name:    "separator injection - empty user in new format",
+			input:   "sentinel::direct:a1b2c3d4",
+			wantErr: "empty",
 		},
 		{
-			name:    "null byte in input",
-			input:   "sentinel:alice\x00:a1b2c3d4",
+			name:    "null byte in user",
+			input:   "sentinel:alice\x00bob:direct:a1b2c3d4",
 			wantErr: "alphanumeric",
 		},
 		{
 			name:    "control character - tab in user",
-			input:   "sentinel:alice\tbob:a1b2c3d4",
-			wantErr: "alphanumeric", // Tab splits parsing, user validation fails
+			input:   "sentinel:alice\tbob:direct:a1b2c3d4",
+			wantErr: "alphanumeric",
 		},
 		{
 			name:    "control character - newline in user",
-			input:   "sentinel:alice\nbob:a1b2c3d4",
-			wantErr: "alphanumeric", // Newline in user fails validation
+			input:   "sentinel:alice\nbob:direct:a1b2c3d4",
+			wantErr: "alphanumeric",
 		},
 		{
 			name:    "control character - carriage return in user",
-			input:   "sentinel:alice\rbob:a1b2c3d4",
-			wantErr: "alphanumeric", // CR in user fails validation
+			input:   "sentinel:alice\rbob:direct:a1b2c3d4",
+			wantErr: "alphanumeric",
 		},
 		{
 			name:    "only separators",
@@ -579,23 +797,28 @@ func TestParse_SecurityInjection(t *testing.T) {
 		},
 		{
 			name:    "just prefix with extra colons",
-			input:   "sentinel::::",
+			input:   "sentinel:::::",
 			wantErr: "invalid SourceIdentity format",
 		},
 		{
 			name:    "unicode in user field",
-			input:   "sentinel:alicé:a1b2c3d4",
+			input:   "sentinel:alicé:direct:a1b2c3d4",
 			wantErr: "alphanumeric",
 		},
 		{
 			name:    "special chars in user field",
-			input:   "sentinel:alice@bob:a1b2c3d4",
+			input:   "sentinel:alice@bob:direct:a1b2c3d4",
 			wantErr: "alphanumeric",
 		},
 		{
-			name:    "request-id injection attempt with colons",
-			input:   "sentinel:alice:a1b2:c3d4",
-			wantErr: "invalid SourceIdentity format",
+			name:    "invalid approval marker - not direct or valid hex",
+			input:   "sentinel:alice:INVALID:a1b2c3d4",
+			wantErr: "approval-id",
+		},
+		{
+			name:    "invalid approval marker - spaces",
+			input:   "sentinel:alice:abc 1234:a1b2c3d4",
+			wantErr: "approval-id",
 		},
 	}
 
@@ -723,12 +946,13 @@ func TestSanitizeUser_SecurityEdgeCases(t *testing.T) {
 	}
 }
 
-// TestValidate_ErrorOrdering tests that Validate() checks user before request-id.
+// TestValidate_ErrorOrdering tests that Validate() checks user before approval-id before request-id.
 func TestValidate_ErrorOrdering(t *testing.T) {
-	t.Run("empty user error returned before invalid request-id", func(t *testing.T) {
+	t.Run("empty user error returned before invalid approval-id", func(t *testing.T) {
 		si := &SourceIdentity{
-			User:      "",       // Invalid - empty
-			RequestID: "badid!", // Invalid - non-hex
+			User:       "",          // Invalid - empty
+			ApprovalID: "badapprv!", // Invalid - non-hex
+			RequestID:  "badid!",    // Invalid - non-hex
 		}
 
 		err := si.Validate()
@@ -742,10 +966,11 @@ func TestValidate_ErrorOrdering(t *testing.T) {
 		}
 	})
 
-	t.Run("user too long error returned before invalid request-id", func(t *testing.T) {
+	t.Run("user too long error returned before invalid approval-id", func(t *testing.T) {
 		si := &SourceIdentity{
-			User:      strings.Repeat("a", MaxUserLength+1), // Invalid - too long
-			RequestID: "badid!",                             // Invalid - non-hex
+			User:       strings.Repeat("a", MaxUserLength+1), // Invalid - too long
+			ApprovalID: "badapprv!",                          // Invalid - non-hex
+			RequestID:  "badid!",                             // Invalid - non-hex
 		}
 
 		err := si.Validate()
@@ -759,10 +984,11 @@ func TestValidate_ErrorOrdering(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid user chars error returned before invalid request-id", func(t *testing.T) {
+	t.Run("invalid user chars error returned before invalid approval-id", func(t *testing.T) {
 		si := &SourceIdentity{
-			User:      "alice_bob", // Invalid - underscore
-			RequestID: "badid!",    // Invalid - non-hex
+			User:       "alice_bob", // Invalid - underscore
+			ApprovalID: "badapprv!", // Invalid - non-hex
+			RequestID:  "badid!",    // Invalid - non-hex
 		}
 
 		err := si.Validate()
@@ -775,45 +1001,75 @@ func TestValidate_ErrorOrdering(t *testing.T) {
 			t.Errorf("expected ErrInvalidUserChars first, got: %v", err)
 		}
 	})
+
+	t.Run("invalid approval-id error returned before invalid request-id", func(t *testing.T) {
+		si := &SourceIdentity{
+			User:       "alice",     // Valid
+			ApprovalID: "badapprv!", // Invalid - non-hex
+			RequestID:  "badid!",    // Invalid - non-hex
+		}
+
+		err := si.Validate()
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+
+		// Approval ID error should be reported before request-id error
+		if !errors.Is(err, ErrInvalidApprovalID) {
+			t.Errorf("expected ErrInvalidApprovalID first, got: %v", err)
+		}
+	})
 }
 
 // TestNew_ReturnsNilOnFirstFailure verifies New() returns nil on first validation failure.
 func TestNew_ReturnsNilOnFirstFailure(t *testing.T) {
 	testCases := []struct {
-		name      string
-		user      string
-		requestID string
-		wantErr   error
+		name       string
+		user       string
+		approvalID string
+		requestID  string
+		wantErr    error
 	}{
 		{
-			name:      "empty user",
-			user:      "",
-			requestID: "a1b2c3d4",
-			wantErr:   ErrEmptyUser,
+			name:       "empty user",
+			user:       "",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantErr:    ErrEmptyUser,
 		},
 		{
-			name:      "user too long",
-			user:      strings.Repeat("a", MaxUserLength+1),
-			requestID: "a1b2c3d4",
-			wantErr:   ErrUserTooLong,
+			name:       "user too long",
+			user:       strings.Repeat("a", MaxUserLength+1),
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantErr:    ErrUserTooLong,
 		},
 		{
-			name:      "invalid user chars",
-			user:      "alice_bob",
-			requestID: "a1b2c3d4",
-			wantErr:   ErrInvalidUserChars,
+			name:       "invalid user chars",
+			user:       "alice_bob",
+			approvalID: "",
+			requestID:  "a1b2c3d4",
+			wantErr:    ErrInvalidUserChars,
 		},
 		{
-			name:      "invalid request-id",
-			user:      "alice",
-			requestID: "badid",
-			wantErr:   ErrInvalidRequestID,
+			name:       "invalid approval-id",
+			user:       "alice",
+			approvalID: "badapproval",
+			requestID:  "a1b2c3d4",
+			wantErr:    ErrInvalidApprovalID,
+		},
+		{
+			name:       "invalid request-id",
+			user:       "alice",
+			approvalID: "",
+			requestID:  "badid",
+			wantErr:    ErrInvalidRequestID,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			si, err := New(tc.user, tc.requestID)
+			si, err := New(tc.user, tc.approvalID, tc.requestID)
 
 			// New() should return nil on error
 			if si != nil {

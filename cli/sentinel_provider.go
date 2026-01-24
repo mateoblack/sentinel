@@ -17,6 +17,7 @@ type SentinelCredentialRequest struct {
 	Region          string
 	User            string // Username for SourceIdentity (required for two-hop flow)
 	RequestID       string // Pre-generated request-id for correlation (if empty, will be generated)
+	ApprovalID      string // Optional: approved request ID for SourceIdentity (empty = direct access)
 }
 
 // SentinelCredentialResult contains retrieved credentials.
@@ -155,7 +156,8 @@ func (s *Sentinel) GetCredentialsWithSourceIdentity(ctx context.Context, req Sen
 		EndpointURL:          config.EndpointURL,
 		ExternalID:           config.ExternalID,
 		SessionDuration:      sessionDuration,
-		RequestID:            req.RequestID, // Pass pre-generated request-id if provided
+		RequestID:            req.RequestID,  // Pass pre-generated request-id if provided
+		ApprovalID:           req.ApprovalID, // Pass approval ID for SourceIdentity stamping
 	}
 
 	twoHopProvider, err := sentinel.NewTwoHopCredentialProvider(twoHopInput)

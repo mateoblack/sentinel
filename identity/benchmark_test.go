@@ -42,8 +42,9 @@ func BenchmarkValidateRequestID_Invalid(b *testing.B) {
 // Expected allocations: 1 (string concatenation result)
 func BenchmarkBuildSourceIdentity(b *testing.B) {
 	si := &SourceIdentity{
-		User:      "alice",
-		RequestID: "a1b2c3d4",
+		User:       "alice",
+		ApprovalID: "", // Direct access
+		RequestID:  "a1b2c3d4",
 	}
 
 	b.ResetTimer()
@@ -53,9 +54,31 @@ func BenchmarkBuildSourceIdentity(b *testing.B) {
 	}
 }
 
-// BenchmarkParseSourceIdentity benchmarks SourceIdentity parsing
+// BenchmarkParseSourceIdentity benchmarks SourceIdentity parsing (new 4-part format)
 // Expected allocations: 2+ (split result, SourceIdentity struct)
 func BenchmarkParseSourceIdentity(b *testing.B) {
+	sourceIdentity := "sentinel:alice:direct:a1b2c3d4"
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = Parse(sourceIdentity)
+	}
+}
+
+// BenchmarkParseSourceIdentity_WithApprovalID benchmarks parsing with approval ID
+func BenchmarkParseSourceIdentity_WithApprovalID(b *testing.B) {
+	sourceIdentity := "sentinel:alice:abcd1234:a1b2c3d4"
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = Parse(sourceIdentity)
+	}
+}
+
+// BenchmarkParseSourceIdentity_Legacy benchmarks legacy 3-part format parsing
+func BenchmarkParseSourceIdentity_Legacy(b *testing.B) {
 	sourceIdentity := "sentinel:alice:a1b2c3d4"
 
 	b.ResetTimer()
@@ -132,7 +155,7 @@ func BenchmarkSourceIdentity_Validate(b *testing.B) {
 func BenchmarkNew(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_, _ = New("alice", "a1b2c3d4")
+		_, _ = New("alice", "", "a1b2c3d4")
 	}
 }
 
@@ -220,7 +243,7 @@ func BenchmarkIdentity(b *testing.B) {
 	b.Run("New", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, _ = New("alice", "a1b2c3d4")
+			_, _ = New("alice", "", "a1b2c3d4")
 		}
 	})
 }

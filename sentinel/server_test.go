@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/byteness/aws-vault/v7/breakglass"
-	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/session"

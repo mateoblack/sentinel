@@ -47,6 +47,7 @@ type CredentialRequest struct {
 	Region          string
 	User            string
 	RequestID       string
+	ApprovalID      string // Optional: approved request ID for SourceIdentity (empty = direct access)
 }
 
 // CredentialResult contains retrieved credentials.
@@ -313,6 +314,13 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 		SessionDuration: sessionDuration,
 		User:            s.config.User,
 		RequestID:       requestID,
+	}
+
+	// If credentials are being issued via an approved request, include the approval ID
+	// in the SourceIdentity. This enables AWS SCPs to distinguish between approved
+	// and non-approved (direct) access.
+	if approvedReq != nil {
+		credReq.ApprovalID = approvedReq.ID
 	}
 
 	// Retrieve credentials with SourceIdentity stamping

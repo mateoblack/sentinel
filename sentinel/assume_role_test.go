@@ -22,7 +22,7 @@ func (m *mockCredentialsProvider) Retrieve(ctx context.Context) (aws.Credentials
 }
 
 func TestSentinelAssumeRoleValidation(t *testing.T) {
-	validSourceIdentity, err := identity.New("alice", "a1b2c3d4")
+	validSourceIdentity, err := identity.New("alice", "", "a1b2c3d4")
 	if err != nil {
 		t.Fatalf("failed to create valid SourceIdentity: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestSentinelAssumeRoleDefaults(t *testing.T) {
 }
 
 func TestValidateInput(t *testing.T) {
-	validSourceIdentity, err := identity.New("alice", "a1b2c3d4")
+	validSourceIdentity, err := identity.New("alice", "", "a1b2c3d4")
 	if err != nil {
 		t.Fatalf("failed to create valid SourceIdentity: %v", err)
 	}
@@ -256,19 +256,19 @@ func TestSentinelAssumeRoleInputBuild(t *testing.T) {
 	// as we can't easily test the full STS call without mocking AWS.
 
 	t.Run("SourceIdentity.Format() is used correctly", func(t *testing.T) {
-		si, err := identity.New("bob", "deadbeef")
+		si, err := identity.New("bob", "", "deadbeef")
 		if err != nil {
 			t.Fatalf("failed to create SourceIdentity: %v", err)
 		}
 
-		expected := "sentinel:bob:deadbeef"
+		expected := "sentinel:bob:direct:deadbeef"
 		if si.Format() != expected {
 			t.Errorf("SourceIdentity.Format() = %q, want %q", si.Format(), expected)
 		}
 	})
 
 	t.Run("all optional fields pass through when provided", func(t *testing.T) {
-		si, err := identity.New("alice", "a1b2c3d4")
+		si, err := identity.New("alice", "", "a1b2c3d4")
 		if err != nil {
 			t.Fatalf("failed to create SourceIdentity: %v", err)
 		}
@@ -366,7 +366,7 @@ func TestDefaultDuration(t *testing.T) {
 // TestValidationOrder verifies the order in which input fields are validated.
 // The order is: CredsProvider -> RoleARN -> SourceIdentity (nil) -> SourceIdentity.IsValid()
 func TestValidationOrder(t *testing.T) {
-	validSourceIdentity, err := identity.New("alice", "a1b2c3d4")
+	validSourceIdentity, err := identity.New("alice", "", "a1b2c3d4")
 	if err != nil {
 		t.Fatalf("failed to create valid SourceIdentity: %v", err)
 	}
@@ -483,7 +483,7 @@ func TestSourceIdentityIntegration(t *testing.T) {
 
 	t.Run("SourceIdentity with MaxUserLength accepted", func(t *testing.T) {
 		maxUser := "abcdefghij0123456789" // Exactly 20 chars
-		si, err := identity.New(maxUser, "a1b2c3d4")
+		si, err := identity.New(maxUser, "", "a1b2c3d4")
 		if err != nil {
 			t.Fatalf("failed to create SourceIdentity with max user: %v", err)
 		}
@@ -506,12 +506,12 @@ func TestSourceIdentityIntegration(t *testing.T) {
 	})
 
 	t.Run("SourceIdentity format preserved in output", func(t *testing.T) {
-		si, err := identity.New("testuser", "deadbeef")
+		si, err := identity.New("testuser", "", "deadbeef")
 		if err != nil {
 			t.Fatalf("failed to create SourceIdentity: %v", err)
 		}
 
-		expected := "sentinel:testuser:deadbeef"
+		expected := "sentinel:testuser:direct:deadbeef"
 		if si.Format() != expected {
 			t.Errorf("Format() = %q, want %q", si.Format(), expected)
 		}
@@ -589,7 +589,7 @@ func TestDurationEdgeCases(t *testing.T) {
 // TestRoleARNValidation tests RoleARN field edge cases.
 // NOTE: Actual ARN format validation is performed by AWS SDK.
 func TestRoleARNValidation(t *testing.T) {
-	validSourceIdentity, err := identity.New("alice", "a1b2c3d4")
+	validSourceIdentity, err := identity.New("alice", "", "a1b2c3d4")
 	if err != nil {
 		t.Fatalf("failed to create valid SourceIdentity: %v", err)
 	}
@@ -654,7 +654,7 @@ func TestRoleARNValidation(t *testing.T) {
 
 // TestExternalIDHandling tests ExternalID field handling.
 func TestExternalIDHandling(t *testing.T) {
-	validSourceIdentity, err := identity.New("alice", "a1b2c3d4")
+	validSourceIdentity, err := identity.New("alice", "", "a1b2c3d4")
 	if err != nil {
 		t.Fatalf("failed to create valid SourceIdentity: %v", err)
 	}

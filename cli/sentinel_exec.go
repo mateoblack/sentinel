@@ -420,6 +420,13 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		RequestID:       requestID,       // For CloudTrail correlation
 	}
 
+	// If credentials are being issued via an approved request, include the approval ID
+	// in the SourceIdentity. This enables AWS SCPs to distinguish between approved
+	// and non-approved (direct) access.
+	if approvedReq != nil {
+		credReq.ApprovalID = approvedReq.ID
+	}
+
 	// Retrieve credentials with SourceIdentity stamping (if profile has role_arn)
 	creds, err := s.GetCredentialsWithSourceIdentity(ctx, credReq)
 	if err != nil {
@@ -499,6 +506,7 @@ func (a *sentinelCredentialProviderAdapter) GetCredentialsWithSourceIdentity(ctx
 		Region:          req.Region,
 		User:            req.User,
 		RequestID:       req.RequestID,
+		ApprovalID:      req.ApprovalID,
 	}
 
 	// Call the CLI's credential retrieval

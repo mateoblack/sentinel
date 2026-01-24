@@ -130,7 +130,7 @@ func TestIntegration_SentinelAssumeRole(t *testing.T) {
 	// Create SourceIdentity with test user and generated request-id
 	testUser := "integrationtest"
 	requestID := identity.NewRequestID()
-	sourceIdentity, err := identity.New(testUser, requestID)
+	sourceIdentity, err := identity.New(testUser, "", requestID) // Empty approval ID for direct access
 	if err != nil {
 		t.Fatalf("failed to create SourceIdentity: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestIntegration_CredentialsAreValid(t *testing.T) {
 	// Create SourceIdentity with test user and generated request-id
 	testUser := "credentialstest"
 	requestID := identity.NewRequestID()
-	sourceIdentity, err := identity.New(testUser, requestID)
+	sourceIdentity, err := identity.New(testUser, "", requestID) // Empty approval ID for direct access
 	if err != nil {
 		t.Fatalf("failed to create SourceIdentity: %v", err)
 	}

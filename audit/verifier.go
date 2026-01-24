@@ -188,10 +188,11 @@ func parseCloudTrailEvent(event types.Event) (*SessionInfo, error) {
 	}
 
 	// Parse SourceIdentity to determine if it's a Sentinel session
-	user, requestID, isSentinel := ParseSourceIdentity(info.SourceIdentity)
+	user, approvalID, requestID, isSentinel := ParseSourceIdentity(info.SourceIdentity)
 	info.IsSentinel = isSentinel
 	if isSentinel {
 		info.User = user
+		info.ApprovalID = approvalID
 		info.RequestID = requestID
 	}
 

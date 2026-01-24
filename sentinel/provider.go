@@ -61,6 +61,13 @@ type TwoHopCredentialProviderInput struct {
 	// If empty, a new request-id will be generated during Retrieve().
 	// Optional.
 	RequestID string
+
+	// ApprovalID is an optional approved request ID for SourceIdentity stamping.
+	// If empty, the SourceIdentity will contain "direct" as the approval marker.
+	// If set, the SourceIdentity will contain the approval ID, enabling SCPs to
+	// distinguish between approved and non-approved access.
+	// Optional.
+	ApprovalID string
 }
 
 // TwoHopCredentialProvider implements aws.CredentialsProvider by chaining
@@ -123,8 +130,8 @@ func (p *TwoHopCredentialProvider) Retrieve(ctx context.Context) (aws.Credential
 		return aws.Credentials{}, err
 	}
 
-	// Create SourceIdentity with sanitized user and request-id
-	sourceIdentity, err := identity.New(sanitizedUser, requestID)
+	// Create SourceIdentity with sanitized user, approval ID, and request-id
+	sourceIdentity, err := identity.New(sanitizedUser, p.Input.ApprovalID, requestID)
 	if err != nil {
 		return aws.Credentials{}, err
 	}

@@ -372,16 +372,20 @@ func TestSecurityRegression_PolicyUsesAWSUsername(t *testing.T) {
 		Version: "1",
 		Rules: []policy.Rule{
 			{
-				Name:     "allow-alice",
-				Effect:   policy.EffectAllow,
-				Users:    []string{"alice"},
-				Profiles: []string{"production"},
+				Name:   "allow-alice",
+				Effect: policy.EffectAllow,
+				Conditions: policy.Condition{
+					Users:    []string{"alice"},
+					Profiles: []string{"production"},
+				},
 			},
 			{
-				Name:     "deny-all",
-				Effect:   policy.EffectDeny,
-				Users:    []string{"*"},
-				Profiles: []string{"*"},
+				Name:   "deny-all",
+				Effect: policy.EffectDeny,
+				Conditions: policy.Condition{
+					Users:    []string{"*"},
+					Profiles: []string{"*"},
+				},
 			},
 		},
 	}
@@ -822,16 +826,20 @@ func TestSecurityRegression_AttackScenario_OSUserBypass(t *testing.T) {
 		Version: "1",
 		Rules: []policy.Rule{
 			{
-				Name:     "allow-admin-production",
-				Effect:   policy.EffectAllow,
-				Users:    []string{"admin"},
-				Profiles: []string{"production"},
+				Name:   "allow-admin-production",
+				Effect: policy.EffectAllow,
+				Conditions: policy.Condition{
+					Users:    []string{"admin"},
+					Profiles: []string{"production"},
+				},
 			},
 			{
-				Name:     "deny-all",
-				Effect:   policy.EffectDeny,
-				Users:    []string{"*"},
-				Profiles: []string{"*"},
+				Name:   "deny-all",
+				Effect: policy.EffectDeny,
+				Conditions: policy.Condition{
+					Users:    []string{"*"},
+					Profiles: []string{"*"},
+				},
 			},
 		},
 	}

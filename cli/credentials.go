@@ -332,6 +332,13 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		RequestID:       requestID,       // For CloudTrail correlation
 	}
 
+	// If credentials are being issued via an approved request, include the approval ID
+	// in the SourceIdentity. This enables AWS SCPs to distinguish between approved
+	// and non-approved (direct) access.
+	if approvedReq != nil {
+		credReq.ApprovalID = approvedReq.ID
+	}
+
 	// Retrieve credentials with SourceIdentity stamping (if profile has role_arn)
 	creds, err := s.GetCredentialsWithSourceIdentity(ctx, credReq)
 	if err != nil {

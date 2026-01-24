@@ -10,34 +10,66 @@ func TestParseSourceIdentity(t *testing.T) {
 		name           string
 		sourceIdentity string
 		wantUser       string
+		wantApprovalID string
 		wantRequestID  string
 		wantIsSentinel bool
 	}{
+		// New 4-part format tests
 		{
-			name:           "valid sentinel format",
-			sourceIdentity: "sentinel:alice:a1b2c3d4",
+			name:           "valid new format - direct access",
+			sourceIdentity: "sentinel:alice:direct:a1b2c3d4",
 			wantUser:       "alice",
+			wantApprovalID: "",
 			wantRequestID:  "a1b2c3d4",
 			wantIsSentinel: true,
 		},
 		{
-			name:           "valid sentinel with longer request-id",
+			name:           "valid new format - with approval ID",
+			sourceIdentity: "sentinel:alice:abcd1234:a1b2c3d4",
+			wantUser:       "alice",
+			wantApprovalID: "abcd1234",
+			wantRequestID:  "a1b2c3d4",
+			wantIsSentinel: true,
+		},
+		{
+			name:           "valid new format - sanitized username with approval",
+			sourceIdentity: "sentinel:johndoeexample:deadbeef:abc12345",
+			wantUser:       "johndoeexample",
+			wantApprovalID: "deadbeef",
+			wantRequestID:  "abc12345",
+			wantIsSentinel: true,
+		},
+		// Legacy 3-part format tests (backward compatibility)
+		{
+			name:           "valid legacy format",
+			sourceIdentity: "sentinel:alice:a1b2c3d4",
+			wantUser:       "alice",
+			wantApprovalID: "",
+			wantRequestID:  "a1b2c3d4",
+			wantIsSentinel: true,
+		},
+		{
+			name:           "valid legacy format with longer request-id",
 			sourceIdentity: "sentinel:bob:deadbeef12345678",
 			wantUser:       "bob",
+			wantApprovalID: "",
 			wantRequestID:  "deadbeef12345678",
 			wantIsSentinel: true,
 		},
 		{
-			name:           "valid sentinel with sanitized username",
+			name:           "valid legacy format with sanitized username",
 			sourceIdentity: "sentinel:johndoeexample:abc123",
 			wantUser:       "johndoeexample",
+			wantApprovalID: "",
 			wantRequestID:  "abc123",
 			wantIsSentinel: true,
 		},
+		// Invalid format tests
 		{
 			name:           "empty string",
 			sourceIdentity: "",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
@@ -45,6 +77,7 @@ func TestParseSourceIdentity(t *testing.T) {
 			name:           "non-sentinel format",
 			sourceIdentity: "other:format:here",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
@@ -52,6 +85,7 @@ func TestParseSourceIdentity(t *testing.T) {
 			name:           "sentinel prefix only",
 			sourceIdentity: "sentinel:",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
@@ -59,20 +93,39 @@ func TestParseSourceIdentity(t *testing.T) {
 			name:           "sentinel with user only",
 			sourceIdentity: "sentinel:alice",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
 		{
-			name:           "sentinel with empty user",
+			name:           "sentinel with empty user in legacy format",
 			sourceIdentity: "sentinel::a1b2c3d4",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
 		{
-			name:           "sentinel with empty request-id",
+			name:           "sentinel with empty user in new format",
+			sourceIdentity: "sentinel::direct:a1b2c3d4",
+			wantUser:       "",
+			wantApprovalID: "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
+		},
+		{
+			name:           "sentinel with empty request-id in legacy format",
 			sourceIdentity: "sentinel:alice:",
 			wantUser:       "",
+			wantApprovalID: "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
+		},
+		{
+			name:           "sentinel with empty request-id in new format",
+			sourceIdentity: "sentinel:alice:direct:",
+			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
@@ -80,6 +133,7 @@ func TestParseSourceIdentity(t *testing.T) {
 			name:           "random string",
 			sourceIdentity: "randomstring",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
@@ -87,138 +141,149 @@ func TestParseSourceIdentity(t *testing.T) {
 			name:           "similar prefix but not sentinel",
 			sourceIdentity: "sentinelx:alice:abc",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
 		{
-			name:           "sentinel with multiple colons in request-id",
-			sourceIdentity: "sentinel:alice:abc:def:ghi",
-			wantUser:       "alice",
-			wantRequestID:  "abc:def:ghi",
-			wantIsSentinel: true,
+			name:           "too many parts (5 parts)",
+			sourceIdentity: "sentinel:alice:direct:a1b2c3d4:extra",
+			wantUser:       "",
+			wantApprovalID: "",
+			wantRequestID:  "",
+			wantIsSentinel: false,
 		},
 		// Security edge cases: prefix case sensitivity
 		{
 			name:           "wrong case - uppercase SENTINEL",
-			sourceIdentity: "SENTINEL:alice:abc123",
+			sourceIdentity: "SENTINEL:alice:direct:abc123",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
 		{
 			name:           "wrong case - mixed case Sentinel",
-			sourceIdentity: "Sentinel:alice:abc123",
+			sourceIdentity: "Sentinel:alice:direct:abc123",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
 		{
 			name:           "wrong case - alternating sEnTiNeL",
-			sourceIdentity: "sEnTiNeL:alice:abc123",
+			sourceIdentity: "sEnTiNeL:alice:direct:abc123",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
 		// Security edge cases: prefix with whitespace
 		{
 			name:           "prefix with leading whitespace",
-			sourceIdentity: " sentinel:alice:abc123",
+			sourceIdentity: " sentinel:alice:direct:abc123",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
 		{
 			name:           "prefix with trailing whitespace after colon",
-			sourceIdentity: "sentinel: alice:abc123",
+			sourceIdentity: "sentinel: alice:direct:abc123",
 			wantUser:       " alice",
+			wantApprovalID: "", // "direct" marker is converted to empty string
 			wantRequestID:  "abc123",
 			wantIsSentinel: true,
 		},
 		// Security edge cases: similar-looking prefix attacks
 		{
 			name:           "similar prefix with zero-width space",
-			sourceIdentity: "sentinel\u200B:alice:abc123",
+			sourceIdentity: "sentinel\u200B:alice:direct:abc123",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
 		{
 			name:           "similar prefix with zero-width joiner",
-			sourceIdentity: "sentinel\u200D:alice:abc123",
+			sourceIdentity: "sentinel\u200D:alice:direct:abc123",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
 		{
 			name:           "similar prefix with soft hyphen",
-			sourceIdentity: "sentinel\u00AD:alice:abc123",
+			sourceIdentity: "sentinel\u00AD:alice:direct:abc123",
 			wantUser:       "",
+			wantApprovalID: "",
 			wantRequestID:  "",
 			wantIsSentinel: false,
 		},
-		// Request-ID extraction edge cases
+		// User field security edge cases - new format
 		{
-			name:           "very long request-id (100+ chars)",
-			sourceIdentity: "sentinel:alice:abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz01234567890123456789",
-			wantUser:       "alice",
-			wantRequestID:  "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz01234567890123456789",
-			wantIsSentinel: true,
-		},
-		{
-			name:           "request-id with special characters",
-			sourceIdentity: "sentinel:alice:abc!@#$%^&*()_+-={}[]|\\;'\"<>,.?/",
-			wantUser:       "alice",
-			wantRequestID:  "abc!@#$%^&*()_+-={}[]|\\;'\"<>,.?/",
-			wantIsSentinel: true,
-		},
-		{
-			name:           "request-id with only colons",
-			sourceIdentity: "sentinel:alice::::",
-			wantUser:       "alice",
-			wantRequestID:  ":::",
-			wantIsSentinel: true,
-		},
-		// User field security edge cases
-		{
-			name:           "user with only whitespace",
-			sourceIdentity: "sentinel:   :abc123",
+			name:           "user with only whitespace - new format",
+			sourceIdentity: "sentinel:   :direct:abc123",
 			wantUser:       "   ",
+			wantApprovalID: "",
 			wantRequestID:  "abc123",
 			wantIsSentinel: true,
 		},
 		{
-			name:           "user with null byte",
-			sourceIdentity: "sentinel:alice\x00bob:abc123",
+			name:           "user with null byte - new format",
+			sourceIdentity: "sentinel:alice\x00bob:direct:abc123",
 			wantUser:       "alice\x00bob",
+			wantApprovalID: "",
 			wantRequestID:  "abc123",
 			wantIsSentinel: true,
 		},
 		{
-			name:           "user with newline",
-			sourceIdentity: "sentinel:alice\nbob:abc123",
+			name:           "user with newline - new format",
+			sourceIdentity: "sentinel:alice\nbob:direct:abc123",
 			wantUser:       "alice\nbob",
+			wantApprovalID: "",
 			wantRequestID:  "abc123",
 			wantIsSentinel: true,
 		},
-		// Format boundary tests
+		// Approval ID extraction tests
 		{
-			name:           "exactly 64 char SourceIdentity (AWS limit)",
-			sourceIdentity: "sentinel:user123:abcdefghijklmnopqrstuvwxyz0123456789abcdef",
-			wantUser:       "user123",
-			wantRequestID:  "abcdefghijklmnopqrstuvwxyz0123456789abcdef",
+			name:           "approval ID with non-direct marker",
+			sourceIdentity: "sentinel:alice:12345678:a1b2c3d4",
+			wantUser:       "alice",
+			wantApprovalID: "12345678",
+			wantRequestID:  "a1b2c3d4",
 			wantIsSentinel: true,
 		},
 		{
-			name:           "beyond 64 char AWS limit (should still parse)",
-			sourceIdentity: "sentinel:verylongusername:abcdefghijklmnopqrstuvwxyz0123456789abcdefghij",
-			wantUser:       "verylongusername",
-			wantRequestID:  "abcdefghijklmnopqrstuvwxyz0123456789abcdefghij",
+			name:           "approval ID case sensitivity - direct must be lowercase",
+			sourceIdentity: "sentinel:alice:DIRECT:a1b2c3d4",
+			wantUser:       "alice",
+			wantApprovalID: "DIRECT",
+			wantRequestID:  "a1b2c3d4",
+			wantIsSentinel: true,
+		},
+		// Format boundary tests - new format
+		{
+			name:           "max length new format (47 chars with approval)",
+			sourceIdentity: "sentinel:abcdefghij0123456789:deadbeef:12345678",
+			wantUser:       "abcdefghij0123456789",
+			wantApprovalID: "deadbeef",
+			wantRequestID:  "12345678",
 			wantIsSentinel: true,
 		},
 		{
-			name:           "minimal valid format",
+			name:           "minimal valid new format",
+			sourceIdentity: "sentinel:a:direct:b",
+			wantUser:       "a",
+			wantApprovalID: "",
+			wantRequestID:  "b",
+			wantIsSentinel: true,
+		},
+		{
+			name:           "minimal valid legacy format",
 			sourceIdentity: "sentinel:a:b",
 			wantUser:       "a",
+			wantApprovalID: "",
 			wantRequestID:  "b",
 			wantIsSentinel: true,
 		},
@@ -226,10 +291,13 @@ func TestParseSourceIdentity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotUser, gotRequestID, gotIsSentinel := ParseSourceIdentity(tt.sourceIdentity)
+			gotUser, gotApprovalID, gotRequestID, gotIsSentinel := ParseSourceIdentity(tt.sourceIdentity)
 
 			if gotUser != tt.wantUser {
 				t.Errorf("ParseSourceIdentity(%q) user = %q, want %q", tt.sourceIdentity, gotUser, tt.wantUser)
+			}
+			if gotApprovalID != tt.wantApprovalID {
+				t.Errorf("ParseSourceIdentity(%q) approvalID = %q, want %q", tt.sourceIdentity, gotApprovalID, tt.wantApprovalID)
 			}
 			if gotRequestID != tt.wantRequestID {
 				t.Errorf("ParseSourceIdentity(%q) requestID = %q, want %q", tt.sourceIdentity, gotRequestID, tt.wantRequestID)
@@ -384,10 +452,10 @@ func TestIssueType_String(t *testing.T) {
 }
 
 func TestSessionInfo_Fields(t *testing.T) {
-	// Test that SessionInfo can be constructed and fields accessed
+	// Test that SessionInfo can be constructed and fields accessed - new format
 	now := time.Now()
 	info := SessionInfo{
-		SourceIdentity: "sentinel:alice:abc123",
+		SourceIdentity: "sentinel:alice:abcd1234:abc12345",
 		EventTime:      now,
 		EventID:        "event-123",
 		EventName:      "AssumeRole",
@@ -396,17 +464,34 @@ func TestSessionInfo_Fields(t *testing.T) {
 		Username:       "alice",
 		IsSentinel:     true,
 		User:           "alice",
-		RequestID:      "abc123",
+		ApprovalID:     "abcd1234",
+		RequestID:      "abc12345",
 	}
 
-	if info.SourceIdentity != "sentinel:alice:abc123" {
-		t.Errorf("SessionInfo.SourceIdentity = %q, want %q", info.SourceIdentity, "sentinel:alice:abc123")
+	if info.SourceIdentity != "sentinel:alice:abcd1234:abc12345" {
+		t.Errorf("SessionInfo.SourceIdentity = %q, want %q", info.SourceIdentity, "sentinel:alice:abcd1234:abc12345")
 	}
 	if info.EventName != "AssumeRole" {
 		t.Errorf("SessionInfo.EventName = %q, want %q", info.EventName, "AssumeRole")
 	}
 	if !info.IsSentinel {
 		t.Error("SessionInfo.IsSentinel = false, want true")
+	}
+	if info.ApprovalID != "abcd1234" {
+		t.Errorf("SessionInfo.ApprovalID = %q, want %q", info.ApprovalID, "abcd1234")
+	}
+
+	// Test with direct access (no approval)
+	infoNoApproval := SessionInfo{
+		SourceIdentity: "sentinel:alice:direct:abc12345",
+		IsSentinel:     true,
+		User:           "alice",
+		ApprovalID:     "",
+		RequestID:      "abc12345",
+	}
+
+	if infoNoApproval.ApprovalID != "" {
+		t.Errorf("SessionInfo.ApprovalID for direct access = %q, want empty", infoNoApproval.ApprovalID)
 	}
 }
 

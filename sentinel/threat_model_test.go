@@ -201,7 +201,7 @@ func TestThreat_Repudiation_SourceIdentityCannotBeNilAfterSuccessfulRetrieve(t *
 	}
 
 	requestID := identity.NewRequestID()
-	sourceIdentity, err := identity.New(sanitizedUser, requestID)
+	sourceIdentity, err := identity.New(sanitizedUser, "", requestID) // Empty approval ID for direct access
 	if err != nil {
 		t.Fatalf("identity.New failed: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestThreat_Repudiation_SourceIdentityFormatParseableAfterRoundTrip(t *testi
 
 	for _, tc := range testCases {
 		t.Run(tc.user, func(t *testing.T) {
-			original, err := identity.New(tc.user, tc.requestID)
+			original, err := identity.New(tc.user, "", tc.requestID) // Empty approval ID for direct access
 			if err != nil {
 				t.Fatalf("failed to create SourceIdentity: %v", err)
 			}

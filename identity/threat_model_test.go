@@ -532,7 +532,7 @@ func TestThreat_Tampering_SourceIdentityImmutability(t *testing.T) {
 	// 1. Fields don't change on their own
 	// 2. Format() returns consistent output
 
-	si, err := New("alice", "a1b2c3d4")
+	si, err := New("alice", "", "a1b2c3d4")
 	if err != nil {
 		t.Fatalf("failed to create SourceIdentity: %v", err)
 	}
@@ -563,20 +563,21 @@ func TestThreat_Tampering_FormatReturnsConsistentOutput(t *testing.T) {
 	// Mitigation: Format() is a pure function of User and RequestID fields.
 
 	testCases := []struct {
-		user      string
-		requestID string
-		expected  string
+		user       string
+		approvalID string
+		requestID  string
+		expected   string
 	}{
-		{"alice", "a1b2c3d4", "sentinel:alice:a1b2c3d4"},
-		{"bob", "12345678", "sentinel:bob:12345678"},
-		{"user123", "deadbeef", "sentinel:user123:deadbeef"},
-		{"a", "00000000", "sentinel:a:00000000"},
-		{"abcdefghij0123456789", "ffffffff", "sentinel:abcdefghij0123456789:ffffffff"},
+		{"alice", "", "a1b2c3d4", "sentinel:alice:direct:a1b2c3d4"},
+		{"bob", "abcd1234", "12345678", "sentinel:bob:abcd1234:12345678"},
+		{"user123", "", "deadbeef", "sentinel:user123:direct:deadbeef"},
+		{"a", "", "00000000", "sentinel:a:direct:00000000"},
+		{"abcdefghij0123456789", "", "ffffffff", "sentinel:abcdefghij0123456789:direct:ffffffff"},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.user, func(t *testing.T) {
-			si := &SourceIdentity{User: tc.user, RequestID: tc.requestID}
+			si := &SourceIdentity{User: tc.user, ApprovalID: tc.approvalID, RequestID: tc.requestID}
 
 			// Call Format() many times
 			for i := 0; i < 100; i++ {
@@ -597,7 +598,7 @@ func TestThreat_Tampering_NoMutationMethodsExposed(t *testing.T) {
 	// Mitigation: SourceIdentity struct has only getter-like methods (Format, String, Validate, IsValid).
 
 	// This is a documentation test - we verify the API surface is as expected
-	si, err := New("alice", "a1b2c3d4")
+	si, err := New("alice", "", "a1b2c3d4")
 	if err != nil {
 		t.Fatalf("failed to create SourceIdentity: %v", err)
 	}
@@ -632,7 +633,7 @@ func TestThreat_Tampering_ParsedIdentityMatchesOriginal(t *testing.T) {
 	// multiple format-parse cycles.
 	// Mitigation: Format and Parse are inverses of each other.
 
-	original, err := New("alice", "a1b2c3d4")
+	original, err := New("alice", "", "a1b2c3d4")
 	if err != nil {
 		t.Fatalf("failed to create SourceIdentity: %v", err)
 	}

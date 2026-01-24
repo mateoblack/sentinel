@@ -11,7 +11,7 @@ import (
 // SessionInfo contains parsed information from a CloudTrail event.
 // It represents the relevant details about an AWS session for verification purposes.
 type SessionInfo struct {
-	// SourceIdentity is the sts:SourceIdentity value (e.g., "sentinel:alice:a1b2c3d4")
+	// SourceIdentity is the sts:SourceIdentity value (e.g., "sentinel:alice:direct:a1b2c3d4")
 	SourceIdentity string `json:"source_identity,omitempty"`
 	// EventTime is when the event occurred
 	EventTime time.Time `json:"event_time"`
@@ -29,6 +29,9 @@ type SessionInfo struct {
 	IsSentinel bool `json:"is_sentinel"`
 	// User is the parsed user from SourceIdentity (if Sentinel)
 	User string `json:"user,omitempty"`
+	// ApprovalID is the parsed approval-id from SourceIdentity (if Sentinel and approved)
+	// Empty if direct access or legacy format
+	ApprovalID string `json:"approval_id,omitempty"`
 	// RequestID is the parsed request-id from SourceIdentity (if Sentinel)
 	RequestID string `json:"request_id,omitempty"`
 }
@@ -136,38 +139,66 @@ type VerifyInput struct {
 }
 
 // ParseSourceIdentity parses a SourceIdentity string into its components.
-// Returns the user, requestID, and whether it's a valid Sentinel format.
+// Returns the user, approvalID, requestID, and whether it's a valid Sentinel format.
 //
-// Sentinel SourceIdentity format: "sentinel:<user>:<request-id>"
-// Example: "sentinel:alice:a1b2c3d4" -> ("alice", "a1b2c3d4", true)
+// Sentinel SourceIdentity formats:
+//   - New format: "sentinel:<user>:<approval-marker>:<request-id>"
+//     Example: "sentinel:alice:abcd1234:a1b2c3d4" -> ("alice", "abcd1234", "a1b2c3d4", true)
+//     Example: "sentinel:alice:direct:a1b2c3d4" -> ("alice", "", "a1b2c3d4", true)
+//   - Legacy format: "sentinel:<user>:<request-id>"
+//     Example: "sentinel:alice:a1b2c3d4" -> ("alice", "", "a1b2c3d4", true)
 //
 // Non-Sentinel format returns empty strings and false.
-func ParseSourceIdentity(sourceIdentity string) (user string, requestID string, isSentinel bool) {
+func ParseSourceIdentity(sourceIdentity string) (user string, approvalID string, requestID string, isSentinel bool) {
 	if sourceIdentity == "" {
-		return "", "", false
+		return "", "", "", false
 	}
 
 	// Must start with "sentinel:"
 	if !strings.HasPrefix(sourceIdentity, "sentinel:") {
-		return "", "", false
+		return "", "", "", false
 	}
 
 	// Remove the "sentinel:" prefix
 	remainder := strings.TrimPrefix(sourceIdentity, "sentinel:")
 
-	// Split by ":" to get user and request-id
-	parts := strings.SplitN(remainder, ":", 2)
-	if len(parts) != 2 {
-		return "", "", false
+	// Split by ":" to get parts
+	parts := strings.Split(remainder, ":")
+
+	switch len(parts) {
+	case 2:
+		// Legacy format: user:request-id
+		user = parts[0]
+		requestID = parts[1]
+
+		// Both user and requestID must be non-empty
+		if user == "" || requestID == "" {
+			return "", "", "", false
+		}
+
+		return user, "", requestID, true
+
+	case 3:
+		// New format: user:approval-marker:request-id
+		user = parts[0]
+		approvalMarker := parts[1]
+		requestID = parts[2]
+
+		// User and requestID must be non-empty
+		if user == "" || requestID == "" {
+			return "", "", "", false
+		}
+
+		// Convert "direct" marker to empty string
+		if approvalMarker == "direct" {
+			approvalID = ""
+		} else {
+			approvalID = approvalMarker
+		}
+
+		return user, approvalID, requestID, true
+
+	default:
+		return "", "", "", false
 	}
-
-	user = parts[0]
-	requestID = parts[1]
-
-	// Both user and requestID must be non-empty
-	if user == "" || requestID == "" {
-		return "", "", false
-	}
-
-	return user, requestID, true
 }
