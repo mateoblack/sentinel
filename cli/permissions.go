@@ -339,7 +339,7 @@ func ConfigurePermissionsCheckCommand(app *kingpin.Application, s *Sentinel) {
 	checkCmd.Flag("auto-detect", "Auto-detect configured features and check only those").
 		BoolVar(&input.Detect)
 
-	checkCmd.Flag("features", "Check specific feature(s), comma-separated (e.g., policy_load,credential_issue)").
+	checkCmd.Flag("feature", "Check specific feature(s), comma-separated (e.g., policy_load,credential_issue)").
 		StringVar(&input.Features)
 
 	checkCmd.Flag("output", "Output format: human (default), json").

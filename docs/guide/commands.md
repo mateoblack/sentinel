@@ -1050,7 +1050,7 @@ sentinel permissions check [flags]
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--auto-detect` | Auto-detect configured features and check only those | false |
-| `--features` | Check specific feature(s), comma-separated | - |
+| `--feature` | Check specific feature(s), comma-separated | - |
 | `--output` | Output format: human, json | human |
 | `--aws-region` | AWS region for API calls | - |
 | `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | - |
@@ -1065,7 +1065,7 @@ sentinel permissions check
 sentinel permissions check --auto-detect
 
 # Check specific features
-sentinel permissions check --features policy_load,credential_issue
+sentinel permissions check --feature policy_load,credential_issue
 
 # JSON output
 sentinel permissions check --output json

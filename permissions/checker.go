@@ -103,6 +103,10 @@ func (c *Checker) Check(ctx context.Context, features []Feature) (*CheckSummary,
 			return nil, sentinelerrors.WrapSTSError(err, "GetCallerIdentity")
 		}
 		c.callerArn = aws.ToString(identity.Arn)
+
+		// Convert assumed-role ARNs to IAM role ARNs for SimulatePrincipalPolicy
+		// SimulatePrincipalPolicy requires IAM principal ARNs, not STS session ARNs
+		c.callerArn = convertToIAMRoleArn(c.callerArn)
 	}
 
 	summary := &CheckSummary{
@@ -205,3 +209,29 @@ func isAccessDeniedError(err error) bool {
 
 // ErrCallerIdentityFailed is returned when GetCallerIdentity fails.
 var ErrCallerIdentityFailed = errors.New("failed to get caller identity")
+
+// convertToIAMRoleArn converts assumed-role session ARNs to IAM role ARNs.
+// SimulatePrincipalPolicy requires IAM principal ARNs, not STS session ARNs.
+// Example: arn:aws:sts::123456789012:assumed-role/MyRole/session -> arn:aws:iam::123456789012:role/MyRole
+func convertToIAMRoleArn(arn string) string {
+	// Match: arn:aws:sts::<account>:assumed-role/<role-name>/<session-name>
+	if !strings.Contains(arn, ":assumed-role/") {
+		return arn // Not an assumed role, return as-is
+	}
+
+	parts := strings.Split(arn, ":")
+	if len(parts) < 6 {
+		return arn
+	}
+
+	// Extract role name from "assumed-role/RoleName/SessionName"
+	resource := parts[5]
+	resourceParts := strings.Split(resource, "/")
+	if len(resourceParts) < 2 {
+		return arn
+	}
+	roleName := resourceParts[1]
+
+	// Reconstruct as IAM role ARN
+	return "arn:aws:iam::" + parts[4] + ":role/" + roleName
+}

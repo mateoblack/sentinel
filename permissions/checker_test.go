@@ -627,3 +627,106 @@ func TestChecker_Check_FeatureWithNoPermissions(t *testing.T) {
 		t.Errorf("expected 0 results for feature with no permissions, got %d", len(summary.Results))
 	}
 }
+
+func TestConvertToIAMRoleArn(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "SSO assumed role",
+			input:    "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_DeveloperAccess_abc123/user-sso",
+			expected: "arn:aws:iam::123456789012:role/AWSReservedSSO_DeveloperAccess_abc123",
+		},
+		{
+			name:     "regular assumed role",
+			input:    "arn:aws:sts::123456789012:assumed-role/MyRole/session-name",
+			expected: "arn:aws:iam::123456789012:role/MyRole",
+		},
+		{
+			name:     "assumed role with complex session name",
+			input:    "arn:aws:sts::644760544461:assumed-role/AWSReservedSSO_DeveloperAccess_8e95752ad6b02f8b/mateo-sso",
+			expected: "arn:aws:iam::644760544461:role/AWSReservedSSO_DeveloperAccess_8e95752ad6b02f8b",
+		},
+		{
+			name:     "IAM user unchanged",
+			input:    "arn:aws:iam::123456789012:user/myuser",
+			expected: "arn:aws:iam::123456789012:user/myuser",
+		},
+		{
+			name:     "IAM role unchanged",
+			input:    "arn:aws:iam::123456789012:role/MyRole",
+			expected: "arn:aws:iam::123456789012:role/MyRole",
+		},
+		{
+			name:     "federated user unchanged",
+			input:    "arn:aws:sts::123456789012:federated-user/myuser",
+			expected: "arn:aws:sts::123456789012:federated-user/myuser",
+		},
+		{
+			name:     "root user unchanged",
+			input:    "arn:aws:iam::123456789012:root",
+			expected: "arn:aws:iam::123456789012:root",
+		},
+		{
+			name:     "empty string unchanged",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "malformed ARN with assumed-role but too few parts",
+			input:    "arn:aws:sts::assumed-role",
+			expected: "arn:aws:sts::assumed-role",
+		},
+		{
+			name:     "assumed role with no session name (malformed)",
+			input:    "arn:aws:sts::123456789012:assumed-role/",
+			expected: "arn:aws:sts::123456789012:assumed-role/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertToIAMRoleArn(tt.input)
+			if result != tt.expected {
+				t.Errorf("convertToIAMRoleArn(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestChecker_Check_ConvertsAssumedRoleArn(t *testing.T) {
+	var capturedPolicySourceArn string
+	stsClient := &mockSTSCheckerClient{
+		GetCallerIdentityFunc: func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+			// Return an assumed-role ARN (like SSO credentials produce)
+			return &sts.GetCallerIdentityOutput{
+				Arn: aws.String("arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_DeveloperAccess_abc/user-sso"),
+			}, nil
+		},
+	}
+	iamClient := &mockIAMCheckerClient{
+		SimulatePrincipalPolicyFunc: func(ctx context.Context, params *iam.SimulatePrincipalPolicyInput, optFns ...func(*iam.Options)) (*iam.SimulatePrincipalPolicyOutput, error) {
+			capturedPolicySourceArn = aws.ToString(params.PolicySourceArn)
+			return &iam.SimulatePrincipalPolicyOutput{
+				EvaluationResults: []iamtypes.EvaluationResult{
+					{EvalDecision: iamtypes.PolicyEvaluationDecisionTypeAllowed},
+				},
+			}, nil
+		},
+	}
+
+	checker := newCheckerWithClients(stsClient, iamClient)
+	_, err := checker.Check(context.Background(), []Feature{FeatureCredentialIssue})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The assumed-role ARN should be converted to IAM role ARN
+	expected := "arn:aws:iam::123456789012:role/AWSReservedSSO_DeveloperAccess_abc"
+	if capturedPolicySourceArn != expected {
+		t.Errorf("expected PolicySourceArn %q, got %q", expected, capturedPolicySourceArn)
+	}
+}

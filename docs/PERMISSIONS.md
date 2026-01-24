@@ -254,7 +254,7 @@ Detects which features you use and validates only those permissions.
 ### Check Specific Features
 
 ```bash
-sentinel permissions check --features policy_load,credential_issue
+sentinel permissions check --feature policy_load,credential_issue
 ```
 
 ### JSON Output
