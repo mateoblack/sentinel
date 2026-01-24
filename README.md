@@ -159,6 +159,17 @@ Sentinel extends [aws-vault](https://github.com/99designs/aws-vault), adding pol
 - Session caching with expiration
 - Cross-platform support (macOS, Linux, Windows)
 
+Supported credential stores:
+* [macOS Keychain](https://support.apple.com/en-au/guide/keychain-access/welcome/mac)
+* [Windows Credential Manager](https://support.microsoft.com/en-au/help/4026814/windows-accessing-credential-manager)
+* Secret Service ([Gnome Keyring](https://wiki.gnome.org/Projects/GnomeKeyring), [KWallet](https://kde.org/applications/system/org.kde.kwalletmanager5))
+* [KWallet](https://kde.org/applications/system/org.kde.kwalletmanager5)
+* [Pass](https://www.passwordstore.org/)
+* [Passage](https://github.com/FiloSottile/passage)
+* Encrypted file
+* [1Password Connect](https://developer.1password.com/docs/connect/)
+* [1Password Service Accounts](https://developer.1password.com/docs/service-accounts)
+
 ## Requirements
 
 - Go 1.21+ (for building from source)
