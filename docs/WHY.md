@@ -66,7 +66,7 @@ Policy denies? --> No credentials issued, no access
 Policy requires approval? --> Wait for second human
         |
         v
-Every action in CloudTrail shows: sentinel:alice:a1b2c3d4
+Every action in CloudTrail shows: sentinel:alice:direct:a1b2c3d4
 ```
 
 **Three-layer defense:**
@@ -116,7 +116,7 @@ rules:
   "rule": "break-glass",
   "reason": "database locked, customers can't login",
   "request_id": "a1b2c3d4",
-  "source_identity": "sentinel:alice:a1b2c3d4",
+  "source_identity": "sentinel:alice:direct:a1b2c3d4",
   "duration": "1h"
 }
 ```
@@ -129,7 +129,7 @@ rules:
     "arn": "arn:aws:sts::123456789012:assumed-role/AdminRole/alice",
     "sessionContext": {
       "sessionIssuer": {
-        "sourceIdentity": "sentinel:alice:a1b2c3d4"
+        "sourceIdentity": "sentinel:alice:direct:a1b2c3d4"
       }
     }
   }
@@ -210,7 +210,7 @@ sentinel breakglass \
 # - Full audit trail created
 # - SNS alert fired to security team
 # - Auto-expires in 1 hour
-# - SourceIdentity stamped: sentinel:alice:a1b2c3d4
+# - SourceIdentity stamped: sentinel:alice:direct:a1b2c3d4
 ```
 
 ### Time-boxed access with time windows

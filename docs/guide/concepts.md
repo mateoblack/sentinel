@@ -190,10 +190,10 @@ Every session issued by Sentinel is stamped with a unique fingerprint for audit 
 ### Format
 
 ```
-sentinel:<username>:<request-id>
+sentinel:<username>:<approval-marker>:<request-id>
 ```
 
-Example: `sentinel:alice:a1b2c3d4`
+Example: `sentinel:alice:direct:a1b2c3d4`
 
 ### Components
 
@@ -201,7 +201,13 @@ Example: `sentinel:alice:a1b2c3d4`
 |------|-------------|---------|
 | `sentinel` | Fixed prefix identifying Sentinel-issued credentials | `sentinel` |
 | `username` | Sanitized OS username (alphanumeric, max 20 chars) | `alice` |
+| `approval-marker` | Either `direct` or an 8-char hex approval ID | `direct` or `abcd1234` |
 | `request-id` | 8-character hex identifier (unique per request) | `a1b2c3d4` |
+
+### Approval Marker Values
+
+- **`direct`** - Access was granted directly by policy (no approval required)
+- **8-char hex** - Access was granted via an approved request; the value is the approval request ID
 
 ### Properties
 
@@ -217,7 +223,7 @@ Example: `sentinel:alice:a1b2c3d4`
 {
   "userIdentity": {
     "type": "AssumedRole",
-    "sourceIdentity": "sentinel:alice:a1b2c3d4"
+    "sourceIdentity": "sentinel:alice:direct:a1b2c3d4"
   },
   "eventName": "DescribeInstances"
 }
@@ -242,7 +248,7 @@ JSON Lines format with one entry per decision:
   "reason": "Production access allowed",
   "policy_path": "/sentinel/policies/prod",
   "request_id": "a1b2c3d4",
-  "source_identity": "sentinel:alice:a1b2c3d4",
+  "source_identity": "sentinel:alice:direct:a1b2c3d4",
   "role_arn": "arn:aws:iam::123456789012:role/ProductionRole",
   "session_duration_seconds": 3600
 }

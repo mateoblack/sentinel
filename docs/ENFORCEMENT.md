@@ -19,15 +19,22 @@ Most teams start at Level 1 (advisory) during rollout, then progressively enable
 Sentinel stamps every issued session with a `SourceIdentity` value:
 
 ```
-sentinel:<user>:<request-id>
+sentinel:<user>:<approval-marker>:<request-id>
 ```
 
-Example: `sentinel:alice:a1b2c3d4`
+Where `<approval-marker>` is either:
+- **An approval ID** (8 hex chars) - for access granted via an approved request
+- **`direct`** - for direct access (no approval required or used)
+
+Examples:
+- `sentinel:alice:direct:a1b2c3d4` (direct access)
+- `sentinel:alice:abcd1234:a1b2c3d4` (approved access with approval ID `abcd1234`)
 
 This value is:
 - **Immutable** - Set once on AssumeRole, cannot be changed for session lifetime
 - **Propagating** - Follows through role chaining automatically
 - **Auditable** - Appears in every CloudTrail event from that session
+- **Distinguishes approval status** - SCPs can enforce approved-only access
 
 IAM trust policies can require this prefix using the `sts:SourceIdentity` condition key. Without a valid Sentinel SourceIdentity, AssumeRole fails with AccessDenied.
 
@@ -38,9 +45,19 @@ IAM trust policies can require this prefix using the `sts:SourceIdentity` condit
 │ "I need prod    │     │ Policy: allow    │     │ AssumeRole +    │
 │  access"        │     │ SourceIdentity:  │     │ SourceIdentity  │
 │                 │     │ sentinel:alice:  │     │ validated by    │
-│                 │     │ a1b2c3d4         │     │ trust policy    │
+│                 │     │ direct:a1b2c3d4  │     │ trust policy    │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
+
+### Legacy Format
+
+For backward compatibility, Sentinel also recognizes the legacy 3-part format when parsing SourceIdentity values from CloudTrail:
+
+```
+sentinel:<user>:<request-id>
+```
+
+This format is treated as direct access (no approval marker). New credentials always use the 4-part format.
 
 ## Enforcement CLI Commands
 
@@ -475,6 +492,131 @@ SCPs can break critical services if misconfigured. Always:
 3. Monitor CloudTrail for access denied events
 4. Have a rollback plan ready
 
+## Approval-Based Access Control
+
+The SourceIdentity format includes an approval marker that enables AWS-side enforcement of the approval workflow. This provides server-side protection against users who bypass Sentinel to obtain credentials directly.
+
+### Understanding the Approval Marker
+
+The third component of the SourceIdentity indicates how access was granted:
+
+| Marker | Meaning | Example |
+|--------|---------|---------|
+| `direct` | Direct access - no approval required or used | `sentinel:alice:direct:a1b2c3d4` |
+| 8-hex-char ID | Approved access - credentials issued via approved request | `sentinel:alice:abcd1234:a1b2c3d4` |
+
+### SCP: Require Approved Access Only
+
+Block all direct access, requiring an approved request for sensitive roles:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RequireApprovedAccess",
+      "Effect": "Deny",
+      "Action": "sts:AssumeRole",
+      "Resource": [
+        "arn:aws:iam::*:role/Production*",
+        "arn:aws:iam::*:role/*Admin*"
+      ],
+      "Condition": {
+        "StringLike": {
+          "sts:SourceIdentity": "sentinel:*:direct:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Use case**: Sensitive production roles that should only be accessed via the approval workflow. Users cannot bypass Sentinel's client-side `require_approval` check by using `aws-vault` or `aws sso` directly.
+
+### SCP: Require Approved Access (Strict)
+
+For maximum security, require approved access for ALL role assumptions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyDirectAccess",
+      "Effect": "Deny",
+      "Action": "sts:AssumeRole",
+      "Resource": "*",
+      "Condition": {
+        "StringLike": {
+          "sts:SourceIdentity": "sentinel:*:direct:*"
+        },
+        "ArnNotLike": {
+          "aws:PrincipalArn": [
+            "arn:aws:iam::*:role/aws-service-role/*",
+            "arn:aws:iam::*:role/AWSServiceRole*"
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Use case**: High-security environments where all human access must go through the approval workflow.
+
+### Trust Policy: Require Approved Sentinel Credentials
+
+Combine user restriction with approval requirement at the trust policy level:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowApprovedSentinelAccess",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringLike": {
+          "sts:SourceIdentity": "sentinel:*"
+        },
+        "StringNotLike": {
+          "sts:SourceIdentity": "sentinel:*:direct:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Use case**: Per-role enforcement where you want both Sentinel AND approval required.
+
+### Correlation with Approval Records
+
+The approval ID in the SourceIdentity can be correlated with approval records in your database:
+
+```bash
+# Find CloudTrail events with a specific approval
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:abcd1234:*" \
+  --start-time "$(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ)"
+
+# Or use Athena for complex queries
+SELECT
+  eventTime,
+  userIdentity.sourceIdentity,
+  eventName,
+  errorCode
+FROM cloudtrail_logs
+WHERE userIdentity.sourceIdentity LIKE 'sentinel:%:abcd1234:%'
+```
+
+This enables:
+- Post-incident analysis: "Which sessions were authorized by this approval?"
+- Compliance reporting: "Show all approved accesses in the last 30 days"
+- Access review: "Correlate actual AWS API calls with approval requests"
+
 ## Deployment Guide
 
 A progressive rollout strategy for enabling Sentinel enforcement.
@@ -735,7 +877,7 @@ To enforce Sentinel, use trust policy conditions as documented above.
 3. **Is StringLike used for wildcards?**
    ```bash
    # Check for StringLike vs StringEquals
-   # StringEquals won't match sentinel:alice:a1b2c3d4 against sentinel:*
+   # StringEquals won't match sentinel:alice:direct:a1b2c3d4 against sentinel:*
    ```
 
 4. **Does the Sentinel log show allow?**
@@ -785,7 +927,7 @@ To enforce Sentinel, use trust policy conditions as documented above.
    ```bash
    # SourceIdentity appears in userIdentity.sourceIdentity field
    aws cloudtrail lookup-events \
-     --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+     --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:direct:a1b2c3d4" \
      --start-time "2024-01-15T00:00:00Z"
    ```
 

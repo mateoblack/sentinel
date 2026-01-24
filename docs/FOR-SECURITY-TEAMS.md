@@ -153,7 +153,7 @@ CloudTrail Event:
 ```
 CloudTrail Event:
   User: arn:aws:sts::123456789012:assumed-role/DevRole/alice
-  SourceIdentity: sentinel:alice:a1b2c3d4
+  SourceIdentity: sentinel:alice:direct:a1b2c3d4
   Action: s3:DeleteBucket
   Time: 2026-01-19 02:47:33 UTC
 
