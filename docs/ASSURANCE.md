@@ -419,6 +419,43 @@ GROUP BY 1
 ORDER BY session_count DESC;
 ```
 
+**Sessions by Approval Status:**
+
+Distinguish between direct access and approved access sessions:
+
+```sql
+SELECT
+    REGEXP_EXTRACT(useridentity.sourceidentity, 'sentinel:([^:]+):', 1) AS sentinel_user,
+    CASE
+        WHEN REGEXP_EXTRACT(useridentity.sourceidentity, 'sentinel:[^:]+:([^:]+):', 1) = 'direct'
+        THEN 'direct'
+        ELSE 'approved'
+    END AS access_type,
+    COUNT(*) AS session_count
+FROM cloudtrail_logs
+WHERE useridentity.sourceidentity LIKE 'sentinel:%'
+    AND eventtime >= DATE_ADD('day', -30, CURRENT_DATE)
+GROUP BY 1, 2
+ORDER BY sentinel_user, access_type;
+```
+
+**Find Sessions by Approval ID:**
+
+Locate all sessions associated with a specific approval request:
+
+```sql
+SELECT
+    eventtime,
+    useridentity.sourceidentity,
+    REGEXP_EXTRACT(useridentity.sourceidentity, 'sentinel:([^:]+):', 1) AS sentinel_user,
+    REGEXP_EXTRACT(useridentity.sourceidentity, 'sentinel:[^:]+:([^:]+):', 1) AS approval_id,
+    eventsource,
+    eventname
+FROM cloudtrail_logs
+WHERE useridentity.sourceidentity LIKE 'sentinel:%:abcd1234:%'
+ORDER BY eventtime;
+```
+
 ## Verification Checklist
 
 Use this checklist when adopting Sentinel enforcement:
