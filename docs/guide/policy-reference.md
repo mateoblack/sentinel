@@ -21,7 +21,8 @@ Access policies define rules for credential issuance. Each rule specifies condit
 version: "1"
 rules:
   - name: string              # Rule identifier
-    effect: string            # allow | deny | require_approval | require_server
+    effect: string            # allow | deny | require_approval | require_server | require_server_session
+    session_table: string     # DynamoDB table for session tracking (optional, used with require_server_session)
     conditions:               # All conditions must match
       profiles: [string]      # AWS profile names (empty = any)
       users: [string]         # Usernames (empty = any)
@@ -43,6 +44,7 @@ rules:
 | `deny` | Reject access - no credentials issued |
 | `require_approval` | Request must be approved before access |
 | `require_server` | Grant access only via server mode (`sentinel exec --server`) |
+| `require_server_session` | Grant access only via server mode with session tracking (`sentinel exec --server --session-table`) |
 
 ### require_server Effect
 
@@ -80,6 +82,70 @@ rules:
 | `sentinel credentials --profile prod` | Deny with message: "policy requires server mode" |
 
 **Note:** `require_server` denials cannot be bypassed by approval workflows or break-glass. If you need emergency access that bypasses server mode, use a separate rule with `allow` effect that checks for break-glass context.
+
+### require_server_session
+
+The `require_server_session` effect allows access only when credentials are issued via server mode with session tracking enabled. This is the strictest enforcement mode, ensuring all credentials are both policy-evaluated per-request AND tracked for revocation.
+
+```yaml
+policies:
+  - name: prod-requires-tracked-sessions
+    match:
+      profile: prod-*
+    effect: require_server_session
+    session_table: sentinel-sessions  # Optional: specify table (otherwise uses --session-table flag)
+```
+
+**Behavior:**
+- If `--server` flag AND `--session-table` flag are provided: access allowed (credentials issued)
+- If `--server` flag without `--session-table`: denied with "Policy requires session tracking"
+- If neither `--server` nor `--session-table`: denied with "Policy requires server mode with session tracking"
+- `credential_process` mode always denied (doesn't support sessions)
+
+**session_table field:**
+The optional `session_table` field in the policy specifies which DynamoDB table to use for session tracking. If not specified in the policy, the CLI flag `--session-table` must be provided.
+
+**Use case:**
+Enforce that all production access is:
+1. Per-request policy evaluated (server mode)
+2. Trackable in DynamoDB (for revocation and audit)
+3. Visible in `sentinel server-sessions` output
+
+**Example:**
+
+```yaml
+version: "1"
+rules:
+  # Production requires server mode with full session tracking
+  - name: prod-requires-tracked-sessions
+    effect: require_server_session
+    conditions:
+      profiles: [production]
+    reason: Production requires tracked server sessions for compliance
+    session_table: sentinel-sessions
+
+  # Staging requires server mode only (no session tracking)
+  - name: staging-requires-server
+    effect: require_server
+    conditions:
+      profiles: [staging]
+    reason: Staging requires server mode for instant revocation
+
+  # Development allows any mode
+  - name: dev-allow
+    effect: allow
+    conditions:
+      profiles: [development]
+```
+
+**Comparison with require_server:**
+
+| Effect | Server Mode | Session Table | Use Case |
+|--------|-------------|---------------|----------|
+| `require_server` | Required | Optional | Instant revocation via policy changes |
+| `require_server_session` | Required | Required | Full tracking with revocation and audit trail |
+
+**Note:** Like `require_server`, `require_server_session` denials cannot be bypassed by approval workflows or break-glass.
 
 ### Complete Example
 
@@ -500,7 +566,7 @@ rules:
 | Error | Cause |
 |-------|-------|
 | "rule at index N missing name" | Rule lacks `name` field |
-| "invalid effect" | Effect not one of: allow, deny, require_approval, require_server |
+| "invalid effect" | Effect not one of: allow, deny, require_approval, require_server, require_server_session |
 | "invalid weekday" | Day not one of: monday-sunday |
 | "invalid timezone" | Timezone not recognized by system |
 | "invalid credential mode" | Mode not one of: server, cli, credential_process |
