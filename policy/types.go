@@ -24,6 +24,9 @@ type Rule struct {
 	Conditions        Condition     `yaml:"conditions" json:"conditions"`
 	Reason            string        `yaml:"reason,omitempty" json:"reason,omitempty"`
 	MaxServerDuration time.Duration `yaml:"max_server_duration,omitempty" json:"max_server_duration,omitempty"`
+	// SessionTable specifies the DynamoDB table name for session tracking when
+	// using require_server_session effect. If empty, uses the --session-table CLI flag.
+	SessionTable string `yaml:"session_table,omitempty" json:"session_table,omitempty"`
 }
 
 // Effect is the outcome of a matched rule.
@@ -42,6 +45,10 @@ const (
 	// If the request mode is not 'server', access is denied with a clear error indicating
 	// server mode is required.
 	EffectRequireServer Effect = "require_server"
+	// EffectRequireServerSession allows access only when credentials are requested via server mode
+	// WITH session tracking enabled. If either condition is not met, access is denied with a clear
+	// error indicating server mode with session tracking is required.
+	EffectRequireServerSession Effect = "require_server_session"
 )
 
 // Condition defines matching criteria for a rule.
@@ -93,7 +100,7 @@ type HourRange struct {
 
 // IsValid returns true if the Effect is a known value.
 func (e Effect) IsValid() bool {
-	return e == EffectAllow || e == EffectDeny || e == EffectRequireApproval || e == EffectRequireServer
+	return e == EffectAllow || e == EffectDeny || e == EffectRequireApproval || e == EffectRequireServer || e == EffectRequireServerSession
 }
 
 // String returns the string representation of the Effect.
