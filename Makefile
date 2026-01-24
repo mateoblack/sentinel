@@ -23,7 +23,7 @@ binaries: aws-vault-linux-amd64 aws-vault-linux-arm64 aws-vault-linux-ppc64le aw
 dmgs: aws-vault-darwin-amd64.dmg aws-vault-darwin-arm64.dmg
 
 clean:
-	rm -rf ./aws-vault ./aws-vault-*-* ./SHA256SUMS dist/ coverage.out coverage.html
+	rm -rf ./aws-vault ./aws-vault-*-* ./lambda-tvm-linux-amd64 ./SHA256SUMS dist/ coverage.out coverage.html
 
 snapshot: clean ## Build local snapshot
 	goreleaser build --clean --snapshot --single-target
@@ -105,6 +105,10 @@ aws-vault-windows-amd64.exe: $(SRC)
 
 aws-vault-windows-arm64.exe: $(SRC)
 	GOOS=windows GOARCH=arm64 go build $(BUILD_FLAGS) -o $@ .
+
+# Lambda TVM binary (Linux amd64 for AWS Lambda)
+lambda-tvm-linux-amd64: $(SRC)
+	GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $@ ./cmd/lambda-tvm
 
 aws-vault-darwin-amd64.dmg: aws-vault-darwin-amd64
 	./bin/create-dmg aws-vault-darwin-amd64 $@

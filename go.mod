@@ -5,6 +5,7 @@ go 1.25
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/alecthomas/kingpin/v2 v2.4.0
+	github.com/aws/aws-lambda-go v1.47.0
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.7
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.7

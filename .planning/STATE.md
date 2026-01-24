@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-22)
+See: .planning/PROJECT.md (updated 2026-01-24)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Milestone v1.12 complete — planning next milestone
+**Current focus:** Milestone v1.14 Server-Side Credential Vending — defining requirements
 
 ## Current Position
 
-Phase: 96 of 96 (session-tracking-audit)
-Plan: 3 of 3 in current phase (all completed)
-Status: Complete
-Last activity: 2026-01-24 — Completed 96-02-PLAN.md (session-compliance command)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.14
+Last activity: 2026-01-24 — Milestone v1.14 Server-Side Credential Vending started
 
-Progress: ██████████████████ 100% (v1.13 Phase 96)
+Progress: ░░░░░░░░░░░░░░░░░░ 0% (requirements phase)
 
 ## Milestone Summary
 
@@ -138,12 +138,22 @@ Progress: ██████████████████ 100% (v1.13 Pha
 - Graceful degradation for permission-less onboarding
 - Complete documentation in QUICKSTART.md, BOOTSTRAP.md, and commands.md
 
+**v1.13 Enforced Session Tracking shipped:** 2026-01-24
+- 3 phases, 10 plans (including 1 SSO fix)
+- +7,461 lines of Go (114,891 total)
+- `require_server_session` policy effect for enforcing server mode with session tracking
+- `SENTINEL_SESSION_TABLE` environment variable for default session table
+- Policy-level `session_table` field for per-profile table override
+- `sentinel audit untracked-sessions` CloudTrail compliance detection
+- `sentinel audit session-compliance` per-profile compliance reporting
+- CSV export and `--since` filtering for audit exports
+
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 168
+- Total plans completed: 186
 - Average duration: 3.5 min
-- Total execution time: ~588 min
+- Total execution time: ~651 min
 
 **By Milestone:**
 
@@ -164,6 +174,7 @@ Progress: ██████████████████ 100% (v1.13 Pha
 | v1.10 Real-time Revocation | 6 | 15 | ~102 min |
 | v1.11 Shell Integration | 4 | 4 | ~14 min |
 | v1.12 Infrastructure Provisioning | 6 | 15 | ~49 min |
+| v1.13 Enforced Session Tracking | 3 | 10 | ~35 min |
 
 ## Accumulated Context
 
@@ -591,9 +602,9 @@ None — clean start for v1.12.
 ## Session Continuity
 
 Last session: 2026-01-24
-Stopped at: Completed 96-02-PLAN.md (all 3 plans in Phase 96 complete)
+Stopped at: Completed v1.13 milestone
 Resume file: None
-Next: Phase 96 complete - ready for milestone completion
+Next: Planning next milestone
 
 ## Roadmap Evolution
 
@@ -612,3 +623,4 @@ Next: Phase 96 complete - ready for milestone completion
 - Milestone v1.10 shipped: 2026-01-20 — Real-time Revocation (Phases 78-83) - Server mode for instant credential revocation
 - Milestone v1.11 shipped: 2026-01-20 — Shell Integration (Phases 84-87) - Auto-generated shell functions for profiles
 - Milestone v1.12 shipped: 2026-01-22 — Infrastructure Provisioning (Phases 88-93) - Automated DynamoDB table creation
+- Milestone v1.13 shipped: 2026-01-24 — Enforced Session Tracking (Phases 94-96) - Policy-enforced session tracking and compliance audit
