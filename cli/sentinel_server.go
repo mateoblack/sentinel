@@ -245,9 +245,9 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 	case "csv":
 		// CSV output for audit exports
 		// Header
-		fmt.Println("id,user,profile,status,started_at,last_access_at,expires_at,request_count,server_instance_id,source_identity")
+		fmt.Println("id,user,profile,status,started_at,last_access_at,expires_at,request_count,server_instance_id")
 		for _, s := range summaries {
-			fmt.Printf("%s,%s,%s,%s,%s,%s,%s,%d,%s,%s\n",
+			fmt.Printf("%s,%s,%s,%s,%s,%s,%s,%d,%s\n",
 				s.ID,
 				csvEscape(s.User),
 				csvEscape(s.Profile),
@@ -257,7 +257,6 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 				s.ExpiresAt.Format(time.RFC3339),
 				s.RequestCount,
 				s.ServerInstanceID,
-				csvEscape(s.SourceIdentity),
 			)
 		}
 	default:

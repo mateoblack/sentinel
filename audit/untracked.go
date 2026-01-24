@@ -149,7 +149,7 @@ func (d *Detector) Detect(ctx context.Context, input *UntrackedSessionsInput) (*
 				EventTime:   aws.ToTime(event.EventTime),
 				RoleARN:     extractRoleARNFromEvent(event),
 				PrincipalID: extractPrincipalIDFromEvent(event),
-				SourceIP:    aws.ToString(event.SourceIPAddress),
+				SourceIP:    extractSourceIPFromEvent(event),
 				UserAgent:   extractUserAgentFromEvent(event),
 				Category:    CategoryNoSourceIdentity,
 				Reason:      "No SourceIdentity set on AssumeRole call",
@@ -165,7 +165,7 @@ func (d *Detector) Detect(ctx context.Context, input *UntrackedSessionsInput) (*
 				EventTime:      aws.ToTime(event.EventTime),
 				RoleARN:        extractRoleARNFromEvent(event),
 				PrincipalID:    extractPrincipalIDFromEvent(event),
-				SourceIP:       aws.ToString(event.SourceIPAddress),
+				SourceIP:       extractSourceIPFromEvent(event),
 				UserAgent:      extractUserAgentFromEvent(event),
 				SourceIdentity: sourceIdentity,
 				Category:       CategoryNonSentinel,
@@ -183,7 +183,7 @@ func (d *Detector) Detect(ctx context.Context, input *UntrackedSessionsInput) (*
 				EventTime:      aws.ToTime(event.EventTime),
 				RoleARN:        extractRoleARNFromEvent(event),
 				PrincipalID:    extractPrincipalIDFromEvent(event),
-				SourceIP:       aws.ToString(event.SourceIPAddress),
+				SourceIP:       extractSourceIPFromEvent(event),
 				UserAgent:      extractUserAgentFromEvent(event),
 				SourceIdentity: sourceIdentity,
 				Category:       CategoryOrphaned,
@@ -273,7 +273,8 @@ type cloudTrailEventPayloadForDetector struct {
 			} `json:"sessionIssuer"`
 		} `json:"sessionContext"`
 	} `json:"userIdentity"`
-	UserAgent string `json:"userAgent"`
+	UserAgent       string `json:"userAgent"`
+	SourceIPAddress string `json:"sourceIPAddress"`
 }
 
 // extractSourceIdentityFromEvent extracts the SourceIdentity from a CloudTrail event.
@@ -322,6 +323,18 @@ func extractUserAgentFromEvent(event types.Event) string {
 		return ""
 	}
 	return payload.UserAgent
+}
+
+// extractSourceIPFromEvent extracts the source IP address from a CloudTrail event.
+func extractSourceIPFromEvent(event types.Event) string {
+	if event.CloudTrailEvent == nil {
+		return ""
+	}
+	var payload cloudTrailEventPayloadForDetector
+	if err := json.Unmarshal([]byte(*event.CloudTrailEvent), &payload); err != nil {
+		return ""
+	}
+	return payload.SourceIPAddress
 }
 
 // DetectFunc is a function type for custom detect implementations (used for testing).

@@ -431,6 +431,11 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		cmdEnv.Set("AWS_CONTAINER_CREDENTIALS_FULL_URI", sentinelServer.BaseURL())
 		cmdEnv.Set("AWS_CONTAINER_AUTHORIZATION_TOKEN", sentinelServer.AuthToken())
 
+		// Prevent AWS SDK from reading config files - use container credentials only
+		// Without this, ~/.aws/config can override the container credentials URL
+		cmdEnv.Set("AWS_CONFIG_FILE", "/dev/null")
+		cmdEnv.Set("AWS_SHARED_CREDENTIALS_FILE", "/dev/null")
+
 		log.Printf("Starting Sentinel credential server at %s", sentinelServer.BaseURL())
 
 		// Remove AWS_SENTINEL since credentials come from server, not env

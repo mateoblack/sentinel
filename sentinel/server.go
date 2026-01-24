@@ -148,7 +148,10 @@ func NewSentinelServer(ctx context.Context, config SentinelServerConfig, authTok
 			User:            config.User,
 			RequestID:       identity.NewRequestID(),
 		}
-		_, err := config.CredentialProvider.GetCredentialsWithSourceIdentity(ctx, credReq)
+		// Use timeout context to prevent blocking forever on slow credential providers
+		prefetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		_, err := config.CredentialProvider.GetCredentialsWithSourceIdentity(prefetchCtx, credReq)
 		if err != nil {
 			listener.Close()
 			return nil, fmt.Errorf("failed to prefetch credentials: %w", err)
