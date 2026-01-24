@@ -23,6 +23,7 @@ type mockSessionStore struct {
 	listByProfileFn              func(ctx context.Context, profile string, limit int) ([]*session.ServerSession, error)
 	findActiveByServerInstanceFn func(ctx context.Context, serverInstanceID string) (*session.ServerSession, error)
 	touchFn                      func(ctx context.Context, id string) error
+	listByTimeRangeFn            func(ctx context.Context, startTime, endTime time.Time, limit int) ([]*session.ServerSession, error)
 }
 
 func (m *mockSessionStore) Create(ctx context.Context, sess *session.ServerSession) error {
@@ -86,6 +87,13 @@ func (m *mockSessionStore) Touch(ctx context.Context, id string) error {
 		return m.touchFn(ctx, id)
 	}
 	return nil
+}
+
+func (m *mockSessionStore) ListByTimeRange(ctx context.Context, startTime, endTime time.Time, limit int) ([]*session.ServerSession, error) {
+	if m.listByTimeRangeFn != nil {
+		return m.listByTimeRangeFn(ctx, startTime, endTime, limit)
+	}
+	return nil, nil
 }
 
 // mockSessionSTSClient implements identity.STSAPI for testing.

@@ -1391,6 +1391,10 @@ func (m *MockSessionStore) Touch(ctx context.Context, id string) error {
 	return nil
 }
 
+func (m *MockSessionStore) ListByTimeRange(ctx context.Context, startTime, endTime time.Time, limit int) ([]*session.ServerSession, error) {
+	return nil, nil
+}
+
 func (m *MockSessionStore) CreateCallCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
