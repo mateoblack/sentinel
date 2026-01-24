@@ -23,7 +23,8 @@ type ServerSessionsCommandInput struct {
 	User         string // Optional filter by user
 	Profile      string // Optional filter by AWS profile served
 	Limit        int
-	OutputFormat string // human, json
+	OutputFormat string // human, json, csv
+	Since        string // Duration filter: "7d", "30d", etc.
 	AWSProfile   string // For SSO credential loading
 
 	// Store is an optional Store implementation for testing.
@@ -80,9 +81,12 @@ func ConfigureServerSessionsCommand(app *kingpin.Application, s *Sentinel) {
 		Default("100").
 		IntVar(&input.Limit)
 
-	cmd.Flag("output", "Output format (human, json)").
+	cmd.Flag("output", "Output format (human, json, csv)").
 		Default("human").
-		EnumVar(&input.OutputFormat, "human", "json")
+		EnumVar(&input.OutputFormat, "human", "json", "csv")
+
+	cmd.Flag("since", "Only show sessions started within this duration (e.g., 7d, 30d)").
+		StringVar(&input.Since)
 
 	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
 		StringVar(&input.AWSProfile)
