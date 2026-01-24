@@ -48,6 +48,7 @@ type ServerSessionSummary struct {
 	ExpiresAt        time.Time `json:"expires_at"`
 	RequestCount     int64     `json:"request_count"`
 	ServerInstanceID string    `json:"server_instance_id"`
+	SourceIdentity   string    `json:"source_identity"`
 }
 
 // ServerSessionsCommandOutput represents the JSON output from the server sessions command.
@@ -213,7 +214,7 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 		sessions = filtered
 	}
 
-	// 6. Format output
+	// 9. Format output
 	summaries := make([]ServerSessionSummary, 0, len(sessions))
 	for _, sess := range sessions {
 		summaries = append(summaries, ServerSessionSummary{
@@ -226,6 +227,7 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 			ExpiresAt:        sess.ExpiresAt,
 			RequestCount:     sess.RequestCount,
 			ServerInstanceID: sess.ServerInstanceID,
+			SourceIdentity:   sess.SourceIdentity,
 		})
 	}
 
