@@ -23,6 +23,8 @@ const (
 	SubsystemEnforce Subsystem = "enforce"
 	// SubsystemBootstrap provides SSM parameter management for setup.
 	SubsystemBootstrap Subsystem = "bootstrap"
+	// SubsystemSessions provides DynamoDB storage for server session tracking.
+	SubsystemSessions Subsystem = "sessions"
 )
 
 // IsValid returns true if the Subsystem is a known value.
@@ -30,7 +32,7 @@ func (s Subsystem) IsValid() bool {
 	switch s {
 	case SubsystemCore, SubsystemCredentials, SubsystemApprovals,
 		SubsystemBreakGlass, SubsystemNotifications, SubsystemAudit,
-		SubsystemEnforce, SubsystemBootstrap:
+		SubsystemEnforce, SubsystemBootstrap, SubsystemSessions:
 		return true
 	}
 	return false
@@ -52,6 +54,7 @@ func AllSubsystems() []Subsystem {
 		SubsystemAudit,
 		SubsystemEnforce,
 		SubsystemBootstrap,
+		SubsystemSessions,
 	}
 }
 
@@ -79,6 +82,8 @@ const (
 	FeatureBootstrapPlan Feature = "bootstrap_plan"
 	// FeatureBootstrapApply applies bootstrap operations (SSM write).
 	FeatureBootstrapApply Feature = "bootstrap_apply"
+	// FeatureSessionTracking manages server sessions with DynamoDB.
+	FeatureSessionTracking Feature = "session_tracking"
 )
 
 // IsValid returns true if the Feature is a known value.
@@ -87,7 +92,7 @@ func (f Feature) IsValid() bool {
 	case FeaturePolicyLoad, FeatureCredentialIssue, FeatureApprovalWorkflow,
 		FeatureBreakGlass, FeatureNotifySNS, FeatureNotifyWebhook,
 		FeatureAuditVerify, FeatureEnforceAnalyze, FeatureBootstrapPlan,
-		FeatureBootstrapApply:
+		FeatureBootstrapApply, FeatureSessionTracking:
 		return true
 	}
 	return false
@@ -111,6 +116,7 @@ func AllFeatures() []Feature {
 		FeatureEnforceAnalyze,
 		FeatureBootstrapPlan,
 		FeatureBootstrapApply,
+		FeatureSessionTracking,
 	}
 }
 
@@ -124,6 +130,7 @@ var subsystemFeatures = map[Subsystem][]Feature{
 	SubsystemAudit:         {FeatureAuditVerify},
 	SubsystemEnforce:       {FeatureEnforceAnalyze},
 	SubsystemBootstrap:     {FeatureBootstrapPlan, FeatureBootstrapApply},
+	SubsystemSessions:      {FeatureSessionTracking},
 }
 
 // Features returns the features belonging to this subsystem.

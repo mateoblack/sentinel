@@ -60,8 +60,8 @@ func TestAllSubsystems(t *testing.T) {
 	subsystems := AllSubsystems()
 
 	// Verify count matches expected
-	if len(subsystems) != 8 {
-		t.Errorf("AllSubsystems() returned %d subsystems, want 8", len(subsystems))
+	if len(subsystems) != 9 {
+		t.Errorf("AllSubsystems() returned %d subsystems, want 9", len(subsystems))
 	}
 
 	// Verify all are valid
@@ -81,6 +81,7 @@ func TestAllSubsystems(t *testing.T) {
 		SubsystemAudit:         false,
 		SubsystemEnforce:       false,
 		SubsystemBootstrap:     false,
+		SubsystemSessions:      false,
 	}
 
 	for _, s := range subsystems {
@@ -154,8 +155,8 @@ func TestAllFeatures(t *testing.T) {
 	features := AllFeatures()
 
 	// Verify count matches expected
-	if len(features) != 10 {
-		t.Errorf("AllFeatures() returned %d features, want 10", len(features))
+	if len(features) != 11 {
+		t.Errorf("AllFeatures() returned %d features, want 11", len(features))
 	}
 
 	// Verify all are valid
@@ -177,6 +178,7 @@ func TestAllFeatures(t *testing.T) {
 		FeatureEnforceAnalyze:   false,
 		FeatureBootstrapPlan:    false,
 		FeatureBootstrapApply:   false,
+		FeatureSessionTracking:  false,
 	}
 
 	for _, f := range features {

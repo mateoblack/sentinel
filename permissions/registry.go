@@ -181,6 +181,33 @@ var registry = map[Feature]FeaturePermissions{
 		},
 		Optional: false,
 	},
+
+	FeatureSessionTracking: {
+		Feature:   FeatureSessionTracking,
+		Subsystem: SubsystemSessions,
+		Permissions: []Permission{
+			{
+				Service: "dynamodb",
+				Actions: []string{
+					"dynamodb:PutItem",
+					"dynamodb:GetItem",
+					"dynamodb:UpdateItem",
+					"dynamodb:Query",
+				},
+				Resource:    "arn:aws:dynamodb:*:*:table/sentinel-sessions",
+				Description: "Manage server sessions in DynamoDB",
+			},
+			{
+				Service: "dynamodb",
+				Actions: []string{
+					"dynamodb:Query",
+				},
+				Resource:    "arn:aws:dynamodb:*:*:table/sentinel-sessions/index/*",
+				Description: "Query server sessions by GSI (user, status, profile)",
+			},
+		},
+		Optional: false,
+	},
 }
 
 // GetFeaturePermissions returns the permissions for a specific feature.

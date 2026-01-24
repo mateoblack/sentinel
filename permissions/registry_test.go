@@ -21,10 +21,10 @@ func TestRegistry_AllFeaturesRegistered(t *testing.T) {
 }
 
 func TestRegistry_FeatureCount(t *testing.T) {
-	// Verify registry has exactly 10 features
+	// Verify registry has exactly 11 features
 	allPerms := GetAllPermissions()
-	if len(allPerms) != 10 {
-		t.Errorf("Registry has %d features, want 10", len(allPerms))
+	if len(allPerms) != 11 {
+		t.Errorf("Registry has %d features, want 11", len(allPerms))
 	}
 }
 
@@ -130,8 +130,8 @@ func TestGetSubsystemPermissions(t *testing.T) {
 func TestGetAllPermissions(t *testing.T) {
 	perms := GetAllPermissions()
 
-	if len(perms) != 10 {
-		t.Errorf("GetAllPermissions() returned %d permissions, want 10", len(perms))
+	if len(perms) != 11 {
+		t.Errorf("GetAllPermissions() returned %d permissions, want 11", len(perms))
 	}
 
 	// Verify all features are present
@@ -157,9 +157,9 @@ func TestGetRequiredPermissions(t *testing.T) {
 		}
 	}
 
-	// Count: 10 total - 2 optional = 8 required
-	if len(perms) != 8 {
-		t.Errorf("GetRequiredPermissions() returned %d features, want 8", len(perms))
+	// Count: 11 total - 2 optional = 9 required
+	if len(perms) != 9 {
+		t.Errorf("GetRequiredPermissions() returned %d features, want 9", len(perms))
 	}
 
 	// Verify required features are present
@@ -172,6 +172,7 @@ func TestGetRequiredPermissions(t *testing.T) {
 		FeatureEnforceAnalyze:   false,
 		FeatureBootstrapPlan:    false,
 		FeatureBootstrapApply:   false,
+		FeatureSessionTracking:  false,
 	}
 
 	for _, fp := range perms {
