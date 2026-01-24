@@ -260,10 +260,11 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 
 	// 6. Build policy.Request
 	policyRequest := &policy.Request{
-		User:    username,
-		Profile: input.ProfileName,
-		Time:    time.Now(),
-		Mode:    policy.ModeCLI, // CLI mode - one-time evaluation
+		User:             username,
+		Profile:          input.ProfileName,
+		Time:             time.Now(),
+		Mode:             policy.ModeCLI, // CLI mode - one-time evaluation
+		SessionTableName: input.SessionTableName,
 	}
 
 	// 7. Evaluate policy
@@ -273,13 +274,23 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	var approvedReq *request.Request
 	var activeBreakGlass *breakglass.BreakGlassEvent
 	if decision.Effect == policy.EffectDeny || decision.Effect == policy.EffectRequireApproval {
-		// Check if denial is due to server mode requirement - this cannot be bypassed
-		if decision.RequiresServerMode {
+		// Check if denial is due to server mode or session tracking requirement - these cannot be bypassed
+		if decision.RequiresSessionTracking || decision.RequiresServerMode {
 			if logger != nil {
 				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
 				logger.LogDecision(entry)
 			}
-			serverErr := fmt.Errorf("policy requires server mode for profile %q - add '--server' flag for real-time revocation control", input.ProfileName)
+			var serverErr error
+			if decision.RequiresSessionTracking && decision.RequiresServerMode {
+				// Both server mode and session tracking required
+				serverErr = fmt.Errorf("policy requires server mode with session tracking for profile %q. Use: sentinel exec --server --session-table <table> --profile %s -- <cmd>", input.ProfileName, input.ProfileName)
+			} else if decision.RequiresSessionTracking {
+				// Only session tracking required (already in server mode)
+				serverErr = fmt.Errorf("policy requires session tracking for profile %q. Add --session-table <table> flag", input.ProfileName)
+			} else {
+				// Only server mode required
+				serverErr = fmt.Errorf("policy requires server mode for profile %q. Add --server flag", input.ProfileName)
+			}
 			FormatErrorWithSuggestion(serverErr)
 			return 1, serverErr
 		}
