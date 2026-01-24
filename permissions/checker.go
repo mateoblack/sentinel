@@ -213,6 +213,8 @@ var ErrCallerIdentityFailed = errors.New("failed to get caller identity")
 // convertToIAMRoleArn converts assumed-role session ARNs to IAM role ARNs.
 // SimulatePrincipalPolicy requires IAM principal ARNs, not STS session ARNs.
 // Example: arn:aws:sts::123456789012:assumed-role/MyRole/session -> arn:aws:iam::123456789012:role/MyRole
+// SSO Example: arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_DevAccess_abc123/user
+//           -> arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_DevAccess_abc123
 func convertToIAMRoleArn(arn string) string {
 	// Match: arn:aws:sts::<account>:assumed-role/<role-name>/<session-name>
 	if !strings.Contains(arn, ":assumed-role/") {
@@ -227,10 +229,16 @@ func convertToIAMRoleArn(arn string) string {
 	// Extract role name from "assumed-role/RoleName/SessionName"
 	resource := parts[5]
 	resourceParts := strings.Split(resource, "/")
-	if len(resourceParts) < 2 {
+	if len(resourceParts) < 2 || resourceParts[1] == "" {
 		return arn
 	}
 	roleName := resourceParts[1]
+
+	// SSO roles have a special path prefix in IAM
+	// They are created under: /aws-reserved/sso.amazonaws.com/
+	if strings.HasPrefix(roleName, "AWSReservedSSO_") {
+		return "arn:aws:iam::" + parts[4] + ":role/aws-reserved/sso.amazonaws.com/" + roleName
+	}
 
 	// Reconstruct as IAM role ARN
 	return "arn:aws:iam::" + parts[4] + ":role/" + roleName

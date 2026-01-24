@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SourceIdentity format updated from 3-part to 4-part
 - All documentation updated to reflect new format
 
+### Fixed
+
+- `permissions check` now works with AWS SSO and assumed-role credentials
+  - Automatically converts STS assumed-role ARNs to IAM role ARNs for SimulatePrincipalPolicy
+  - Previously failed with "Invalid ARN" error for SSO users
+- Fixed `--feature` flag on `permissions check` (was incorrectly named `--features`)
+
 ## [1.12.2] - 2026-01-23
 
 ### Security

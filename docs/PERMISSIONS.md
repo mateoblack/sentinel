@@ -257,6 +257,24 @@ Detects which features you use and validates only those permissions.
 sentinel permissions check --feature policy_load,credential_issue
 ```
 
+### AWS SSO Support
+
+Permission checking works with AWS SSO credentials. The CLI automatically converts
+assumed-role session ARNs to IAM role ARNs for the SimulatePrincipalPolicy API.
+
+**Required permission:** Your SSO role needs `iam:SimulatePrincipalPolicy` to check permissions:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "iam:SimulatePrincipalPolicy",
+  "Resource": "arn:aws:iam::ACCOUNT_ID:role/YOUR_SSO_ROLE_NAME"
+}
+```
+
+If this permission is not available, you'll see a message indicating
+permission checking requires SimulatePrincipalPolicy.
+
 ### JSON Output
 
 ```bash

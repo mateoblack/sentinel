@@ -637,7 +637,7 @@ func TestConvertToIAMRoleArn(t *testing.T) {
 		{
 			name:     "SSO assumed role",
 			input:    "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_DeveloperAccess_abc123/user-sso",
-			expected: "arn:aws:iam::123456789012:role/AWSReservedSSO_DeveloperAccess_abc123",
+			expected: "arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_DeveloperAccess_abc123",
 		},
 		{
 			name:     "regular assumed role",
@@ -647,7 +647,7 @@ func TestConvertToIAMRoleArn(t *testing.T) {
 		{
 			name:     "assumed role with complex session name",
 			input:    "arn:aws:sts::644760544461:assumed-role/AWSReservedSSO_DeveloperAccess_8e95752ad6b02f8b/mateo-sso",
-			expected: "arn:aws:iam::644760544461:role/AWSReservedSSO_DeveloperAccess_8e95752ad6b02f8b",
+			expected: "arn:aws:iam::644760544461:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_DeveloperAccess_8e95752ad6b02f8b",
 		},
 		{
 			name:     "IAM user unchanged",
@@ -724,8 +724,8 @@ func TestChecker_Check_ConvertsAssumedRoleArn(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// The assumed-role ARN should be converted to IAM role ARN
-	expected := "arn:aws:iam::123456789012:role/AWSReservedSSO_DeveloperAccess_abc"
+	// The assumed-role ARN should be converted to IAM role ARN with SSO path prefix
+	expected := "arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_DeveloperAccess_abc"
 	if capturedPolicySourceArn != expected {
 		t.Errorf("expected PolicySourceArn %q, got %q", expected, capturedPolicySourceArn)
 	}
