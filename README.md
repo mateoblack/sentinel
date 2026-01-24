@@ -36,7 +36,7 @@ sentinel exec --server --profile dev --policy-parameter /sentinel/policies/dev \
 Request access --> Sentinel evaluates policy --> Credentials issued (or denied)
                                                         |
                                                         v
-                                    SourceIdentity stamped: sentinel:alice:a1b2c3d4
+                                    SourceIdentity stamped: sentinel:alice:direct:a1b2c3d4
                                                         |
                                                         v
                                            CloudTrail shows WHO + WHY
