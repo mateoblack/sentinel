@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // Query limit constants for List operations.
@@ -70,4 +71,15 @@ type Store interface {
 	// so implementations should be optimized for efficiency.
 	// Returns ErrSessionNotFound if session doesn't exist.
 	Touch(ctx context.Context, id string) error
+
+	// ListByTimeRange retrieves sessions created within a time range.
+	// Results are sorted by created_at descending (newest first).
+	// Used for audit queries to retrieve sessions within a specific period.
+	// If limit is 0, DefaultQueryLimit is used. Limit is capped at MaxQueryLimit.
+	ListByTimeRange(ctx context.Context, startTime, endTime time.Time, limit int) ([]*ServerSession, error)
+
+	// GetBySourceIdentity retrieves a session by its source identity.
+	// Returns nil, nil if no session with the source identity is found.
+	// This is used for audit correlation between CloudTrail events and tracked sessions.
+	GetBySourceIdentity(ctx context.Context, sourceIdentity string) (*ServerSession, error)
 }

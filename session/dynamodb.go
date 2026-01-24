@@ -34,6 +34,7 @@ type dynamoDBAPI interface {
 	DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
+	Scan(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
 }
 
 // DynamoDBStore implements Store using AWS DynamoDB.
@@ -364,6 +365,101 @@ func (s *DynamoDBStore) Touch(ctx context.Context, id string) error {
 	return nil
 }
 
+// ListByTimeRange retrieves sessions created within a time range.
+// Uses a scan with filter since we don't have a GSI on created_at.
+// For audit queries, this is acceptable as they are infrequent.
+func (s *DynamoDBStore) ListByTimeRange(ctx context.Context, startTime, endTime time.Time, limit int) ([]*ServerSession, error) {
+	effectiveLimit := enforceLimit(limit)
+
+	var sessions []*ServerSession
+	var lastEvaluatedKey map[string]types.AttributeValue
+
+	for len(sessions) < effectiveLimit {
+		input := &dynamodb.ScanInput{
+			TableName:        aws.String(s.tableName),
+			FilterExpression: aws.String("created_at BETWEEN :start AND :end"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":start": &types.AttributeValueMemberS{Value: startTime.Format(time.RFC3339Nano)},
+				":end":   &types.AttributeValueMemberS{Value: endTime.Format(time.RFC3339Nano)},
+			},
+			ExclusiveStartKey: lastEvaluatedKey,
+		}
+
+		output, err := s.client.Scan(ctx, input)
+		if err != nil {
+			return nil, sentinelerrors.WrapDynamoDBError(err, s.tableName, "Scan:TimeRange")
+		}
+
+		for _, item := range output.Items {
+			var di dynamoItem
+			if err := attributevalue.UnmarshalMap(item, &di); err != nil {
+				continue // Skip invalid items
+			}
+			sess, err := fromItem(&di)
+			if err != nil {
+				continue // Skip items that fail parsing
+			}
+			sessions = append(sessions, sess)
+			if len(sessions) >= effectiveLimit {
+				break
+			}
+		}
+
+		// Check if there are more pages
+		lastEvaluatedKey = output.LastEvaluatedKey
+		if lastEvaluatedKey == nil {
+			break // No more pages
+		}
+	}
+
+	// Sort by created_at descending (newest first)
+	sortSessionsByCreatedAtDesc(sessions)
+
+	return sessions, nil
+}
+
+// sortSessionsByCreatedAtDesc sorts sessions by created_at in descending order.
+func sortSessionsByCreatedAtDesc(sessions []*ServerSession) {
+	for i := 0; i < len(sessions)-1; i++ {
+		for j := i + 1; j < len(sessions); j++ {
+			if sessions[j].CreatedAt.After(sessions[i].CreatedAt) {
+				sessions[i], sessions[j] = sessions[j], sessions[i]
+			}
+		}
+	}
+}
+
+// GetBySourceIdentity retrieves a session by its source identity.
+// Returns nil, nil if no session with the source identity is found.
+// This uses a scan with filter since source_identity is not indexed.
+// For audit queries, this is acceptable as they are infrequent.
+func (s *DynamoDBStore) GetBySourceIdentity(ctx context.Context, sourceIdentity string) (*ServerSession, error) {
+	input := &dynamodb.ScanInput{
+		TableName:        aws.String(s.tableName),
+		FilterExpression: aws.String("source_identity = :sid"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":sid": &types.AttributeValueMemberS{Value: sourceIdentity},
+		},
+		Limit: aws.Int32(1),
+	}
+
+	output, err := s.client.Scan(ctx, input)
+	if err != nil {
+		return nil, sentinelerrors.WrapDynamoDBError(err, s.tableName, "Scan:SourceIdentity")
+	}
+
+	if len(output.Items) == 0 {
+		return nil, nil // Not found, return nil without error
+	}
+
+	var item dynamoItem
+	if err := attributevalue.UnmarshalMap(output.Items[0], &item); err != nil {
+		return nil, fmt.Errorf("unmarshal session: %w", err)
+	}
+
+	return fromItem(&item)
+}
+
 // queryByIndex executes a query against a GSI with the given partition key.
 // Results are ordered by created_at descending (newest first).
 func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, keyValue string, limit int) ([]*ServerSession, error) {
@@ -376,10 +472,10 @@ func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, ke
 	}
 
 	output, err := s.client.Query(ctx, &dynamodb.QueryInput{
-		TableName:                 aws.String(s.tableName),
-		IndexName:                 aws.String(indexName),
-		KeyConditionExpression:    aws.String(keyCondition),
-		ExpressionAttributeNames:  exprAttrNames,
+		TableName:                aws.String(s.tableName),
+		IndexName:                aws.String(indexName),
+		KeyConditionExpression:   aws.String(keyCondition),
+		ExpressionAttributeNames: exprAttrNames,
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":v": &types.AttributeValueMemberS{Value: keyValue},
 		},
