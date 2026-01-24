@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -1176,5 +1177,282 @@ func TestServerRevokeCommand_StoreError(t *testing.T) {
 	_, err := testableServerRevokeCommand(context.Background(), input)
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("Expected error %v, got: %v", expectedErr, err)
+	}
+}
+
+// TestServerSessionsCommand_SinceFilter tests --since duration filtering.
+func TestServerSessionsCommand_SinceFilter(t *testing.T) {
+	now := time.Now()
+	recentSession := &session.ServerSession{
+		ID:             "abc123def4567890",
+		User:           "alice",
+		Profile:        "dev",
+		Status:         session.StatusActive,
+		StartedAt:      now.Add(-2 * time.Hour),
+		LastAccessAt:   now.Add(-1 * time.Hour),
+		ExpiresAt:      now.Add(1 * time.Hour),
+		RequestCount:   10,
+		SourceIdentity: "sentinel:alice:req123",
+	}
+	oldSession := &session.ServerSession{
+		ID:             "def456ghi7890123",
+		User:           "bob",
+		Profile:        "staging",
+		Status:         session.StatusExpired,
+		StartedAt:      now.Add(-48 * time.Hour),
+		LastAccessAt:   now.Add(-24 * time.Hour),
+		ExpiresAt:      now.Add(-12 * time.Hour),
+		RequestCount:   5,
+		SourceIdentity: "sentinel:bob:req456",
+	}
+
+	var calledStartTime, calledEndTime time.Time
+	store := &mockSessionStore{
+		listByTimeRangeFn: func(ctx context.Context, startTime, endTime time.Time, limit int) ([]*session.ServerSession, error) {
+			calledStartTime = startTime
+			calledEndTime = endTime
+			// Return both sessions - filtering would be done in actual DynamoDB
+			return []*session.ServerSession{recentSession, oldSession}, nil
+		},
+	}
+
+	input := ServerSessionsCommandInput{
+		Since: "24h",
+		Store: store,
+		Limit: 100,
+	}
+
+	summaries, err := testableServerSessionsCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify ListByTimeRange was called with correct time range
+	expectedStart := now.Add(-24 * time.Hour)
+	if calledStartTime.Before(expectedStart.Add(-1*time.Second)) || calledStartTime.After(expectedStart.Add(1*time.Second)) {
+		t.Errorf("expected start time around %v, got %v", expectedStart, calledStartTime)
+	}
+	if calledEndTime.Before(now.Add(-1*time.Second)) || calledEndTime.After(now.Add(1*time.Second)) {
+		t.Errorf("expected end time around %v, got %v", now, calledEndTime)
+	}
+
+	// Verify results
+	if len(summaries) != 2 {
+		t.Fatalf("expected 2 summaries, got %d", len(summaries))
+	}
+}
+
+// TestServerSessionsCommand_SinceWithStatusFilter tests combined --since and --status filtering.
+func TestServerSessionsCommand_SinceWithStatusFilter(t *testing.T) {
+	now := time.Now()
+	activeSession := &session.ServerSession{
+		ID:           "abc123def4567890",
+		User:         "alice",
+		Profile:      "dev",
+		Status:       session.StatusActive,
+		StartedAt:    now.Add(-2 * time.Hour),
+		LastAccessAt: now.Add(-1 * time.Hour),
+		ExpiresAt:    now.Add(1 * time.Hour),
+		RequestCount: 10,
+	}
+	expiredSession := &session.ServerSession{
+		ID:           "def456ghi7890123",
+		User:         "bob",
+		Profile:      "staging",
+		Status:       session.StatusExpired,
+		StartedAt:    now.Add(-12 * time.Hour),
+		LastAccessAt: now.Add(-6 * time.Hour),
+		ExpiresAt:    now.Add(-2 * time.Hour),
+		RequestCount: 5,
+	}
+
+	store := &mockSessionStore{
+		listByTimeRangeFn: func(ctx context.Context, startTime, endTime time.Time, limit int) ([]*session.ServerSession, error) {
+			return []*session.ServerSession{activeSession, expiredSession}, nil
+		},
+	}
+
+	input := ServerSessionsCommandInput{
+		Since:  "24h",
+		Status: "active",
+		Store:  store,
+		Limit:  100,
+	}
+
+	summaries, err := testableServerSessionsCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should filter to only active sessions
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 summary (filtered to active), got %d", len(summaries))
+	}
+
+	if summaries[0].Status != "active" {
+		t.Errorf("expected active status, got %s", summaries[0].Status)
+	}
+}
+
+// TestServerSessionsCommand_SinceWithDays tests --since with day-based durations.
+func TestServerSessionsCommand_SinceWithDays(t *testing.T) {
+	now := time.Now()
+	expectedSessions := []*session.ServerSession{
+		{
+			ID:           "abc123def4567890",
+			User:         "alice",
+			Profile:      "dev",
+			Status:       session.StatusActive,
+			StartedAt:    now.Add(-24 * time.Hour),
+			LastAccessAt: now,
+			ExpiresAt:    now.Add(12 * time.Hour),
+			RequestCount: 50,
+		},
+	}
+
+	var calledStartTime time.Time
+	store := &mockSessionStore{
+		listByTimeRangeFn: func(ctx context.Context, startTime, endTime time.Time, limit int) ([]*session.ServerSession, error) {
+			calledStartTime = startTime
+			return expectedSessions, nil
+		},
+	}
+
+	input := ServerSessionsCommandInput{
+		Since: "7d",
+		Store: store,
+		Limit: 100,
+	}
+
+	summaries, err := testableServerSessionsCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify the start time is approximately 7 days ago
+	expectedStart := now.Add(-7 * 24 * time.Hour)
+	timeDiff := calledStartTime.Sub(expectedStart)
+	if timeDiff < -2*time.Second || timeDiff > 2*time.Second {
+		t.Errorf("expected start time around %v, got %v (diff: %v)", expectedStart, calledStartTime, timeDiff)
+	}
+
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 summary, got %d", len(summaries))
+	}
+}
+
+// TestServerSessionsCommand_InvalidSince tests error for invalid --since duration.
+func TestServerSessionsCommand_InvalidSince(t *testing.T) {
+	store := &mockSessionStore{}
+
+	input := ServerSessionsCommandInput{
+		Since: "invalid",
+		Store: store,
+		Limit: 100,
+	}
+
+	_, err := testableServerSessionsCommand(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error for invalid --since duration")
+	}
+
+	if !strings.Contains(err.Error(), "invalid --since duration") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// TestServerSessionsCommand_SourceIdentityIncluded tests that SourceIdentity is included in output.
+func TestServerSessionsCommand_SourceIdentityIncluded(t *testing.T) {
+	now := time.Now()
+	expectedSessions := []*session.ServerSession{
+		{
+			ID:               "abc123def4567890",
+			User:             "alice",
+			Profile:          "production",
+			Status:           session.StatusActive,
+			StartedAt:        now,
+			LastAccessAt:     now,
+			ExpiresAt:        now.Add(30 * time.Minute),
+			RequestCount:     42,
+			ServerInstanceID: "server-xyz",
+			SourceIdentity:   "sentinel:alice:req123abc",
+		},
+	}
+
+	store := &mockSessionStore{
+		listByStatusFn: func(ctx context.Context, status session.SessionStatus, limit int) ([]*session.ServerSession, error) {
+			return expectedSessions, nil
+		},
+	}
+
+	input := ServerSessionsCommandInput{
+		Status: "active",
+		Store:  store,
+		Limit:  100,
+	}
+
+	summaries, err := testableServerSessionsCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 summary, got %d", len(summaries))
+	}
+
+	if summaries[0].SourceIdentity != "sentinel:alice:req123abc" {
+		t.Errorf("expected SourceIdentity 'sentinel:alice:req123abc', got %s", summaries[0].SourceIdentity)
+	}
+}
+
+// TestServerSessionsCommand_SinceWithUserFilter tests combined --since and --user filtering.
+func TestServerSessionsCommand_SinceWithUserFilter(t *testing.T) {
+	now := time.Now()
+	aliceSession := &session.ServerSession{
+		ID:           "abc123def4567890",
+		User:         "alice",
+		Profile:      "dev",
+		Status:       session.StatusActive,
+		StartedAt:    now.Add(-2 * time.Hour),
+		LastAccessAt: now.Add(-1 * time.Hour),
+		ExpiresAt:    now.Add(1 * time.Hour),
+		RequestCount: 10,
+	}
+	bobSession := &session.ServerSession{
+		ID:           "def456ghi7890123",
+		User:         "bob",
+		Profile:      "staging",
+		Status:       session.StatusActive,
+		StartedAt:    now.Add(-3 * time.Hour),
+		LastAccessAt: now.Add(-2 * time.Hour),
+		ExpiresAt:    now.Add(2 * time.Hour),
+		RequestCount: 20,
+	}
+
+	store := &mockSessionStore{
+		listByTimeRangeFn: func(ctx context.Context, startTime, endTime time.Time, limit int) ([]*session.ServerSession, error) {
+			return []*session.ServerSession{aliceSession, bobSession}, nil
+		},
+	}
+
+	input := ServerSessionsCommandInput{
+		Since: "24h",
+		User:  "alice",
+		Store: store,
+		Limit: 100,
+	}
+
+	summaries, err := testableServerSessionsCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should filter to only alice's sessions
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 summary (filtered to alice), got %d", len(summaries))
+	}
+
+	if summaries[0].User != "alice" {
+		t.Errorf("expected user 'alice', got %s", summaries[0].User)
 	}
 }
