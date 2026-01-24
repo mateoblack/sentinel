@@ -96,6 +96,10 @@ func (m *mockSessionStore) ListByTimeRange(ctx context.Context, startTime, endTi
 	return nil, nil
 }
 
+func (m *mockSessionStore) GetBySourceIdentity(ctx context.Context, sourceIdentity string) (*session.ServerSession, error) {
+	return nil, nil
+}
+
 // mockSessionSTSClient implements identity.STSAPI for testing.
 type mockSessionSTSClient struct {
 	GetCallerIdentityFunc func(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)

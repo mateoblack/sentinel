@@ -43,6 +43,7 @@ func main() {
 
 	// Audit commands
 	cli.ConfigureAuditVerifyCommand(app, s)
+	cli.ConfigureAuditUntrackedSessionsCommand(app, s)
 
 	// Permissions command
 	cli.ConfigurePermissionsCommand(app, s)

@@ -1395,6 +1395,10 @@ func (m *MockSessionStore) ListByTimeRange(ctx context.Context, startTime, endTi
 	return nil, nil
 }
 
+func (m *MockSessionStore) GetBySourceIdentity(ctx context.Context, sourceIdentity string) (*session.ServerSession, error) {
+	return nil, nil
+}
+
 func (m *MockSessionStore) CreateCallCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
