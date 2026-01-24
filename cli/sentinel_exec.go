@@ -25,6 +25,11 @@ import (
 	"github.com/byteness/aws-vault/v7/vault"
 )
 
+const (
+	// EnvSessionTable is the environment variable for default session table name.
+	EnvSessionTable = "SENTINEL_SESSION_TABLE"
+)
+
 // SentinelExecCommandInput contains the input for the sentinel exec command.
 type SentinelExecCommandInput struct {
 	ProfileName      string
@@ -151,6 +156,14 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		return 0, fmt.Errorf("Can't use --server with --no-session")
 	}
 
+	// 0.8. Apply SENTINEL_SESSION_TABLE env var if --session-table not provided and in server mode
+	if input.SessionTableName == "" && input.StartServer {
+		if envTable := os.Getenv(EnvSessionTable); envTable != "" {
+			input.SessionTableName = envTable
+			log.Printf("Using session table from %s: %s", EnvSessionTable, envTable)
+		}
+	}
+
 	// 0.6. Load AWS config file for auto-login SSO lookup (if needed)
 	configFile := input.ConfigFile
 	if input.AutoLogin && configFile == nil {
@@ -270,6 +283,12 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	// 7. Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
+	// 7.5. Apply policy-specified session table if present (overrides CLI/env)
+	if decision.SessionTableName != "" && input.StartServer {
+		log.Printf("Using session table from policy: %s", decision.SessionTableName)
+		input.SessionTableName = decision.SessionTableName
+	}
+
 	// 8. Handle deny or require_approval decision - check for require_server mode first, then approved request or break-glass
 	var approvedReq *request.Request
 	var activeBreakGlass *breakglass.BreakGlassEvent
@@ -361,7 +380,10 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		}
 
 		// Create credential provider adapter that wraps Sentinel.GetCredentialsWithSourceIdentity
-		credProvider := &sentinelCredentialProviderAdapter{sentinel: s}
+		credProvider := &sentinelCredentialProviderAdapter{
+			sentinel:          s,
+			credentialProfile: credentialProfile, // Pass SSO credential profile
+		}
 
 		serverConfig := sentinel.SentinelServerConfig{
 			ProfileName:        input.ProfileName,
@@ -504,14 +526,22 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 // sentinelCredentialProviderAdapter adapts Sentinel.GetCredentialsWithSourceIdentity
 // to the sentinel.CredentialProvider interface used by SentinelServer.
 type sentinelCredentialProviderAdapter struct {
-	sentinel *Sentinel
+	sentinel          *Sentinel
+	credentialProfile string // SSO credential profile (from --aws-profile)
 }
 
 // GetCredentialsWithSourceIdentity implements sentinel.CredentialProvider.
 func (a *sentinelCredentialProviderAdapter) GetCredentialsWithSourceIdentity(ctx context.Context, req sentinel.CredentialRequest) (*sentinel.CredentialResult, error) {
+	// Use credentialProfile for credential retrieval if set, otherwise fall back to req.ProfileName.
+	// credentialProfile is the SSO source profile (--aws-profile), while req.ProfileName is the policy target.
+	profileForCredentials := a.credentialProfile
+	if profileForCredentials == "" {
+		profileForCredentials = req.ProfileName
+	}
+
 	// Convert sentinel.CredentialRequest to SentinelCredentialRequest
 	cliReq := SentinelCredentialRequest{
-		ProfileName:     req.ProfileName,
+		ProfileName:     profileForCredentials,
 		NoSession:       req.NoSession,
 		SessionDuration: req.SessionDuration,
 		Region:          req.Region,

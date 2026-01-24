@@ -216,8 +216,8 @@ func InitSessionsCommand(ctx context.Context, input InitSessionsCommandInput) er
 	// Print next steps
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintln(stdout, "Next steps:")
-	fmt.Fprintf(stdout, "  1. Configure --session-table %s in sentinel exec --server\n", input.TableName)
-	fmt.Fprintln(stdout, "  2. Or set SENTINEL_SESSION_TABLE environment variable")
+	fmt.Fprintf(stdout, "  1. Set SENTINEL_SESSION_TABLE=%s environment variable for automatic session tracking\n", input.TableName)
+	fmt.Fprintf(stdout, "  2. Or use --session-table %s explicitly with sentinel exec --server\n", input.TableName)
 	fmt.Fprintln(stdout, "")
 	fmt.Fprintf(stdout, "  Run 'sentinel init sessions --generate-iam --table %s --region %s'\n", input.TableName, input.Region)
 	fmt.Fprintln(stdout, "  to generate the IAM policy document for table access.")

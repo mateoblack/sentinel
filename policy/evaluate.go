@@ -27,6 +27,7 @@ type Decision struct {
 	MaxServerDuration       time.Duration // Policy-imposed cap on server mode session duration (0 = no cap)
 	RequiresServerMode      bool          // True when EffectRequireServer matched but mode was not server
 	RequiresSessionTracking bool          // True when EffectRequireServerSession matched but session tracking was not enabled
+	SessionTableName        string        // Session table name from matched rule (overrides CLI/env if set)
 }
 
 // String returns a human-readable representation of the decision.
@@ -98,6 +99,7 @@ func Evaluate(policy *Policy, req *Request) Decision {
 				MaxServerDuration:       rule.MaxServerDuration,
 				RequiresServerMode:      requiresServerMode,
 				RequiresSessionTracking: requiresSessionTracking,
+				SessionTableName:        rule.SessionTable,
 			}
 		}
 	}
