@@ -91,7 +91,7 @@ func testableApproveCommand(ctx context.Context, input ApproveCommandInput) (*Ap
 	req.Status = request.StatusApproved
 	req.Approver = approver
 	req.ApproverComment = input.Comment
-	req.UpdatedAt = time.Now()
+	// Note: UpdatedAt is set internally by store.Update() for optimistic locking
 
 	// 8. Store updated request
 	if err := store.Update(ctx, req); err != nil {

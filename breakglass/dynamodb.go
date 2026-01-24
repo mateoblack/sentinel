@@ -188,14 +188,21 @@ func (s *DynamoDBStore) Get(ctx context.Context, id string) (*BreakGlassEvent, e
 // Update modifies an existing event using optimistic locking.
 // Returns ErrEventNotFound if event doesn't exist.
 // Returns ErrConcurrentModification if event was modified since last read.
+// Note: Update() sets UpdatedAt internally - callers should NOT set it before calling.
 func (s *DynamoDBStore) Update(ctx context.Context, event *BreakGlassEvent) error {
+	// Save original UpdatedAt for optimistic lock condition check
+	originalUpdatedAt := event.UpdatedAt
+
+	// Set new UpdatedAt for the write (this also updates the caller's event in-place)
+	event.UpdatedAt = time.Now()
+
 	item := eventToItem(event)
 	av, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return fmt.Errorf("marshal event: %w", err)
 	}
 
-	// Build condition: item must exist AND updated_at must match
+	// Build condition: item must exist AND updated_at must match ORIGINAL value
 	// This implements optimistic locking - if someone else updated the item,
 	// the condition will fail.
 	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
@@ -203,7 +210,7 @@ func (s *DynamoDBStore) Update(ctx context.Context, event *BreakGlassEvent) erro
 		Item:                av,
 		ConditionExpression: aws.String("attribute_exists(id) AND updated_at = :old_updated_at"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":old_updated_at": &types.AttributeValueMemberS{Value: event.UpdatedAt.Format(time.RFC3339Nano)},
+			":old_updated_at": &types.AttributeValueMemberS{Value: originalUpdatedAt.Format(time.RFC3339Nano)},
 		},
 	})
 	if err != nil {

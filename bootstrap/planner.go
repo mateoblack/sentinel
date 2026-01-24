@@ -132,3 +132,56 @@ func (p *Planner) checkSSMParameter(ctx context.Context, paramName string) (bool
 
 	return true, version, nil
 }
+
+// mockSSMClient is a mock SSM client that returns a predetermined plan.
+// It implements ssmAPI but is only used internally by NewMockPlanner.
+type mockSSMClient struct {
+	plan *BootstrapPlan
+}
+
+func (m *mockSSMClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+	// Look up the parameter in the plan's resources
+	paramName := aws.ToString(params.Name)
+	for _, r := range m.plan.Resources {
+		if r.Name == paramName {
+			if r.State == StateExists || r.State == StateUpdate {
+				version := int64(1)
+				if r.CurrentVersion != "" {
+					fmt.Sscanf(r.CurrentVersion, "%d", &version)
+				}
+				return &ssm.GetParameterOutput{
+					Parameter: &types.Parameter{
+						Name:    params.Name,
+						Version: version,
+					},
+				}, nil
+			}
+		}
+	}
+	// Not found
+	return nil, &types.ParameterNotFound{}
+}
+
+// NewMockPlanner creates a Planner that returns the provided plan.
+// This is useful for testing CLI commands that need to inject a mock Planner.
+// The plan's Resources are used to determine which parameters "exist" in SSM.
+func NewMockPlanner(plan *BootstrapPlan, err error) *Planner {
+	if err != nil {
+		// For error case, return a planner that will fail on any Plan() call
+		return &Planner{
+			ssm: &errorSSMClient{err: err},
+		}
+	}
+	return &Planner{
+		ssm: &mockSSMClient{plan: plan},
+	}
+}
+
+// errorSSMClient always returns an error.
+type errorSSMClient struct {
+	err error
+}
+
+func (e *errorSSMClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+	return nil, e.err
+}

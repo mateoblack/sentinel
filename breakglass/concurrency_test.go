@@ -79,6 +79,8 @@ func (s *concurrentMockStore) Update(ctx context.Context, event *breakglass.Brea
 	if _, exists := s.events[event.ID]; !exists {
 		return fmt.Errorf("%s: %w", event.ID, breakglass.ErrEventNotFound)
 	}
+	// Set UpdatedAt to match real DynamoDB store behavior
+	event.UpdatedAt = time.Now()
 	// Last-writer-wins for simplicity in mock
 	s.events[event.ID] = event
 	return nil

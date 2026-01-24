@@ -227,10 +227,18 @@ func BootstrapCommand(ctx context.Context, input BootstrapCommandInput) error {
 		return nil
 	}
 
-	// If no changes needed, return early
+	// If no SSM changes needed
 	if plan.Summary.ToCreate == 0 && plan.Summary.ToUpdate == 0 {
 		if !input.JSONOutput {
-			fmt.Fprintln(stdout, "\nNo changes needed.")
+			fmt.Fprintln(stdout, "\nNo SSM changes needed.")
+		}
+		// Still provision DynamoDB tables if requested
+		if err := provisionTables(ctx, input, stdout, stderr); err != nil {
+			return err
+		}
+		// Output IAM policies if requested
+		if input.GenerateIAMPolicies && !input.JSONOutput {
+			outputCombinedIAMPolicies(stdout, input)
 		}
 		return nil
 	}

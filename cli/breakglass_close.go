@@ -152,7 +152,7 @@ func BreakGlassCloseCommand(ctx context.Context, input BreakGlassCloseCommandInp
 	event.Status = breakglass.StatusClosed
 	event.ClosedBy = closer
 	event.ClosedReason = input.Reason
-	event.UpdatedAt = time.Now()
+	// Note: UpdatedAt is set internally by store.Update() for optimistic locking
 
 	// 9. Store updated event
 	if err := store.Update(ctx, event); err != nil {

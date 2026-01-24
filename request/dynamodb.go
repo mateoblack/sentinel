@@ -180,14 +180,21 @@ func (s *DynamoDBStore) Get(ctx context.Context, id string) (*Request, error) {
 // Update modifies an existing request using optimistic locking.
 // Returns ErrRequestNotFound if request doesn't exist.
 // Returns ErrConcurrentModification if request was modified since last read.
+// Note: Update() sets UpdatedAt internally - callers should NOT set it before calling.
 func (s *DynamoDBStore) Update(ctx context.Context, req *Request) error {
+	// Save original UpdatedAt for optimistic lock condition check
+	originalUpdatedAt := req.UpdatedAt
+
+	// Set new UpdatedAt for the write (this also updates the caller's request in-place)
+	req.UpdatedAt = time.Now()
+
 	item := requestToItem(req)
 	av, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	// Build condition: item must exist AND updated_at must match
+	// Build condition: item must exist AND updated_at must match ORIGINAL value
 	// This implements optimistic locking - if someone else updated the item,
 	// the condition will fail.
 	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
@@ -195,7 +202,7 @@ func (s *DynamoDBStore) Update(ctx context.Context, req *Request) error {
 		Item:                av,
 		ConditionExpression: aws.String("attribute_exists(id) AND updated_at = :old_updated_at"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":old_updated_at": &types.AttributeValueMemberS{Value: req.UpdatedAt.Format(time.RFC3339Nano)},
+			":old_updated_at": &types.AttributeValueMemberS{Value: originalUpdatedAt.Format(time.RFC3339Nano)},
 		},
 	})
 	if err != nil {

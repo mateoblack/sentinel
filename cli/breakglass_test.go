@@ -46,6 +46,8 @@ func (m *mockBreakGlassStore) Get(ctx context.Context, id string) (*breakglass.B
 }
 
 func (m *mockBreakGlassStore) Update(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+	// Set UpdatedAt to match real DynamoDB store behavior
+	event.UpdatedAt = time.Now()
 	if m.updateFn != nil {
 		return m.updateFn(ctx, event)
 	}

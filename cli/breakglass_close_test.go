@@ -61,7 +61,7 @@ func testableBreakGlassCloseCommand(ctx context.Context, input BreakGlassCloseCo
 	event.Status = breakglass.StatusClosed
 	event.ClosedBy = closer
 	event.ClosedReason = input.Reason
-	event.UpdatedAt = time.Now()
+	// Note: UpdatedAt is set internally by store.Update() for optimistic locking
 
 	// 8. Store updated event
 	if err := store.Update(ctx, event); err != nil {

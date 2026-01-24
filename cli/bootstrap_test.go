@@ -941,12 +941,87 @@ func TestBootstrapCommand_NoChangesNeeded(t *testing.T) {
 	output := readFile(t, stdout)
 
 	// Verify no changes message
-	if !strings.Contains(output, "No changes needed") {
-		t.Error("expected output to contain 'No changes needed'")
+	if !strings.Contains(output, "No changes needed") && !strings.Contains(output, "No SSM changes needed") {
+		t.Error("expected output to contain 'No changes needed' or 'No SSM changes needed'")
 	}
 	// Should not attempt apply
 	if strings.Contains(output, "Apply complete") {
 		t.Error("expected output NOT to contain 'Apply complete' when no changes")
+	}
+}
+
+func TestBootstrapCommand_SSMExistsWithTables(t *testing.T) {
+	// Test that DynamoDB tables are provisioned even when SSM parameters already exist.
+	// This was a bug where the early return for "no SSM changes" skipped table provisioning.
+	stdout, stderr, cleanup := createTestFiles(t)
+	defer cleanup()
+
+	// Mock SSM planner - no SSM changes needed (parameters already exist)
+	plan := &bootstrap.BootstrapPlan{
+		Config: bootstrap.BootstrapConfig{
+			PolicyRoot: "/sentinel/policies",
+			Profiles:   []bootstrap.ProfileConfig{{Name: "dev"}},
+		},
+		Resources: []bootstrap.ResourceSpec{
+			{
+				Type:           bootstrap.ResourceTypeSSMParameter,
+				Name:           "/sentinel/policies/dev",
+				State:          bootstrap.StateExists,
+				CurrentVersion: "1",
+			},
+		},
+		Summary: bootstrap.PlanSummary{ToCreate: 0, ToUpdate: 0, ToSkip: 1, Total: 1},
+	}
+	mockPlanner := bootstrap.NewMockPlanner(plan, nil)
+
+	// Mock DynamoDB provisioner - tracks calls
+	mockProvisioner := &mockTableProvisioner{
+		CreateResult: &infrastructure.ProvisionResult{
+			TableName: "sentinel-requests",
+			Status:    infrastructure.StatusCreated,
+			ARN:       "arn:aws:dynamodb:us-east-1:123456789012:table/sentinel-requests",
+		},
+	}
+
+	input := BootstrapCommandInput{
+		PolicyRoot:        "/sentinel/policies",
+		Profiles:          []string{"dev"},
+		Region:            "us-east-1",
+		AutoApprove:       true,
+		WithApprovals:     true,
+		ApprovalTableName: "sentinel-requests",
+		Planner:           mockPlanner,
+		Provisioner:       mockProvisioner,
+		Stdout:            stdout,
+		Stderr:            stderr,
+	}
+
+	err := BootstrapCommand(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify provisioner was called for the table
+	if len(mockProvisioner.CreateCalls) != 1 {
+		t.Errorf("expected 1 Create call for DynamoDB table, got %d", len(mockProvisioner.CreateCalls))
+	}
+	if len(mockProvisioner.CreateCalls) > 0 && mockProvisioner.CreateCalls[0].TableName != "sentinel-requests" {
+		t.Errorf("expected table name 'sentinel-requests', got %q", mockProvisioner.CreateCalls[0].TableName)
+	}
+
+	output := readFile(t, stdout)
+
+	// Verify "No SSM changes needed" message appears
+	if !strings.Contains(output, "No SSM changes needed") {
+		t.Error("expected output to contain 'No SSM changes needed'")
+	}
+
+	// Verify DynamoDB table output appears
+	if !strings.Contains(output, "DynamoDB Tables") {
+		t.Error("expected output to contain 'DynamoDB Tables'")
+	}
+	if !strings.Contains(output, "Approvals table") {
+		t.Error("expected output to contain 'Approvals table'")
 	}
 }
 

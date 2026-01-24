@@ -41,6 +41,8 @@ func (m *mockStore) Get(ctx context.Context, id string) (*request.Request, error
 }
 
 func (m *mockStore) Update(ctx context.Context, req *request.Request) error {
+	// Set UpdatedAt to match real DynamoDB store behavior
+	req.UpdatedAt = time.Now()
 	if m.updateFn != nil {
 		return m.updateFn(ctx, req)
 	}

@@ -93,7 +93,8 @@ func (s *concurrentMockStore) Update(ctx context.Context, req *request.Request) 
 		return fmt.Errorf("%s: %w", req.ID, request.ErrRequestNotFound)
 	}
 
-	// Optimistic locking: check UpdatedAt matches
+	// Optimistic locking: check UpdatedAt matches (using original value)
+	// This matches DynamoDB behavior where we check the original UpdatedAt
 	if s.optimisticLocking {
 		if !existing.UpdatedAt.Equal(req.UpdatedAt) {
 			s.updateErrors.Add(1)
@@ -101,9 +102,11 @@ func (s *concurrentMockStore) Update(ctx context.Context, req *request.Request) 
 		}
 	}
 
-	// Clone and update
+	// Update timestamp on passed-in request (matches DynamoDB store behavior)
+	req.UpdatedAt = time.Now()
+
+	// Clone and store
 	clone := *req
-	clone.UpdatedAt = time.Now()
 	s.requests[req.ID] = &clone
 	return nil
 }
