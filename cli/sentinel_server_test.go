@@ -135,9 +135,19 @@ func defaultSessionMockSTSClient() identity.STSAPI {
 
 // testableServerSessionsCommand is a testable version that uses mock STS client.
 func testableServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput) ([]ServerSessionSummary, error) {
-	// 1. Get user (use STSClient if no user filter and no other filter)
+	// 1. Parse --since duration if provided
+	var sinceTime time.Time
+	if input.Since != "" {
+		sinceDuration, err := ParseDuration(input.Since)
+		if err != nil {
+			return nil, errors.New("invalid --since duration: " + err.Error())
+		}
+		sinceTime = time.Now().Add(-sinceDuration)
+	}
+
+	// 2. Get user (use STSClient if no user filter and no other filter)
 	user := input.User
-	if user == "" && input.Status == "" && input.Profile == "" {
+	if user == "" && input.Status == "" && input.Profile == "" && input.Since == "" {
 		stsClient := input.STSClient
 		if stsClient == nil {
 			return nil, errors.New("STSClient is required for testing when no filter is provided")
@@ -149,13 +159,13 @@ func testableServerSessionsCommand(ctx context.Context, input ServerSessionsComm
 		}
 	}
 
-	// 2. Get store (must be provided for testing)
+	// 3. Get store (must be provided for testing)
 	store := input.Store
 	if store == nil {
 		return nil, errors.New("store is required for testing")
 	}
 
-	// 3. Query based on flags (priority: status > profile > user)
+	// 4. Query based on flags (priority: since > status > profile > user)
 	var sessions []*session.ServerSession
 	var err error
 	limit := input.Limit
@@ -163,7 +173,10 @@ func testableServerSessionsCommand(ctx context.Context, input ServerSessionsComm
 		limit = 100
 	}
 
-	if input.Status != "" {
+	if input.Since != "" {
+		// Query by time range (from sinceTime to now)
+		sessions, err = store.ListByTimeRange(ctx, sinceTime, time.Now(), limit)
+	} else if input.Status != "" {
 		// Query by status
 		status := session.SessionStatus(input.Status)
 		if !status.IsValid() {
@@ -185,8 +198,8 @@ func testableServerSessionsCommand(ctx context.Context, input ServerSessionsComm
 		return nil, err
 	}
 
-	// 4. Filter by user if specified AND query was not by user
-	if input.User != "" && (input.Status != "" || input.Profile != "") {
+	// 5. Filter by user if specified AND query was not by user
+	if input.User != "" && (input.Status != "" || input.Profile != "" || input.Since != "") {
 		filtered := make([]*session.ServerSession, 0, len(sessions))
 		for _, sess := range sessions {
 			if sess.User == input.User {
@@ -196,7 +209,30 @@ func testableServerSessionsCommand(ctx context.Context, input ServerSessionsComm
 		sessions = filtered
 	}
 
-	// 5. Format results
+	// 6. Filter by status if specified AND query was by time range
+	if input.Status != "" && input.Since != "" {
+		status := session.SessionStatus(input.Status)
+		filtered := make([]*session.ServerSession, 0, len(sessions))
+		for _, sess := range sessions {
+			if sess.Status == status {
+				filtered = append(filtered, sess)
+			}
+		}
+		sessions = filtered
+	}
+
+	// 7. Filter by profile if specified AND query was by time range
+	if input.Profile != "" && input.Since != "" {
+		filtered := make([]*session.ServerSession, 0, len(sessions))
+		for _, sess := range sessions {
+			if sess.Profile == input.Profile {
+				filtered = append(filtered, sess)
+			}
+		}
+		sessions = filtered
+	}
+
+	// 8. Format results
 	summaries := make([]ServerSessionSummary, 0, len(sessions))
 	for _, sess := range sessions {
 		summaries = append(summaries, ServerSessionSummary{
@@ -209,6 +245,7 @@ func testableServerSessionsCommand(ctx context.Context, input ServerSessionsComm
 			ExpiresAt:        sess.ExpiresAt,
 			RequestCount:     sess.RequestCount,
 			ServerInstanceID: sess.ServerInstanceID,
+			SourceIdentity:   sess.SourceIdentity,
 		})
 	}
 

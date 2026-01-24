@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -116,9 +117,20 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 		return err
 	}
 
-	// 2. Get AWS identity if User not specified and no other filter
+	// 2. Parse --since duration if provided
+	var sinceTime time.Time
+	if input.Since != "" {
+		sinceDuration, err := ParseDuration(input.Since)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Invalid --since duration: %v\n", err)
+			return fmt.Errorf("invalid --since duration: %w", err)
+		}
+		sinceTime = time.Now().Add(-sinceDuration)
+	}
+
+	// 3. Get AWS identity if User not specified and no other filter
 	user := input.User
-	if user == "" && input.Status == "" && input.Profile == "" {
+	if user == "" && input.Status == "" && input.Profile == "" && input.Since == "" {
 		stsClient := input.STSClient
 		if stsClient == nil {
 			stsClient = sts.NewFromConfig(awsCfg)
@@ -130,17 +142,20 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 		}
 	}
 
-	// 3. Get or create store
+	// 4. Get or create store
 	store := input.Store
 	if store == nil {
 		store = session.NewDynamoDBStore(awsCfg, input.TableName)
 	}
 
-	// 4. Query based on flags (priority: status > profile > user, default to active sessions)
+	// 5. Query based on flags (priority: since > status > profile > user, default to active sessions)
 	var sessions []*session.ServerSession
 	limit := input.Limit
 
-	if input.Status != "" {
+	if input.Since != "" {
+		// Query by time range (from sinceTime to now)
+		sessions, err = store.ListByTimeRange(ctx, sinceTime, time.Now(), limit)
+	} else if input.Status != "" {
 		// Query by status
 		status := session.SessionStatus(input.Status)
 		if !status.IsValid() {
@@ -164,11 +179,34 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 		return err
 	}
 
-	// 5. Filter by user if specified AND query was not by user
-	if input.User != "" && (input.Status != "" || input.Profile != "") {
+	// 6. Filter by user if specified AND query was not by user
+	if input.User != "" && (input.Status != "" || input.Profile != "" || input.Since != "") {
 		filtered := make([]*session.ServerSession, 0, len(sessions))
 		for _, sess := range sessions {
 			if sess.User == input.User {
+				filtered = append(filtered, sess)
+			}
+		}
+		sessions = filtered
+	}
+
+	// 7. Filter by status if specified AND query was by time range or profile
+	if input.Status != "" && input.Since != "" {
+		status := session.SessionStatus(input.Status)
+		filtered := make([]*session.ServerSession, 0, len(sessions))
+		for _, sess := range sessions {
+			if sess.Status == status {
+				filtered = append(filtered, sess)
+			}
+		}
+		sessions = filtered
+	}
+
+	// 8. Filter by profile if specified AND query was by time range
+	if input.Profile != "" && input.Since != "" {
+		filtered := make([]*session.ServerSession, 0, len(sessions))
+		for _, sess := range sessions {
+			if sess.Profile == input.Profile {
 				filtered = append(filtered, sess)
 			}
 		}
@@ -191,7 +229,8 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 		})
 	}
 
-	if input.OutputFormat == "json" {
+	switch input.OutputFormat {
+	case "json":
 		output := ServerSessionsCommandOutput{
 			Sessions: summaries,
 		}
@@ -201,7 +240,25 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 			return err
 		}
 		fmt.Println(string(jsonBytes))
-	} else {
+	case "csv":
+		// CSV output for audit exports
+		// Header
+		fmt.Println("id,user,profile,status,started_at,last_access_at,expires_at,request_count,server_instance_id,source_identity")
+		for _, s := range summaries {
+			fmt.Printf("%s,%s,%s,%s,%s,%s,%s,%d,%s,%s\n",
+				s.ID,
+				csvEscape(s.User),
+				csvEscape(s.Profile),
+				s.Status,
+				s.StartedAt.Format(time.RFC3339),
+				s.LastAccessAt.Format(time.RFC3339),
+				s.ExpiresAt.Format(time.RFC3339),
+				s.RequestCount,
+				s.ServerInstanceID,
+				csvEscape(s.SourceIdentity),
+			)
+		}
+	default:
 		// Human-readable format
 		if len(summaries) == 0 {
 			fmt.Println("No sessions found.")
@@ -227,6 +284,14 @@ func ServerSessionsCommand(ctx context.Context, input ServerSessionsCommandInput
 	}
 
 	return nil
+}
+
+// csvEscape escapes a string for CSV output by wrapping in quotes if it contains special characters.
+func csvEscape(s string) string {
+	if strings.ContainsAny(s, ",\"\n\r") {
+		return "\"" + strings.ReplaceAll(s, "\"", "\"\"") + "\""
+	}
+	return s
 }
 
 // ServerSessionCommandInput contains the input for the server session detail command.
