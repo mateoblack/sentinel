@@ -17,7 +17,7 @@ The `SourceIdentity` value is immutable for the lifetime of the AWS session and 
 │                 │     │                  │     │                 │
 │ request_id:     │     │ SourceIdentity:  │     │ sourceIdentity: │
 │ a1b2c3d4        │     │ sentinel:alice:  │     │ sentinel:alice: │
-│                 │     │ a1b2c3d4         │     │ a1b2c3d4        │
+│                 │     │ direct:a1b2c3d4  │     │ direct:a1b2c3d4 │
 │ effect: allow   │     │                  │     │ eventName: ...  │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
@@ -39,7 +39,7 @@ Sentinel writes decision logs in JSON Lines format. Each log entry contains fiel
 | `reason` | string | Rule's reason field or "no matching rule" | Always |
 | `policy_path` | string | SSM Parameter Store path for policy | Always |
 | `request_id` | string | 8-char hex request identifier | Allow only |
-| `source_identity` | string | Full `sentinel:user:request-id` string | Allow only |
+| `source_identity` | string | Full `sentinel:user:approval-marker:request-id` string | Allow only |
 | `role_arn` | string | Target role ARN | Allow only |
 | `session_duration_seconds` | int | Session duration in seconds | Allow only |
 
@@ -56,7 +56,7 @@ Sentinel writes decision logs in JSON Lines format. Each log entry contains fiel
   "reason": "Production access during business hours",
   "policy_path": "/sentinel/policy",
   "request_id": "a1b2c3d4",
-  "source_identity": "sentinel:alice:a1b2c3d4",
+  "source_identity": "sentinel:alice:direct:a1b2c3d4",
   "role_arn": "arn:aws:iam::123456789012:role/ProductionAdmin",
   "session_duration_seconds": 3600
 }
@@ -81,25 +81,42 @@ Note: Deny decisions do not include `request_id`, `source_identity`, `role_arn`,
 
 ## SourceIdentity Format
 
-Sentinel stamps every AWS session with a `SourceIdentity` value that uniquely identifies the access request.
+Sentinel stamps every AWS session with a `SourceIdentity` value that uniquely identifies the access request and its approval status.
 
 ### Format
 
 ```
-sentinel:<user>:<request-id>
+sentinel:<user>:<approval-marker>:<request-id>
 ```
 
 | Component | Description | Example |
 |-----------|-------------|---------|
 | `sentinel` | Fixed prefix identifying Sentinel-issued credentials | `sentinel` |
 | `user` | Sanitized username (alphanumeric only, max 20 chars) | `alice` |
+| `approval-marker` | Either `direct` or an 8-char hex approval ID | `direct` or `abcd1234` |
 | `request-id` | 8-character lowercase hex string (32 bits of entropy) | `a1b2c3d4` |
 
-### Example
+### Approval Marker Values
+
+- **`direct`** - Access was granted directly by policy (no approval required)
+- **8-char hex** - Access was granted via an approved request; the value is the approval request ID
+
+### Examples
+
+| Scenario | SourceIdentity |
+|----------|----------------|
+| Direct access (policy allows) | `sentinel:alice:direct:a1b2c3d4` |
+| Approved access (via request) | `sentinel:alice:abcd1234:a1b2c3d4` |
+
+### Legacy Format
+
+For backward compatibility, Sentinel recognizes the legacy 3-part format when parsing:
 
 ```
-sentinel:alice:a1b2c3d4
+sentinel:<user>:<request-id>
 ```
+
+This format is treated as direct access. New credentials always use the 4-part format.
 
 ### How SourceIdentity Appears in CloudTrail
 
@@ -122,7 +139,7 @@ In CloudTrail events, the `SourceIdentity` appears in the `userIdentity` object:
         "userName": "ProductionAdmin"
       }
     },
-    "sourceIdentity": "sentinel:alice:a1b2c3d4"
+    "sourceIdentity": "sentinel:alice:direct:a1b2c3d4"
   },
   "eventTime": "2024-01-15T10:35:00Z",
   "eventSource": "ec2.amazonaws.com",
@@ -164,7 +181,7 @@ From the Sentinel log entry, copy the `source_identity` field value:
 ```bash
 # Extract source_identity from matching entry
 grep '"request_id":"a1b2c3d4"' /var/log/sentinel/decisions.log | jq -r '.source_identity'
-# Output: sentinel:alice:a1b2c3d4
+# Output: sentinel:alice:direct:a1b2c3d4
 ```
 
 ### Step 3: Search CloudTrail for Matching SourceIdentity
@@ -173,7 +190,7 @@ Use the AWS CLI or Athena to find all CloudTrail events with that `sourceIdentit
 
 ```bash
 aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:direct:a1b2c3d4" \
   --start-time "2024-01-15T10:00:00Z" \
   --end-time "2024-01-15T12:00:00Z"
 ```
@@ -185,7 +202,7 @@ The CloudTrail results show every AWS API call made during that session:
 ```bash
 # Pretty-print the events
 aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:direct:a1b2c3d4" \
   --start-time "2024-01-15T10:00:00Z" \
   --end-time "2024-01-15T12:00:00Z" \
   --output json | jq '.Events[].CloudTrailEvent | fromjson | {time: .eventTime, service: .eventSource, action: .eventName}'
@@ -211,7 +228,7 @@ Find all CloudTrail events for a specific Sentinel session:
 
 ```bash
 aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:direct:a1b2c3d4" \
   --start-time "2024-01-15T00:00:00Z" \
   --end-time "2024-01-15T23:59:59Z"
 ```
@@ -223,7 +240,7 @@ Parse the nested CloudTrail response to extract actionable information:
 ```bash
 # Get event time, service, action, and source IP
 aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:direct:a1b2c3d4" \
   --start-time "2024-01-15T10:00:00Z" \
   --end-time "2024-01-15T12:00:00Z" \
   --output json | jq -r '
@@ -262,7 +279,7 @@ Find all EC2 actions from a Sentinel session:
 
 ```bash
 aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:a1b2c3d4" \
+  --lookup-attributes AttributeKey=Username,AttributeValue="sentinel:alice:direct:a1b2c3d4" \
   --start-time "2024-01-15T10:00:00Z" \
   --end-time "2024-01-15T12:00:00Z" \
   --output json | jq '
@@ -277,13 +294,14 @@ aws cloudtrail lookup-events \
 Complete example starting from Sentinel log and ending with CloudTrail activity:
 
 ```bash
-# Step 1: Find the Sentinel decision for a user
-REQUEST_ID=$(grep '"user":"alice"' /var/log/sentinel/decisions.log | tail -1 | jq -r '.request_id')
-echo "Request ID: $REQUEST_ID"
-
-# Step 2: Build the source identity
-SOURCE_IDENTITY="sentinel:alice:$REQUEST_ID"
+# Step 1: Find the Sentinel decision for a user and extract source identity
+SOURCE_IDENTITY=$(grep '"user":"alice"' /var/log/sentinel/decisions.log | tail -1 | jq -r '.source_identity')
 echo "Source Identity: $SOURCE_IDENTITY"
+# Example output: sentinel:alice:direct:a1b2c3d4
+
+# Step 2: (Optional) Extract just the request ID from the source identity
+REQUEST_ID=$(echo "$SOURCE_IDENTITY" | rev | cut -d: -f1 | rev)
+echo "Request ID: $REQUEST_ID"
 
 # Step 3: Lookup CloudTrail events
 aws cloudtrail lookup-events \
@@ -327,7 +345,7 @@ SELECT
     sourceipaddress,
     useridentity.sourceidentity
 FROM cloudtrail_logs
-WHERE useridentity.sourceidentity = 'sentinel:alice:a1b2c3d4'
+WHERE useridentity.sourceidentity = 'sentinel:alice:direct:a1b2c3d4'
 ORDER BY eventtime;
 ```
 
@@ -388,6 +406,58 @@ WHERE useridentity.sourceidentity LIKE 'sentinel:%'
     AND eventtime >= DATE_ADD('day', -30, CURRENT_DATE)
 GROUP BY 1, 2
 ORDER BY 1 DESC, 4 DESC;
+```
+
+### Find Sessions That Required Approval
+
+Query sessions where access was granted via an approved request (not direct access):
+
+```sql
+SELECT
+    eventtime,
+    useridentity.sourceidentity,
+    REGEXP_EXTRACT(useridentity.sourceidentity, 'sentinel:[^:]+:([^:]+):', 1) AS approval_marker,
+    eventsource,
+    eventname
+FROM cloudtrail_logs
+WHERE useridentity.sourceidentity LIKE 'sentinel:%'
+    AND REGEXP_EXTRACT(useridentity.sourceidentity, 'sentinel:[^:]+:([^:]+):', 1) != 'direct'
+ORDER BY eventtime DESC
+LIMIT 100;
+```
+
+### Breakdown of Direct vs Approved Access
+
+Summarize access patterns by approval status:
+
+```sql
+SELECT
+    CASE
+        WHEN REGEXP_EXTRACT(useridentity.sourceidentity, 'sentinel:[^:]+:([^:]+):', 1) = 'direct'
+        THEN 'direct'
+        ELSE 'approved'
+    END AS access_type,
+    COUNT(*) AS session_count
+FROM cloudtrail_logs
+WHERE useridentity.sourceidentity LIKE 'sentinel:%'
+    AND eventtime >= DATE_ADD('day', -30, CURRENT_DATE)
+GROUP BY 1;
+```
+
+### Find Sessions by Approval ID
+
+Locate all activity associated with a specific approval request:
+
+```sql
+SELECT
+    eventtime,
+    useridentity.sourceidentity,
+    eventsource,
+    eventname,
+    sourceipaddress
+FROM cloudtrail_logs
+WHERE useridentity.sourceidentity LIKE 'sentinel:%:abcd1234:%'
+ORDER BY eventtime;
 ```
 
 ### Cross-Reference with Sentinel Logs
