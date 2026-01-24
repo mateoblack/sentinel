@@ -9,22 +9,24 @@ import (
 
 // Request represents a credential request to be evaluated.
 type Request struct {
-	User    string
-	Profile string
-	Time    time.Time
-	Mode    CredentialMode // Credential delivery mode (server, cli, credential_process)
+	User             string
+	Profile          string
+	Time             time.Time
+	Mode             CredentialMode // Credential delivery mode (server, cli, credential_process)
+	SessionTableName string         // DynamoDB table name for session tracking (empty = no session tracking)
 }
 
 // Decision represents the outcome of policy evaluation.
 type Decision struct {
-	Effect             Effect
-	MatchedRule        string
-	Reason             string
-	RuleIndex          int           // Position of matched rule in policy (0-based, -1 if no match)
-	Conditions         *Condition    // Copy of matched rule's conditions for logging (nil for default deny)
-	EvaluatedAt        time.Time     // Timestamp when evaluation occurred
-	MaxServerDuration  time.Duration // Policy-imposed cap on server mode session duration (0 = no cap)
-	RequiresServerMode bool          // True when EffectRequireServer matched but mode was not server
+	Effect                  Effect
+	MatchedRule             string
+	Reason                  string
+	RuleIndex               int           // Position of matched rule in policy (0-based, -1 if no match)
+	Conditions              *Condition    // Copy of matched rule's conditions for logging (nil for default deny)
+	EvaluatedAt             time.Time     // Timestamp when evaluation occurred
+	MaxServerDuration       time.Duration // Policy-imposed cap on server mode session duration (0 = no cap)
+	RequiresServerMode      bool          // True when EffectRequireServer matched but mode was not server
+	RequiresSessionTracking bool          // True when EffectRequireServerSession matched but session tracking was not enabled
 }
 
 // String returns a human-readable representation of the decision.
@@ -61,9 +63,11 @@ func Evaluate(policy *Policy, req *Request) Decision {
 			// Copy conditions to avoid reference to original
 			conditionsCopy := rule.Conditions
 
-			// Handle require_server effect - allow only in server mode
+			// Handle special effects that convert to allow/deny based on mode
 			effect := rule.Effect
 			requiresServerMode := false
+			requiresSessionTracking := false
+
 			if rule.Effect == EffectRequireServer {
 				if req.Mode == ModeServer {
 					effect = EffectAllow
@@ -71,17 +75,29 @@ func Evaluate(policy *Policy, req *Request) Decision {
 					effect = EffectDeny
 					requiresServerMode = true
 				}
+			} else if rule.Effect == EffectRequireServerSession {
+				// require_server_session needs BOTH server mode AND session tracking
+				if req.Mode == ModeServer && req.SessionTableName != "" {
+					effect = EffectAllow
+				} else {
+					effect = EffectDeny
+					requiresSessionTracking = true
+					if req.Mode != ModeServer {
+						requiresServerMode = true
+					}
+				}
 			}
 
 			return Decision{
-				Effect:             effect,
-				MatchedRule:        rule.Name,
-				Reason:             rule.Reason,
-				RuleIndex:          i,
-				Conditions:         &conditionsCopy,
-				EvaluatedAt:        evaluatedAt,
-				MaxServerDuration:  rule.MaxServerDuration,
-				RequiresServerMode: requiresServerMode,
+				Effect:                  effect,
+				MatchedRule:             rule.Name,
+				Reason:                  rule.Reason,
+				RuleIndex:               i,
+				Conditions:              &conditionsCopy,
+				EvaluatedAt:             evaluatedAt,
+				MaxServerDuration:       rule.MaxServerDuration,
+				RequiresServerMode:      requiresServerMode,
+				RequiresSessionTracking: requiresSessionTracking,
 			}
 		}
 	}
