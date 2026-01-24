@@ -1454,8 +1454,9 @@ sentinel server-sessions --region REGION --table TABLE [flags]
 | `--status` | Filter by status (active, revoked, expired) | No |
 | `--user` | Filter by user | No |
 | `--profile` | Filter by AWS profile served | No |
+| `--since` | Only show sessions started within this duration (e.g., 7d, 30d, 24h) | No |
 | `--limit` | Maximum number of results | No (default: 100) |
-| `--output` | Output format (human, json) | No (default: human) |
+| `--output` | Output format (human, json, csv) | No (default: human) |
 | `--aws-profile` | AWS profile for credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
@@ -1470,8 +1471,17 @@ sentinel server-sessions --region us-east-1 --table sentinel-sessions --status a
 # List sessions for specific profile
 sentinel server-sessions --region us-east-1 --table sentinel-sessions --profile prod
 
+# List sessions from the last 7 days
+sentinel server-sessions --region us-east-1 --table sentinel-sessions --since 7d
+
+# List active sessions from the last 24 hours
+sentinel server-sessions --region us-east-1 --table sentinel-sessions --since 24h --status active
+
 # JSON output
 sentinel server-sessions --region us-east-1 --table sentinel-sessions --output json
+
+# CSV export for audit reporting
+sentinel server-sessions --region us-east-1 --table sentinel-sessions --since 30d --output csv > sessions.csv
 ```
 
 **Output (JSON):**
@@ -1488,10 +1498,18 @@ sentinel server-sessions --region us-east-1 --table sentinel-sessions --output j
       "last_access_at": "2026-01-20T10:45:00Z",
       "expires_at": "2026-01-20T10:45:00Z",
       "request_count": 15,
-      "server_instance_id": "b2c3d4e5f6789012"
+      "server_instance_id": "b2c3d4e5f6789012",
+      "source_identity": "sentinel:alice:a1b2c3d4"
     }
   ]
 }
+```
+
+**Output (CSV):**
+
+```csv
+id,user,profile,status,started_at,last_access_at,expires_at,request_count,server_instance_id,source_identity
+a1b2c3d4e5f67890,alice,prod,active,2026-01-20T10:30:00Z,2026-01-20T10:45:00Z,2026-01-20T11:30:00Z,15,b2c3d4e5f6789012,sentinel:alice:a1b2c3d4
 ```
 
 ---

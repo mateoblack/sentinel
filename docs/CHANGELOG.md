@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Actionable error messages guiding users from credential_process to exec --server --session-table
 - `SENTINEL_SESSION_TABLE` environment variable for default session table in server mode
 - Policy `session_table` field override for per-profile table configuration
+- `--since` flag for `server-sessions` command to filter by time range (e.g., 7d, 30d, 24h)
+- CSV output format for `server-sessions` command (`--output csv`) for audit exports
+- `source_identity` field in `server-sessions` JSON and CSV output for CloudTrail correlation
 
 ### Fixed
 
