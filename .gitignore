@@ -30,5 +30,8 @@ build/
 dist/
 vendor/
 
-# Private Notes 
+# Private Notes
 docs/VISION.md
+
+# Planning docs
+.planning/
