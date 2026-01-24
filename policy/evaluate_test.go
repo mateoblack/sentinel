@@ -1670,3 +1670,101 @@ func TestEffectRequireServer_IsValid(t *testing.T) {
 		t.Error("EffectRequireServer.IsValid() = false, want true")
 	}
 }
+
+func TestEvaluate_RequireServerSession(t *testing.T) {
+	tests := []struct {
+		name                    string
+		mode                    CredentialMode
+		sessionTableName        string
+		wantEffect              Effect
+		wantRequiresServerMode  bool
+		wantRequiresSessionTrack bool
+	}{
+		{
+			name:                    "server mode + session table = ALLOW",
+			mode:                    ModeServer,
+			sessionTableName:        "sentinel-sessions",
+			wantEffect:              EffectAllow,
+			wantRequiresServerMode:  false,
+			wantRequiresSessionTrack: false,
+		},
+		{
+			name:                    "server mode + NO session table = DENY",
+			mode:                    ModeServer,
+			sessionTableName:        "",
+			wantEffect:              EffectDeny,
+			wantRequiresServerMode:  false, // Mode is correct, only session tracking missing
+			wantRequiresSessionTrack: true,
+		},
+		{
+			name:                    "cli mode + session table = DENY",
+			mode:                    ModeCLI,
+			sessionTableName:        "sentinel-sessions",
+			wantEffect:              EffectDeny,
+			wantRequiresServerMode:  true,
+			wantRequiresSessionTrack: true,
+		},
+		{
+			name:                    "cli mode + NO session table = DENY (both flags true)",
+			mode:                    ModeCLI,
+			sessionTableName:        "",
+			wantEffect:              EffectDeny,
+			wantRequiresServerMode:  true,
+			wantRequiresSessionTrack: true,
+		},
+		{
+			name:                    "credential_process mode = DENY",
+			mode:                    ModeCredentialProcess,
+			sessionTableName:        "sentinel-sessions",
+			wantEffect:              EffectDeny,
+			wantRequiresServerMode:  true,
+			wantRequiresSessionTrack: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := &Policy{
+				Version: "1",
+				Rules: []Rule{
+					{
+						Name:   "require-server-session",
+						Effect: EffectRequireServerSession,
+						Conditions: Condition{
+							Profiles: []string{"production"},
+						},
+					},
+				},
+			}
+
+			req := &Request{
+				User:             "alice",
+				Profile:          "production",
+				Time:             time.Now(),
+				Mode:             tt.mode,
+				SessionTableName: tt.sessionTableName,
+			}
+
+			decision := Evaluate(policy, req)
+
+			if decision.Effect != tt.wantEffect {
+				t.Errorf("Effect = %v, want %v", decision.Effect, tt.wantEffect)
+			}
+			if decision.RequiresServerMode != tt.wantRequiresServerMode {
+				t.Errorf("RequiresServerMode = %v, want %v", decision.RequiresServerMode, tt.wantRequiresServerMode)
+			}
+			if decision.RequiresSessionTracking != tt.wantRequiresSessionTrack {
+				t.Errorf("RequiresSessionTracking = %v, want %v", decision.RequiresSessionTracking, tt.wantRequiresSessionTrack)
+			}
+			if decision.MatchedRule != "require-server-session" {
+				t.Errorf("MatchedRule = %v, want require-server-session", decision.MatchedRule)
+			}
+		})
+	}
+}
+
+func TestEffectRequireServerSession_IsValid(t *testing.T) {
+	if !EffectRequireServerSession.IsValid() {
+		t.Error("EffectRequireServerSession.IsValid() = false, want true")
+	}
+}
