@@ -238,10 +238,11 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 
 	// 6. Build policy.Request
 	policyRequest := &policy.Request{
-		User:    username,
-		Profile: input.ProfileName,
-		Time:    time.Now(),
-		Mode:    policy.ModeCredentialProcess, // credential_process mode - one-time evaluation
+		User:             username,
+		Profile:          input.ProfileName,
+		Time:             time.Now(),
+		Mode:             policy.ModeCredentialProcess, // credential_process mode - one-time evaluation
+		SessionTableName: "",                           // credentials command doesn't support session tracking
 	}
 
 	// 7. Evaluate policy
@@ -251,13 +252,21 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 	var approvedReq *request.Request
 	var activeBreakGlass *breakglass.BreakGlassEvent
 	if decision.Effect == policy.EffectDeny || decision.Effect == policy.EffectRequireApproval {
-		// Check if denial is due to server mode requirement - this cannot be bypassed
-		if decision.RequiresServerMode {
+		// Check if denial is due to server mode or session tracking requirement - these cannot be bypassed
+		// credential_process doesn't support session tracking, so always direct to exec --server
+		if decision.RequiresSessionTracking || decision.RequiresServerMode {
 			if input.Logger != nil {
 				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
 				input.Logger.LogDecision(entry)
 			}
-			serverErr := fmt.Errorf("policy requires server mode for profile %q - use 'sentinel exec --server %s -- <command>' for real-time revocation control", input.ProfileName, input.ProfileName)
+			var serverErr error
+			if decision.RequiresSessionTracking {
+				// Session tracking required - credential_process doesn't support this
+				serverErr = fmt.Errorf("policy requires server mode with session tracking for profile %q. credential_process doesn't support session tracking. Use: sentinel exec --server --session-table <table> --profile %s -- <cmd>", input.ProfileName, input.ProfileName)
+			} else {
+				// Only server mode required
+				serverErr = fmt.Errorf("policy requires server mode for profile %q. Use: sentinel exec --server --profile %s -- <cmd>", input.ProfileName, input.ProfileName)
+			}
 			fmt.Fprintf(stderr, "Error: %v\n", serverErr)
 			return serverErr
 		}
