@@ -262,13 +262,22 @@ sentinel permissions check --feature policy_load,credential_issue
 Permission checking works with AWS SSO credentials. The CLI automatically converts
 assumed-role session ARNs to IAM role ARNs for the SimulatePrincipalPolicy API.
 
-**Required permission:** Your SSO role needs `iam:SimulatePrincipalPolicy` to check permissions:
+**Required permission:** Your SSO role needs `iam:SimulatePrincipalPolicy` to check permissions.
+
+> **Important:** SSO roles have a special path prefix in IAM. Use the full path in your policy:
 
 ```json
 {
   "Effect": "Allow",
   "Action": "iam:SimulatePrincipalPolicy",
-  "Resource": "arn:aws:iam::ACCOUNT_ID:role/YOUR_SSO_ROLE_NAME"
+  "Resource": "arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_YourPermissionSet_*"
+}
+```
+
+For example, if your permission set is `DeveloperAccess`:
+```json
+{
+  "Resource": "arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_DeveloperAccess_*"
 }
 ```
 
