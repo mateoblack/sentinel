@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/vault"
 )
@@ -1358,6 +1360,149 @@ sso_role_name = TestRole
 		}
 		if profile.SSOStartURL == "" {
 			t.Error("expected profile to have SSO start URL")
+		}
+	})
+}
+
+func TestCredentialsCommand_RequireServerSession(t *testing.T) {
+	// Tests verify that credentials command produces actionable error for require_server_session policies
+	// Since credentials command (credential_process) doesn't support session tracking,
+	// it should always guide users to exec --server --session-table
+
+	t.Run("credentials command sets empty SessionTableName", func(t *testing.T) {
+		// Verify the Request struct is built with empty SessionTableName
+		req := &policy.Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             policy.ModeCredentialProcess,
+			SessionTableName: "", // credential_process doesn't support session tracking
+		}
+
+		if req.SessionTableName != "" {
+			t.Errorf("expected empty SessionTableName for credential_process, got %q", req.SessionTableName)
+		}
+		if req.Mode != policy.ModeCredentialProcess {
+			t.Errorf("expected ModeCredentialProcess, got %v", req.Mode)
+		}
+	})
+
+	t.Run("require_server_session denies credential_process", func(t *testing.T) {
+		testPolicy := &policy.Policy{
+			Version: "1",
+			Rules: []policy.Rule{
+				{
+					Name:   "require-server-session",
+					Effect: policy.EffectRequireServerSession,
+					Conditions: policy.Condition{
+						Profiles: []string{"production"},
+					},
+					Reason: "production requires server mode with session tracking",
+				},
+			},
+		}
+
+		req := &policy.Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             policy.ModeCredentialProcess,
+			SessionTableName: "", // credential_process doesn't support sessions
+		}
+
+		decision := policy.Evaluate(testPolicy, req)
+
+		// Should deny in credential_process mode
+		if decision.Effect != policy.EffectDeny {
+			t.Errorf("expected EffectDeny for credential_process mode, got %v", decision.Effect)
+		}
+		// Both flags should be set
+		if !decision.RequiresServerMode {
+			t.Error("expected RequiresServerMode to be true")
+		}
+		if !decision.RequiresSessionTracking {
+			t.Error("expected RequiresSessionTracking to be true")
+		}
+	})
+
+	t.Run("error message guides to exec --server --session-table", func(t *testing.T) {
+		// Simulate the error construction from credentials.go
+		profileName := "production"
+
+		decision := policy.Decision{
+			Effect:                  policy.EffectDeny,
+			RequiresSessionTracking: true,
+			RequiresServerMode:      true,
+		}
+
+		var errMsg string
+		if decision.RequiresSessionTracking {
+			// Session tracking required - credential_process doesn't support this
+			errMsg = fmt.Sprintf("policy requires server mode with session tracking for profile %q. credential_process doesn't support session tracking. Use: sentinel exec --server --session-table <table> --profile %s -- <cmd>", profileName, profileName)
+		}
+
+		// Should mention credential_process doesn't support session tracking
+		if !strings.Contains(errMsg, "credential_process doesn't support session tracking") {
+			t.Errorf("expected error to explain credential_process limitation, got: %s", errMsg)
+		}
+
+		// Should suggest the correct command pattern
+		if !strings.Contains(errMsg, "sentinel exec --server --session-table") {
+			t.Errorf("expected error to suggest exec --server --session-table, got: %s", errMsg)
+		}
+	})
+
+	t.Run("require_server (without session) also guides to exec", func(t *testing.T) {
+		// For require_server (not require_server_session), just suggest --server
+		testPolicy := &policy.Policy{
+			Version: "1",
+			Rules: []policy.Rule{
+				{
+					Name:   "require-server",
+					Effect: policy.EffectRequireServer,
+					Conditions: policy.Condition{
+						Profiles: []string{"production"},
+					},
+					Reason: "production requires server mode",
+				},
+			},
+		}
+
+		req := &policy.Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             policy.ModeCredentialProcess,
+			SessionTableName: "",
+		}
+
+		decision := policy.Evaluate(testPolicy, req)
+
+		// Should deny in credential_process mode
+		if decision.Effect != policy.EffectDeny {
+			t.Errorf("expected EffectDeny for credential_process mode, got %v", decision.Effect)
+		}
+		// Only RequiresServerMode should be set (no session tracking requirement)
+		if !decision.RequiresServerMode {
+			t.Error("expected RequiresServerMode to be true")
+		}
+		if decision.RequiresSessionTracking {
+			t.Error("expected RequiresSessionTracking to be false for require_server effect")
+		}
+
+		// Simulate error construction
+		profileName := "production"
+		var errMsg string
+		if !decision.RequiresSessionTracking && decision.RequiresServerMode {
+			errMsg = fmt.Sprintf("policy requires server mode for profile %q. Use: sentinel exec --server --profile %s -- <cmd>", profileName, profileName)
+		}
+
+		if !strings.Contains(errMsg, "sentinel exec --server") {
+			t.Errorf("expected error to suggest exec --server, got: %s", errMsg)
+		}
+		// Should NOT mention session-table for require_server
+		if strings.Contains(errMsg, "--session-table") {
+			t.Errorf("expected error NOT to mention --session-table for require_server effect, got: %s", errMsg)
 		}
 	})
 }

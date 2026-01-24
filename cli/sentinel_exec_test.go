@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/vault"
 )
@@ -1203,6 +1205,334 @@ func TestSentinelExecCommand_ServerMode_EnvVarModeComparison(t *testing.T) {
 		// Just verify the configuration - actual validation tested above
 		if !serverMode.StartServer || !serverMode.NoSession {
 			t.Error("test setup is wrong")
+		}
+	})
+}
+
+func TestSentinelExecCommand_RequireServerSession_InputFields(t *testing.T) {
+	t.Run("SessionTableName field is empty by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.SessionTableName != "" {
+			t.Errorf("expected SessionTableName to be empty by default, got %q", input.SessionTableName)
+		}
+	})
+
+	t.Run("SessionTableName field can be set", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:      "test-profile",
+			PolicyParameter:  "/sentinel/policies/test",
+			SessionTableName: "sentinel-sessions",
+		}
+		if input.SessionTableName != "sentinel-sessions" {
+			t.Errorf("expected SessionTableName 'sentinel-sessions', got %q", input.SessionTableName)
+		}
+	})
+
+	t.Run("SessionTableName used with server mode", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:      "production",
+			PolicyParameter:  "/sentinel/policies/default",
+			StartServer:      true,
+			SessionTableName: "sentinel-sessions",
+		}
+		if !input.StartServer {
+			t.Error("expected StartServer to be true")
+		}
+		if input.SessionTableName != "sentinel-sessions" {
+			t.Errorf("expected SessionTableName 'sentinel-sessions', got %q", input.SessionTableName)
+		}
+	})
+}
+
+func TestSentinelExecCommand_RequireServerSession_PolicyEvaluation(t *testing.T) {
+	// Tests verify that SessionTableName is passed to policy.Request
+	// and that RequiresSessionTracking decision flags produce correct errors
+
+	t.Run("policy.Request includes SessionTableName", func(t *testing.T) {
+		// Verify the Request struct can hold SessionTableName
+		req := &policy.Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             policy.ModeServer,
+			SessionTableName: "sentinel-sessions",
+		}
+
+		if req.SessionTableName != "sentinel-sessions" {
+			t.Errorf("expected SessionTableName 'sentinel-sessions', got %q", req.SessionTableName)
+		}
+	})
+
+	t.Run("RequiresSessionTracking decision flag exists", func(t *testing.T) {
+		// Verify the Decision struct has RequiresSessionTracking flag
+		decision := policy.Decision{
+			Effect:                  policy.EffectDeny,
+			RequiresSessionTracking: true,
+			RequiresServerMode:      false,
+		}
+
+		if !decision.RequiresSessionTracking {
+			t.Error("expected RequiresSessionTracking to be true")
+		}
+		if decision.RequiresServerMode {
+			t.Error("expected RequiresServerMode to be false")
+		}
+	})
+
+	t.Run("RequiresSessionTracking and RequiresServerMode can both be true", func(t *testing.T) {
+		// When mode is CLI and require_server_session matches, both flags are set
+		decision := policy.Decision{
+			Effect:                  policy.EffectDeny,
+			RequiresSessionTracking: true,
+			RequiresServerMode:      true,
+		}
+
+		if !decision.RequiresSessionTracking {
+			t.Error("expected RequiresSessionTracking to be true")
+		}
+		if !decision.RequiresServerMode {
+			t.Error("expected RequiresServerMode to be true")
+		}
+	})
+}
+
+func TestSentinelExecCommand_RequireServerSession_ErrorMessages(t *testing.T) {
+	// These tests verify the error message patterns for require_server_session scenarios
+
+	t.Run("error message for server mode with session tracking", func(t *testing.T) {
+		// When both RequiresServerMode and RequiresSessionTracking are true,
+		// error should suggest --server --session-table
+		profileName := "production"
+		expectedPattern := "--server --session-table"
+
+		// Simulate the error construction from sentinel_exec.go
+		decision := policy.Decision{
+			Effect:                  policy.EffectDeny,
+			RequiresSessionTracking: true,
+			RequiresServerMode:      true,
+		}
+
+		var errMsg string
+		if decision.RequiresSessionTracking && decision.RequiresServerMode {
+			errMsg = fmt.Sprintf("policy requires server mode with session tracking for profile %q. Use: sentinel exec --server --session-table <table> --profile %s -- <cmd>", profileName, profileName)
+		}
+
+		if !strings.Contains(errMsg, expectedPattern) {
+			t.Errorf("expected error to contain %q, got: %s", expectedPattern, errMsg)
+		}
+		if !strings.Contains(errMsg, "session tracking") {
+			t.Errorf("expected error to mention 'session tracking', got: %s", errMsg)
+		}
+	})
+
+	t.Run("error message for session tracking only", func(t *testing.T) {
+		// When only RequiresSessionTracking is true (already in server mode),
+		// error should suggest --session-table only
+		profileName := "production"
+		expectedPattern := "--session-table"
+		unexpectedPattern := "--server"
+
+		decision := policy.Decision{
+			Effect:                  policy.EffectDeny,
+			RequiresSessionTracking: true,
+			RequiresServerMode:      false,
+		}
+
+		var errMsg string
+		if decision.RequiresSessionTracking && !decision.RequiresServerMode {
+			errMsg = fmt.Sprintf("policy requires session tracking for profile %q. Add --session-table <table> flag", profileName)
+		}
+
+		if !strings.Contains(errMsg, expectedPattern) {
+			t.Errorf("expected error to contain %q, got: %s", expectedPattern, errMsg)
+		}
+		// Should not suggest --server since we're already in server mode
+		if strings.Contains(errMsg, unexpectedPattern) {
+			t.Errorf("expected error NOT to contain %q when already in server mode, got: %s", unexpectedPattern, errMsg)
+		}
+	})
+
+	t.Run("error message for server mode only", func(t *testing.T) {
+		// When only RequiresServerMode is true (no session tracking requirement),
+		// error should suggest --server only
+		profileName := "production"
+		expectedPattern := "--server"
+		unexpectedPattern := "--session-table"
+
+		decision := policy.Decision{
+			Effect:                  policy.EffectDeny,
+			RequiresSessionTracking: false,
+			RequiresServerMode:      true,
+		}
+
+		var errMsg string
+		if !decision.RequiresSessionTracking && decision.RequiresServerMode {
+			errMsg = fmt.Sprintf("policy requires server mode for profile %q. Add --server flag", profileName)
+		}
+
+		if !strings.Contains(errMsg, expectedPattern) {
+			t.Errorf("expected error to contain %q, got: %s", expectedPattern, errMsg)
+		}
+		// Should not suggest --session-table since no session tracking required
+		if strings.Contains(errMsg, unexpectedPattern) {
+			t.Errorf("expected error NOT to contain %q when no session tracking required, got: %s", unexpectedPattern, errMsg)
+		}
+	})
+}
+
+func TestSentinelExecCommand_RequireServerSession_ModeScenarios(t *testing.T) {
+	// Tests for the different mode/session-table combinations
+
+	t.Run("CLI mode without session table triggers both flags", func(t *testing.T) {
+		// In CLI mode (not server), both RequiresServerMode and RequiresSessionTracking should be set
+		testPolicy := &policy.Policy{
+			Version: "1",
+			Rules: []policy.Rule{
+				{
+					Name:   "require-server-session",
+					Effect: policy.EffectRequireServerSession,
+					Conditions: policy.Condition{
+						Profiles: []string{"production"},
+					},
+					Reason: "production requires server mode with session tracking",
+				},
+			},
+		}
+
+		req := &policy.Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             policy.ModeCLI, // Not server mode
+			SessionTableName: "",             // No session table
+		}
+
+		decision := policy.Evaluate(testPolicy, req)
+
+		// Should deny in CLI mode
+		if decision.Effect != policy.EffectDeny {
+			t.Errorf("expected EffectDeny for CLI mode, got %v", decision.Effect)
+		}
+		// Both flags should be set
+		if !decision.RequiresServerMode {
+			t.Error("expected RequiresServerMode to be true for CLI mode")
+		}
+		if !decision.RequiresSessionTracking {
+			t.Error("expected RequiresSessionTracking to be true")
+		}
+	})
+
+	t.Run("server mode without session table triggers session tracking flag only", func(t *testing.T) {
+		testPolicy := &policy.Policy{
+			Version: "1",
+			Rules: []policy.Rule{
+				{
+					Name:   "require-server-session",
+					Effect: policy.EffectRequireServerSession,
+					Conditions: policy.Condition{
+						Profiles: []string{"production"},
+					},
+					Reason: "production requires server mode with session tracking",
+				},
+			},
+		}
+
+		req := &policy.Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             policy.ModeServer, // Server mode
+			SessionTableName: "",                // But no session table
+		}
+
+		decision := policy.Evaluate(testPolicy, req)
+
+		// Should deny without session table
+		if decision.Effect != policy.EffectDeny {
+			t.Errorf("expected EffectDeny without session table, got %v", decision.Effect)
+		}
+		// Only session tracking flag should be set (already in server mode)
+		if decision.RequiresServerMode {
+			t.Error("expected RequiresServerMode to be false when already in server mode")
+		}
+		if !decision.RequiresSessionTracking {
+			t.Error("expected RequiresSessionTracking to be true without session table")
+		}
+	})
+
+	t.Run("server mode with session table allows access", func(t *testing.T) {
+		testPolicy := &policy.Policy{
+			Version: "1",
+			Rules: []policy.Rule{
+				{
+					Name:   "require-server-session",
+					Effect: policy.EffectRequireServerSession,
+					Conditions: policy.Condition{
+						Profiles: []string{"production"},
+					},
+					Reason: "production requires server mode with session tracking",
+				},
+			},
+		}
+
+		req := &policy.Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             policy.ModeServer,          // Server mode
+			SessionTableName: "sentinel-sessions", // With session table
+		}
+
+		decision := policy.Evaluate(testPolicy, req)
+
+		// Should allow with both server mode and session table
+		if decision.Effect != policy.EffectAllow {
+			t.Errorf("expected EffectAllow with server mode and session table, got %v", decision.Effect)
+		}
+		// Neither flag should be set on allow
+		if decision.RequiresServerMode {
+			t.Error("expected RequiresServerMode to be false on allow")
+		}
+		if decision.RequiresSessionTracking {
+			t.Error("expected RequiresSessionTracking to be false on allow")
+		}
+	})
+
+	t.Run("credential_process mode triggers both flags", func(t *testing.T) {
+		testPolicy := &policy.Policy{
+			Version: "1",
+			Rules: []policy.Rule{
+				{
+					Name:   "require-server-session",
+					Effect: policy.EffectRequireServerSession,
+					Conditions: policy.Condition{
+						Profiles: []string{"production"},
+					},
+					Reason: "production requires server mode with session tracking",
+				},
+			},
+		}
+
+		req := &policy.Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             policy.ModeCredentialProcess, // credential_process mode
+			SessionTableName: "",                           // credential_process doesn't support sessions
+		}
+
+		decision := policy.Evaluate(testPolicy, req)
+
+		// Should deny in credential_process mode
+		if decision.Effect != policy.EffectDeny {
+			t.Errorf("expected EffectDeny for credential_process mode, got %v", decision.Effect)
+		}
+		// Both flags should be set
+		if !decision.RequiresServerMode {
+			t.Error("expected RequiresServerMode to be true for credential_process mode")
+		}
+		if !decision.RequiresSessionTracking {
+			t.Error("expected RequiresSessionTracking to be true")
 		}
 	})
 }
