@@ -38,6 +38,7 @@ sentinel credentials --profile PROFILE --policy-parameter PATH [flags]
 | `--require-sentinel` | Warn if role lacks trust policy enforcement | No |
 | `--auto-login` | Automatically trigger SSO login when credentials are expired or missing | No |
 | `--stdout` | Print SSO URL instead of opening browser (used with --auto-login) | No |
+| `--aws-profile` | AWS profile for SSO credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -93,6 +94,7 @@ sentinel exec --profile PROFILE --policy-parameter PATH [flags] [-- command args
 | `--no-session` / `-n` | Skip GetSessionToken | No |
 | `--log-file` | Path to write decision logs | No |
 | `--log-stderr` | Write decision logs to stderr | No |
+| `--aws-profile` | AWS profile for SSO credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -189,6 +191,7 @@ sentinel request --profile PROFILE --justification TEXT --request-table TABLE [f
 | `--request-table` | DynamoDB table name | Yes |
 | `--duration` | How long access is needed (max 8h) | No (default: 1h) |
 | `--region` | AWS region for DynamoDB | No |
+| `--aws-profile` | AWS profile for SSO credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 
@@ -418,6 +421,7 @@ sentinel breakglass --profile PROFILE --reason-code CODE --justification TEXT --
 | `--breakglass-table` | DynamoDB table name | Yes |
 | `--duration` | Emergency access duration (max 4h) | No (default: 1h) |
 | `--region` | AWS region for DynamoDB | No |
+| `--aws-profile` | AWS profile for SSO credentials (optional, uses default chain if not specified) | No |
 
 **Examples:**
 

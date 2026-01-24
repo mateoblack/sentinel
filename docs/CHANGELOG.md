@@ -5,6 +5,36 @@ All notable changes to Sentinel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] - 2026-01-23
+
+### Security
+
+- **CRITICAL**: Fixed `require_approval` policy effect not being enforced
+  - Prior to this fix, policies with `effect: require_approval` would issue credentials without checking for an approved request
+  - The approval check was only triggered for `effect: deny`, allowing `require_approval` to fall through to credential issuance
+  - Affects: `sentinel credentials`, `sentinel exec`
+
+### Added
+
+- `--aws-profile` flag for SSO credential separation on credential issuance commands:
+  - `sentinel request`
+  - `sentinel credentials`
+  - `sentinel exec`
+  - `sentinel breakglass`
+
+### Fixed
+
+- DynamoDB reserved keyword error when querying by `status` in request list operations
+- Bootstrap command now provisions DynamoDB tables even when SSM parameters have no changes
+
+## [1.12.1] - 2026-01-23
+
+### Fixed
+
+- Optimistic locking bug in DynamoDB store Update methods
+  - The `UpdatedAt` field was being modified before the condition check, causing all updates to fail with "concurrent modification detected"
+  - Affects: `breakglass-close`, `approve`, `deny` commands
+
 ## [1.10.0] - 2026-01-20
 
 ### Added
