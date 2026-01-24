@@ -1673,51 +1673,51 @@ func TestEffectRequireServer_IsValid(t *testing.T) {
 
 func TestEvaluate_RequireServerSession(t *testing.T) {
 	tests := []struct {
-		name                    string
-		mode                    CredentialMode
-		sessionTableName        string
-		wantEffect              Effect
-		wantRequiresServerMode  bool
+		name                     string
+		mode                     CredentialMode
+		sessionTableName         string
+		wantEffect               Effect
+		wantRequiresServerMode   bool
 		wantRequiresSessionTrack bool
 	}{
 		{
-			name:                    "server mode + session table = ALLOW",
-			mode:                    ModeServer,
-			sessionTableName:        "sentinel-sessions",
-			wantEffect:              EffectAllow,
-			wantRequiresServerMode:  false,
+			name:                     "server mode + session table = ALLOW",
+			mode:                     ModeServer,
+			sessionTableName:         "sentinel-sessions",
+			wantEffect:               EffectAllow,
+			wantRequiresServerMode:   false,
 			wantRequiresSessionTrack: false,
 		},
 		{
-			name:                    "server mode + NO session table = DENY",
-			mode:                    ModeServer,
-			sessionTableName:        "",
-			wantEffect:              EffectDeny,
-			wantRequiresServerMode:  false, // Mode is correct, only session tracking missing
+			name:                     "server mode + NO session table = DENY",
+			mode:                     ModeServer,
+			sessionTableName:         "",
+			wantEffect:               EffectDeny,
+			wantRequiresServerMode:   false, // Mode is correct, only session tracking missing
 			wantRequiresSessionTrack: true,
 		},
 		{
-			name:                    "cli mode + session table = DENY",
-			mode:                    ModeCLI,
-			sessionTableName:        "sentinel-sessions",
-			wantEffect:              EffectDeny,
-			wantRequiresServerMode:  true,
+			name:                     "cli mode + session table = DENY",
+			mode:                     ModeCLI,
+			sessionTableName:         "sentinel-sessions",
+			wantEffect:               EffectDeny,
+			wantRequiresServerMode:   true,
 			wantRequiresSessionTrack: true,
 		},
 		{
-			name:                    "cli mode + NO session table = DENY (both flags true)",
-			mode:                    ModeCLI,
-			sessionTableName:        "",
-			wantEffect:              EffectDeny,
-			wantRequiresServerMode:  true,
+			name:                     "cli mode + NO session table = DENY (both flags true)",
+			mode:                     ModeCLI,
+			sessionTableName:         "",
+			wantEffect:               EffectDeny,
+			wantRequiresServerMode:   true,
 			wantRequiresSessionTrack: true,
 		},
 		{
-			name:                    "credential_process mode = DENY",
-			mode:                    ModeCredentialProcess,
-			sessionTableName:        "sentinel-sessions",
-			wantEffect:              EffectDeny,
-			wantRequiresServerMode:  true,
+			name:                     "credential_process mode = DENY",
+			mode:                     ModeCredentialProcess,
+			sessionTableName:         "sentinel-sessions",
+			wantEffect:               EffectDeny,
+			wantRequiresServerMode:   true,
 			wantRequiresSessionTrack: true,
 		},
 	}
@@ -1767,4 +1767,131 @@ func TestEffectRequireServerSession_IsValid(t *testing.T) {
 	if !EffectRequireServerSession.IsValid() {
 		t.Error("EffectRequireServerSession.IsValid() = false, want true")
 	}
+}
+
+// TestEvaluate_SessionTablePropagation tests that SessionTableName from rules is propagated to decisions.
+func TestEvaluate_SessionTablePropagation(t *testing.T) {
+	t.Run("require_server_session with session_table specified", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:         "require-session",
+					Effect:       EffectRequireServerSession,
+					SessionTable: "policy-table",
+					Conditions: Condition{
+						Profiles: []string{"production"},
+					},
+				},
+			},
+		}
+
+		req := &Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             ModeServer,
+			SessionTableName: "cli-table", // CLI specified, but policy should override
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.SessionTableName != "policy-table" {
+			t.Errorf("SessionTableName = %q, want 'policy-table'", decision.SessionTableName)
+		}
+	})
+
+	t.Run("require_server_session without session_table", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:         "require-session",
+					Effect:       EffectRequireServerSession,
+					SessionTable: "", // Not specified in policy
+					Conditions: Condition{
+						Profiles: []string{"production"},
+					},
+				},
+			},
+		}
+
+		req := &Request{
+			User:             "alice",
+			Profile:          "production",
+			Time:             time.Now(),
+			Mode:             ModeServer,
+			SessionTableName: "cli-table",
+		}
+
+		decision := Evaluate(policy, req)
+
+		// SessionTableName should be empty (CLI value used, not from policy)
+		if decision.SessionTableName != "" {
+			t.Errorf("SessionTableName = %q, want empty (use CLI value)", decision.SessionTableName)
+		}
+	})
+
+	t.Run("allow effect with session_table", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:         "allow-with-audit",
+					Effect:       EffectAllow,
+					SessionTable: "audit-table",
+					Conditions: Condition{
+						Profiles: []string{"production"},
+					},
+				},
+			},
+		}
+
+		req := &Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+			Mode:    ModeServer,
+		}
+
+		decision := Evaluate(policy, req)
+
+		// session_table should be propagated regardless of effect
+		if decision.SessionTableName != "audit-table" {
+			t.Errorf("SessionTableName = %q, want 'audit-table'", decision.SessionTableName)
+		}
+	})
+
+	t.Run("deny effect preserves session_table from rule", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:         "deny-with-table",
+					Effect:       EffectDeny,
+					SessionTable: "deny-audit-table",
+					Conditions: Condition{
+						Profiles: []string{"production"},
+					},
+				},
+			},
+		}
+
+		req := &Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+			Mode:    ModeCLI,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Effect != EffectDeny {
+			t.Errorf("Effect = %v, want EffectDeny", decision.Effect)
+		}
+		// session_table should still be set even for deny rules
+		if decision.SessionTableName != "deny-audit-table" {
+			t.Errorf("SessionTableName = %q, want 'deny-audit-table'", decision.SessionTableName)
+		}
+	})
 }

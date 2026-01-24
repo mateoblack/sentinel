@@ -119,6 +119,19 @@ sentinel exec --profile dev --policy-parameter /sentinel/policies/dev -d 2h -- t
 | `AWS_CREDENTIAL_EXPIRATION` | ISO8601 expiration time |
 | `AWS_SENTINEL` | Profile name (prevents nesting) |
 
+#### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `SENTINEL_SESSION_TABLE` | Default DynamoDB table for session tracking in server mode. Overridden by `--session-table` flag. |
+
+**Example:**
+```bash
+export SENTINEL_SESSION_TABLE=sentinel-sessions
+sentinel exec --server --profile prod -- aws s3 ls
+# Session tracking enabled automatically
+```
+
 #### Server Mode
 
 Server mode starts a local credential server that evaluates policy on every credential request. This enables real-time revocation - changing policy immediately affects subsequent credential requests.
@@ -127,7 +140,7 @@ Server mode starts a local credential server that evaluates policy on every cred
 - `--server, -s` - Enable server mode (starts credential server instead of env vars)
 - `--server-port PORT` - Port for credential server (default: auto-assigned)
 - `--server-duration` - Session duration in server mode (default: 15m for rapid revocation)
-- `--session-table TABLE` - DynamoDB table for session tracking (optional, enables revocation)
+- `--session-table TABLE` - DynamoDB table for session tracking (optional, enables revocation). Falls back to `SENTINEL_SESSION_TABLE` env var.
 - `--lazy` - Skip credential prefetch on server startup
 - `--auto-login` - Automatically trigger SSO login when credentials are expired or missing
 - `--stdout` - Print SSO URL instead of opening browser (used with --auto-login)

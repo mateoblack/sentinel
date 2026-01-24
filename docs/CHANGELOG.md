@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `require_server_session` policy effect enforcing server mode with session tracking
 - `session_table` field in policy rules for specifying session tracking table
 - Actionable error messages guiding users from credential_process to exec --server --session-table
-- `SENTINEL_SESSION_TABLE` environment variable for default session table (no need for `--session-table` every time)
+- `SENTINEL_SESSION_TABLE` environment variable for default session table in server mode
+- Policy `session_table` field override for per-profile table configuration
 
 ### Fixed
 

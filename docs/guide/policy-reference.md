@@ -102,8 +102,26 @@ policies:
 - If neither `--server` nor `--session-table`: denied with "Policy requires server mode with session tracking"
 - `credential_process` mode always denied (doesn't support sessions)
 
-**session_table field:**
-The optional `session_table` field in the policy specifies which DynamoDB table to use for session tracking. If not specified in the policy, the CLI flag `--session-table` must be provided.
+#### Session Table Configuration
+
+The `session_table` field specifies which DynamoDB table to use for session tracking:
+
+```yaml
+policies:
+  - match:
+      profile: prod
+    effect: require_server_session
+    session_table: prod-sentinel-sessions
+```
+
+**Precedence order (highest to lowest):**
+1. Policy `session_table` field (from matched rule)
+2. `--session-table` CLI flag
+3. `SENTINEL_SESSION_TABLE` environment variable
+4. Empty (no session tracking - will fail if require_server_session)
+
+The policy-specified table overrides CLI and environment settings, ensuring security policies
+can enforce specific tables for compliance or multi-table architectures.
 
 **Use case:**
 Enforce that all production access is:
