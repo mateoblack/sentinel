@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Server mode now correctly uses SSO credential profile (`--aws-profile`) instead of policy target profile
   - Previously caused "InvalidClientTokenId" errors when using SSO credentials with `--server`
+- Server mode subprocess now correctly uses container credentials
+  - Prevents AWS SDK from reading `~/.aws/config` which could override container credentials
+  - Fixes "InvalidClientTokenId" errors when using `--server` with existing AWS config files
 
 ### Changed
 

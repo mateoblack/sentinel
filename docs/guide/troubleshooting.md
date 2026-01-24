@@ -234,6 +234,27 @@ Debug output includes:
 
 ---
 
+### "InvalidClientTokenId" in Server Mode
+
+**Symptom:** `sentinel exec --server` fails with "InvalidClientTokenId" even though the credential server is running.
+
+**Cause:** The subprocess AWS CLI/SDK is reading `~/.aws/config` instead of using the container credentials URL.
+
+**Verification:**
+```bash
+# Test if credentials are being served correctly
+sentinel exec --server --profile dev --policy-parameter /sentinel/policies/dev \
+  -- bash -c 'curl -s -H "Authorization: Bearer $AWS_CONTAINER_AUTHORIZATION_TOKEN" "$AWS_CONTAINER_CREDENTIALS_FULL_URI"'
+```
+
+If credentials appear but `aws sts get-caller-identity` fails, the config file is overriding container credentials.
+
+**Solution:** This was fixed in v1.13.0. Sentinel now sets `AWS_CONFIG_FILE=/dev/null` and `AWS_SHARED_CREDENTIALS_FILE=/dev/null` in server mode to ensure the subprocess uses only container credentials.
+
+If you're on an older version, upgrade or set these environment variables manually.
+
+---
+
 ### "ValidationException" on DynamoDB
 
 **Symptom:** Request/break-glass commands fail with DynamoDB error.
