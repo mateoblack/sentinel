@@ -86,10 +86,10 @@ Plans:
 **Depends on**: Phase 104
 **Research**: Likely (MDM API integration patterns)
 **Research topics**: macOS MDM enrollment status, Windows device health attestation APIs
-**Plans**: TBD
+**Plans**: 1 (1/1 complete)
 
 Plans:
-- [ ] 105-01: TBD
+- [x] 105-01: Collector interface and implementations — completed 2026-01-25
 
 #### Phase 106: Local Device Collector
 
