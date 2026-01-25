@@ -61,6 +61,10 @@ func main() {
 	cli.ConfigureServerSessionCommand(app, s)
 	cli.ConfigureServerRevokeCommand(app, s)
 
+	// Device audit commands
+	cli.ConfigureDeviceSessionsCommand(app, s)
+	cli.ConfigureDevicesCommand(app, s)
+
 	// Shell integration commands
 	cli.ConfigureShellInitCommand(app, s)
 
