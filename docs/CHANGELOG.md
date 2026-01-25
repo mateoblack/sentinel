@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LAMBDA_TVM_DEPLOYMENT.md with comprehensive setup guide
 - Resource policy examples for VPC/IP restriction
 
+#### Phase 101: Client Integration (2026-01-25)
+- **Remote TVM flag**: `sentinel exec --remote-server <url>` connects to Lambda TVM
+- **Container credentials**: Sets `AWS_CONTAINER_CREDENTIALS_FULL_URI` for SDK integration
+- **SCP patterns**: Documentation for enforcing TVM-only access via AWS SCPs
+- **Client examples**: Direct SDK integration without Sentinel CLI changes
+
 ## [1.13.0] - Unreleased
 
 ### Added
