@@ -31,18 +31,26 @@ type Handler struct {
 	Config *TVMConfig
 }
 
-// NewHandler creates a new TVM handler with the given configuration.
-func NewHandler(cfg *TVMConfig) *Handler {
-	return &Handler{Config: cfg}
+// NewHandler creates a new TVM handler.
+// If cfg is nil, configuration will be loaded from environment on first request.
+func NewHandler(cfg ...*TVMConfig) *Handler {
+	if len(cfg) > 0 && cfg[0] != nil {
+		return &Handler{Config: cfg[0]}
+	}
+	return &Handler{}
 }
 
 // HandleRequest processes an API Gateway v2 HTTP request.
 // Returns credentials in AWS container credentials format.
 func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	// Validate config
+	// Lazy-load config from environment if not provided
 	if h.Config == nil {
-		return errorResponse(http.StatusInternalServerError, "CONFIG_ERROR",
-			"Handler configuration is missing")
+		cfg, err := LoadConfigFromEnv(ctx)
+		if err != nil {
+			return errorResponse(http.StatusInternalServerError, "CONFIG_ERROR",
+				"Failed to load configuration: "+err.Error())
+		}
+		h.Config = cfg
 	}
 
 	// Extract caller identity from IAM authorizer context
@@ -299,4 +307,10 @@ func errorResponse(statusCode int, code, message string) (events.APIGatewayV2HTT
 		},
 		Body: string(body),
 	}, nil
+}
+
+// ErrorResponse creates an error response (exported for main.go).
+// This is a convenience wrapper around errorResponse.
+func ErrorResponse(statusCode int, code, message string) (events.APIGatewayV2HTTPResponse, error) {
+	return errorResponse(statusCode, code, message)
 }
