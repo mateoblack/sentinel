@@ -4,6 +4,7 @@ package lambda
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/mdm"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/session"
@@ -24,6 +26,12 @@ const (
 	EnvBreakGlassTable = "SENTINEL_BREAKGLASS_TABLE"
 	EnvSessionTable    = "SENTINEL_SESSION_TABLE"
 	EnvRegion          = "AWS_REGION"
+
+	// MDM configuration environment variables.
+	EnvMDMProvider   = "SENTINEL_MDM_PROVIDER"   // "jamf", "intune", "kandji", "none"
+	EnvMDMBaseURL    = "SENTINEL_MDM_BASE_URL"   // MDM server URL (e.g., Jamf Pro URL)
+	EnvMDMAPIToken   = "SENTINEL_MDM_API_TOKEN"  // Bearer token (from Secrets Manager)
+	EnvRequireDevice = "SENTINEL_REQUIRE_DEVICE" // "true" to require device verification
 )
 
 // Default configuration values.
@@ -80,6 +88,14 @@ type TVMConfig struct {
 	// DefaultDuration is the default session duration if not specified.
 	// Defaults to 15 minutes (matching server mode).
 	DefaultDuration time.Duration
+
+	// MDMProvider queries MDM for device posture verification.
+	// If nil, device posture checking is disabled (credentials issued without device verification).
+	MDMProvider mdm.Provider
+
+	// RequireDevicePosture when true, rejects credentials if MDM lookup fails.
+	// When false (default), MDM failure is logged but credentials are issued.
+	RequireDevicePosture bool
 }
 
 // LoadConfigFromEnv creates a TVMConfig from environment variables.
@@ -124,6 +140,40 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 	// e.g., "/sentinel/policies/production" -> "/sentinel/policies"
 	if cfg.PolicyRoot == "" && cfg.PolicyParameter != "" {
 		cfg.PolicyRoot = extractPolicyRoot(cfg.PolicyParameter)
+	}
+
+	// Configure MDM provider from environment
+	mdmProvider := os.Getenv(EnvMDMProvider)
+	if mdmProvider != "" && mdmProvider != "none" {
+		mdmConfig := &mdm.MDMConfig{
+			ProviderType: mdmProvider,
+			BaseURL:      os.Getenv(EnvMDMBaseURL),
+			APIToken:     os.Getenv(EnvMDMAPIToken),
+		}
+
+		switch mdmProvider {
+		case "jamf":
+			provider, err := mdm.NewJamfProvider(mdmConfig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create Jamf MDM provider: %w", err)
+			}
+			cfg.MDMProvider = provider
+		case "intune":
+			// Intune provider not yet implemented
+			log.Printf("WARNING: MDM provider 'intune' is not yet implemented, using NoopProvider")
+			cfg.MDMProvider = &mdm.NoopProvider{}
+		case "kandji":
+			// Kandji provider not yet implemented
+			log.Printf("WARNING: MDM provider 'kandji' is not yet implemented, using NoopProvider")
+			cfg.MDMProvider = &mdm.NoopProvider{}
+		default:
+			log.Printf("WARNING: Unknown MDM provider '%s', device posture checking disabled", mdmProvider)
+		}
+	}
+
+	// Parse RequireDevicePosture
+	if requireDevice := os.Getenv(EnvRequireDevice); requireDevice == "true" {
+		cfg.RequireDevicePosture = true
 	}
 
 	return cfg, nil
