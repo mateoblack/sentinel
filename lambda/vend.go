@@ -63,6 +63,11 @@ type VendInput struct {
 	// SessionID is the session ID to stamp as a session tag.
 	// Optional - if empty, no session tag is added.
 	SessionID string
+
+	// ApprovalID is the ID of the approved request that allowed this credential issuance.
+	// Optional - if empty, indicates direct access (policy allowed).
+	// Included in SourceIdentity for audit trail and SCP differentiation.
+	ApprovalID string
 }
 
 // VendOutput contains the result of credential vending.
@@ -112,8 +117,8 @@ func VendCredentialsWithClient(ctx context.Context, input *VendInput, client STS
 	// Generate request-id
 	requestID := identity.NewRequestID()
 
-	// Create SourceIdentity (empty approval for direct access)
-	sourceIdentity, err := identity.New(username, "", requestID)
+	// Create SourceIdentity (includes approval ID if via approved request)
+	sourceIdentity, err := identity.New(username, input.ApprovalID, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SourceIdentity: %w", err)
 	}

@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/policy"
+	"github.com/byteness/aws-vault/v7/request"
 )
 
 // Duration validation constants (AWS STS limits).
@@ -95,12 +97,37 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	// Evaluate policy
 	decision := policy.Evaluate(loadedPolicy, policyRequest)
 
-	// Handle deny (approval/break-glass check will be added in 99-03)
+	// Handle deny decision - check for approved request or break-glass first
+	var approvedReq *request.Request
+	var activeBreakGlass *breakglass.BreakGlassEvent
+
 	if decision.Effect == policy.EffectDeny {
-		log.Printf("DENY: user=%s profile=%s rule=%s reason=%s",
-			username, profile, decision.MatchedRule, decision.Reason)
-		return errorResponse(http.StatusForbidden, "POLICY_DENY",
-			fmt.Sprintf("Policy denied: %s", decision.Reason))
+		// Check for approved request before denying
+		if h.Config.ApprovalStore != nil {
+			var storeErr error
+			approvedReq, storeErr = request.FindApprovedRequest(ctx, h.Config.ApprovalStore, username, profile)
+			if storeErr != nil {
+				log.Printf("Warning: failed to check approved requests: %v", storeErr)
+			}
+		}
+
+		// If no approved request, check for active break-glass
+		if approvedReq == nil && h.Config.BreakGlassStore != nil {
+			var bgErr error
+			activeBreakGlass, bgErr = breakglass.FindActiveBreakGlass(ctx, h.Config.BreakGlassStore, username, profile)
+			if bgErr != nil {
+				log.Printf("Warning: failed to check break-glass: %v", bgErr)
+			}
+		}
+
+		// If neither approved request nor break-glass, deny
+		if approvedReq == nil && activeBreakGlass == nil {
+			log.Printf("DENY: user=%s profile=%s rule=%s reason=%s",
+				username, profile, decision.MatchedRule, decision.Reason)
+			return errorResponse(http.StatusForbidden, "POLICY_DENY",
+				fmt.Sprintf("Policy denied: %s", decision.Reason))
+		}
+		// Approved request or active break-glass found - continue to credential issuance
 	}
 
 	// Apply duration from policy cap
@@ -109,6 +136,15 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 		if duration == 0 || duration > decision.MaxServerDuration {
 			duration = decision.MaxServerDuration
 			log.Printf("INFO: Capping duration to policy max_server_duration: %v", duration)
+		}
+	}
+
+	// Cap duration to break-glass remaining time if applicable
+	if activeBreakGlass != nil {
+		remainingTime := breakglass.RemainingDuration(activeBreakGlass)
+		if duration == 0 || duration > remainingTime {
+			duration = remainingTime
+			log.Printf("INFO: Capping duration to break-glass remaining time: %v", duration)
 		}
 	}
 
@@ -131,6 +167,11 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 		RoleARN:         roleARN,
 		SessionDuration: duration,
 		Region:          h.Config.Region,
+	}
+
+	// Include approval ID for SourceIdentity stamping (if via approved request)
+	if approvedReq != nil {
+		vendInput.ApprovalID = approvedReq.ID
 	}
 
 	// Vend credentials
