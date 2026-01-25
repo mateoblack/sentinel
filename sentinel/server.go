@@ -5,6 +5,7 @@ package sentinel
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -431,9 +432,14 @@ func writeErrorMessage(w http.ResponseWriter, msg string, statusCode int) {
 }
 
 // withAuthorizationCheck is middleware that validates the Authorization header.
+// SECURITY: Uses constant-time comparison to prevent timing attacks on bearer tokens.
 func withAuthorizationCheck(authToken string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != authToken {
+		// SECURITY: Use constant-time comparison to prevent timing attacks.
+		// Direct string comparison (!=) returns early on first mismatched byte,
+		// leaking timing information that allows attackers to extract the token
+		// byte-by-byte by measuring response times.
+		if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte(authToken)) != 1 {
 			writeErrorMessage(w, "invalid Authorization token", http.StatusForbidden)
 			return
 		}
