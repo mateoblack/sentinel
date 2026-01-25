@@ -113,12 +113,11 @@ Plans:
 
 **Goal**: Add govulncheck, gosec, and Trivy to GitHub Actions for SAST and dependency scanning
 **Depends on**: Phase 113
-**Research**: Likely (GitHub Actions integration, tool configuration)
-**Research topics**: govulncheck action, gosec action, trivy-action, sarif reporting
-**Plans**: TBD
+**Research**: Complete
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 115-01: TBD
+- [x] 115-01: Fix and enhance gosec and Trivy workflows — completed 2026-01-25
 
 #### Phase 116: DynamoDB Encryption
 
@@ -583,6 +582,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
-| v1.16 Security Hardening | 113-120 | 3/? | 🚧 In Progress | - |
+| v1.16 Security Hardening | 113-120 | 4/? | 🚧 In Progress | - |
 
 **Totals:** 19 milestones shipped (112 phases, 213 plans shipped)
