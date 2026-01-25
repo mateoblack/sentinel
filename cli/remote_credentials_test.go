@@ -327,3 +327,164 @@ func TestMockTVMServer(t *testing.T) {
 		t.Errorf("expected AccessKeyID 'ASIATESTACCESSKEY', got %q", result.AccessKeyID)
 	}
 }
+
+func TestRemoteCredentialClient_WithDeviceID(t *testing.T) {
+	// Create mock TVM server that captures and verifies the device_id parameter
+	var capturedDeviceID string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Capture the device_id query parameter
+		capturedDeviceID = r.URL.Query().Get("device_id")
+
+		// Return valid credentials
+		resp := `{
+			"AccessKeyId": "ASIADEVICEIDTEST",
+			"SecretAccessKey": "secretwithdeviceid",
+			"Token": "deviceidtoken123",
+			"Expiration": "2024-01-01T12:00:00Z"
+		}`
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(resp))
+	}))
+	defer server.Close()
+
+	// Test with a valid device ID (64-char lowercase hex)
+	deviceID := "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+	client := &RemoteCredentialClient{
+		URL:       server.URL,
+		AuthToken: "test-token",
+		DeviceID:  deviceID,
+	}
+
+	result, err := client.GetCredentials(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify device_id was sent in request
+	if capturedDeviceID != deviceID {
+		t.Errorf("expected device_id %q in request, got %q", deviceID, capturedDeviceID)
+	}
+
+	// Verify response was parsed correctly
+	if result.AccessKeyID != "ASIADEVICEIDTEST" {
+		t.Errorf("expected AccessKeyID 'ASIADEVICEIDTEST', got %q", result.AccessKeyID)
+	}
+}
+
+func TestRemoteCredentialClient_WithoutDeviceID(t *testing.T) {
+	// Create mock TVM server that verifies no device_id parameter is present
+	var capturedDeviceID string
+	var hasDeviceIDParam bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if device_id is present at all
+		_, hasDeviceIDParam = r.URL.Query()["device_id"]
+		capturedDeviceID = r.URL.Query().Get("device_id")
+
+		// Return valid credentials
+		resp := `{
+			"AccessKeyId": "ASIANODEVICEID",
+			"SecretAccessKey": "secretnodeviceid",
+			"Token": "nodeviceidtoken",
+			"Expiration": "2024-01-01T12:00:00Z"
+		}`
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(resp))
+	}))
+	defer server.Close()
+
+	// Test without device ID (backward compatibility)
+	client := NewRemoteCredentialClient(server.URL, "test-token")
+
+	result, err := client.GetCredentials(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify no device_id was sent in request
+	if hasDeviceIDParam {
+		t.Errorf("expected no device_id parameter, but found: %q", capturedDeviceID)
+	}
+
+	// Verify response was parsed correctly
+	if result.AccessKeyID != "ASIANODEVICEID" {
+		t.Errorf("expected AccessKeyID 'ASIANODEVICEID', got %q", result.AccessKeyID)
+	}
+}
+
+func TestRemoteCredentialClient_WithExistingQueryParams(t *testing.T) {
+	// Create mock TVM server that captures all query parameters
+	var capturedProfile string
+	var capturedDeviceID string
+	var capturedDuration string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Capture all query parameters
+		capturedProfile = r.URL.Query().Get("profile")
+		capturedDeviceID = r.URL.Query().Get("device_id")
+		capturedDuration = r.URL.Query().Get("duration")
+
+		// Return valid credentials
+		resp := `{
+			"AccessKeyId": "ASIAMULTIPARAM",
+			"SecretAccessKey": "secretmultiparam",
+			"Token": "multiparamtoken",
+			"Expiration": "2024-01-01T12:00:00Z"
+		}`
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(resp))
+	}))
+	defer server.Close()
+
+	// Test with existing query parameters (profile and duration) plus device_id
+	deviceID := "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"
+	urlWithParams := server.URL + "?profile=production&duration=3600"
+	client := &RemoteCredentialClient{
+		URL:       urlWithParams,
+		AuthToken: "test-token",
+		DeviceID:  deviceID,
+	}
+
+	result, err := client.GetCredentials(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify all query parameters are present
+	if capturedProfile != "production" {
+		t.Errorf("expected profile 'production', got %q", capturedProfile)
+	}
+	if capturedDuration != "3600" {
+		t.Errorf("expected duration '3600', got %q", capturedDuration)
+	}
+	if capturedDeviceID != deviceID {
+		t.Errorf("expected device_id %q, got %q", deviceID, capturedDeviceID)
+	}
+
+	// Verify response was parsed correctly
+	if result.AccessKeyID != "ASIAMULTIPARAM" {
+		t.Errorf("expected AccessKeyID 'ASIAMULTIPARAM', got %q", result.AccessKeyID)
+	}
+}
+
+func TestRemoteCredentialClient_DeviceIDField(t *testing.T) {
+	t.Run("DeviceID field is empty by default", func(t *testing.T) {
+		client := NewRemoteCredentialClient("https://api.example.com/tvm", "token")
+		if client.DeviceID != "" {
+			t.Errorf("expected DeviceID to be empty by default, got %q", client.DeviceID)
+		}
+	})
+
+	t.Run("DeviceID field can be set", func(t *testing.T) {
+		deviceID := "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+		client := &RemoteCredentialClient{
+			URL:       "https://api.example.com/tvm",
+			AuthToken: "token",
+			DeviceID:  deviceID,
+		}
+		if client.DeviceID != deviceID {
+			t.Errorf("expected DeviceID %q, got %q", deviceID, client.DeviceID)
+		}
+	})
+}

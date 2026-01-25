@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,6 +20,7 @@ type RemoteCredentialClient struct {
 	URL        string       // TVM URL (e.g., https://api.example.com/sentinel?profile=myprofile)
 	AuthToken  string       // Optional auth token for local server mode (empty = use SigV4)
 	HTTPClient *http.Client // HTTP client (nil = use default)
+	DeviceID   string       // Optional device identifier for MDM-based posture verification (64-char lowercase hex)
 }
 
 // RemoteCredentialResult contains credentials fetched from the remote TVM.
@@ -42,6 +44,7 @@ func NewRemoteCredentialClient(url string, authToken string) *RemoteCredentialCl
 // GetCredentials fetches credentials from the remote TVM.
 // Uses SigV4 signing if AuthToken is empty (API Gateway mode).
 // Uses Authorization header if AuthToken is set (local server mode).
+// If DeviceID is set, it is appended as a query parameter for MDM-based posture verification.
 func (c *RemoteCredentialClient) GetCredentials(ctx context.Context) (*RemoteCredentialResult, error) {
 	httpClient := c.HTTPClient
 	if httpClient == nil {
@@ -50,7 +53,20 @@ func (c *RemoteCredentialClient) GetCredentials(ctx context.Context) (*RemoteCre
 		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.URL, nil)
+	// Build request URL, appending device_id query parameter if set
+	requestURL := c.URL
+	if c.DeviceID != "" {
+		parsedURL, err := url.Parse(c.URL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse URL: %w", err)
+		}
+		queryParams := parsedURL.Query()
+		queryParams.Set("device_id", c.DeviceID)
+		parsedURL.RawQuery = queryParams.Encode()
+		requestURL = parsedURL.String()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
