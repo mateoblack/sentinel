@@ -112,27 +112,35 @@ None pending for v1.14 (milestone complete).
 
 ### Future Milestones
 
-**v1.15 Device Posture**
+**v1.15 Device Posture (Server-Verified)**
 
-Add device posture as a policy signal — who you are + what you can do + when + from what device.
+Zero Trust device context for credential decisions. Lambda TVM verifies posture server-side — clients cannot bypass enforcement.
 
-Phase 1: Local checks (no dependencies)
-- `sentinel device-status` command showing encryption, screen lock, OS version, firewall
-- Device fingerprint generation (hardware-backed where available)
-- Device conditions in policy rules (`device.disk_encryption: enabled`)
-- Device ID in SourceIdentity for CloudTrail forensics
+**Architecture:**
+- CLI collects device signals → sends to Lambda TVM
+- TVM validates claims against MDM/EDR APIs (server-side, tamper-proof)
+- Policy evaluates verified posture → issue or deny credentials
+- Device ID stamped in SourceIdentity for CloudTrail forensics
 
-Phase 2: MDM integration (optional)
-- Jamf Pro, Intune, Kandji API queries
-- `mdm_enrolled` and `mdm_compliant` policy conditions
+**Phase 1: MDM Integration**
+- Lambda TVM queries MDM API (Jamf, Intune, Kandji) directly
+- `device.mdm_enrolled` and `device.mdm_compliant` policy conditions
+- Server-verified — cannot be faked by modified CLI
 
-Phase 3: EDR integration (optional)
-- CrowdStrike, SentinelOne health score queries
-- `edr_health` and `edr_threats` policy conditions
+**Phase 2: EDR Integration**
+- Lambda TVM queries EDR API (CrowdStrike, SentinelOne) directly
+- `device.edr_health` and `device.edr_threats` policy conditions
+- Block credentials when active threats detected
 
-Phase 4: Continuous posture (server mode)
-- Periodic posture re-check in server mode
+**Phase 3: Hardware Attestation**
+- TPM/Secure Enclave cryptographic device identity
+- Device-bound keys for high-security roles
+- Attestation required for production access
+
+**Phase 4: Continuous Posture**
+- Server mode re-checks posture on each credential request
 - Revoke sessions when device drifts out of compliance
+- Webhook integration for real-time MDM/EDR events
 
 **v1.16 Policy Developer Experience**
 - `sentinel policy pull <profile>` — fetch policy from SSM to stdout/file for editing
