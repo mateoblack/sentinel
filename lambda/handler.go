@@ -166,13 +166,27 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 
 		// If neither approved request nor break-glass, deny
 		if approvedReq == nil && activeBreakGlass == nil {
-			// Log deny decision
+			// Log deny decision with device posture context
 			if h.Config.Logger != nil {
-				entry := logging.NewDecisionLogEntry(policyRequest, decision, h.Config.PolicyParameter)
+				// Use enhanced entry to include device posture in deny logs
+				var denyCredFields *logging.CredentialIssuanceFields
+				if mdmResult != nil && mdmResult.Posture != nil {
+					denyCredFields = &logging.CredentialIssuanceFields{
+						DevicePosture: mdmResult.Posture,
+					}
+				}
+				entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, h.Config.PolicyParameter, denyCredFields)
 				h.Config.Logger.LogDecision(entry)
 			}
-			log.Printf("DENY: user=%s profile=%s rule=%s reason=%s",
-				username, profile, decision.MatchedRule, decision.Reason)
+			// Include device posture in console log for debugging
+			if mdmResult != nil && mdmResult.Posture != nil {
+				log.Printf("DENY: user=%s profile=%s rule=%s reason=%s device_id=%s device_status=%s mdm_enrolled=%v",
+					username, profile, decision.MatchedRule, decision.Reason,
+					mdmResult.Posture.DeviceID, mdmResult.Posture.Status, mdmResult.Posture.HasMDMEnrollment())
+			} else {
+				log.Printf("DENY: user=%s profile=%s rule=%s reason=%s device_status=not_provided",
+					username, profile, decision.MatchedRule, decision.Reason)
+			}
 			return errorResponse(http.StatusForbidden, "POLICY_DENY",
 				fmt.Sprintf("Policy denied: %s", decision.Reason))
 		}
