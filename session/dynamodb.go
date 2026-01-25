@@ -24,6 +24,8 @@ const (
 	GSIProfile = "gsi-profile"
 	// GSIServerInstance indexes sessions by server_instance_id with status.
 	GSIServerInstance = "gsi-server-instance"
+	// GSIDeviceID indexes sessions by device_id with created_at sort key.
+	GSIDeviceID = "gsi-device-id"
 )
 
 // dynamoDBAPI defines the DynamoDB operations used by DynamoDBStore.
@@ -84,6 +86,7 @@ type dynamoItem struct {
 	ExpiresAt        string `dynamodbav:"expires_at"`     // RFC3339Nano
 	RequestCount     int64  `dynamodbav:"request_count"`
 	SourceIdentity   string `dynamodbav:"source_identity"`
+	DeviceID         string `dynamodbav:"device_id"`
 	CreatedAt        string `dynamodbav:"created_at"` // RFC3339Nano
 	UpdatedAt        string `dynamodbav:"updated_at"` // RFC3339Nano
 	TTL              int64  `dynamodbav:"ttl"`        // Unix timestamp for DynamoDB TTL
@@ -104,6 +107,7 @@ func toItem(session *ServerSession) *dynamoItem {
 		ExpiresAt:        session.ExpiresAt.Format(time.RFC3339Nano),
 		RequestCount:     session.RequestCount,
 		SourceIdentity:   session.SourceIdentity,
+		DeviceID:         session.DeviceID,
 		CreatedAt:        session.CreatedAt.Format(time.RFC3339Nano),
 		UpdatedAt:        session.UpdatedAt.Format(time.RFC3339Nano),
 		TTL:              session.ExpiresAt.Unix(),
@@ -146,6 +150,7 @@ func fromItem(item *dynamoItem) (*ServerSession, error) {
 		ExpiresAt:        expiresAt,
 		RequestCount:     item.RequestCount,
 		SourceIdentity:   item.SourceIdentity,
+		DeviceID:         item.DeviceID,
 		CreatedAt:        createdAt,
 		UpdatedAt:        updatedAt,
 		RevokedBy:        item.RevokedBy,

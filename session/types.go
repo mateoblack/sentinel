@@ -104,6 +104,9 @@ type ServerSession struct {
 	// SourceIdentity is the SourceIdentity being used for correlation.
 	SourceIdentity string `yaml:"source_identity" json:"source_identity"`
 
+	// DeviceID is the device fingerprint associated with this session (64 lowercase hex chars, empty if not provided).
+	DeviceID string `yaml:"device_id,omitempty" json:"device_id,omitempty"`
+
 	// CreatedAt is when the session record was created.
 	CreatedAt time.Time `yaml:"created_at" json:"created_at"`
 
