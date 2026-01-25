@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/device"
 	"github.com/byteness/aws-vault/v7/policy"
 )
 
@@ -790,6 +791,272 @@ func TestDecisionLogEntry_DriftFields_JSONMarshal(t *testing.T) {
 			expected := `"drift_status":"` + status + `"`
 			if !containsSubstring(jsonStr, expected) {
 				t.Errorf("JSON should contain %s, got: %s", expected, jsonStr)
+			}
+		}
+	})
+}
+
+func TestNewEnhancedDecisionLogEntry_WithDevicePosture(t *testing.T) {
+	boolTrue := true
+	boolFalse := false
+
+	t.Run("populates all device fields when present", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect:      policy.EffectAllow,
+			MatchedRule: "allow-production",
+			RuleIndex:   0,
+		}
+
+		posture := &device.DevicePosture{
+			DeviceID:        "a1b2c3d4e5f67890a1b2c3d4e5f67890",
+			Status:          device.StatusCompliant,
+			DiskEncrypted:   &boolTrue,
+			MDMEnrolled:     &boolTrue,
+			OSType:          "darwin",
+			OSVersion:       "14.2.1",
+			CollectedAt:     time.Now(),
+		}
+
+		creds := &CredentialIssuanceFields{
+			RequestID:     "a1b2c3d4",
+			RoleARN:       "arn:aws:iam::123456789012:role/TestRole",
+			DevicePosture: posture,
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+
+		if entry.DeviceID != "a1b2c3d4e5f67890a1b2c3d4e5f67890" {
+			t.Errorf("expected device_id 'a1b2c3d4e5f67890a1b2c3d4e5f67890', got %q", entry.DeviceID)
+		}
+		if entry.DeviceStatus != "compliant" {
+			t.Errorf("expected device_status 'compliant', got %q", entry.DeviceStatus)
+		}
+		if !entry.DeviceDiskEncrypt {
+			t.Error("expected device_disk_encrypted true")
+		}
+		if !entry.DeviceMDMEnrolled {
+			t.Error("expected device_mdm_enrolled true")
+		}
+		if entry.DeviceOSType != "darwin" {
+			t.Errorf("expected device_os_type 'darwin', got %q", entry.DeviceOSType)
+		}
+		if entry.DeviceOSVersion != "14.2.1" {
+			t.Errorf("expected device_os_version '14.2.1', got %q", entry.DeviceOSVersion)
+		}
+	})
+
+	t.Run("handles nil device posture gracefully", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "bob",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect: policy.EffectAllow,
+		}
+
+		creds := &CredentialIssuanceFields{
+			RequestID:     "test1234",
+			DevicePosture: nil,
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+
+		if entry.DeviceID != "" {
+			t.Errorf("expected empty device_id, got %q", entry.DeviceID)
+		}
+		if entry.DeviceStatus != "" {
+			t.Errorf("expected empty device_status, got %q", entry.DeviceStatus)
+		}
+		if entry.DeviceDiskEncrypt {
+			t.Error("expected device_disk_encrypted false")
+		}
+		if entry.DeviceMDMEnrolled {
+			t.Error("expected device_mdm_enrolled false")
+		}
+	})
+
+	t.Run("handles partial device posture (nil bool pointers)", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "charlie",
+			Profile: "development",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect: policy.EffectAllow,
+		}
+
+		// Posture with nil bool pointers (not checked)
+		posture := &device.DevicePosture{
+			DeviceID:      "b2c3d4e5f67890a1b2c3d4e5f67890a1",
+			Status:        device.StatusUnknown,
+			DiskEncrypted: nil, // Not checked
+			MDMEnrolled:   nil, // Not checked
+			OSType:        "linux",
+			OSVersion:     "6.1.0",
+			CollectedAt:   time.Now(),
+		}
+
+		creds := &CredentialIssuanceFields{
+			RequestID:     "test5678",
+			DevicePosture: posture,
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+
+		if entry.DeviceID != "b2c3d4e5f67890a1b2c3d4e5f67890a1" {
+			t.Errorf("expected device_id, got %q", entry.DeviceID)
+		}
+		if entry.DeviceStatus != "unknown" {
+			t.Errorf("expected device_status 'unknown', got %q", entry.DeviceStatus)
+		}
+		// Nil pointers should result in false (zero value)
+		if entry.DeviceDiskEncrypt {
+			t.Error("expected device_disk_encrypted false for nil pointer")
+		}
+		if entry.DeviceMDMEnrolled {
+			t.Error("expected device_mdm_enrolled false for nil pointer")
+		}
+		if entry.DeviceOSType != "linux" {
+			t.Errorf("expected device_os_type 'linux', got %q", entry.DeviceOSType)
+		}
+	})
+
+	t.Run("handles device posture with false values", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "dave",
+			Profile: "test",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect: policy.EffectDeny,
+		}
+
+		posture := &device.DevicePosture{
+			DeviceID:      "c3d4e5f67890a1b2c3d4e5f67890a1b2",
+			Status:        device.StatusNonCompliant,
+			DiskEncrypted: &boolFalse,
+			MDMEnrolled:   &boolFalse,
+			OSType:        "windows",
+			OSVersion:     "10.0.19045",
+			CollectedAt:   time.Now(),
+		}
+
+		creds := &CredentialIssuanceFields{
+			RequestID:     "test9012",
+			DevicePosture: posture,
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+
+		if entry.DeviceStatus != "non_compliant" {
+			t.Errorf("expected device_status 'non_compliant', got %q", entry.DeviceStatus)
+		}
+		if entry.DeviceDiskEncrypt {
+			t.Error("expected device_disk_encrypted false")
+		}
+		if entry.DeviceMDMEnrolled {
+			t.Error("expected device_mdm_enrolled false")
+		}
+	})
+}
+
+func TestDecisionLogEntry_DeviceFields_JSONMarshal(t *testing.T) {
+	boolTrue := true
+
+	t.Run("includes device fields in JSON when present", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "alice",
+			Profile: "production",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect: policy.EffectAllow,
+		}
+
+		posture := &device.DevicePosture{
+			DeviceID:        "a1b2c3d4e5f67890a1b2c3d4e5f67890",
+			Status:          device.StatusCompliant,
+			DiskEncrypted:   &boolTrue,
+			MDMEnrolled:     &boolTrue,
+			OSType:          "darwin",
+			OSVersion:       "14.2.1",
+			CollectedAt:     time.Now(),
+		}
+
+		creds := &CredentialIssuanceFields{
+			RequestID:     "a1b2c3d4",
+			DevicePosture: posture,
+		}
+
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", creds)
+
+		data, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatalf("failed to marshal entry: %v", err)
+		}
+
+		jsonStr := string(data)
+
+		expectedFields := []string{
+			`"device_id":"a1b2c3d4e5f67890a1b2c3d4e5f67890"`,
+			`"device_status":"compliant"`,
+			`"device_disk_encrypted":true`,
+			`"device_mdm_enrolled":true`,
+			`"device_os_type":"darwin"`,
+			`"device_os_version":"14.2.1"`,
+		}
+
+		for _, field := range expectedFields {
+			if !containsSubstring(jsonStr, field) {
+				t.Errorf("JSON should contain %s, got: %s", field, jsonStr)
+			}
+		}
+	})
+
+	t.Run("omits device fields in JSON when empty (omitempty)", func(t *testing.T) {
+		req := &policy.Request{
+			User:    "bob",
+			Profile: "staging",
+			Time:    time.Now(),
+		}
+
+		decision := policy.Decision{
+			Effect: policy.EffectDeny,
+		}
+
+		// No device posture
+		entry := NewEnhancedDecisionLogEntry(req, decision, "/path", nil)
+
+		data, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatalf("failed to marshal entry: %v", err)
+		}
+
+		jsonStr := string(data)
+
+		deviceFields := []string{
+			`"device_id"`,
+			`"device_status"`,
+			`"device_disk_encrypted"`,
+			`"device_mdm_enrolled"`,
+			`"device_os_type"`,
+			`"device_os_version"`,
+		}
+
+		for _, field := range deviceFields {
+			if containsSubstring(jsonStr, field) {
+				t.Errorf("JSON should NOT contain %s when empty, got: %s", field, jsonStr)
 			}
 		}
 	})

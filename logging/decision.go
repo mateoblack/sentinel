@@ -3,6 +3,7 @@ package logging
 import (
 	"time"
 
+	"github.com/byteness/aws-vault/v7/device"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/policy"
 )
@@ -25,6 +26,14 @@ type DecisionLogEntry struct {
 	BreakGlassEventID string `json:"break_glass_event_id,omitempty"`     // ID of break-glass event that overrode policy deny
 	DriftStatus       string `json:"drift_status,omitempty"`             // Sentinel enforcement drift status: "ok", "partial", "none", "unknown"
 	DriftMessage      string `json:"drift_message,omitempty"`            // Human-readable explanation of drift status
+
+	// Device posture context (populated when device posture is evaluated)
+	DeviceID          string `json:"device_id,omitempty"`           // Device identifier
+	DeviceStatus      string `json:"device_status,omitempty"`       // compliant, non_compliant, unknown
+	DeviceDiskEncrypt bool   `json:"device_disk_encrypted,omitempty"` // Disk encryption status
+	DeviceMDMEnrolled bool   `json:"device_mdm_enrolled,omitempty"`   // MDM enrollment status
+	DeviceOSType      string `json:"device_os_type,omitempty"`        // darwin, windows, linux
+	DeviceOSVersion   string `json:"device_os_version,omitempty"`     // OS version string
 }
 
 // NewDecisionLogEntry creates a DecisionLogEntry from policy evaluation results.
@@ -51,6 +60,9 @@ type CredentialIssuanceFields struct {
 	BreakGlassEventID string // ID of break-glass event that overrode policy deny (empty if not break-glass)
 	DriftStatus       string // Drift check result: "ok", "partial", "none", "unknown"
 	DriftMessage      string // Human-readable explanation of drift status
+
+	// DevicePosture contains device posture data (nil if not evaluated)
+	DevicePosture *device.DevicePosture
 }
 
 // NewEnhancedDecisionLogEntry creates a DecisionLogEntry with credential issuance details.
@@ -69,6 +81,20 @@ func NewEnhancedDecisionLogEntry(req *policy.Request, decision policy.Decision, 
 		entry.BreakGlassEventID = creds.BreakGlassEventID
 		entry.DriftStatus = creds.DriftStatus
 		entry.DriftMessage = creds.DriftMessage
+
+		// Populate device posture fields if present
+		if creds.DevicePosture != nil {
+			entry.DeviceID = creds.DevicePosture.DeviceID
+			entry.DeviceStatus = string(creds.DevicePosture.Status)
+			if creds.DevicePosture.DiskEncrypted != nil {
+				entry.DeviceDiskEncrypt = *creds.DevicePosture.DiskEncrypted
+			}
+			if creds.DevicePosture.MDMEnrolled != nil {
+				entry.DeviceMDMEnrolled = *creds.DevicePosture.MDMEnrolled
+			}
+			entry.DeviceOSType = creds.DevicePosture.OSType
+			entry.DeviceOSVersion = creds.DevicePosture.OSVersion
+		}
 	}
 
 	return entry
