@@ -77,6 +77,30 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	// Create session context (after username and profile extraction)
 	sessionCtx := CreateSessionContext(ctx, h.Config, username, profile)
 
+	// Extract device ID from request (optional)
+	deviceID := extractDeviceID(req)
+
+	// Query MDM for device posture if configured and device ID provided
+	var mdmResult *MDMResult
+	if h.Config.MDMProvider != nil && deviceID != "" {
+		posture, mdmErr := queryDevicePosture(ctx, h.Config.MDMProvider, deviceID)
+		mdmResult = &MDMResult{
+			DeviceID: deviceID,
+			Posture:  posture,
+			Error:    mdmErr,
+		}
+		logMDMResult(deviceID, posture, mdmErr)
+
+		// If RequireDevicePosture and lookup failed, deny
+		if h.Config.RequireDevicePosture && mdmErr != nil {
+			return errorResponse(http.StatusForbidden, "DEVICE_VERIFICATION_FAILED",
+				fmt.Sprintf("Device verification failed: %v", mdmErr))
+		}
+	} else if deviceID != "" && h.Config.MDMProvider == nil {
+		log.Printf("INFO: Device ID provided but MDM not configured, skipping verification")
+		mdmResult = &MDMResult{DeviceID: deviceID, Skipped: true}
+	}
+
 	// Parse optional duration parameter
 	parsedDuration, err := parseDuration(req.QueryStringParameters["duration"])
 	if err != nil {
@@ -238,6 +262,11 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 			credFields.BreakGlassEventID = activeBreakGlass.ID
 		}
 
+		// Include device posture if MDM lookup was successful
+		if mdmResult != nil && mdmResult.Posture != nil {
+			credFields.DevicePosture = mdmResult.Posture
+		}
+
 		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, h.Config.PolicyParameter, credFields)
 		h.Config.Logger.LogDecision(entry)
 	}
@@ -314,4 +343,5 @@ func errorResponse(statusCode int, code, message string) (events.APIGatewayV2HTT
 func ErrorResponse(statusCode int, code, message string) (events.APIGatewayV2HTTPResponse, error) {
 	return errorResponse(statusCode, code, message)
 }
+
 // Phase 100 placeholder
