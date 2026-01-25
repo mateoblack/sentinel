@@ -97,12 +97,10 @@ Plans:
 **Depends on**: Phase 105
 **Research**: Likely (OS-specific system calls)
 **Research topics**: macOS diskutil/fdesetup, Windows BitLocker status, Linux LUKS detection
-**Plans**: 3
+**Plans**: TBD
 
 Plans:
-- [ ] 106-01: LocalCollector interface and macOS implementation
-- [ ] 106-02: Linux posture collection (LUKS, firewall, OS)
-- [ ] 106-03: Windows posture collection (BitLocker, firewall, OS)
+- [ ] 106-01: TBD
 
 #### Phase 107: Policy Device Conditions
 
