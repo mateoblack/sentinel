@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/device"
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
@@ -1969,6 +1972,180 @@ func TestSentinelExecCommand_RemoteServer_DeviceID(t *testing.T) {
 		}
 		if !strings.Contains(resultURL, "device_id=") {
 			t.Errorf("expected URL to contain device_id parameter, got: %s", resultURL)
+		}
+	})
+}
+
+// TestSentinelExec_DeviceIDFlow is an integration test for the device ID attestation flow.
+// It verifies that device ID flows from CLI to TVM via query parameter.
+func TestSentinelExec_DeviceIDFlow(t *testing.T) {
+	t.Run("mock TVM captures device_id from request", func(t *testing.T) {
+		// Create mock TVM server that captures request details
+		var capturedDeviceID string
+		var hasDeviceIDParam bool
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Capture device_id query parameter
+			capturedDeviceID = r.URL.Query().Get("device_id")
+			_, hasDeviceIDParam = r.URL.Query()["device_id"]
+
+			// Return valid credentials response
+			resp := `{
+				"AccessKeyId": "ASIADEVICEFLOWTEST",
+				"SecretAccessKey": "deviceflowsecret",
+				"Token": "deviceflowtoken",
+				"Expiration": "2024-01-01T12:00:00Z"
+			}`
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(resp))
+		}))
+		defer server.Close()
+
+		// Create RemoteCredentialClient with device ID
+		localDeviceID, err := device.GetDeviceID()
+		if err != nil {
+			// Device ID collection may fail in test environment (no /etc/machine-id)
+			// This is expected - test still validates the flow
+			t.Logf("device.GetDeviceID() failed (expected in some environments): %v", err)
+		}
+
+		// Create client with device ID (if available)
+		client := &RemoteCredentialClient{
+			URL:      server.URL + "?profile=test-profile",
+			DeviceID: localDeviceID,
+		}
+
+		// Make request
+		_, clientErr := client.GetCredentials(context.Background())
+		if clientErr != nil {
+			t.Fatalf("GetCredentials failed: %v", clientErr)
+		}
+
+		// Verify device_id handling
+		if localDeviceID != "" {
+			// If device ID was collected, it should appear in request
+			if !hasDeviceIDParam {
+				t.Error("expected device_id parameter in request when device ID is available")
+			}
+			if capturedDeviceID != localDeviceID {
+				t.Errorf("expected device_id %q, got %q", localDeviceID, capturedDeviceID)
+			}
+			// Verify format: 64-char lowercase hex
+			if len(capturedDeviceID) != 64 {
+				t.Errorf("expected device_id to be 64 chars, got %d", len(capturedDeviceID))
+			}
+			if !device.ValidateDeviceIdentifier(capturedDeviceID) {
+				t.Errorf("device_id does not match expected format (64 lowercase hex): %s", capturedDeviceID)
+			}
+		} else {
+			// If device ID collection failed, request should still work (fail-open)
+			t.Log("device ID collection failed, verifying fail-open behavior")
+			// No device_id param, but request should still succeed
+		}
+	})
+
+	t.Run("request succeeds without device_id (backward compatibility)", func(t *testing.T) {
+		// Create mock TVM server that accepts requests without device_id
+		var hasDeviceIDParam bool
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, hasDeviceIDParam = r.URL.Query()["device_id"]
+
+			// Return valid credentials response
+			resp := `{
+				"AccessKeyId": "ASIANODEVICEID",
+				"SecretAccessKey": "nodeviceidsecret",
+				"Token": "nodeviceidtoken",
+				"Expiration": "2024-01-01T12:00:00Z"
+			}`
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(resp))
+		}))
+		defer server.Close()
+
+		// Create client WITHOUT device ID (backward compatible mode)
+		client := NewRemoteCredentialClient(server.URL+"?profile=test-profile", "")
+
+		// Make request
+		result, err := client.GetCredentials(context.Background())
+		if err != nil {
+			t.Fatalf("GetCredentials failed: %v", err)
+		}
+
+		// Verify request succeeded without device_id
+		if hasDeviceIDParam {
+			t.Error("expected no device_id parameter when client DeviceID is empty")
+		}
+		if result.AccessKeyID != "ASIANODEVICEID" {
+			t.Errorf("expected AccessKeyID 'ASIANODEVICEID', got %q", result.AccessKeyID)
+		}
+	})
+
+	t.Run("device_id is preserved alongside profile parameter", func(t *testing.T) {
+		// Verify that device_id doesn't interfere with profile parameter
+		var capturedProfile string
+		var capturedDeviceID string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			capturedProfile = r.URL.Query().Get("profile")
+			capturedDeviceID = r.URL.Query().Get("device_id")
+
+			resp := `{
+				"AccessKeyId": "ASIABOTHPARAMS",
+				"SecretAccessKey": "bothparamssecret",
+				"Token": "bothparamstoken",
+				"Expiration": "2024-01-01T12:00:00Z"
+			}`
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(resp))
+		}))
+		defer server.Close()
+
+		deviceID := "c1d2e3f4a5b6c1d2e3f4a5b6c1d2e3f4a5b6c1d2e3f4a5b6c1d2e3f4a5b6c1d2"
+		client := &RemoteCredentialClient{
+			URL:      server.URL + "?profile=production-role",
+			DeviceID: deviceID,
+		}
+
+		_, err := client.GetCredentials(context.Background())
+		if err != nil {
+			t.Fatalf("GetCredentials failed: %v", err)
+		}
+
+		// Verify both parameters are present
+		if capturedProfile != "production-role" {
+			t.Errorf("expected profile 'production-role', got %q", capturedProfile)
+		}
+		if capturedDeviceID != deviceID {
+			t.Errorf("expected device_id %q, got %q", deviceID, capturedDeviceID)
+		}
+	})
+
+	t.Run("device.ValidateDeviceIdentifier works correctly", func(t *testing.T) {
+		// Test the validation function used by Lambda TVM
+		validIDs := []string{
+			"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+			"0000000000000000000000000000000000000000000000000000000000000000",
+			"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		}
+		for _, id := range validIDs {
+			if !device.ValidateDeviceIdentifier(id) {
+				t.Errorf("expected ValidateDeviceIdentifier to return true for %q", id)
+			}
+		}
+
+		invalidIDs := []string{
+			"",      // empty
+			"short", // too short
+			"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3", // 65 chars (too long)
+			"A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2",   // uppercase
+			"g1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",   // invalid char 'g'
+			"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b",    // 63 chars (too short)
+		}
+		for _, id := range invalidIDs {
+			if device.ValidateDeviceIdentifier(id) {
+				t.Errorf("expected ValidateDeviceIdentifier to return false for %q", id)
+			}
 		}
 	})
 }
