@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
@@ -122,6 +123,11 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 
 		// If neither approved request nor break-glass, deny
 		if approvedReq == nil && activeBreakGlass == nil {
+			// Log deny decision
+			if h.Config.Logger != nil {
+				entry := logging.NewDecisionLogEntry(policyRequest, decision, h.Config.PolicyParameter)
+				h.Config.Logger.LogDecision(entry)
+			}
 			log.Printf("DENY: user=%s profile=%s rule=%s reason=%s",
 				username, profile, decision.MatchedRule, decision.Reason)
 			return errorResponse(http.StatusForbidden, "POLICY_DENY",
@@ -190,6 +196,29 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 		// Return generic error to client (don't leak details)
 		return errorResponse(http.StatusInternalServerError, "CREDENTIAL_ERROR",
 			"Failed to vend credentials")
+	}
+
+	// Log decision with credential context
+	if h.Config.Logger != nil {
+		credFields := &logging.CredentialIssuanceFields{
+			RequestID:       vendOutput.SourceIdentity.RequestID(),
+			SourceIdentity:  vendOutput.SourceIdentity.Format(),
+			RoleARN:         roleARN,
+			SessionDuration: duration,
+		}
+
+		// Include approved request ID if credentials were issued via approval override
+		if approvedReq != nil {
+			credFields.ApprovedRequestID = approvedReq.ID
+		}
+
+		// Include break-glass event ID if credentials were issued via break-glass override
+		if activeBreakGlass != nil {
+			credFields.BreakGlassEventID = activeBreakGlass.ID
+		}
+
+		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, h.Config.PolicyParameter, credFields)
+		h.Config.Logger.LogDecision(entry)
 	}
 
 	// Log successful credential issuance (for audit/debugging)
