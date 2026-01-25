@@ -1,8 +1,12 @@
 package lambda
 
 import (
+	"context"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
 func TestEnvVariableNames(t *testing.T) {
@@ -17,6 +21,8 @@ func TestEnvVariableNames(t *testing.T) {
 		{"BreakGlassTable", EnvBreakGlassTable, "SENTINEL_BREAKGLASS_TABLE"},
 		{"SessionTable", EnvSessionTable, "SENTINEL_SESSION_TABLE"},
 		{"Region", EnvRegion, "AWS_REGION"},
+		{"MDMAPISecretID", EnvMDMAPISecretID, "SENTINEL_MDM_API_SECRET_ID"},
+		{"MDMAPIToken", EnvMDMAPIToken, "SENTINEL_MDM_API_TOKEN"},
 	}
 
 	for _, tt := range tests {
@@ -98,3 +104,134 @@ func TestTVMConfig_MirrorsSentinelServerConfig(t *testing.T) {
 // The function requires actual AWS SDK config loading which would fail
 // in test environments without proper credentials. Integration tests
 // should cover this path.
+
+func TestTVMConfig_SecretsLoader(t *testing.T) {
+	// Verify SecretsLoader field exists and is optional
+	cfg := &TVMConfig{}
+
+	if cfg.SecretsLoader != nil {
+		t.Error("expected nil SecretsLoader by default")
+	}
+
+	// Verify it can be set
+	mock := NewMockSecretsLoader(map[string]string{"test": "value"})
+	cfg.SecretsLoader = mock
+
+	if cfg.SecretsLoader == nil {
+		t.Error("expected SecretsLoader to be set")
+	}
+}
+
+func TestLoadMDMAPIToken_FromSecretsManager(t *testing.T) {
+	ctx := context.Background()
+	awsCfg := aws.Config{}
+
+	// Setup: Set secret ID, clear env token
+	os.Setenv(EnvMDMAPISecretID, "test-secret-id")
+	os.Unsetenv(EnvMDMAPIToken)
+	defer os.Unsetenv(EnvMDMAPISecretID)
+
+	// Create mock secrets loader
+	mock := NewMockSecretsLoader(map[string]string{
+		"test-secret-id": "secret-api-token-from-sm",
+	})
+
+	// Load token
+	token, err := loadMDMAPIToken(ctx, awsCfg, mock)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if token != "secret-api-token-from-sm" {
+		t.Errorf("expected secret-api-token-from-sm, got %s", token)
+	}
+
+	// Verify mock was called with correct secret ID
+	if len(mock.GetSecretCalls) != 1 || mock.GetSecretCalls[0] != "test-secret-id" {
+		t.Errorf("expected GetSecret to be called with test-secret-id, got %v", mock.GetSecretCalls)
+	}
+}
+
+func TestLoadMDMAPIToken_EnvVarDeprecationFallback(t *testing.T) {
+	ctx := context.Background()
+	awsCfg := aws.Config{}
+
+	// Setup: Clear secret ID, set env token
+	os.Unsetenv(EnvMDMAPISecretID)
+	os.Setenv(EnvMDMAPIToken, "env-var-token")
+	defer os.Unsetenv(EnvMDMAPIToken)
+
+	// Load token (mock won't be used since no secret ID)
+	token, err := loadMDMAPIToken(ctx, awsCfg, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if token != "env-var-token" {
+		t.Errorf("expected env-var-token, got %s", token)
+	}
+}
+
+func TestLoadMDMAPIToken_NeitherConfigured(t *testing.T) {
+	ctx := context.Background()
+	awsCfg := aws.Config{}
+
+	// Setup: Clear both
+	os.Unsetenv(EnvMDMAPISecretID)
+	os.Unsetenv(EnvMDMAPIToken)
+
+	// Load token
+	token, err := loadMDMAPIToken(ctx, awsCfg, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if token != "" {
+		t.Errorf("expected empty token, got %s", token)
+	}
+}
+
+func TestLoadMDMAPIToken_SecretsManagerError(t *testing.T) {
+	ctx := context.Background()
+	awsCfg := aws.Config{}
+
+	// Setup: Set secret ID
+	os.Setenv(EnvMDMAPISecretID, "nonexistent-secret")
+	defer os.Unsetenv(EnvMDMAPISecretID)
+
+	// Create mock secrets loader that returns error
+	mock := NewMockSecretsLoader(nil) // No secrets configured
+
+	// Load token - should fail
+	_, err := loadMDMAPIToken(ctx, awsCfg, mock)
+	if err == nil {
+		t.Error("expected error for nonexistent secret")
+	}
+}
+
+func TestLoadMDMAPIToken_PrefersSecretsManagerOverEnvVar(t *testing.T) {
+	ctx := context.Background()
+	awsCfg := aws.Config{}
+
+	// Setup: Set both secret ID and env token
+	os.Setenv(EnvMDMAPISecretID, "test-secret")
+	os.Setenv(EnvMDMAPIToken, "env-var-token-ignored")
+	defer os.Unsetenv(EnvMDMAPISecretID)
+	defer os.Unsetenv(EnvMDMAPIToken)
+
+	// Create mock secrets loader
+	mock := NewMockSecretsLoader(map[string]string{
+		"test-secret": "secrets-manager-token",
+	})
+
+	// Load token
+	token, err := loadMDMAPIToken(ctx, awsCfg, mock)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should use Secrets Manager value, not env var
+	if token != "secrets-manager-token" {
+		t.Errorf("expected secrets-manager-token, got %s", token)
+	}
+}

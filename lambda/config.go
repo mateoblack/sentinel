@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/logging"
@@ -28,10 +29,11 @@ const (
 	EnvRegion          = "AWS_REGION"
 
 	// MDM configuration environment variables.
-	EnvMDMProvider   = "SENTINEL_MDM_PROVIDER"   // "jamf", "intune", "kandji", "none"
-	EnvMDMBaseURL    = "SENTINEL_MDM_BASE_URL"   // MDM server URL (e.g., Jamf Pro URL)
-	EnvMDMAPIToken   = "SENTINEL_MDM_API_TOKEN"  // Bearer token (from Secrets Manager)
-	EnvRequireDevice = "SENTINEL_REQUIRE_DEVICE" // "true" to require device verification
+	EnvMDMProvider    = "SENTINEL_MDM_PROVIDER"      // "jamf", "intune", "kandji", "none"
+	EnvMDMBaseURL     = "SENTINEL_MDM_BASE_URL"      // MDM server URL (e.g., Jamf Pro URL)
+	EnvMDMAPISecretID = "SENTINEL_MDM_API_SECRET_ID" // Secrets Manager secret ID/ARN (preferred)
+	EnvMDMAPIToken    = "SENTINEL_MDM_API_TOKEN"     // Bearer token (deprecated - use Secrets Manager)
+	EnvRequireDevice  = "SENTINEL_REQUIRE_DEVICE"    // "true" to require device verification
 )
 
 // Default configuration values.
@@ -96,6 +98,10 @@ type TVMConfig struct {
 	// RequireDevicePosture when true, rejects credentials if MDM lookup fails.
 	// When false (default), MDM failure is logged but credentials are issued.
 	RequireDevicePosture bool
+
+	// SecretsLoader loads secrets from Secrets Manager. If nil, created automatically.
+	// Exposed for testing (inject MockSecretsLoader).
+	SecretsLoader SecretsLoader
 }
 
 // LoadConfigFromEnv creates a TVMConfig from environment variables.
@@ -145,10 +151,16 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 	// Configure MDM provider from environment
 	mdmProvider := os.Getenv(EnvMDMProvider)
 	if mdmProvider != "" && mdmProvider != "none" {
+		// Load MDM API token - prefer Secrets Manager over environment variable
+		mdmAPIToken, err := loadMDMAPIToken(ctx, awsCfg, cfg.SecretsLoader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load MDM API token: %w", err)
+		}
+
 		mdmConfig := &mdm.MDMConfig{
 			ProviderType: mdmProvider,
 			BaseURL:      os.Getenv(EnvMDMBaseURL),
-			APIToken:     os.Getenv(EnvMDMAPIToken),
+			APIToken:     mdmAPIToken,
 		}
 
 		switch mdmProvider {
@@ -187,4 +199,54 @@ func extractPolicyRoot(parameterPath string) string {
 		return "/sentinel/policies" // Default fallback
 	}
 	return parameterPath[:lastSlash]
+}
+
+// loadMDMAPIToken loads the MDM API token from Secrets Manager or environment variable.
+// Prefers Secrets Manager (EnvMDMAPISecretID) over environment variable (EnvMDMAPIToken).
+//
+// Priority:
+//  1. If SENTINEL_MDM_API_SECRET_ID is set, load from Secrets Manager (recommended)
+//  2. If SENTINEL_MDM_API_TOKEN is set, use env var (deprecated, logs warning)
+//  3. If neither is set, return empty string (MDM provider creation will fail)
+//
+// The secretsLoader parameter is optional - if nil, a new CachedSecretsLoader is created.
+func loadMDMAPIToken(ctx context.Context, awsCfg aws.Config, secretsLoader SecretsLoader) (string, error) {
+	secretID := os.Getenv(EnvMDMAPISecretID)
+	envToken := os.Getenv(EnvMDMAPIToken)
+
+	// If Secrets Manager secret ID is configured, load from Secrets Manager
+	if secretID != "" {
+		// Create SecretsLoader if not provided (nil means use default)
+		loader := secretsLoader
+		if loader == nil {
+			var err error
+			loader, err = NewCachedSecretsLoader(awsCfg)
+			if err != nil {
+				return "", fmt.Errorf("failed to create secrets loader: %w", err)
+			}
+		}
+
+		token, err := loader.GetSecret(ctx, secretID)
+		if err != nil {
+			return "", fmt.Errorf("failed to load MDM API token from Secrets Manager: %w", err)
+		}
+
+		// Warn if both are set (env var will be ignored)
+		if envToken != "" {
+			log.Printf("WARNING: Both %s and %s are set. Using Secrets Manager (env var ignored).",
+				EnvMDMAPISecretID, EnvMDMAPIToken)
+		}
+
+		return token, nil
+	}
+
+	// Fall back to environment variable (deprecated)
+	if envToken != "" {
+		log.Printf("WARNING: %s is deprecated. Migrate to Secrets Manager using %s for improved security.",
+			EnvMDMAPIToken, EnvMDMAPISecretID)
+		return envToken, nil
+	}
+
+	// Neither configured - return empty (MDM provider will fail to initialize)
+	return "", nil
 }
