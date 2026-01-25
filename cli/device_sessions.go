@@ -218,13 +218,13 @@ func DeviceSessionsCommand(ctx context.Context, input DeviceSessionsCommandInput
 
 // DevicesCommandInput contains the input for the devices list command.
 type DevicesCommandInput struct {
-	Region            string
-	TableName         string
-	Since             string // Duration filter: "7d", "30d", etc.
-	Limit             int
-	ProfileThreshold  int    // Threshold for HIGH_PROFILE_COUNT anomaly
-	OutputFormat      string // human, json
-	AWSProfile        string // For SSO credential loading
+	Region           string
+	TableName        string
+	Since            string // Duration filter: "7d", "30d", etc.
+	Limit            int
+	ProfileThreshold int    // Threshold for HIGH_PROFILE_COUNT anomaly
+	OutputFormat     string // human, json
+	AWSProfile       string // For SSO credential loading
 
 	// Store is an optional Store implementation for testing.
 	// If nil, a DynamoDB store will be created using the TableName and Region.
@@ -351,10 +351,10 @@ func DevicesCommand(ctx context.Context, input DevicesCommandInput) error {
 		agg, exists := deviceMap[sess.DeviceID]
 		if !exists {
 			agg = &deviceAggregator{
-				deviceID:    sess.DeviceID,
-				users:       make(map[string]bool),
-				profiles:    make(map[string]bool),
-				latestTime:  sess.StartedAt,
+				deviceID:     sess.DeviceID,
+				users:        make(map[string]bool),
+				profiles:     make(map[string]bool),
+				latestTime:   sess.StartedAt,
 				sessionCount: 0,
 			}
 			deviceMap[sess.DeviceID] = agg

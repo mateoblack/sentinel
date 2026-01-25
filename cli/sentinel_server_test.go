@@ -25,6 +25,7 @@ type mockSessionStore struct {
 	findActiveByServerInstanceFn func(ctx context.Context, serverInstanceID string) (*session.ServerSession, error)
 	touchFn                      func(ctx context.Context, id string) error
 	listByTimeRangeFn            func(ctx context.Context, startTime, endTime time.Time, limit int) ([]*session.ServerSession, error)
+	listByDeviceIDFn             func(ctx context.Context, deviceID string, limit int) ([]*session.ServerSession, error)
 }
 
 func (m *mockSessionStore) Create(ctx context.Context, sess *session.ServerSession) error {
@@ -98,6 +99,13 @@ func (m *mockSessionStore) ListByTimeRange(ctx context.Context, startTime, endTi
 }
 
 func (m *mockSessionStore) GetBySourceIdentity(ctx context.Context, sourceIdentity string) (*session.ServerSession, error) {
+	return nil, nil
+}
+
+func (m *mockSessionStore) ListByDeviceID(ctx context.Context, deviceID string, limit int) ([]*session.ServerSession, error) {
+	if m.listByDeviceIDFn != nil {
+		return m.listByDeviceIDFn(ctx, deviceID, limit)
+	}
 	return nil, nil
 }
 
