@@ -66,6 +66,9 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 			"Missing required 'profile' query parameter")
 	}
 
+	// Create session context (after username and profile extraction)
+	sessionCtx := CreateSessionContext(ctx, h.Config, username, profile)
+
 	// Parse optional duration parameter
 	parsedDuration, err := parseDuration(req.QueryStringParameters["duration"])
 	if err != nil {
@@ -162,6 +165,12 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 		}
 	}
 
+	// Check session revocation before credential issuance
+	if sessionCtx.CheckRevocation(ctx) {
+		return errorResponse(http.StatusForbidden, "SESSION_REVOKED",
+			"Session has been revoked")
+	}
+
 	// Build RoleARN from profile
 	// For now, use profile directly as RoleARN
 	// Phase 100 will add profile lookup
@@ -173,6 +182,7 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 		RoleARN:         roleARN,
 		SessionDuration: duration,
 		Region:          h.Config.Region,
+		SessionID:       sessionCtx.ID,
 	}
 
 	// Include approval ID for SourceIdentity stamping (if via approved request)
@@ -197,6 +207,9 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 		return errorResponse(http.StatusInternalServerError, "CREDENTIAL_ERROR",
 			"Failed to vend credentials")
 	}
+
+	// Touch session to update LastAccessAt
+	sessionCtx.Touch(ctx)
 
 	// Log decision with credential context
 	if h.Config.Logger != nil {
