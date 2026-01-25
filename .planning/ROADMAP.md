@@ -86,7 +86,7 @@ Plans:
 Plans:
 - [x] 98-01: Credential vending function (VendCredentials, SourceIdentity stamping) — Wave 1 — completed 2026-01-25
 - [ ] 98-02: TBD
-- [ ] 98-03: TBD
+- [x] 98-03: Lambda IAM role templates documentation — Wave 2 — completed 2026-01-25
 
 ### Phase 99: Policy & Session Integration
 
