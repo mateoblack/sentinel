@@ -263,6 +263,7 @@ func (ts TableSchema) GSINames() []string {
 //   - GSIs: gsi-requester, gsi-status, gsi-profile (each with created_at sort key)
 //   - TTL attribute: ttl
 //   - Billing: PAY_PER_REQUEST
+//   - Encryption: AWS managed KMS (enabled by default for security)
 func ApprovalTableSchema(tableName string) TableSchema {
 	createdAtSortKey := &KeyAttribute{Name: "created_at", Type: KeyTypeString}
 
@@ -291,6 +292,7 @@ func ApprovalTableSchema(tableName string) TableSchema {
 		},
 		TTLAttribute: "ttl",
 		BillingMode:  BillingModePayPerRequest,
+		Encryption:   DefaultEncryptionKMS(),
 	}
 }
 
@@ -300,6 +302,7 @@ func ApprovalTableSchema(tableName string) TableSchema {
 //   - GSIs: gsi-invoker, gsi-status, gsi-profile (each with created_at sort key)
 //   - TTL attribute: ttl
 //   - Billing: PAY_PER_REQUEST
+//   - Encryption: AWS managed KMS (enabled by default for security)
 func BreakGlassTableSchema(tableName string) TableSchema {
 	createdAtSortKey := &KeyAttribute{Name: "created_at", Type: KeyTypeString}
 
@@ -328,6 +331,7 @@ func BreakGlassTableSchema(tableName string) TableSchema {
 		},
 		TTLAttribute: "ttl",
 		BillingMode:  BillingModePayPerRequest,
+		Encryption:   DefaultEncryptionKMS(),
 	}
 }
 
@@ -338,6 +342,7 @@ func BreakGlassTableSchema(tableName string) TableSchema {
 //   - GSI: gsi-server-instance (server_instance_id PK, status SK - different sort key!)
 //   - TTL attribute: ttl
 //   - Billing: PAY_PER_REQUEST
+//   - Encryption: AWS managed KMS (enabled by default for security)
 func SessionTableSchema(tableName string) TableSchema {
 	createdAtSortKey := &KeyAttribute{Name: "created_at", Type: KeyTypeString}
 
@@ -372,5 +377,6 @@ func SessionTableSchema(tableName string) TableSchema {
 		},
 		TTLAttribute: "ttl",
 		BillingMode:  BillingModePayPerRequest,
+		Encryption:   DefaultEncryptionKMS(),
 	}
 }

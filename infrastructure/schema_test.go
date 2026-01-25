@@ -547,6 +547,13 @@ func TestApprovalTableSchema(t *testing.T) {
 		t.Errorf("BillingMode = %q, want %q", schema.BillingMode, BillingModePayPerRequest)
 	}
 
+	// Test encryption - should default to KMS
+	if schema.Encryption == nil {
+		t.Error("Encryption = nil, want non-nil (KMS encryption)")
+	} else if schema.Encryption.Type != EncryptionKMS {
+		t.Errorf("Encryption.Type = %q, want %q", schema.Encryption.Type, EncryptionKMS)
+	}
+
 	// Test GSIs
 	expectedGSIs := map[string]struct {
 		partitionKey string
@@ -656,6 +663,13 @@ func TestBreakGlassTableSchema(t *testing.T) {
 		t.Errorf("BillingMode = %q, want %q", schema.BillingMode, BillingModePayPerRequest)
 	}
 
+	// Test encryption - should default to KMS
+	if schema.Encryption == nil {
+		t.Error("Encryption = nil, want non-nil (KMS encryption)")
+	} else if schema.Encryption.Type != EncryptionKMS {
+		t.Errorf("Encryption.Type = %q, want %q", schema.Encryption.Type, EncryptionKMS)
+	}
+
 	// Test GSIs - key difference is gsi-invoker instead of gsi-requester
 	expectedGSIs := map[string]struct {
 		partitionKey string
@@ -763,6 +777,13 @@ func TestSessionTableSchema(t *testing.T) {
 	// Test billing mode
 	if schema.BillingMode != BillingModePayPerRequest {
 		t.Errorf("BillingMode = %q, want %q", schema.BillingMode, BillingModePayPerRequest)
+	}
+
+	// Test encryption - should default to KMS
+	if schema.Encryption == nil {
+		t.Error("Encryption = nil, want non-nil (KMS encryption)")
+	} else if schema.Encryption.Type != EncryptionKMS {
+		t.Errorf("Encryption.Type = %q, want %q", schema.Encryption.Type, EncryptionKMS)
 	}
 
 	// Test GSI count - session table has 4 GSIs (1 more than approval/breakglass)
