@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/aws-sdk-go-v2/service/sts/types"
 	"github.com/byteness/aws-vault/v7/identity"
 )
 
@@ -58,6 +59,10 @@ type VendInput struct {
 	// Region is the AWS region for the STS endpoint.
 	// Optional - uses Lambda's region if not specified.
 	Region string
+
+	// SessionID is the session ID to stamp as a session tag.
+	// Optional - if empty, no session tag is added.
+	SessionID string
 }
 
 // VendOutput contains the result of credential vending.
@@ -122,6 +127,14 @@ func VendCredentialsWithClient(ctx context.Context, input *VendInput, client STS
 		RoleSessionName: aws.String(roleSessionName),
 		DurationSeconds: aws.Int32(int32(input.SessionDuration.Seconds())),
 		SourceIdentity:  aws.String(sourceIdentity.Format()),
+	}
+
+	// Add session tag if session tracking is enabled
+	if input.SessionID != "" {
+		assumeRoleInput.Tags = []types.Tag{{
+			Key:   aws.String("SentinelSessionID"),
+			Value: aws.String(input.SessionID),
+		}}
 	}
 
 	// Call STS AssumeRole
