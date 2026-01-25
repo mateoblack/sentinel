@@ -23,7 +23,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.12 Infrastructure Provisioning** — [milestones/v1.12-ROADMAP.md](milestones/v1.12-ROADMAP.md) (Phases 88-93, shipped 2026-01-22)
 - ✅ **v1.13 Enforced Session Tracking** — [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) (Phases 94-96, shipped 2026-01-24)
 - ✅ **v1.14 Server-Side Credential Vending** — [milestones/v1.14-ROADMAP.md](milestones/v1.14-ROADMAP.md) (Phases 97-103, shipped 2026-01-25)
-- 🚧 **v1.15 Device Posture** — Phases 104-112 (in progress)
+- 🚧 **v1.15 Device Posture** — Phases 104-113 (in progress)
 
 ## Completed Milestones
 
@@ -68,99 +68,111 @@ See [milestones/v1.14-ROADMAP.md](milestones/v1.14-ROADMAP.md) for full details.
 
 ### 🚧 v1.15 Device Posture (In Progress)
 
-**Milestone Goal:** Verify device security posture (disk encryption, MDM enrollment, OS version) before issuing credentials, with device fingerprinting in decision logs and session metadata for forensic analysis.
+**Milestone Goal:** Server-verified device posture via MDM/EDR APIs in Lambda TVM. CLI sends device identifier only — TVM queries Jamf/Intune/CrowdStrike for actual posture. Clients cannot fake compliance.
+
+**Security Constraint:** No local CLI posture checks (can be bypassed). See .planning/CONSTRAINTS.md.
 
 #### Phase 104: Device Fingerprint Schema
 
 **Goal**: Define device posture data model with device ID, attestation claims, and policy binding
 **Depends on**: v1.14 complete
 **Research**: Unlikely (internal design, extends existing types)
-**Plans**: TBD
+**Plans**: 1 (1/1 complete)
 
 Plans:
-- [ ] 104-01: TBD (run /gsd:plan-phase 104 to break down)
+- [x] 104-01: Device posture types, policy conditions, log fields — completed 2026-01-25
 
 #### Phase 105: Device Collector Interface
 
 **Goal**: Abstract interface for collecting device posture from multiple sources (MDM, local)
 **Depends on**: Phase 104
-**Research**: Likely (MDM API integration patterns)
-**Research topics**: macOS MDM enrollment status, Windows device health attestation APIs
+**Research**: Unlikely (interface design)
 **Plans**: 1 (1/1 complete)
 
 Plans:
 - [x] 105-01: Collector interface and implementations — completed 2026-01-25
 
-#### Phase 106: Local Device Collector
+#### Phase 106: Device Identification
 
-**Goal**: Collect local device state (disk encryption, firewall, OS version) without MDM
+**Goal**: CLI collects stable hardware device ID only (NOT posture claims)
 **Depends on**: Phase 105
-**Research**: Likely (OS-specific system calls)
-**Research topics**: macOS diskutil/fdesetup, Windows BitLocker status, Linux LUKS detection
-**Plans**: TBD
+**Research**: Likely (OS-specific hardware ID APIs)
+**Research topics**: macOS IOPlatformSerialNumber, Linux /etc/machine-id, Windows MachineGuid
+**Plans**: 1
 
 Plans:
-- [ ] 106-01: TBD
+- [ ] 106-01: Device identity module with GetDeviceID() using machineid library
 
-#### Phase 107: Policy Device Conditions
+#### Phase 107: MDM API Integration
 
-**Goal**: Add device posture conditions to policy rules (require_encryption, require_mdm, etc.)
+**Goal**: Lambda TVM queries MDM APIs (Jamf, Intune, Kandji) server-side to get actual device posture
 **Depends on**: Phase 106
-**Research**: Unlikely (extends existing policy schema)
+**Research**: Likely (MDM API authentication and endpoints)
+**Research topics**: Jamf Pro API, Microsoft Graph API for Intune, Kandji API
 **Plans**: TBD
 
 Plans:
 - [ ] 107-01: TBD
 
-#### Phase 108: Device Attestation Flow
+#### Phase 108: Policy Device Conditions
 
-**Goal**: Capture device posture at credential request time and bind to session
+**Goal**: Add device posture conditions to policy rules (require_encryption, require_mdm, etc.)
 **Depends on**: Phase 107
-**Research**: Unlikely (internal integration with existing credential flow)
+**Research**: Unlikely (extends existing policy schema)
 **Plans**: TBD
 
 Plans:
 - [ ] 108-01: TBD
 
-#### Phase 109: Decision Logging Enhancement
+#### Phase 109: Device Attestation Flow
 
-**Goal**: Add device context to decision logs for forensic analysis
+**Goal**: Wire device ID into credential request, TVM queries MDM, binds posture to session
 **Depends on**: Phase 108
-**Research**: Unlikely (extends existing logging patterns)
+**Research**: Unlikely (internal integration with existing credential flow)
 **Plans**: TBD
 
 Plans:
 - [ ] 109-01: TBD
 
-#### Phase 110: Session Device Binding
+#### Phase 110: Decision Logging Enhancement
 
-**Goal**: Store device fingerprint in session metadata for revocation correlation
+**Goal**: Add device context to decision logs for forensic analysis
 **Depends on**: Phase 109
-**Research**: Unlikely (extends existing session tracking)
+**Research**: Unlikely (extends existing logging patterns)
 **Plans**: TBD
 
 Plans:
 - [ ] 110-01: TBD
 
-#### Phase 111: Device Audit Commands
+#### Phase 111: Session Device Binding
 
-**Goal**: CLI commands to list devices, query sessions by device, and flag anomalies
+**Goal**: Store device fingerprint in session metadata for revocation correlation
 **Depends on**: Phase 110
-**Research**: Unlikely (extends existing CLI patterns)
+**Research**: Unlikely (extends existing session tracking)
 **Plans**: TBD
 
 Plans:
 - [ ] 111-01: TBD
 
-#### Phase 112: Documentation & Testing
+#### Phase 112: Device Audit Commands
 
-**Goal**: Device posture documentation and integration tests
+**Goal**: CLI commands to list devices, query sessions by device, and flag anomalies
 **Depends on**: Phase 111
-**Research**: Unlikely (documentation)
+**Research**: Unlikely (extends existing CLI patterns)
 **Plans**: TBD
 
 Plans:
 - [ ] 112-01: TBD
+
+#### Phase 113: Documentation & Testing
+
+**Goal**: Device posture documentation and integration tests
+**Depends on**: Phase 112
+**Research**: Unlikely (documentation)
+**Plans**: TBD
+
+Plans:
+- [ ] 113-01: TBD
 
 ## Domain Expertise
 
@@ -573,6 +585,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.12 Infrastructure Provisioning | 88-93 | 15/15 | ✅ Complete | 2026-01-22 |
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
-| v1.15 Device Posture | 104-112 | 0/? | 🚧 In Progress | - |
+| v1.15 Device Posture | 104-113 | 2/? | 🚧 In Progress | - |
 
-**Totals:** 17 milestones shipped (103 phases, 192 plans shipped)
+**Totals:** 17 milestones shipped (103 phases, 194 plans shipped)
