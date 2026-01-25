@@ -1,5 +1,7 @@
 # Sentinel
 
+> **Alpha Release** - APIs and features may change. Feedback welcome via issues.
+
 Policy-based credential gateway for AWS. Know not just *what* happened, but *why* it was allowed.
 
 ## The Problem
@@ -153,11 +155,14 @@ rules:
 
 ## Built On
 
-Sentinel extends [aws-vault](https://github.com/99designs/aws-vault), adding policy evaluation while inheriting:
+Sentinel is a fork of [aws-vault](https://github.com/99designs/aws-vault) by 99designs. It adds policy evaluation, approval workflows, and session tracking while inheriting aws-vault's battle-tested credential management:
+
 - Secure credential storage via system keyring
 - AWS SSO integration
 - Session caching with expiration
 - Cross-platform support (macOS, Linux, Windows)
+
+**Upstream:** Based on aws-vault v7.x
 
 Supported credential stores:
 * [macOS Keychain](https://support.apple.com/en-au/guide/keychain-access/welcome/mac)
@@ -183,7 +188,9 @@ Supported credential stores:
 
 ## License
 
-MIT
+MIT - See [LICENSE](LICENSE) for details.
+
+Sentinel is a fork of [aws-vault](https://github.com/99designs/aws-vault) by 99designs, also MIT licensed.
 
 ---
 
