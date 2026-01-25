@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 ## Current Position
 
-Phase: 105 of 112 (Device Collector Interface)
+Phase: 106 of 112 (Local Device Collector)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-25 — Completed 105-01-PLAN.md
+Last activity: 2026-01-25 — Completed 106-01-PLAN.md
 
-Progress: ██░░░░░░░░ 22%
+Progress: ███░░░░░░░ 30%
 
 ## Milestone Summary
 
@@ -25,6 +25,7 @@ Progress: ██░░░░░░░░ 22%
 - Key feature: Device fingerprinting in decision logs and session metadata
 - Phase 104 complete: Device posture schema types, policy conditions, log fields
 - Phase 105 complete: Collector interface, MultiCollector, NoopCollector
+- Phase 106 complete: Device identity module with machineid library
 
 **v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
@@ -94,6 +95,8 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Collector interface returns (*DevicePosture, error) for partial results
 - MultiCollector merges with first-non-nil-wins semantics
 - StatusUnknown treated as empty/default for merge purposes
+- machineid.ProtectedID() for HMAC-SHA256 hashed device ID (64 hex chars)
+- AppID 'sentinel-device-posture' isolates device IDs from other apps
 
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
@@ -118,9 +121,9 @@ None — fresh milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Phase 105 complete
+Stopped at: Phase 106 complete
 Resume file: None
-Next: `/gsd:plan-phase 106` to plan Local Device Collector
+Next: `/gsd:plan-phase 107` to plan MDM API Integration
 
 ## Roadmap Evolution
 

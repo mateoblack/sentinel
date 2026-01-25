@@ -98,10 +98,10 @@ Plans:
 **Depends on**: Phase 105
 **Research**: Likely (OS-specific hardware ID APIs)
 **Research topics**: macOS IOPlatformSerialNumber, Linux /etc/machine-id, Windows MachineGuid
-**Plans**: 1
+**Plans**: 1 (1/1 complete)
 
 Plans:
-- [ ] 106-01: Device identity module with GetDeviceID() using machineid library
+- [x] 106-01: Device identity module with GetDeviceID() using machineid library — completed 2026-01-25
 
 #### Phase 107: MDM API Integration
 
@@ -585,6 +585,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.12 Infrastructure Provisioning | 88-93 | 15/15 | ✅ Complete | 2026-01-22 |
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
-| v1.15 Device Posture | 104-113 | 2/? | 🚧 In Progress | - |
+| v1.15 Device Posture | 104-113 | 3/? | 🚧 In Progress | - |
 
 **Totals:** 17 milestones shipped (103 phases, 194 plans shipped)
