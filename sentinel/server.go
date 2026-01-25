@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/device"
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
@@ -120,6 +121,10 @@ type SentinelServer struct {
 	// sessionID is the current session ID (created on startup if SessionStore is configured).
 	// Empty string if session tracking is disabled.
 	sessionID string
+
+	// deviceID is the device identifier collected at server startup for decision logging.
+	// Empty string if device ID collection failed (fail-open).
+	deviceID string
 }
 
 // NewSentinelServer creates a new SentinelServer that listens on the specified port.
@@ -163,10 +168,18 @@ func NewSentinelServer(ctx context.Context, config SentinelServerConfig, authTok
 		config.ServerInstanceID = identity.NewRequestID()
 	}
 
+	// Collect device ID once at server startup for decision logging (fail-open)
+	deviceID, deviceErr := device.GetDeviceID()
+	if deviceErr != nil {
+		log.Printf("Warning: failed to collect device ID for logging: %v", deviceErr)
+		deviceID = "" // Continue without device ID
+	}
+
 	s := &SentinelServer{
 		listener:  listener,
 		authToken: authToken,
 		config:    config,
+		deviceID:  deviceID,
 	}
 
 	// Create session if SessionStore is configured (best-effort tracking)
@@ -349,6 +362,12 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 		// Include break-glass event ID if credentials were issued via break-glass override
 		if activeBreakGlass != nil {
 			credFields.BreakGlassEventID = activeBreakGlass.ID
+		}
+		// Include device ID in logs for forensic correlation
+		if s.deviceID != "" {
+			credFields.DevicePosture = &device.DevicePosture{
+				DeviceID: s.deviceID,
+			}
 		}
 		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, s.config.PolicyParameter, credFields)
 		s.config.Logger.LogDecision(entry)
