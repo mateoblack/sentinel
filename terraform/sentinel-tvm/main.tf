@@ -36,6 +36,22 @@ locals {
     } : {},
     var.breakglass_table != "" ? {
       SENTINEL_BREAKGLASS_TABLE = var.breakglass_table
+    } : {},
+    # MDM Provider Configuration
+    var.mdm_provider != "" ? {
+      SENTINEL_MDM_PROVIDER = var.mdm_provider
+    } : {},
+    var.mdm_base_url != "" ? {
+      SENTINEL_MDM_BASE_URL = var.mdm_base_url
+    } : {},
+    # Use Secrets Manager (preferred) or env var (deprecated) for MDM API token
+    var.mdm_api_secret_arn != "" ? {
+      SENTINEL_MDM_API_SECRET_ID = var.mdm_api_secret_arn
+    } : var.mdm_api_token != "" ? {
+      SENTINEL_MDM_API_TOKEN = var.mdm_api_token
+    } : {},
+    var.require_device_posture ? {
+      SENTINEL_REQUIRE_DEVICE = "true"
     } : {}
   )
 }
