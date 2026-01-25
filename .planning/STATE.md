@@ -10,19 +10,20 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 ## Current Position
 
 Phase: 104 of 112 (Device Fingerprint Schema)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-25 — Milestone v1.15 created
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-01-25 — Completed 104-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0%
+Progress: █░░░░░░░░░ 11%
 
 ## Milestone Summary
 
 **v1.15 Device Posture (IN PROGRESS):**
 - 9 phases (104-112)
-- Plans: TBD
+- Plans: 1 completed (Phase 104)
 - Goal: Verify device security posture before issuing credentials
 - Key feature: Device fingerprinting in decision logs and session metadata
+- Phase 104 complete: Device posture schema types, policy conditions, log fields
 
 **v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
@@ -52,9 +53,9 @@ Progress: ░░░░░░░░░░ 0%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 192
+- Total plans completed: 193
 - Average duration: ~3.5 min
-- Total execution time: ~672 min
+- Total execution time: ~682 min
 
 **By Milestone:**
 
@@ -82,7 +83,13 @@ Progress: ░░░░░░░░░░ 0%
 
 ### Decisions
 
-Key decisions logged in PROJECT.md Key Decisions table. Recent decisions from v1.14:
+Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
+
+**v1.15 Device Posture decisions (Phase 104):**
+- DeviceID uses 32-char hex (128 bits) vs SessionID 16-char for stronger fingerprint uniqueness
+- Pointer bools distinguish not checked (nil) from checked and false
+- Simple version comparison without external semver library
+- All device log fields use omitempty for backward compatibility
 
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
@@ -107,9 +114,9 @@ None — fresh milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Milestone v1.15 initialization
+Stopped at: Phase 104 complete
 Resume file: None
-Next: `/gsd:plan-phase 104` to plan Device Fingerprint Schema
+Next: `/gsd:plan-phase 105` to plan Posture Collection SDK
 
 ## Roadmap Evolution
 
