@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 ## Current Position
 
 Phase: 107 of 112 (MDM API Integration)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-01-25 — Completed 107-02-PLAN.md
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-01-25 — Completed 107-03-PLAN.md
 
-Progress: ████░░░░░░ 44%
+Progress: ████░░░░░░ 45%
 
 ## Milestone Summary
 
@@ -26,7 +26,7 @@ Progress: ████░░░░░░ 44%
 - Phase 104 complete: Device posture schema types, policy conditions, log fields
 - Phase 105 complete: Collector interface, MultiCollector, NoopCollector
 - Phase 106 complete: Device identity module with machineid library
-- Phase 107 in progress: MDM Provider interface + JamfProvider (2/3 plans)
+- Phase 107 complete: MDM Provider interface, JamfProvider, Lambda integration (3/3 plans)
 
 **v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
@@ -103,6 +103,9 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - DeviceIDMapper placeholder for MVP direct passthrough mapping
 - JamfProvider requires Extension Attribute 'SentinelDeviceID' for production
 - Compliance = enrolled (managed) + remote management enabled
+- Fail-open by default for MDM (RequireDevicePosture=false)
+- Device ID passed as query parameter device_id (64-char lowercase hex)
+- Unimplemented providers (intune, kandji) use NoopProvider with warning
 
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
@@ -127,9 +130,9 @@ None — fresh milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 107-02-PLAN.md (JamfProvider)
+Stopped at: Completed 107-03-PLAN.md (Lambda MDM Integration)
 Resume file: None
-Next: `/gsd:execute-plan 107-03` to execute Intune provider plan
+Next: `/gsd:plan-phase 108` to plan next phase
 
 ## Roadmap Evolution
 
