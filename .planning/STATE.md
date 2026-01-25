@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 ## Current Position
 
-Phase: 111 of 112 (Decision Logging Enhancement)
+Phase: 112 of 112 (Device Audit Commands)
 Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-25 — Completed 111-01-PLAN.md
+Status: Phase complete - MILESTONE COMPLETE
+Last activity: 2026-01-25 — Completed 112-01-PLAN.md
 
-Progress: ████████░░ 80%
+Progress: ██████████ 100%
 
 ## Milestone Summary
 
@@ -31,6 +31,7 @@ Progress: ████████░░ 80%
 - Phase 109 complete: Device attestation flow from CLI to TVM (1/1 plans)
 - Phase 110 complete: Session device binding for forensics (1/1 plans)
 - Phase 111 complete: Decision logging enhancement with device ID (1/1 plans)
+- Phase 112 complete: Device audit commands for forensic analysis (1/1 plans)
 
 **v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
@@ -60,9 +61,9 @@ Progress: ████████░░ 80%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 200
+- Total plans completed: 201
 - Average duration: ~3.5 min
-- Total execution time: ~735 min
+- Total execution time: ~739 min
 
 **By Milestone:**
 
@@ -120,6 +121,8 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Log device_bound=true flag rather than actual device ID for privacy
 - Fail-open on device ID collection for CLI decision logs (availability over blocking)
 - Device ID collected once at server startup, cached in struct for efficiency
+- Device audit commands: device-sessions queries by 64-char hex device ID, devices aggregates with anomaly detection
+- Anomaly thresholds: MULTI_USER at >1 user, HIGH_PROFILE_COUNT at >5 profiles (configurable)
 
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
@@ -144,9 +147,9 @@ None — fresh milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 111-01-PLAN.md (Decision Logging Enhancement)
+Stopped at: Completed 112-01-PLAN.md (Device Audit Commands) - MILESTONE COMPLETE
 Resume file: None
-Next: `/gsd:plan-phase 112` or `/gsd:progress` to continue
+Next: `/gsd:complete-milestone` to archive v1.15 and prepare for next
 
 ## Roadmap Evolution
 
