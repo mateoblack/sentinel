@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 ## Current Position
 
 Phase: 117 of 120 (API Rate Limiting)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-25 — Completed 117-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-01-25 — Completed 117-02-PLAN.md
 
-Progress: ███░░░░░░░ 31%
+Progress: ████░░░░░░ 33%
 
 ## Milestone Summary
 
@@ -139,6 +139,9 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Rate limit by IAM user ARN, not IP (IAM auth identifies caller)
 - Fail-open on rate limiter errors (availability preferred over blocking)
 - Default 100 requests per 60 seconds (conservative but usable)
+- Credential server rate limits by remote address (127.0.0.1 for localhost but provides burst protection)
+- RFC 7231 compliant Retry-After header with 429 responses
+- Rate limiter closed on shutdown if implements io.Closer
 
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
@@ -163,9 +166,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 117-01-PLAN.md
+Stopped at: Completed 117-02-PLAN.md (Phase 117 complete)
 Resume file: None
-Next: Plan 117-02 (Credential server rate limiting)
+Next: Phase 118 (Audit Logging)
 
 ## Roadmap Evolution
 
