@@ -178,3 +178,27 @@ resource "aws_iam_role_policy" "cloudwatch_logs" {
     ]
   })
 }
+
+# Policy: Secrets Manager Access (conditional - only if mdm_api_secret_arn is specified)
+# Required for loading MDM API token from Secrets Manager with caching
+resource "aws_iam_role_policy" "secrets_manager" {
+  count = var.mdm_api_secret_arn != "" ? 1 : 0
+
+  name = "${var.function_name}-secrets-manager"
+  role = aws_iam_role.tvm_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "SecretsManagerAccess"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = var.mdm_api_secret_arn
+      }
+    ]
+  })
+}
