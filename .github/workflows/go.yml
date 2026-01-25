@@ -1,0 +1,30 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  GOTELEMETRY: off
+
+jobs:
+  build:
+    name: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          check-latest: true
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
