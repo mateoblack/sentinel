@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 Phase: 102 of 103 (Infrastructure as Code)
 Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-25 — Completed 102-02-PLAN.md
+Last activity: 2026-01-25 — Completed 102-01-PLAN.md
 
 Progress: █████████████████░░ 73% (207/295 total plans across all milestones)
 
@@ -102,6 +102,8 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions from v1
 - ARM64 architecture for Lambda cost optimization (Graviton2)
 - Conditional DynamoDB policies only if tables specified
 - Context + environment variable configuration pattern for CDK apps
+- Use aws_apigatewayv2_* for HTTP APIs (not deprecated REST API resources)
+- Count-based conditionals for optional DynamoDB table policies in Terraform
 
 ### Pending Todos
 
@@ -121,7 +123,7 @@ None — clean start for v1.14.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 102-02-PLAN.md (CDK example)
+Stopped at: Completed 102-01-PLAN.md (Terraform module)
 Resume file: None
 Next: `/gsd:execute-plan 102-03`
 
