@@ -74,11 +74,11 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 			"Missing required 'profile' query parameter")
 	}
 
-	// Create session context (after username and profile extraction)
-	sessionCtx := CreateSessionContext(ctx, h.Config, username, profile)
-
-	// Extract device ID from request (optional)
+	// Extract device ID from request (optional - used for session binding and MDM lookup)
 	deviceID := extractDeviceID(req)
+
+	// Create session context (after username and profile extraction)
+	sessionCtx := CreateSessionContext(ctx, h.Config, username, profile, deviceID)
 
 	// Query MDM for device posture if configured and device ID provided
 	var mdmResult *MDMResult

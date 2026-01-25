@@ -24,7 +24,8 @@ type SessionContext struct {
 
 // CreateSessionContext creates a new session if session tracking is enabled.
 // Returns empty SessionContext if SessionStore is nil.
-func CreateSessionContext(ctx context.Context, cfg *TVMConfig, username, profile string) *SessionContext {
+// The deviceID parameter is optional (empty string means no device binding).
+func CreateSessionContext(ctx context.Context, cfg *TVMConfig, username, profile, deviceID string) *SessionContext {
 	sc := &SessionContext{
 		Store: cfg.SessionStore,
 	}
@@ -54,6 +55,7 @@ func CreateSessionContext(ctx context.Context, cfg *TVMConfig, username, profile
 		LastAccessAt:     now,
 		ExpiresAt:        now.Add(duration),
 		RequestCount:     0,
+		DeviceID:         deviceID,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -66,7 +68,11 @@ func CreateSessionContext(ctx context.Context, cfg *TVMConfig, username, profile
 
 	sc.ID = sessionID
 	sc.Session = serverSession
-	log.Printf("Session created: %s user=%s profile=%s", sessionID, username, profile)
+	if deviceID != "" {
+		log.Printf("Session created: %s user=%s profile=%s device_bound=true", sessionID, username, profile)
+	} else {
+		log.Printf("Session created: %s user=%s profile=%s", sessionID, username, profile)
+	}
 
 	return sc
 }

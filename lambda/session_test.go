@@ -89,7 +89,7 @@ func (m *mockSessionStore) ListByDeviceID(ctx context.Context, deviceID string, 
 
 func TestCreateSessionContext_NoStore(t *testing.T) {
 	cfg := &TVMConfig{SessionStore: nil}
-	sc := CreateSessionContext(context.Background(), cfg, "alice", "dev")
+	sc := CreateSessionContext(context.Background(), cfg, "alice", "dev", "")
 
 	if sc.ID != "" {
 		t.Errorf("expected empty ID when store is nil, got %s", sc.ID)
@@ -106,7 +106,7 @@ func TestCreateSessionContext_WithStore(t *testing.T) {
 		DefaultDuration: 15 * time.Minute,
 	}
 
-	sc := CreateSessionContext(context.Background(), cfg, "alice", "dev")
+	sc := CreateSessionContext(context.Background(), cfg, "alice", "dev", "")
 
 	if sc.ID == "" {
 		t.Error("expected session ID to be set")
@@ -122,6 +122,27 @@ func TestCreateSessionContext_WithStore(t *testing.T) {
 	}
 	if sc.Session.Status != session.StatusActive {
 		t.Errorf("expected status active, got %s", sc.Session.Status)
+	}
+}
+
+func TestCreateSessionContext_WithDeviceID(t *testing.T) {
+	store := newMockSessionStore()
+	cfg := &TVMConfig{
+		SessionStore:    store,
+		DefaultDuration: 15 * time.Minute,
+	}
+	deviceID := "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+
+	sc := CreateSessionContext(context.Background(), cfg, "alice", "dev", deviceID)
+
+	if sc.ID == "" {
+		t.Error("expected session ID to be set")
+	}
+	if sc.Session == nil {
+		t.Error("expected session to be created")
+	}
+	if sc.Session.DeviceID != deviceID {
+		t.Errorf("expected device ID %s, got %s", deviceID, sc.Session.DeviceID)
 	}
 }
 
