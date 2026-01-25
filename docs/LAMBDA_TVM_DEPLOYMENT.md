@@ -427,6 +427,63 @@ Set up alarms for:
 5. **CloudWatch logging**: Enable for security monitoring
 6. **VPC deployment**: Consider VPC Lambda for network isolation
 
+## Client Integration
+
+### Using Sentinel CLI
+
+```bash
+# Use --remote-server to fetch credentials from TVM
+sentinel exec --remote-server https://API_ID.execute-api.REGION.amazonaws.com --profile production -- aws sts get-caller-identity
+```
+
+The CLI sets `AWS_CONTAINER_CREDENTIALS_FULL_URI` and the AWS SDK handles credential refresh automatically.
+
+### Direct SDK Integration (No Sentinel CLI)
+
+For applications using AWS SDKs directly:
+
+```bash
+# Set environment variable pointing to TVM
+export AWS_CONTAINER_CREDENTIALS_FULL_URI=https://API_ID.execute-api.REGION.amazonaws.com?profile=production
+
+# SDK automatically fetches credentials from this URL
+# Request is signed with caller's existing credentials (SigV4)
+aws sts get-caller-identity
+```
+
+**Important:** The TVM requires IAM authorization (SigV4). Callers must have valid AWS credentials to call the TVM endpoint. The TVM then issues role credentials based on Sentinel policy evaluation.
+
+### Credential Flow
+
+1. Client has base credentials (SSO, IAM user, instance role)
+2. Client calls TVM with SigV4-signed request
+3. TVM extracts caller identity from API Gateway
+4. TVM evaluates Sentinel policy for caller
+5. TVM calls AssumeRole with SourceIdentity stamping
+6. TVM returns temporary role credentials
+7. Client uses role credentials for AWS access
+
+### IAM Permissions for Clients
+
+Clients need permission to invoke the API Gateway endpoint:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "execute-api:Invoke",
+      "Resource": "arn:aws:execute-api:REGION:ACCOUNT:API_ID/*"
+    }
+  ]
+}
+```
+
+## Enforcement with SCPs
+
+To ensure all access goes through the TVM, use AWS Service Control Policies (SCPs) to deny direct AssumeRole calls. See [LAMBDA_TVM_SCP.md](LAMBDA_TVM_SCP.md) for patterns.
+
 ## Troubleshooting
 
 ### "IAM_AUTH_REQUIRED" error
