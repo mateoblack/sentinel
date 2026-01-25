@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-24)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Milestone v1.14 Server-Side Credential Vending — Phase 101 Client Integration
+**Current focus:** Milestone v1.14 Server-Side Credential Vending — Phase 102 Infrastructure as Code
 
 ## Current Position
 
-Phase: 101 of 103 (Client Integration)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-25 — Completed 101-02-PLAN.md
+Phase: 102 of 103 (Infrastructure as Code)
+Plan: 2 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-25 — Completed 102-02-PLAN.md
 
-Progress: █████████████████░░ 72% (205/295 total plans across all milestones)
+Progress: █████████████████░░ 73% (207/295 total plans across all milestones)
 
 ## Milestone Summary
 
@@ -97,6 +97,12 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions from v1
 - Skip local profile validation in remote mode (TVM has different profiles)
 - --remote-server conflicts with both --server and --policy-parameter
 
+**v1.14 Phase 102 decisions:**
+- Use aws-cdk-lib ^2.170.0 for latest CDK features
+- ARM64 architecture for Lambda cost optimization (Graviton2)
+- Conditional DynamoDB policies only if tables specified
+- Context + environment variable configuration pattern for CDK apps
+
 ### Pending Todos
 
 None yet for v1.14.
@@ -115,9 +121,9 @@ None — clean start for v1.14.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 101-02-PLAN.md (Phase 101 complete)
+Stopped at: Completed 102-02-PLAN.md (CDK example)
 Resume file: None
-Next: `/gsd:plan-phase 102`
+Next: `/gsd:execute-plan 102-03`
 
 ## Roadmap Evolution
 
