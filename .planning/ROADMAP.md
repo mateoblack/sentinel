@@ -124,7 +124,7 @@ Plans:
 Plans:
 - [x] 100-01: Routing and profile discovery (Router, ProfileDiscovery) — Wave 1 — completed 2026-01-25
 - [x] 100-02: Config integration (SSM client, policy root config) — Wave 2 — completed 2026-01-25
-- [ ] 100-03: Main entry point (Lambda main.go with Router) — Wave 2
+- [x] 100-03: Lambda authorizer for session validation — Wave 2 — completed 2026-01-25
 - [ ] 100-04: End-to-end test documentation — Wave 3
 
 ### Phase 101: Client Integration
