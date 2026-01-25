@@ -2,38 +2,29 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-24)
+See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Milestone v1.14 Server-Side Credential Vending — COMPLETE
+**Current focus:** v1.14 Server-Side Credential Vending — SHIPPED
 
 ## Current Position
 
 Phase: 103 of 103 (Testing & Documentation)
-Plan: 1 of 2 in current phase
-Status: Plan 103-01 complete
-Last activity: 2026-01-25 — Completed 103-01-PLAN.md (security tests + testing docs)
+Plan: 2 of 2 in current phase
+Status: Milestone v1.14 SHIPPED
+Last activity: 2026-01-25 — v1.14 milestone complete
 
-Progress: ████████████████████ 100% (v1.14 Phase 103 Plan 01 complete)
+Progress: ████████████████████ 100% (v1.14 Server-Side Credential Vending shipped)
 
 ## Milestone Summary
 
-**v1.14 Server-Side Credential Vending:**
+**v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
-- Plan count: TBD (will be determined during planning)
+- 19 plans
 - Goal: Lambda TVM for server-side credential vending
 - Critical constraint: Lambda IS the trust boundary
 
-**Phase structure:**
-- Phase 97: Foundation (Lambda handler skeleton, build pipeline)
-- Phase 98: Credential Vending (AssumeRole integration, SourceIdentity)
-- Phase 99: Policy & Session Integration (policy evaluation, session tracking, approval/break-glass)
-- Phase 100: API Gateway (HTTP API, IAM auth, profile discovery)
-- Phase 101: Client Integration (--remote-server flag, SCP patterns)
-- Phase 102: Infrastructure as Code (Terraform, CDK, role templates)
-- Phase 103: Testing & Documentation (integration tests, load tests, deployment guide)
-
-**Previous milestones (16 shipped):**
+**Previous milestones (17 shipped):**
 - v1.0 MVP: 8 phases, 16 plans (shipped 2026-01-14)
 - v1.1 Sentinel Fingerprint: 9 phases, 12 plans (shipped 2026-01-15)
 - v1.2 Approval Workflows: 9 phases, 17 plans (shipped 2026-01-15)
@@ -50,13 +41,14 @@ Progress: ████████████████████ 100% (v1.
 - v1.11 Shell Integration: 4 phases, 4 plans (shipped 2026-01-20)
 - v1.12 Infrastructure Provisioning: 6 phases, 15 plans (shipped 2026-01-22)
 - v1.13 Enforced Session Tracking: 3 phases, 10 plans (shipped 2026-01-24)
+- v1.14 Server-Side Credential Vending: 7 phases, 19 plans (shipped 2026-01-25)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 190
-- Average duration: 3.5 min
-- Total execution time: ~663 min
+- Total plans completed: 192
+- Average duration: ~3.5 min
+- Total execution time: ~672 min
 
 **By Milestone:**
 
@@ -78,61 +70,40 @@ Progress: ████████████████████ 100% (v1.
 | v1.11 Shell Integration | 4 | 4 | ~14 min |
 | v1.12 Infrastructure Provisioning | 6 | 15 | ~49 min |
 | v1.13 Enforced Session Tracking | 3 | 10 | ~35 min |
+| v1.14 Server-Side Credential Vending | 7 | 19 | ~49 min |
 
 ## Accumulated Context
 
 ### Decisions
 
-Key decisions logged in PROJECT.md Key Decisions table. Recent decisions from v1.13:
+Key decisions logged in PROJECT.md Key Decisions table. Recent decisions from v1.14:
 
-**v1.13 Enforced Session Tracking decisions:**
-- Dual-condition effect (require_server_session needs both --server AND --session-table flags)
-- SENTINEL_SESSION_TABLE environment variable only applies in server mode
-- Policy-level session_table field overrides CLI flag and environment variable
-- Profile extraction tries session lookup first (Sentinel format), falls back to role name
-- Non-zero exit code for compliance gaps (CI/CD integration)
-
-**v1.14 Phase 101 decisions:**
-- Use AWS_CONTAINER_CREDENTIALS_FULL_URI for SDK integration (automatic refresh)
-- Skip local profile validation in remote mode (TVM has different profiles)
-- --remote-server conflicts with both --server and --policy-parameter
-
-**v1.14 Phase 102 decisions:**
-- Use aws-cdk-lib ^2.170.0 for latest CDK features
+**v1.14 Server-Side Credential Vending decisions:**
+- aws-lambda-go v1.47.0 for Lambda handler types
+- AWS container credentials format for SDK compatibility
+- Lambda handler returns (response, error) for all paths
+- TVMConfig uses environment variable loading pattern
+- Router with POST / for credentials, GET /profiles for discovery
 - ARM64 architecture for Lambda cost optimization (Graviton2)
-- Conditional DynamoDB policies only if tables specified
-- Context + environment variable configuration pattern for CDK apps
-- Use aws_apigatewayv2_* for HTTP APIs (not deprecated REST API resources)
-- Count-based conditionals for optional DynamoDB table policies in Terraform
 - Protected roles must use SentinelProtected- prefix for TVM policy match
 - Trust policy requires both TVM principal and SourceIdentity condition
-
-**v1.14 Phase 103 decisions:**
-- Security tests use explicit "SECURITY VIOLATION" markers for critical failures
-- Tests verify STS is NOT called when access should be denied
-- Load testing docs cover both Artillery and k6 configurations
+- Security tests use explicit "SECURITY VIOLATION" markers
+- Gradual rollout strategy for enterprise adoption (4-phase migration)
 
 ### Pending Todos
 
-None yet for v1.14.
+None — v1.14 complete.
 
 ### Blockers/Concerns
 
-None — clean start for v1.14.
-
-**v1.14 Technical Notes:**
-- Research suggests 95%+ code reuse from existing Sentinel packages
-- Lambda handler will follow SentinelServer.DefaultRoute() pattern
-- Integration points: policy.Evaluate, session.Store, request.FindApprovedRequest, breakglass.FindActiveBreakGlass, identity.GenerateSourceIdentity, logging.Logger
-- Build target: cmd/lambda-tvm/ for Lambda binary
-- New package: lambda/ for API Gateway handler logic
+None — clean milestone completion.
 
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 103-01-PLAN.md (security tests + testing docs)
+Stopped at: Completed v1.14 milestone archival
 Resume file: None
-Next: `/gsd:execute-plan 103-02` or `/gsd:plan-phase 103` (if plan 02 needs creation)
+Next: `/gsd:discuss-milestone` or `/gsd:new-milestone` for v1.15
 
 ## Roadmap Evolution
 
@@ -152,4 +123,4 @@ Next: `/gsd:execute-plan 103-02` or `/gsd:plan-phase 103` (if plan 02 needs crea
 - Milestone v1.11 shipped: 2026-01-20 — Shell Integration (Phases 84-87)
 - Milestone v1.12 shipped: 2026-01-22 — Infrastructure Provisioning (Phases 88-93)
 - Milestone v1.13 shipped: 2026-01-24 — Enforced Session Tracking (Phases 94-96)
-- Milestone v1.14 planning: 2026-01-24 — Server-Side Credential Vending (Phases 97-103)
+- Milestone v1.14 shipped: 2026-01-25 — Server-Side Credential Vending (Phases 97-103)

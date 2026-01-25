@@ -50,136 +50,20 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 
 </details>
 
-## ✅ v1.14 Server-Side Credential Vending (Complete)
+<details>
+<summary>✅ v1.14 Server-Side Credential Vending (Phases 97-103) — SHIPPED 2026-01-25</summary>
 
-**Milestone Goal:** Move credential vending to server-side infrastructure (Lambda TVM) so clients cannot bypass policy enforcement. Lambda IS the trust boundary - protected roles trust ONLY the Lambda execution role.
+- [x] Phase 97: Foundation (2/2 plans) — completed 2026-01-24
+- [x] Phase 98: Credential Vending (3/3 plans) — completed 2026-01-25
+- [x] Phase 99: Policy & Session Integration (4/4 plans) — completed 2026-01-25
+- [x] Phase 100: API Gateway (4/4 plans) — completed 2026-01-25
+- [x] Phase 101: Client Integration (2/2 plans) — completed 2026-01-25
+- [x] Phase 102: Infrastructure as Code (3/3 plans) — completed 2026-01-25
+- [x] Phase 103: Testing & Documentation (2/2 plans) — completed 2026-01-25
 
-**Shipped:** 2026-01-25
+See [milestones/v1.14-ROADMAP.md](milestones/v1.14-ROADMAP.md) for full details.
 
-### Phase 97: Foundation
-
-**Goal**: Establish Lambda build pipeline and basic handler logic before AWS integration
-**Depends on**: v1.13 complete
-**Requirements**: LCORE-01
-**Success Criteria** (what must be TRUE):
-  1. Lambda binary builds for Linux architecture via make target
-  2. Lambda handler parses API Gateway request and extracts caller identity
-  3. Lambda handler returns credentials in AWS container credentials format
-  4. Unit tests verify request parsing logic
-**Plans**: 2 plans in 2 waves
-
-Plans:
-- [x] 97-01: Lambda infrastructure (build pipeline + types) — Wave 1 — completed 2026-01-24
-- [x] 97-02: Handler implementation + tests — Wave 2 — completed 2026-01-24
-
-### Phase 98: Credential Vending
-
-**Goal**: Core TVM functionality - credential issuance via STS AssumeRole
-**Depends on**: Phase 97
-**Requirements**: LCORE-03, LCORE-04
-**Success Criteria** (what must be TRUE):
-  1. Lambda calls STS AssumeRole with SourceIdentity stamping
-  2. Lambda returns temporary credentials in AWS container credentials format
-  3. Returned credentials work for AWS service access (integration test)
-  4. Lambda execution role IAM policy template exists for least-privilege AssumeRole
-  5. Protected role trust policy template exists (trusts only Lambda execution role)
-**Plans**: TBD
-
-Plans:
-- [x] 98-01: Credential vending function (VendCredentials, SourceIdentity stamping) — Wave 1 — completed 2026-01-25
-- [x] 98-02: Handler integration (VendCredentials integration, duration parameter) — Wave 2 — completed 2026-01-25
-- [x] 98-03: Lambda IAM role templates documentation — Wave 2 — completed 2026-01-25
-
-### Phase 99: Policy & Session Integration
-
-**Goal**: Reuse existing Sentinel policy evaluation, session tracking, approval, and break-glass logic with session tagging
-**Depends on**: Phase 98
-**Requirements**: LCORE-02, LCORE-05, LCORE-06, LCORE-07, LCORE-08, LCORE-09
-**Success Criteria** (what must be TRUE):
-  1. Lambda evaluates Sentinel policy before issuing credentials (policy deny blocks issuance)
-  2. Lambda integrates with DynamoDB session tracking (sessions created/tracked via environment variable table name)
-  3. Lambda stamps session ID as session tag on AssumeRole for downstream revocation checks
-  4. Lambda checks for approved requests before credential issuance (approval flow works)
-  5. Lambda checks for active break-glass before credential issuance (emergency access works)
-  6. Lambda decision logging to CloudWatch in JSON Lines format (audit trail exists)
-**Plans**: 4 plans in 3 waves
-
-Plans:
-- [x] 99-01: TVM configuration layer (TVMConfig + environment loading) — Wave 1 — completed 2026-01-25
-- [x] 99-02: Policy evaluation integration — Wave 2 — completed 2026-01-25
-- [x] 99-03: Session tracking with session tagging — Wave 2 — completed 2026-01-25
-- [x] 99-04: Approval, break-glass, and logging integration — Wave 3 — completed 2026-01-25
-
-### Phase 100: API Gateway
-
-**Goal**: Expose Lambda via HTTP API with IAM authorization for caller identity extraction
-**Depends on**: Phase 99
-**Requirements**: APIGW-01, APIGW-02, APIGW-03, APIGW-04
-**Success Criteria** (what must be TRUE):
-  1. HTTP API endpoint serves credential vending at root path
-  2. IAM authorization (SigV4) extracts caller identity from API Gateway request
-  3. Profile discovery endpoint (GET /profiles) returns available profiles from SSM
-  4. Resource policy restricts API Gateway access to VPC or IP ranges (deployment example)
-  5. End-to-end test: API Gateway request returns credentials usable for AWS service access
-**Plans**: 4 plans in 3 waves
-
-Plans:
-- [x] 100-01: Routing and profile discovery (Router, ProfileDiscovery) — Wave 1 — completed 2026-01-25
-- [x] 100-02: Config integration (SSM client, policy root config) — Wave 2 — completed 2026-01-25
-- [x] 100-03: Lambda authorizer for session validation — Wave 2 — completed 2026-01-25
-- [x] 100-04: End-to-end test documentation — Wave 3 — completed 2026-01-25
-
-### Phase 101: Client Integration
-
-**Goal**: Enable CLI and SDK clients to use remote TVM for credentials
-**Depends on**: Phase 100
-**Requirements**: CLIENT-01, CLIENT-02, CLIENT-03
-**Success Criteria** (what must be TRUE):
-  1. `sentinel exec --remote-server <url>` sets AWS_CONTAINER_CREDENTIALS_FULL_URI for SDK integration
-  2. Documentation exists for manual credential URI setup without CLI changes (SDK-only clients)
-  3. SCP example patterns exist to enforce TVM-only access (block direct AssumeRole calls)
-  4. Integration test: sentinel exec --remote-server calls TVM endpoint and receives working credentials
-**Plans**: 2 plans in 2 waves
-
-Plans:
-- [x] 101-01: Remote TVM flag (--remote-server, RemoteCredentialClient) — Wave 1 — completed 2026-01-25
-- [x] 101-02: SCP patterns and documentation — Wave 2 — completed 2026-01-25
-
-### Phase 102: Infrastructure as Code
-
-**Goal**: Automate deployment once all components work end-to-end
-**Depends on**: Phase 101
-**Requirements**: INFRA-01, INFRA-02, INFRA-03, INFRA-04, INFRA-05
-**Success Criteria** (what must be TRUE):
-  1. Terraform module exists for Lambda + API Gateway deployment
-  2. Lambda execution role template exists with least-privilege permissions
-  3. Protected role trust policy template exists (trusts only Lambda execution role)
-  4. CDK example exists for Lambda + API Gateway deployment
-  5. Cost optimization documentation exists (low/medium/high volume patterns)
-  6. Integration test: terraform apply deploys working TVM (credentials issued successfully)
-**Plans**: 3 plans in 2 waves — completed 2026-01-25
-
-Plans:
-- [x] 102-01: Terraform module for Lambda TVM — Wave 1 — completed 2026-01-25
-- [x] 102-02: CDK TypeScript example — Wave 1 — completed 2026-01-25
-- [x] 102-03: Protected role module + cost docs — Wave 2 — completed 2026-01-25
-
-### Phase 103: Testing & Documentation
-
-**Goal**: Comprehensive testing and deployment documentation for production readiness
-**Depends on**: Phase 102
-**Requirements**: TEST-01, TEST-02, TEST-03, DOC-01, DOC-02
-**Success Criteria** (what must be TRUE):
-  1. Integration tests cover full credential vending flow (API Gateway → Lambda → STS → working credentials)
-  2. Security regression tests validate policy bypass prevention (cannot circumvent TVM)
-  3. Load testing confirms <200ms p99 latency at target throughput
-  4. LAMBDA_TVM.md deployment guide exists with setup instructions
-  5. Migration guide exists comparing CLI server vs Lambda TVM (decision framework for users)
-**Plans**: 2 plans in 1 wave — completed 2026-01-25
-
-Plans:
-- [x] 103-01: Security regression tests and testing documentation — Wave 1 — completed 2026-01-25
-- [x] 103-02: Migration guide and CHANGELOG — Wave 1 — completed 2026-01-25
+</details>
 
 ## Domain Expertise
 
@@ -593,4 +477,4 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 
-**Totals:** 17 milestones shipped (103 phases, 215 plans shipped)
+**Totals:** 17 milestones shipped (103 phases, 192 plans shipped)
