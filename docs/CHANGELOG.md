@@ -5,6 +5,33 @@ All notable changes to Sentinel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased - v1.14]
+
+### Added
+
+#### Phase 97: Foundation (2026-01-24)
+- Lambda TVM binary build pipeline (`make lambda-tvm`)
+- API Gateway v2 HTTP request parsing
+- Caller identity extraction from IAM authorizer context
+
+#### Phase 98: Credential Vending (2026-01-25)
+- STS AssumeRole with SourceIdentity stamping
+- AWS container credentials format response
+- IAM role templates for Lambda execution role and protected roles
+
+#### Phase 99: Policy & Session Integration (2026-01-25)
+- Policy evaluation before credential issuance
+- Session tracking with DynamoDB integration
+- Approval and break-glass override support
+- Decision logging in JSON Lines format
+
+#### Phase 100: API Gateway (2026-01-25)
+- Multi-path routing (/ for credentials, /profiles for discovery)
+- Profile discovery endpoint via SSM GetParametersByPath
+- Lambda authorizer for instant session revocation
+- LAMBDA_TVM_DEPLOYMENT.md with comprehensive setup guide
+- Resource policy examples for VPC/IP restriction
+
 ## [1.13.0] - Unreleased
 
 ### Added
