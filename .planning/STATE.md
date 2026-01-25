@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 ## Current Position
 
-Phase: 107 of 112 (MDM API Integration)
-Plan: 3 of 3 in current phase
+Phase: 108 of 112 (Policy Device Conditions)
+Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-25 — Completed 107-03-PLAN.md
+Last activity: 2026-01-25 — Completed 108-01-PLAN.md
 
-Progress: ████░░░░░░ 45%
+Progress: █████░░░░░ 50%
 
 ## Milestone Summary
 
@@ -27,6 +27,7 @@ Progress: ████░░░░░░ 45%
 - Phase 105 complete: Collector interface, MultiCollector, NoopCollector
 - Phase 106 complete: Device identity module with machineid library
 - Phase 107 complete: MDM Provider interface, JamfProvider, Lambda integration (3/3 plans)
+- Phase 108 complete: Policy device conditions wired into evaluation (1/1 plans)
 
 **v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
@@ -56,9 +57,9 @@ Progress: ████░░░░░░ 45%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 196
+- Total plans completed: 197
 - Average duration: ~3.5 min
-- Total execution time: ~692 min
+- Total execution time: ~712 min
 
 **By Milestone:**
 
@@ -106,6 +107,10 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Fail-open by default for MDM (RequireDevicePosture=false)
 - Device ID passed as query parameter device_id (64-char lowercase hex)
 - Unimplemented providers (intune, kandji) use NoopProvider with warning
+- Device conditions affect RULE MATCHING (not effect) - if posture fails, rule doesn't match
+- Nil posture fails non-empty device conditions (security: no posture = no match)
+- Empty device conditions always match (backward compatible)
+- DENY decision logs include device posture context for debugging
 
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
@@ -130,9 +135,9 @@ None — fresh milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 107-03-PLAN.md (Lambda MDM Integration)
+Stopped at: Completed 108-01-PLAN.md (Policy Device Conditions)
 Resume file: None
-Next: `/gsd:plan-phase 108` to plan next phase
+Next: `/gsd:plan-phase 109` or `/gsd:progress` to continue
 
 ## Roadmap Evolution
 
