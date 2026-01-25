@@ -29,6 +29,7 @@ require (
 	golang.org/x/term v0.39.0
 	golang.org/x/time v0.14.0
 	gopkg.in/ini.v1 v1.67.1
+	github.com/denisbrodbeck/machineid v1.0.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
