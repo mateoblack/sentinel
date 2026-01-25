@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCP patterns**: Documentation for enforcing TVM-only access via AWS SCPs
 - **Client examples**: Direct SDK integration without Sentinel CLI changes
 
+#### Phase 102: Infrastructure as Code (2026-01-25)
+- Added Terraform module for Lambda TVM deployment (`terraform/sentinel-tvm/`)
+- Added Terraform module for protected roles (`terraform/sentinel-protected-role/`)
+- Added CDK TypeScript example for Lambda TVM (`cdk/sentinel-tvm/`)
+- Added cost optimization guide (`docs/LAMBDA_TVM_COSTS.md`)
+
 ## [1.13.0] - Unreleased
 
 ### Added
