@@ -112,11 +112,33 @@ None pending for v1.14 (milestone complete).
 
 ### Future Milestones
 
-**v1.15 Policy Developer Experience**
+**v1.15 Device Posture**
+
+Add device posture as a policy signal — who you are + what you can do + when + from what device.
+
+Phase 1: Local checks (no dependencies)
+- `sentinel device-status` command showing encryption, screen lock, OS version, firewall
+- Device fingerprint generation (hardware-backed where available)
+- Device conditions in policy rules (`device.disk_encryption: enabled`)
+- Device ID in SourceIdentity for CloudTrail forensics
+
+Phase 2: MDM integration (optional)
+- Jamf Pro, Intune, Kandji API queries
+- `mdm_enrolled` and `mdm_compliant` policy conditions
+
+Phase 3: EDR integration (optional)
+- CrowdStrike, SentinelOne health score queries
+- `edr_health` and `edr_threats` policy conditions
+
+Phase 4: Continuous posture (server mode)
+- Periodic posture re-check in server mode
+- Revoke sessions when device drifts out of compliance
+
+**v1.16 Policy Developer Experience**
 - `sentinel policy pull <profile>` — fetch policy from SSM to stdout/file for editing
 - `sentinel policy push <profile>` — validate and upload policy to SSM
 - `sentinel policy diff <profile>` — show pending changes before push
-- `sentinel policy validate <file>` — validate TOML syntax without uploading
+- `sentinel policy validate <file>` — validate YAML syntax without uploading
 
 ## Context
 

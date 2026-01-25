@@ -5,18 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.14 Server-Side Credential Vending — SHIPPED
+**Current focus:** v1.15 Device Posture — verify device security before issuing credentials
 
 ## Current Position
 
-Phase: 103 of 103 (Testing & Documentation)
-Plan: 2 of 2 in current phase
-Status: Milestone v1.14 SHIPPED
-Last activity: 2026-01-25 — v1.14 milestone complete
+Phase: 104 of 112 (Device Fingerprint Schema)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-25 — Milestone v1.15 created
 
-Progress: ████████████████████ 100% (v1.14 Server-Side Credential Vending shipped)
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone Summary
+
+**v1.15 Device Posture (IN PROGRESS):**
+- 9 phases (104-112)
+- Plans: TBD
+- Goal: Verify device security posture before issuing credentials
+- Key feature: Device fingerprinting in decision logs and session metadata
 
 **v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
@@ -92,18 +98,18 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions from v1
 
 ### Pending Todos
 
-None — v1.14 complete.
+None — ready to plan v1.15.
 
 ### Blockers/Concerns
 
-None — clean milestone completion.
+None — fresh milestone.
 
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed v1.14 milestone archival
+Stopped at: Milestone v1.15 initialization
 Resume file: None
-Next: `/gsd:discuss-milestone` or `/gsd:new-milestone` for v1.15
+Next: `/gsd:plan-phase 104` to plan Device Fingerprint Schema
 
 ## Roadmap Evolution
 
@@ -124,3 +130,4 @@ Next: `/gsd:discuss-milestone` or `/gsd:new-milestone` for v1.15
 - Milestone v1.12 shipped: 2026-01-22 — Infrastructure Provisioning (Phases 88-93)
 - Milestone v1.13 shipped: 2026-01-24 — Enforced Session Tracking (Phases 94-96)
 - Milestone v1.14 shipped: 2026-01-25 — Server-Side Credential Vending (Phases 97-103)
+- Milestone v1.15 created: 2026-01-25 — Device Posture, 9 phases (Phase 104-112)
