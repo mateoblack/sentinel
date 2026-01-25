@@ -59,6 +59,7 @@ type Condition struct {
 	Users    []string         `yaml:"users,omitempty" json:"users,omitempty"`
 	Time     *TimeWindow      `yaml:"time,omitempty" json:"time,omitempty"`
 	Mode     []CredentialMode `yaml:"mode,omitempty" json:"mode,omitempty"` // Empty = match any mode
+	Device   *DeviceCondition `yaml:"device,omitempty" json:"device,omitempty"`
 }
 
 // TimeWindow restricts when a rule applies.
