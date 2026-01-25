@@ -55,6 +55,7 @@ type SentinelExecCommandInput struct {
 	ServerPort       int               // Port for server (0 = auto-assign)
 	Lazy             bool              // Lazily fetch credentials in server mode
 	SessionTableName string            // DynamoDB table for session tracking (optional)
+	RemoteServer     string            // Remote TVM URL for credential vending (uses AWS_CONTAINER_CREDENTIALS_FULL_URI)
 }
 
 // ConfigureSentinelExecCommand sets up the sentinel exec command with kingpin.
@@ -67,8 +68,7 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 		Required().
 		StringVar(&input.ProfileName)
 
-	cmd.Flag("policy-parameter", "SSM parameter path containing the policy (e.g., /sentinel/policies/default)").
-		Required().
+	cmd.Flag("policy-parameter", "SSM parameter path containing the policy (e.g., /sentinel/policies/default). Required unless --remote-server is set.").
 		StringVar(&input.PolicyParameter)
 
 	cmd.Flag("region", "The AWS region").
@@ -111,6 +111,9 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("session-table", "DynamoDB table for session tracking (optional, server mode only)").
 		StringVar(&input.SessionTableName)
 
+	cmd.Flag("remote-server", "Remote TVM URL for credential vending (uses AWS_CONTAINER_CREDENTIALS_FULL_URI)").
+		StringVar(&input.RemoteServer)
+
 	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses --profile if not specified)").
 		StringVar(&input.AWSProfile)
 
@@ -127,6 +130,10 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 		StringsVar(&input.Args)
 
 	cmd.Action(func(c *kingpin.ParseContext) error {
+		// Validate --policy-parameter is required unless --remote-server is set
+		if input.PolicyParameter == "" && input.RemoteServer == "" {
+			return fmt.Errorf("--policy-parameter is required unless --remote-server is set")
+		}
 		exitcode, err := SentinelExecCommand(context.Background(), input, s)
 		app.FatalIfError(err, "exec")
 		if exitcode != 0 {
@@ -145,15 +152,55 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		return 0, fmt.Errorf("running in an existing sentinel subshell; 'exit' from the subshell or unset AWS_SENTINEL to force")
 	}
 
-	// 0.5. Validate profile exists in AWS config
-	if err := s.ValidateProfile(input.ProfileName); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return 1, err
+	// 0.5. Validate profile exists in AWS config (skip for remote server mode - TVM has different profiles)
+	if input.RemoteServer == "" {
+		if err := s.ValidateProfile(input.ProfileName); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			return 1, err
+		}
 	}
 
 	// 0.7. Validate server mode flag combinations
 	if input.StartServer && input.NoSession {
 		return 0, fmt.Errorf("Can't use --server with --no-session")
+	}
+
+	// 0.7.1. Validate --remote-server flag combinations
+	if input.RemoteServer != "" {
+		if input.StartServer {
+			return 0, fmt.Errorf("Can't use --remote-server with --server (they are mutually exclusive modes)")
+		}
+		if input.PolicyParameter != "" {
+			return 0, fmt.Errorf("Can't use --remote-server with --policy-parameter (remote TVM has its own policy)")
+		}
+	}
+
+	// 0.7.2. Handle remote server mode - skip local policy evaluation and credential retrieval
+	if input.RemoteServer != "" {
+		// Remote TVM mode - credentials come from external TVM
+		// TVM handles policy evaluation, so skip local profile validation
+		// The profile parameter specifies which profile to request from TVM
+
+		// Default to shell if no command specified
+		command := input.Command
+		if command == "" {
+			command = getDefaultShell()
+		}
+
+		// Prepare subprocess environment
+		cmdEnv := createEnv(input.ProfileName, input.Region, "")
+
+		// Set AWS_CONTAINER_CREDENTIALS_FULL_URI to point to TVM
+		// AWS SDK handles credential refresh automatically
+		cmdEnv.Set("AWS_CONTAINER_CREDENTIALS_FULL_URI", input.RemoteServer)
+
+		// Prevent AWS SDK from reading config files - use container credentials only
+		cmdEnv.Set("AWS_CONFIG_FILE", "/dev/null")
+		cmdEnv.Set("AWS_SHARED_CREDENTIALS_FILE", "/dev/null")
+
+		log.Printf("Using remote TVM at %s for profile %s", input.RemoteServer, input.ProfileName)
+
+		return runSubProcess(command, input.Args, cmdEnv)
 	}
 
 	// 0.8. Apply SENTINEL_SESSION_TABLE env var if --session-table not provided and in server mode
