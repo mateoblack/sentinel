@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 ## Current Position
 
-Phase: 108 of 112 (Policy Device Conditions)
+Phase: 109 of 112 (Device Attestation Flow)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-25 — Completed 108-01-PLAN.md
+Last activity: 2026-01-25 — Completed 109-01-PLAN.md
 
-Progress: █████░░░░░ 50%
+Progress: ██████░░░░ 60%
 
 ## Milestone Summary
 
@@ -28,6 +28,7 @@ Progress: █████░░░░░ 50%
 - Phase 106 complete: Device identity module with machineid library
 - Phase 107 complete: MDM Provider interface, JamfProvider, Lambda integration (3/3 plans)
 - Phase 108 complete: Policy device conditions wired into evaluation (1/1 plans)
+- Phase 109 complete: Device attestation flow from CLI to TVM (1/1 plans)
 
 **v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
@@ -57,9 +58,9 @@ Progress: █████░░░░░ 50%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 197
+- Total plans completed: 198
 - Average duration: ~3.5 min
-- Total execution time: ~712 min
+- Total execution time: ~727 min
 
 **By Milestone:**
 
@@ -111,6 +112,8 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Nil posture fails non-empty device conditions (security: no posture = no match)
 - Empty device conditions always match (backward compatible)
 - DENY decision logs include device posture context for debugging
+- CLI collects device ID via device.GetDeviceID() and passes to TVM as query param
+- Fail-open on device ID collection failure (warning log, continue without)
 
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
@@ -135,9 +138,9 @@ None — fresh milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 108-01-PLAN.md (Policy Device Conditions)
+Stopped at: Completed 109-01-PLAN.md (Device Attestation Flow)
 Resume file: None
-Next: `/gsd:plan-phase 109` or `/gsd:progress` to continue
+Next: `/gsd:plan-phase 110` or `/gsd:progress` to continue
 
 ## Roadmap Evolution
 
