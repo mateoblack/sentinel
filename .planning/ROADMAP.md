@@ -136,21 +136,21 @@ Plans:
 Plans:
 - [ ] 109-01: TBD
 
-#### Phase 110: Decision Logging Enhancement
+#### Phase 110: Session Device Binding
 
-**Goal**: Add device context to decision logs for forensic analysis
+**Goal**: Store device fingerprint in session metadata for forensic correlation and device-based revocation
 **Depends on**: Phase 109
-**Research**: Unlikely (extends existing logging patterns)
-**Plans**: TBD
+**Research**: Unlikely (extends existing session tracking)
+**Plans**: 1 (1/1 complete)
 
 Plans:
-- [ ] 110-01: TBD
+- [x] 110-01: DeviceID field in ServerSession, ListByDeviceID query, Lambda integration — completed 2026-01-25
 
-#### Phase 111: Session Device Binding
+#### Phase 111: Decision Logging Enhancement
 
-**Goal**: Store device fingerprint in session metadata for revocation correlation
+**Goal**: Add device context to decision logs for forensic analysis
 **Depends on**: Phase 110
-**Research**: Unlikely (extends existing session tracking)
+**Research**: Unlikely (extends existing logging patterns)
 **Plans**: TBD
 
 Plans:
@@ -587,6 +587,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.12 Infrastructure Provisioning | 88-93 | 15/15 | ✅ Complete | 2026-01-22 |
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
-| v1.15 Device Posture | 104-113 | 3/? | 🚧 In Progress | - |
+| v1.15 Device Posture | 104-113 | 10/? | 🚧 In Progress | - |
 
-**Totals:** 17 milestones shipped (103 phases, 194 plans shipped)
+**Totals:** 17 milestones shipped (103 phases, 199 plans shipped)

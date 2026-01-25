@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 ## Current Position
 
-Phase: 109 of 112 (Device Attestation Flow)
+Phase: 110 of 112 (Session Device Binding)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-25 — Completed 109-01-PLAN.md
+Last activity: 2026-01-25 — Completed 110-01-PLAN.md
 
-Progress: ██████░░░░ 60%
+Progress: ███████░░░ 70%
 
 ## Milestone Summary
 
@@ -29,6 +29,7 @@ Progress: ██████░░░░ 60%
 - Phase 107 complete: MDM Provider interface, JamfProvider, Lambda integration (3/3 plans)
 - Phase 108 complete: Policy device conditions wired into evaluation (1/1 plans)
 - Phase 109 complete: Device attestation flow from CLI to TVM (1/1 plans)
+- Phase 110 complete: Session device binding for forensics (1/1 plans)
 
 **v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
@@ -58,9 +59,9 @@ Progress: ██████░░░░ 60%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 198
+- Total plans completed: 199
 - Average duration: ~3.5 min
-- Total execution time: ~727 min
+- Total execution time: ~732 min
 
 **By Milestone:**
 
@@ -114,6 +115,8 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - DENY decision logs include device posture context for debugging
 - CLI collects device ID via device.GetDeviceID() and passes to TVM as query param
 - Fail-open on device ID collection failure (warning log, continue without)
+- ServerSession.DeviceID uses omitempty for backward compatibility
+- Log device_bound=true flag rather than actual device ID for privacy
 
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
@@ -138,9 +141,9 @@ None — fresh milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 109-01-PLAN.md (Device Attestation Flow)
+Stopped at: Completed 110-01-PLAN.md (Session Device Binding)
 Resume file: None
-Next: `/gsd:plan-phase 110` or `/gsd:progress` to continue
+Next: `/gsd:plan-phase 111` or `/gsd:progress` to continue
 
 ## Roadmap Evolution
 
