@@ -135,10 +135,11 @@ Plans:
 **Goal**: Implement rate limiting for Lambda TVM and credential server endpoints
 **Depends on**: Phase 116
 **Research**: Unlikely (existing breakglass rate limiting patterns)
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 117-01: TBD
+- [ ] 117-01: Rate limiter types and Lambda TVM integration
+- [ ] 117-02: Credential server rate limiting and security tests
 
 #### Phase 118: Dependency Security Audit
 
