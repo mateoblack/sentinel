@@ -117,6 +117,14 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 		SessionTableName: h.Config.SessionTableName,
 	}
 
+	// Wire device posture into policy request for device condition evaluation
+	// Policy rules with device conditions will use this posture for matching.
+	// If MDM lookup succeeded, include the posture for policy evaluation.
+	// If MDM lookup failed or was skipped, posture remains nil.
+	if mdmResult != nil && mdmResult.Posture != nil {
+		policyRequest.DevicePosture = mdmResult.Posture
+	}
+
 	// Load policy
 	if h.Config.PolicyLoader == nil {
 		return errorResponse(http.StatusInternalServerError, "CONFIG_ERROR",
