@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 ## Current Position
 
-Phase: 116 of 120 (DynamoDB Encryption)
-Plan: 1 of 1 in current phase
-Status: Plan 01 complete
-Last activity: 2026-01-25 — Completed 116-01-PLAN.md
+Phase: 117 of 120 (API Rate Limiting)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-25 — Completed 117-01-PLAN.md
 
-Progress: ███░░░░░░░ 25%
+Progress: ███░░░░░░░ 31%
 
 ## Milestone Summary
 
@@ -55,9 +55,9 @@ Progress: ███░░░░░░░ 25%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 214
+- Total plans completed: 215
 - Average duration: ~3.5 min
-- Total execution time: ~780 min
+- Total execution time: ~785 min
 
 **By Milestone:**
 
@@ -134,6 +134,12 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - EncryptionConfig is pointer for backward compatibility (nil = AWS owned)
 - EncryptionDefault omits SSESpecification to maintain DynamoDB default behavior
 
+**v1.16 Security Hardening decisions (Phase 117):**
+- Sliding window log algorithm for rate limiting (simpler than token bucket for request-response)
+- Rate limit by IAM user ARN, not IP (IAM auth identifies caller)
+- Fail-open on rate limiter errors (availability preferred over blocking)
+- Default 100 requests per 60 seconds (conservative but usable)
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -157,9 +163,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 116-01-PLAN.md
+Stopped at: Completed 117-01-PLAN.md
 Resume file: None
-Next: Plan 116-02 (Terraform modules) or `/gsd:plan-phase 117`
+Next: Plan 117-02 (Credential server rate limiting)
 
 ## Roadmap Evolution
 

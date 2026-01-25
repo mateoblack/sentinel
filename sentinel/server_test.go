@@ -13,6 +13,7 @@ import (
 
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/policy"
+	"github.com/byteness/aws-vault/v7/ratelimit"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/session"
 	"github.com/byteness/aws-vault/v7/testutil"
@@ -1821,5 +1822,265 @@ func TestSentinelServer_SessionActive_AllowsCredentials(t *testing.T) {
 	}
 	if resp["SecretAccessKey"] == "" {
 		t.Error("Expected SecretAccessKey in response")
+	}
+}
+
+// ============================================================================
+// Rate Limiting tests
+// ============================================================================
+
+func TestSentinelServer_RateLimiting_BlocksExcessRequests(t *testing.T) {
+	// Create server with rate limiting (2 requests per window)
+	rateLimitConfig := &ratelimit.Config{
+		RequestsPerWindow: 2,
+		Window:            time.Minute,
+	}
+
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.RateLimitConfig = rateLimitConfig
+	})
+	defer server.Shutdown(context.Background())
+
+	// Use the full handler with rate limit middleware
+	handler := withLogging(
+		withAuthorizationCheck(server.authToken,
+			withRateLimiting(server.rateLimiter,
+				server.DefaultRoute)))
+
+	// First 2 requests should succeed
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Authorization", authToken)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Request %d: expected status %d, got %d", i+1, http.StatusOK, rec.Code)
+		}
+	}
+
+	// 3rd request should be rate limited
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Errorf("Expected status %d (rate limited), got %d", http.StatusTooManyRequests, rec.Code)
+	}
+
+	// Verify Retry-After header is set
+	retryAfter := rec.Header().Get("Retry-After")
+	if retryAfter == "" {
+		t.Error("Expected Retry-After header to be set when rate limited")
+	}
+
+	// Verify error message
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if !strings.Contains(resp["Message"], "Rate limit exceeded") {
+		t.Errorf("Expected 'Rate limit exceeded' message, got: %s", resp["Message"])
+	}
+}
+
+func TestSentinelServer_RateLimiting_NilDisablesRateLimiting(t *testing.T) {
+	// Create server WITHOUT rate limiting
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.RateLimiter = nil
+		c.RateLimitConfig = nil
+	})
+	defer server.Shutdown(context.Background())
+
+	// Use the full handler with rate limit middleware (nil limiter)
+	handler := withLogging(
+		withAuthorizationCheck(server.authToken,
+			withRateLimiting(server.rateLimiter,
+				server.DefaultRoute)))
+
+	// Should allow many requests without rate limiting
+	for i := 0; i < 10; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Authorization", authToken)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Request %d: expected status %d with no rate limiting, got %d", i+1, http.StatusOK, rec.Code)
+		}
+	}
+}
+
+// MockErrorRateLimiter simulates rate limiter errors to test fail-open behavior.
+type MockErrorRateLimiter struct {
+	Err error
+}
+
+func (m *MockErrorRateLimiter) Allow(ctx context.Context, key string) (bool, time.Duration, error) {
+	return false, 0, m.Err
+}
+
+func TestSentinelServer_RateLimiting_FailOpenOnError(t *testing.T) {
+	// Create server with a rate limiter that returns errors
+	mockLimiter := &MockErrorRateLimiter{Err: errors.New("rate limiter internal error")}
+
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.RateLimiter = mockLimiter
+	})
+	defer server.Shutdown(context.Background())
+
+	// Use the full handler with rate limit middleware
+	handler := withLogging(
+		withAuthorizationCheck(server.authToken,
+			withRateLimiting(server.rateLimiter,
+				server.DefaultRoute)))
+
+	// Should allow the request (fail-open)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// Should be 200 OK (fail-open allows the request)
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status %d (fail-open), got %d", http.StatusOK, rec.Code)
+	}
+
+	// Verify credentials were still returned
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if resp["AccessKeyId"] == "" {
+		t.Error("Expected AccessKeyId in response (fail-open)")
+	}
+}
+
+func TestSentinelServer_RateLimiting_RetryAfterHeader(t *testing.T) {
+	// Create server with rate limiting (1 request per window)
+	rateLimitConfig := &ratelimit.Config{
+		RequestsPerWindow: 1,
+		Window:            time.Minute,
+	}
+
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.RateLimitConfig = rateLimitConfig
+	})
+	defer server.Shutdown(context.Background())
+
+	// Use the full handler with rate limit middleware
+	handler := withLogging(
+		withAuthorizationCheck(server.authToken,
+			withRateLimiting(server.rateLimiter,
+				server.DefaultRoute)))
+
+	// First request uses the quota
+	req1 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req1.Header.Set("Authorization", authToken)
+	rec1 := httptest.NewRecorder()
+	handler.ServeHTTP(rec1, req1)
+
+	// Second request should be rate limited with Retry-After header
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2.Header.Set("Authorization", authToken)
+	rec2 := httptest.NewRecorder()
+	handler.ServeHTTP(rec2, req2)
+
+	if rec2.Code != http.StatusTooManyRequests {
+		t.Fatalf("Expected status %d, got %d", http.StatusTooManyRequests, rec2.Code)
+	}
+
+	// Verify Retry-After header value is a valid number of seconds
+	retryAfter := rec2.Header().Get("Retry-After")
+	if retryAfter == "" {
+		t.Fatal("Expected Retry-After header")
+	}
+
+	// Parse the Retry-After value (should be seconds)
+	var seconds float64
+	if _, err := fmt.Sscanf(retryAfter, "%f", &seconds); err != nil {
+		t.Errorf("Retry-After header should be a number, got %q: %v", retryAfter, err)
+	}
+	if seconds < 0 || seconds > 60 {
+		t.Errorf("Retry-After should be between 0 and 60 seconds, got %.0f", seconds)
+	}
+}
+
+func TestSentinelServer_RateLimiterClosed_OnShutdown(t *testing.T) {
+	// Create a rate limiter to verify it gets closed
+	rateLimitConfig := &ratelimit.Config{
+		RequestsPerWindow: 10,
+		Window:            time.Minute,
+	}
+
+	server, _ := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.RateLimitConfig = rateLimitConfig
+	})
+
+	// Verify rate limiter was created
+	if server.rateLimiter == nil {
+		t.Fatal("Expected rate limiter to be initialized from config")
+	}
+
+	// Shutdown should close the rate limiter without error
+	err := server.Shutdown(context.Background())
+	if err != nil {
+		t.Errorf("Shutdown failed: %v", err)
+	}
+
+	// Note: We can't easily test that Close() was called without mocking,
+	// but this test verifies shutdown doesn't panic with a rate limiter configured
+}
+
+func TestSentinelServer_RateLimiterProvided(t *testing.T) {
+	// Create our own rate limiter
+	limiter, err := ratelimit.NewMemoryRateLimiter(ratelimit.Config{
+		RequestsPerWindow: 5,
+		Window:            time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create rate limiter: %v", err)
+	}
+	defer limiter.Close()
+
+	// Provide it directly to the server (not via RateLimitConfig)
+	server, authToken := createTestServer(t, policy.EffectAllow, func(c *SentinelServerConfig) {
+		c.RateLimiter = limiter
+		c.RateLimitConfig = nil // Should be ignored
+	})
+	defer server.Shutdown(context.Background())
+
+	// Verify the provided rate limiter is used
+	if server.rateLimiter != limiter {
+		t.Error("Expected server to use provided rate limiter")
+	}
+
+	// Use the full handler with rate limit middleware
+	handler := withLogging(
+		withAuthorizationCheck(server.authToken,
+			withRateLimiting(server.rateLimiter,
+				server.DefaultRoute)))
+
+	// Make requests up to limit
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Authorization", authToken)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Request %d: expected status %d, got %d", i+1, http.StatusOK, rec.Code)
+		}
+	}
+
+	// 6th request should be rate limited
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", authToken)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Errorf("Expected status %d (rate limited), got %d", http.StatusTooManyRequests, rec.Code)
 	}
 }

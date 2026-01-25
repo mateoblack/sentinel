@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
+	"github.com/byteness/aws-vault/v7/ratelimit"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/session"
 )
@@ -109,15 +111,24 @@ type SentinelServerConfig struct {
 	// If empty, a new ID is generated using identity.NewRequestID().
 	// Used for session correlation and multi-server scenarios.
 	ServerInstanceID string
+
+	// RateLimiter is the optional rate limiter for credential requests.
+	// If nil, rate limiting is disabled.
+	RateLimiter ratelimit.RateLimiter
+
+	// RateLimitConfig is used to create a default rate limiter if RateLimiter is nil.
+	// If both are nil, rate limiting is disabled.
+	RateLimitConfig *ratelimit.Config
 }
 
 // SentinelServer is an HTTP server that serves policy-gated AWS credentials.
 // It evaluates policy on each credential request, enabling real-time revocation.
 type SentinelServer struct {
-	listener  net.Listener
-	authToken string
-	server    http.Server
-	config    SentinelServerConfig
+	listener    net.Listener
+	authToken   string
+	server      http.Server
+	config      SentinelServerConfig
+	rateLimiter ratelimit.RateLimiter
 
 	// sessionID is the current session ID (created on startup if SessionStore is configured).
 	// Empty string if session tracking is disabled.
@@ -169,6 +180,19 @@ func NewSentinelServer(ctx context.Context, config SentinelServerConfig, authTok
 		config.ServerInstanceID = identity.NewRequestID()
 	}
 
+	// Initialize rate limiter if configured
+	var rateLimiter ratelimit.RateLimiter
+	if config.RateLimiter != nil {
+		rateLimiter = config.RateLimiter
+	} else if config.RateLimitConfig != nil {
+		limiter, limiterErr := ratelimit.NewMemoryRateLimiter(*config.RateLimitConfig)
+		if limiterErr != nil {
+			listener.Close()
+			return nil, fmt.Errorf("failed to create rate limiter: %w", limiterErr)
+		}
+		rateLimiter = limiter
+	}
+
 	// Collect device ID once at server startup for decision logging (fail-open)
 	deviceID, deviceErr := device.GetDeviceID()
 	if deviceErr != nil {
@@ -177,10 +201,11 @@ func NewSentinelServer(ctx context.Context, config SentinelServerConfig, authTok
 	}
 
 	s := &SentinelServer{
-		listener:  listener,
-		authToken: authToken,
-		config:    config,
-		deviceID:  deviceID,
+		listener:    listener,
+		authToken:   authToken,
+		config:      config,
+		rateLimiter: rateLimiter,
+		deviceID:    deviceID,
 	}
 
 	// Create session if SessionStore is configured (best-effort tracking)
@@ -220,7 +245,11 @@ func NewSentinelServer(ctx context.Context, config SentinelServerConfig, authTok
 	// Set up HTTP router
 	router := http.NewServeMux()
 	router.HandleFunc("/", s.DefaultRoute)
-	s.server.Handler = withLogging(withAuthorizationCheck(s.authToken, router.ServeHTTP))
+	// Middleware chain: logging -> auth -> rate limit -> handler
+	s.server.Handler = withLogging(
+		withAuthorizationCheck(s.authToken,
+			withRateLimiting(s.rateLimiter,
+				router.ServeHTTP)))
 
 	return s, nil
 }
@@ -419,6 +448,15 @@ func (s *SentinelServer) Shutdown(ctx context.Context) error {
 		}
 	}
 
+	// Close rate limiter if it implements io.Closer
+	if s.rateLimiter != nil {
+		if closer, ok := s.rateLimiter.(io.Closer); ok {
+			if closeErr := closer.Close(); closeErr != nil {
+				log.Printf("Warning: failed to close rate limiter: %v", closeErr)
+			}
+		}
+	}
+
 	return s.server.Shutdown(ctx)
 }
 
@@ -442,6 +480,28 @@ func withAuthorizationCheck(authToken string, next http.HandlerFunc) http.Handle
 		if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte(authToken)) != 1 {
 			writeErrorMessage(w, "invalid Authorization token", http.StatusForbidden)
 			return
+		}
+		next.ServeHTTP(w, r)
+	}
+}
+
+// withRateLimiting is middleware that enforces rate limits per remote address.
+func withRateLimiting(limiter ratelimit.RateLimiter, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if limiter != nil {
+			// Use remote address as rate limit key
+			// For localhost server, this is always 127.0.0.1 but still provides burst protection
+			key := r.RemoteAddr
+			allowed, retryAfter, err := limiter.Allow(r.Context(), key)
+			if err != nil {
+				log.Printf("WARNING: Rate limit check failed: %v", err)
+				// Fail open - allow the request
+			} else if !allowed {
+				log.Printf("RATE_LIMITED: addr=%s retry_after=%v", key, retryAfter)
+				w.Header().Set("Retry-After", fmt.Sprintf("%.0f", retryAfter.Seconds()))
+				writeErrorMessage(w, "Rate limit exceeded", http.StatusTooManyRequests)
+				return
+			}
 		}
 		next.ServeHTTP(w, r)
 	}
