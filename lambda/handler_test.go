@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/sts/types"
+	"github.com/byteness/aws-vault/v7/policy"
 )
 
 // testSTSClient implements STSClient for handler testing.
@@ -25,6 +25,59 @@ func (m *testSTSClient) AssumeRole(ctx context.Context, params *sts.AssumeRoleIn
 		return m.AssumeRoleFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("AssumeRoleFunc not implemented")
+}
+
+// mockPolicyLoader implements policy.PolicyLoader for testing.
+type mockPolicyLoader struct {
+	policy *policy.Policy
+	err    error
+}
+
+func (m *mockPolicyLoader) Load(ctx context.Context, param string) (*policy.Policy, error) {
+	return m.policy, m.err
+}
+
+// allowAllPolicy returns a policy that allows all requests.
+func allowAllPolicy() *policy.Policy {
+	return &policy.Policy{
+		Rules: []policy.Rule{{
+			Name:   "allow-all",
+			Effect: policy.EffectAllow,
+		}},
+	}
+}
+
+// denyAllPolicy returns a policy that denies all requests.
+func denyAllPolicy() *policy.Policy {
+	return &policy.Policy{
+		Rules: []policy.Rule{{
+			Name:   "deny-all",
+			Effect: policy.EffectDeny,
+			Reason: "test deny reason",
+		}},
+	}
+}
+
+// maxDurationPolicy returns a policy that allows with a max server duration cap.
+func maxDurationPolicy(duration time.Duration) *policy.Policy {
+	return &policy.Policy{
+		Rules: []policy.Rule{{
+			Name:              "with-duration-cap",
+			Effect:            policy.EffectAllow,
+			MaxServerDuration: duration,
+		}},
+	}
+}
+
+// testTVMConfig creates a TVMConfig for testing with mock components.
+func testTVMConfig(loader policy.PolicyLoader, stsClient STSClient) *TVMConfig {
+	return &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    loader,
+		STSClient:       stsClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
 }
 
 // successfulTestSTSResponse returns a mock successful AssumeRole response.
@@ -69,10 +122,8 @@ func TestHandleRequest_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
@@ -120,10 +171,8 @@ func TestHandleRequest_WithDuration(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	// Request with custom duration (30 minutes = 1800 seconds)
@@ -152,10 +201,8 @@ func TestHandleRequest_InvalidDuration_TooShort(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	// Duration 600 seconds (10 min) - below minimum 900
@@ -187,10 +234,8 @@ func TestHandleRequest_InvalidDuration_TooLong(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	// Duration 50000 seconds - above maximum 43200
@@ -222,10 +267,8 @@ func TestHandleRequest_InvalidDuration_NotNumber(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	// Non-numeric duration
@@ -257,10 +300,8 @@ func TestHandleRequest_STSError(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
@@ -299,10 +340,8 @@ func TestHandleRequest_SourceIdentityInSTSCall(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
@@ -337,10 +376,8 @@ func TestHandleRequest_MissingIAMAuth(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	req := events.APIGatewayV2HTTPRequest{
@@ -377,10 +414,8 @@ func TestHandleRequest_MissingProfile(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	req := events.APIGatewayV2HTTPRequest{
@@ -412,50 +447,38 @@ func TestHandleRequest_MissingProfile(t *testing.T) {
 	}
 }
 
-func TestNewHandler_DefaultRegion(t *testing.T) {
-	// Set environment variable
-	os.Setenv("AWS_REGION", "eu-west-1")
-	defer os.Unsetenv("AWS_REGION")
-
-	handler := NewHandler(nil)
-	if handler.Region != "eu-west-1" {
-		t.Errorf("Region = %s, want eu-west-1 from env", handler.Region)
-	}
-}
-
-func TestNewHandler_CustomRegion(t *testing.T) {
-	// Even with env set, custom region should override
-	os.Setenv("AWS_REGION", "eu-west-1")
-	defer os.Unsetenv("AWS_REGION")
-
-	handler := NewHandler(&HandlerConfig{
-		Region: "ap-northeast-1",
-	})
-	if handler.Region != "ap-northeast-1" {
-		t.Errorf("Region = %s, want ap-northeast-1", handler.Region)
-	}
-}
-
-func TestNewHandler_CustomSTSClient(t *testing.T) {
+func TestNewHandler_WithTVMConfig(t *testing.T) {
 	mockClient := &testSTSClient{}
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-	})
-	if handler.STSClient != mockClient {
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		STSClient:       mockClient,
+		Region:          "ap-northeast-1",
+		DefaultDuration: 30 * time.Minute,
+	}
+
+	handler := NewHandler(cfg)
+	if handler == nil {
+		t.Error("NewHandler returned nil")
+	}
+	if handler.Config != cfg {
+		t.Error("Config was not set correctly")
+	}
+	if handler.Config.Region != "ap-northeast-1" {
+		t.Errorf("Region = %s, want ap-northeast-1", handler.Config.Region)
+	}
+	if handler.Config.STSClient != mockClient {
 		t.Error("STSClient was not set correctly")
 	}
 }
 
 func TestNewHandler_NilConfig(t *testing.T) {
-	// Clear env to ensure empty region
-	os.Unsetenv("AWS_REGION")
-
 	handler := NewHandler(nil)
 	if handler == nil {
 		t.Error("NewHandler(nil) returned nil")
 	}
-	if handler.STSClient != nil {
-		t.Error("STSClient should be nil with nil config")
+	if handler.Config != nil {
+		t.Error("Config should be nil with nil input")
 	}
 }
 
@@ -467,10 +490,8 @@ func TestCredentialResponseFormat(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(&HandlerConfig{
-		STSClient: mockClient,
-		Region:    "us-east-1",
-	})
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
 	ctx := context.Background()
 
 	req := validIAMRequest("arn:aws:iam::123456789012:role/test-role")
@@ -570,5 +591,203 @@ func TestParseDuration(t *testing.T) {
 				t.Errorf("parseDuration() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// Policy integration tests
+
+func TestHandleRequest_PolicyDeny(t *testing.T) {
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called when policy denies")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := testTVMConfig(&mockPolicyLoader{policy: denyAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should return 403 for policy deny
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "POLICY_DENY" {
+		t.Errorf("Error code = %s, want POLICY_DENY", errResp.Code)
+	}
+	// Error message should contain the deny reason
+	if errResp.Message != "Policy denied: test deny reason" {
+		t.Errorf("Error message = %s, want 'Policy denied: test deny reason'", errResp.Message)
+	}
+}
+
+func TestHandleRequest_PolicyLoadError(t *testing.T) {
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called when policy load fails")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := testTVMConfig(&mockPolicyLoader{err: errors.New("SSM connection error")}, mockClient)
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should return 500 for policy load errors
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusInternalServerError)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "POLICY_ERROR" {
+		t.Errorf("Error code = %s, want POLICY_ERROR", errResp.Code)
+	}
+}
+
+func TestHandleRequest_MaxServerDuration(t *testing.T) {
+	var capturedDuration int32
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			if params.DurationSeconds != nil {
+				capturedDuration = *params.DurationSeconds
+			}
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	// Policy caps duration to 10 minutes (600 seconds)
+	cfg := testTVMConfig(&mockPolicyLoader{policy: maxDurationPolicy(10 * time.Minute)}, mockClient)
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	// Request with longer duration (30 minutes = 1800 seconds)
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	req.QueryStringParameters["duration"] = "1800"
+
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	// Duration should be capped to policy max (10 minutes = 600 seconds)
+	if capturedDuration != 600 {
+		t.Errorf("Expected duration capped to 600, got %d", capturedDuration)
+	}
+}
+
+func TestHandleRequest_MaxServerDuration_NoDurationRequested(t *testing.T) {
+	var capturedDuration int32
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			if params.DurationSeconds != nil {
+				capturedDuration = *params.DurationSeconds
+			}
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	// Policy caps duration to 5 minutes (300 seconds) - less than default
+	cfg := testTVMConfig(&mockPolicyLoader{policy: maxDurationPolicy(5 * time.Minute)}, mockClient)
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	// Request without explicit duration - should use policy max instead of default
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	// Duration should use policy max (5 minutes = 300 seconds)
+	if capturedDuration != 300 {
+		t.Errorf("Expected duration 300 (policy max), got %d", capturedDuration)
+	}
+}
+
+func TestHandleRequest_MissingPolicyLoader(t *testing.T) {
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called without policy loader")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    nil, // No policy loader
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should return 500 for missing policy loader
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusInternalServerError)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "CONFIG_ERROR" {
+		t.Errorf("Error code = %s, want CONFIG_ERROR", errResp.Code)
+	}
+}
+
+func TestHandleRequest_NilConfig(t *testing.T) {
+	handler := NewHandler(nil)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should return 500 for nil config
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusInternalServerError)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "CONFIG_ERROR" {
+		t.Errorf("Error code = %s, want CONFIG_ERROR", errResp.Code)
 	}
 }
