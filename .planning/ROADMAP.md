@@ -109,20 +109,22 @@ Plans:
 **Depends on**: Phase 106
 **Research**: Likely (MDM API authentication and endpoints)
 **Research topics**: Jamf Pro API, Microsoft Graph API for Intune, Kandji API
-**Plans**: TBD
+**Plans**: 3 (3/3 complete)
 
 Plans:
-- [ ] 107-01: TBD
+- [x] 107-01: MDM provider interface and configuration types — completed 2026-01-25
+- [x] 107-02: Jamf Pro MDM provider implementation — completed 2026-01-25
+- [x] 107-03: Lambda TVM MDM integration — completed 2026-01-25
 
 #### Phase 108: Policy Device Conditions
 
 **Goal**: Add device posture conditions to policy rules (require_encryption, require_mdm, etc.)
 **Depends on**: Phase 107
 **Research**: Unlikely (extends existing policy schema)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 108-01: TBD
+- [ ] 108-01: Wire device posture into policy evaluation and Lambda handler
 
 #### Phase 109: Device Attestation Flow
 
