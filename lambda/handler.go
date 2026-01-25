@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/byteness/aws-vault/v7/policy"
 )
 
 // Duration validation constants (AWS STS limits).
@@ -24,45 +24,36 @@ const (
 
 // Handler handles API Gateway v2 HTTP requests for credential vending.
 type Handler struct {
-	// STSClient is an optional custom STS client for testing.
-	// If nil, uses default credentials from Lambda execution role.
-	STSClient STSClient
-
-	// Region is the AWS region for STS endpoint.
-	// Defaults to AWS_REGION environment variable.
-	Region string
+	// Config contains all TVM configuration including policy, stores, and STS client.
+	Config *TVMConfig
 }
 
-// HandlerConfig contains optional configuration for creating a Handler.
-type HandlerConfig struct {
-	// STSClient is an optional custom STS client for testing.
-	STSClient STSClient
-
-	// Region is the AWS region for STS endpoint (defaults to AWS_REGION).
-	Region string
-}
-
-// NewHandler creates a new TVM handler with optional configuration.
-func NewHandler(cfg *HandlerConfig) *Handler {
-	h := &Handler{}
-	if cfg != nil {
-		h.STSClient = cfg.STSClient
-		h.Region = cfg.Region
-	}
-	if h.Region == "" {
-		h.Region = os.Getenv("AWS_REGION")
-	}
-	return h
+// NewHandler creates a new TVM handler with the given configuration.
+func NewHandler(cfg *TVMConfig) *Handler {
+	return &Handler{Config: cfg}
 }
 
 // HandleRequest processes an API Gateway v2 HTTP request.
 // Returns credentials in AWS container credentials format.
 func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	// Validate config
+	if h.Config == nil {
+		return errorResponse(http.StatusInternalServerError, "CONFIG_ERROR",
+			"Handler configuration is missing")
+	}
+
 	// Extract caller identity from IAM authorizer context
 	caller, err := ExtractCallerIdentity(req)
 	if err != nil {
 		return errorResponse(http.StatusForbidden, "IAM_AUTH_REQUIRED",
 			fmt.Sprintf("IAM authorization required: %v", err))
+	}
+
+	// Extract username from caller ARN for policy evaluation
+	username, err := extractUsername(caller.UserARN)
+	if err != nil {
+		return errorResponse(http.StatusBadRequest, "INVALID_IDENTITY",
+			fmt.Sprintf("Could not extract username: %v", err))
 	}
 
 	// Parse profile parameter (required)
@@ -73,10 +64,60 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	}
 
 	// Parse optional duration parameter
-	duration, err := parseDuration(req.QueryStringParameters["duration"])
+	parsedDuration, err := parseDuration(req.QueryStringParameters["duration"])
 	if err != nil {
 		return errorResponse(http.StatusBadRequest, "INVALID_DURATION",
 			fmt.Sprintf("Invalid duration: %v", err))
+	}
+
+	// Build policy request - Lambda TVM acts as server mode
+	policyRequest := &policy.Request{
+		User:             username,
+		Profile:          profile,
+		Time:             time.Now(),
+		Mode:             policy.ModeServer, // TVM is server-side
+		SessionTableName: h.Config.SessionTableName,
+	}
+
+	// Load policy
+	if h.Config.PolicyLoader == nil {
+		return errorResponse(http.StatusInternalServerError, "CONFIG_ERROR",
+			"Policy loader not configured")
+	}
+
+	loadedPolicy, err := h.Config.PolicyLoader.Load(ctx, h.Config.PolicyParameter)
+	if err != nil {
+		log.Printf("ERROR: Failed to load policy: %v", err)
+		return errorResponse(http.StatusInternalServerError, "POLICY_ERROR",
+			"Failed to load policy")
+	}
+
+	// Evaluate policy
+	decision := policy.Evaluate(loadedPolicy, policyRequest)
+
+	// Handle deny (approval/break-glass check will be added in 99-03)
+	if decision.Effect == policy.EffectDeny {
+		log.Printf("DENY: user=%s profile=%s rule=%s reason=%s",
+			username, profile, decision.MatchedRule, decision.Reason)
+		return errorResponse(http.StatusForbidden, "POLICY_DENY",
+			fmt.Sprintf("Policy denied: %s", decision.Reason))
+	}
+
+	// Apply duration from policy cap
+	duration := parsedDuration
+	if decision.MaxServerDuration > 0 {
+		if duration == 0 || duration > decision.MaxServerDuration {
+			duration = decision.MaxServerDuration
+			log.Printf("INFO: Capping duration to policy max_server_duration: %v", duration)
+		}
+	}
+
+	// Apply default duration if not specified
+	if duration == 0 {
+		duration = h.Config.DefaultDuration
+		if duration == 0 {
+			duration = DefaultTVMDuration
+		}
 	}
 
 	// Build RoleARN from profile
@@ -89,14 +130,14 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 		Caller:          caller,
 		RoleARN:         roleARN,
 		SessionDuration: duration,
-		Region:          h.Region,
+		Region:          h.Config.Region,
 	}
 
 	// Vend credentials
 	var vendOutput *VendOutput
-	if h.STSClient != nil {
+	if h.Config.STSClient != nil {
 		// Use provided STS client (for testing)
-		vendOutput, err = VendCredentialsWithClient(ctx, vendInput, h.STSClient)
+		vendOutput, err = VendCredentialsWithClient(ctx, vendInput, h.Config.STSClient)
 	} else {
 		// Use default STS client (Lambda execution role)
 		vendOutput, err = VendCredentials(ctx, vendInput)
@@ -111,8 +152,8 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	}
 
 	// Log successful credential issuance (for audit/debugging)
-	log.Printf("INFO: Credentials issued profile=%s account=%s source_identity_request_id=%s",
-		profile, caller.AccountID, vendOutput.SourceIdentity.RequestID())
+	log.Printf("INFO: Credentials issued user=%s profile=%s account=%s source_identity_request_id=%s",
+		username, profile, caller.AccountID, vendOutput.SourceIdentity.RequestID())
 
 	return successResponse(vendOutput.Credentials)
 }
