@@ -44,6 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added CDK TypeScript example for Lambda TVM (`cdk/sentinel-tvm/`)
 - Added cost optimization guide (`docs/LAMBDA_TVM_COSTS.md`)
 
+#### Phase 103: Testing & Documentation (2026-01-25)
+- Security regression tests for TVM bypass prevention
+- End-to-end testing documentation (`docs/LAMBDA_TVM_TESTING.md`)
+- Migration guide comparing CLI server vs Lambda TVM (`docs/LAMBDA_TVM_MIGRATION.md`)
+- Complete v1.14 milestone documentation
+
+**v1.14 Milestone Complete:** Lambda TVM provides server-side credential vending with enforced policy evaluation. Protected roles trust only the Lambda execution role, preventing client-side bypass.
+
 ## [1.13.0] - Unreleased
 
 ### Added
