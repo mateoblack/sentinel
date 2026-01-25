@@ -45,6 +45,11 @@ var ErrMissingIAMContext = errors.New("IAM authorization context is missing or i
 // ExtractCallerIdentity extracts the IAM caller identity from an API Gateway v2 HTTP request.
 // Returns an error if IAM authorization context is missing or incomplete.
 func ExtractCallerIdentity(req events.APIGatewayV2HTTPRequest) (*CallerIdentity, error) {
+	// Check if Authorizer context exists
+	if req.RequestContext.Authorizer == nil {
+		return nil, ErrMissingIAMContext
+	}
+
 	// Access the IAM authorization context from the request
 	iam := req.RequestContext.Authorizer.IAM
 

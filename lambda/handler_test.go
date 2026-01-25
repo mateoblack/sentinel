@@ -898,8 +898,15 @@ func (m *mockBreakGlassStore) CountByProfileSince(ctx context.Context, profile s
 	return 0, nil
 }
 
-// mockSessionStore implements session.Store for testing.
-type mockSessionStore struct {
+func (m *mockBreakGlassStore) FindActiveByInvokerAndProfile(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+	if m.activeEvent != nil && m.activeEvent.Invoker == invoker && m.activeEvent.Profile == profile && m.activeEvent.Status == breakglass.StatusActive {
+		return m.activeEvent, nil
+	}
+	return nil, nil
+}
+
+// handlerMockSessionStore implements session.Store for testing.
+type handlerMockSessionStore struct {
 	session   *session.ServerSession
 	revoked   bool
 	createErr error
@@ -907,7 +914,7 @@ type mockSessionStore struct {
 	touchErr  error
 }
 
-func (m *mockSessionStore) Create(ctx context.Context, sess *session.ServerSession) error {
+func (m *handlerMockSessionStore) Create(ctx context.Context, sess *session.ServerSession) error {
 	if m.createErr != nil {
 		return m.createErr
 	}
@@ -915,7 +922,7 @@ func (m *mockSessionStore) Create(ctx context.Context, sess *session.ServerSessi
 	return nil
 }
 
-func (m *mockSessionStore) Get(ctx context.Context, id string) (*session.ServerSession, error) {
+func (m *handlerMockSessionStore) Get(ctx context.Context, id string) (*session.ServerSession, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
 	}
@@ -929,28 +936,40 @@ func (m *mockSessionStore) Get(ctx context.Context, id string) (*session.ServerS
 	return nil, errors.New("not found")
 }
 
-func (m *mockSessionStore) Update(ctx context.Context, sess *session.ServerSession) error {
+func (m *handlerMockSessionStore) Update(ctx context.Context, sess *session.ServerSession) error {
 	return nil
 }
 
-func (m *mockSessionStore) Delete(ctx context.Context, id string) error {
+func (m *handlerMockSessionStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (m *mockSessionStore) ListByUser(ctx context.Context, user string, limit int) ([]*session.ServerSession, error) {
+func (m *handlerMockSessionStore) ListByUser(ctx context.Context, user string, limit int) ([]*session.ServerSession, error) {
 	return []*session.ServerSession{}, nil
 }
 
-func (m *mockSessionStore) ListByStatus(ctx context.Context, status session.SessionStatus, limit int) ([]*session.ServerSession, error) {
+func (m *handlerMockSessionStore) ListByStatus(ctx context.Context, status session.SessionStatus, limit int) ([]*session.ServerSession, error) {
 	return []*session.ServerSession{}, nil
 }
 
-func (m *mockSessionStore) Touch(ctx context.Context, id string) error {
+func (m *handlerMockSessionStore) Touch(ctx context.Context, id string) error {
 	return m.touchErr
 }
 
-func (m *mockSessionStore) ListByTimeRange(ctx context.Context, start, end time.Time, limit int) ([]*session.ServerSession, error) {
+func (m *handlerMockSessionStore) ListByTimeRange(ctx context.Context, start, end time.Time, limit int) ([]*session.ServerSession, error) {
 	return []*session.ServerSession{}, nil
+}
+
+func (m *handlerMockSessionStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*session.ServerSession, error) {
+	return []*session.ServerSession{}, nil
+}
+
+func (m *handlerMockSessionStore) FindActiveByServerInstance(ctx context.Context, serverInstanceID string) (*session.ServerSession, error) {
+	return nil, nil
+}
+
+func (m *handlerMockSessionStore) GetBySourceIdentity(ctx context.Context, sourceIdentity string) (*session.ServerSession, error) {
+	return nil, nil
 }
 
 // mockLogger implements logging.Logger for testing.
@@ -1108,7 +1127,7 @@ func TestHandleRequest_SessionRevoked(t *testing.T) {
 	cfg := &TVMConfig{
 		PolicyParameter: "/test/policy",
 		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
-		SessionStore:    &mockSessionStore{revoked: true},
+		SessionStore:    &handlerMockSessionStore{revoked: true},
 		STSClient:       mockClient,
 		Region:          "us-east-1",
 		DefaultDuration: 15 * time.Minute,
@@ -1249,7 +1268,7 @@ func TestHandleRequest_FullFlow(t *testing.T) {
 	}
 
 	logger := &mockLogger{}
-	sessionStore := &mockSessionStore{}
+	sessionStore := &handlerMockSessionStore{}
 
 	cfg := &TVMConfig{
 		PolicyParameter: "/test/policy",

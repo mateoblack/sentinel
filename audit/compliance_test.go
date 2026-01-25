@@ -152,7 +152,8 @@ func TestExtractRoleNameFromARN(t *testing.T) {
 }
 
 func TestGetProfileListForCompliance(t *testing.T) {
-	profileEvents := map[string][]eventType{
+	// profileEvents defined for reference but test uses nil to check filter logic
+	_ = map[string][]eventType{
 		"prod":    {},
 		"staging": {},
 		"dev":     {},
