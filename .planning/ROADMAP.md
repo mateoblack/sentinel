@@ -123,7 +123,7 @@ Plans:
 
 Plans:
 - [x] 100-01: Routing and profile discovery (Router, ProfileDiscovery) — Wave 1 — completed 2026-01-25
-- [ ] 100-02: Config integration (SSM client, policy root config) — Wave 1
+- [x] 100-02: Config integration (SSM client, policy root config) — Wave 2 — completed 2026-01-25
 - [ ] 100-03: Main entry point (Lambda main.go with Router) — Wave 2
 - [ ] 100-04: End-to-end test documentation — Wave 3
 
