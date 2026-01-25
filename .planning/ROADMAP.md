@@ -103,10 +103,10 @@ Plans:
 **Goal**: Move MDM API token from environment variable to AWS Secrets Manager
 **Depends on**: Phase 113
 **Research**: Complete (aws-secretsmanager-caching-go v2 library)
-**Plans**: 2
+**Plans**: 1/2 complete
 
 Plans:
-- [ ] 114-01: Secrets Manager caching client and config integration
+- [x] 114-01: Secrets Manager caching client and config integration — completed 2026-01-25
 - [ ] 114-02: Terraform module and documentation updates
 
 #### Phase 115: CI/CD Security Scanning
