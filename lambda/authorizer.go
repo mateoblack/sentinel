@@ -141,12 +141,14 @@ func denyResponse() events.APIGatewayV2CustomAuthorizerSimpleResponse {
 
 // ValidateSession is a convenience function for validating a session ID.
 // Returns nil if session is valid, error otherwise.
+// Unlike HandleRequest which uses IsSessionRevoked (fail-open for not found),
+// this function distinguishes between "not found" and "not revoked" for explicit validation.
 func (a *Authorizer) ValidateSession(ctx context.Context, sessionID string) error {
 	if sessionID == "" {
 		return ErrMissingSessionID
 	}
 
-	revoked, err := session.IsSessionRevoked(ctx, a.store, sessionID)
+	sess, err := a.store.Get(ctx, sessionID)
 	if err != nil {
 		if errors.Is(err, session.ErrSessionNotFound) {
 			return ErrSessionNotFound
@@ -154,7 +156,7 @@ func (a *Authorizer) ValidateSession(ctx context.Context, sessionID string) erro
 		return fmt.Errorf("failed to check session: %w", err)
 	}
 
-	if revoked {
+	if sess.Status == session.StatusRevoked {
 		return ErrSessionRevoked
 	}
 
