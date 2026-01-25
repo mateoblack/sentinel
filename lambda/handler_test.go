@@ -12,7 +12,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/sts/types"
+	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
+	"github.com/byteness/aws-vault/v7/request"
+	"github.com/byteness/aws-vault/v7/session"
 )
 
 // testSTSClient implements STSClient for handler testing.
@@ -789,5 +793,610 @@ func TestHandleRequest_NilConfig(t *testing.T) {
 	}
 	if errResp.Code != "CONFIG_ERROR" {
 		t.Errorf("Error code = %s, want CONFIG_ERROR", errResp.Code)
+	}
+}
+
+// ============================================================================
+// Mock stores for approval/break-glass/session/logging integration tests
+// ============================================================================
+
+// mockApprovalStore implements request.Store for testing.
+type mockApprovalStore struct {
+	approvedRequest *request.Request
+	listByReqErr    error
+}
+
+func (m *mockApprovalStore) Create(ctx context.Context, req *request.Request) error {
+	return nil
+}
+
+func (m *mockApprovalStore) Get(ctx context.Context, id string) (*request.Request, error) {
+	if m.approvedRequest != nil && m.approvedRequest.ID == id {
+		return m.approvedRequest, nil
+	}
+	return nil, errors.New("not found")
+}
+
+func (m *mockApprovalStore) Update(ctx context.Context, req *request.Request) error {
+	return nil
+}
+
+func (m *mockApprovalStore) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *mockApprovalStore) ListByRequester(ctx context.Context, requester string, limit int) ([]*request.Request, error) {
+	if m.listByReqErr != nil {
+		return nil, m.listByReqErr
+	}
+	if m.approvedRequest != nil && m.approvedRequest.Requester == requester {
+		return []*request.Request{m.approvedRequest}, nil
+	}
+	return []*request.Request{}, nil
+}
+
+func (m *mockApprovalStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*request.Request, error) {
+	return []*request.Request{}, nil
+}
+
+func (m *mockApprovalStore) ListByStatus(ctx context.Context, status request.RequestStatus, limit int) ([]*request.Request, error) {
+	return []*request.Request{}, nil
+}
+
+// mockBreakGlassStore implements breakglass.Store for testing.
+type mockBreakGlassStore struct {
+	activeEvent   *breakglass.BreakGlassEvent
+	listByInvErr  error
+}
+
+func (m *mockBreakGlassStore) Create(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+	return nil
+}
+
+func (m *mockBreakGlassStore) Get(ctx context.Context, id string) (*breakglass.BreakGlassEvent, error) {
+	if m.activeEvent != nil && m.activeEvent.ID == id {
+		return m.activeEvent, nil
+	}
+	return nil, errors.New("not found")
+}
+
+func (m *mockBreakGlassStore) Update(ctx context.Context, event *breakglass.BreakGlassEvent) error {
+	return nil
+}
+
+func (m *mockBreakGlassStore) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *mockBreakGlassStore) ListByInvoker(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+	if m.listByInvErr != nil {
+		return nil, m.listByInvErr
+	}
+	if m.activeEvent != nil && m.activeEvent.Invoker == invoker {
+		return []*breakglass.BreakGlassEvent{m.activeEvent}, nil
+	}
+	return []*breakglass.BreakGlassEvent{}, nil
+}
+
+func (m *mockBreakGlassStore) ListByProfile(ctx context.Context, profile string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+	return []*breakglass.BreakGlassEvent{}, nil
+}
+
+func (m *mockBreakGlassStore) ListByStatus(ctx context.Context, status breakglass.BreakGlassStatus, limit int) ([]*breakglass.BreakGlassEvent, error) {
+	return []*breakglass.BreakGlassEvent{}, nil
+}
+
+func (m *mockBreakGlassStore) GetLastByInvokerAndProfile(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
+	return nil, nil
+}
+
+func (m *mockBreakGlassStore) CountByInvokerSince(ctx context.Context, invoker string, since time.Time) (int, error) {
+	return 0, nil
+}
+
+func (m *mockBreakGlassStore) CountByProfileSince(ctx context.Context, profile string, since time.Time) (int, error) {
+	return 0, nil
+}
+
+// mockSessionStore implements session.Store for testing.
+type mockSessionStore struct {
+	session   *session.ServerSession
+	revoked   bool
+	createErr error
+	getErr    error
+	touchErr  error
+}
+
+func (m *mockSessionStore) Create(ctx context.Context, sess *session.ServerSession) error {
+	if m.createErr != nil {
+		return m.createErr
+	}
+	m.session = sess
+	return nil
+}
+
+func (m *mockSessionStore) Get(ctx context.Context, id string) (*session.ServerSession, error) {
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	if m.session != nil && m.session.ID == id {
+		sess := *m.session
+		if m.revoked {
+			sess.Status = session.StatusRevoked
+		}
+		return &sess, nil
+	}
+	return nil, errors.New("not found")
+}
+
+func (m *mockSessionStore) Update(ctx context.Context, sess *session.ServerSession) error {
+	return nil
+}
+
+func (m *mockSessionStore) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *mockSessionStore) ListByUser(ctx context.Context, user string, limit int) ([]*session.ServerSession, error) {
+	return []*session.ServerSession{}, nil
+}
+
+func (m *mockSessionStore) ListByStatus(ctx context.Context, status session.SessionStatus, limit int) ([]*session.ServerSession, error) {
+	return []*session.ServerSession{}, nil
+}
+
+func (m *mockSessionStore) Touch(ctx context.Context, id string) error {
+	return m.touchErr
+}
+
+func (m *mockSessionStore) ListByTimeRange(ctx context.Context, start, end time.Time, limit int) ([]*session.ServerSession, error) {
+	return []*session.ServerSession{}, nil
+}
+
+// mockLogger implements logging.Logger for testing.
+type mockLogger struct {
+	entries []logging.DecisionLogEntry
+}
+
+func (m *mockLogger) LogDecision(entry logging.DecisionLogEntry) {
+	m.entries = append(m.entries, entry)
+}
+
+func (m *mockLogger) LogApproval(entry logging.ApprovalLogEntry) {
+}
+
+func (m *mockLogger) LogBreakGlass(entry logging.BreakGlassLogEntry) {
+}
+
+// ============================================================================
+// Approval/Break-Glass/Session Integration Tests
+// ============================================================================
+
+func TestHandleRequest_ApprovalOverride(t *testing.T) {
+	// Policy denies, but there's an approved request
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	approvedReq := &request.Request{
+		ID:        "test-request-123",
+		Requester: "testuser",
+		Profile:   "arn:aws:iam::123456789012:role/prod-role",
+		Status:    request.StatusApproved,
+		CreatedAt: time.Now().Add(-time.Hour),
+		ExpiresAt: time.Now().Add(time.Hour),
+		Duration:  2 * time.Hour,
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: denyAllPolicy()},
+		ApprovalStore:   &mockApprovalStore{approvedRequest: approvedReq},
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should allow access despite policy deny - approved request overrides
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HandleRequest() statusCode = %d, want %d (approval should override deny)", resp.StatusCode, http.StatusOK)
+	}
+}
+
+func TestHandleRequest_BreakGlassOverride(t *testing.T) {
+	// Policy denies, no approved request, but active break-glass
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	bgEvent := &breakglass.BreakGlassEvent{
+		ID:        "bg-event-456",
+		Invoker:   "testuser",
+		Profile:   "arn:aws:iam::123456789012:role/prod-role",
+		Status:    breakglass.StatusActive,
+		CreatedAt: time.Now().Add(-30 * time.Minute),
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+		Duration:  time.Hour,
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: denyAllPolicy()},
+		ApprovalStore:   &mockApprovalStore{}, // Empty - no approved request
+		BreakGlassStore: &mockBreakGlassStore{activeEvent: bgEvent},
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should allow access despite policy deny - break-glass overrides
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HandleRequest() statusCode = %d, want %d (break-glass should override deny)", resp.StatusCode, http.StatusOK)
+	}
+}
+
+func TestHandleRequest_NeitherOverride(t *testing.T) {
+	// Policy denies, no approved request, no break-glass
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called when denied without override")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: denyAllPolicy()},
+		ApprovalStore:   &mockApprovalStore{}, // Empty
+		BreakGlassStore: &mockBreakGlassStore{}, // Empty
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should deny - no override available
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "POLICY_DENY" {
+		t.Errorf("Error code = %s, want POLICY_DENY", errResp.Code)
+	}
+}
+
+func TestHandleRequest_SessionRevoked(t *testing.T) {
+	// Policy allows, but session is revoked
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called when session is revoked")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		SessionStore:    &mockSessionStore{revoked: true},
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should deny - session revoked
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "SESSION_REVOKED" {
+		t.Errorf("Error code = %s, want SESSION_REVOKED", errResp.Code)
+	}
+}
+
+func TestHandleRequest_Logging(t *testing.T) {
+	// Verify logger is called with correct fields
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	logger := &mockLogger{}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		Logger:          logger,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	// Verify logger was called
+	if len(logger.entries) != 1 {
+		t.Fatalf("Logger entries = %d, want 1", len(logger.entries))
+	}
+
+	entry := logger.entries[0]
+	if entry.User != "testuser" {
+		t.Errorf("Log entry User = %s, want testuser", entry.User)
+	}
+	if entry.Profile != "arn:aws:iam::123456789012:role/prod-role" {
+		t.Errorf("Log entry Profile = %s, want arn:aws:iam::123456789012:role/prod-role", entry.Profile)
+	}
+	if entry.Effect != string(policy.EffectAllow) {
+		t.Errorf("Log entry Effect = %s, want allow", entry.Effect)
+	}
+	if entry.RequestID == "" {
+		t.Error("Log entry RequestID should not be empty")
+	}
+	if entry.SourceIdentity == "" {
+		t.Error("Log entry SourceIdentity should not be empty")
+	}
+}
+
+func TestHandleRequest_LoggingDeny(t *testing.T) {
+	// Verify logger is called on deny
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called on deny")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	logger := &mockLogger{}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: denyAllPolicy()},
+		Logger:          logger,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+
+	// Verify logger was called for deny
+	if len(logger.entries) != 1 {
+		t.Fatalf("Logger entries = %d, want 1", len(logger.entries))
+	}
+
+	entry := logger.entries[0]
+	if entry.Effect != string(policy.EffectDeny) {
+		t.Errorf("Log entry Effect = %s, want deny", entry.Effect)
+	}
+}
+
+func TestHandleRequest_FullFlow(t *testing.T) {
+	// Complete success path with session tracking and logging
+	var capturedSessionTag string
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			// Check for session tag
+			for _, tag := range params.Tags {
+				if *tag.Key == "SentinelSessionID" {
+					capturedSessionTag = *tag.Value
+				}
+			}
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	logger := &mockLogger{}
+	sessionStore := &mockSessionStore{}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		SessionStore:    sessionStore,
+		Logger:          logger,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	// Verify session was created
+	if sessionStore.session == nil {
+		t.Error("Session should have been created")
+	} else {
+		if sessionStore.session.User != "testuser" {
+			t.Errorf("Session User = %s, want testuser", sessionStore.session.User)
+		}
+		if sessionStore.session.Profile != "arn:aws:iam::123456789012:role/prod-role" {
+			t.Errorf("Session Profile = %s, want arn:aws:iam::123456789012:role/prod-role", sessionStore.session.Profile)
+		}
+	}
+
+	// Verify session tag was passed to STS
+	if capturedSessionTag == "" {
+		t.Error("Session ID should be passed to STS as tag")
+	}
+
+	// Verify logger was called
+	if len(logger.entries) != 1 {
+		t.Fatalf("Logger entries = %d, want 1", len(logger.entries))
+	}
+}
+
+func TestHandleRequest_ApprovalIDInSourceIdentity(t *testing.T) {
+	// Verify approval ID is passed to SourceIdentity when using approved request
+	var capturedSourceIdentity string
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			if params.SourceIdentity != nil {
+				capturedSourceIdentity = *params.SourceIdentity
+			}
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	approvedReq := &request.Request{
+		ID:        "approval-id-789",
+		Requester: "testuser",
+		Profile:   "arn:aws:iam::123456789012:role/prod-role",
+		Status:    request.StatusApproved,
+		CreatedAt: time.Now().Add(-time.Hour),
+		ExpiresAt: time.Now().Add(time.Hour),
+		Duration:  2 * time.Hour,
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: denyAllPolicy()},
+		ApprovalStore:   &mockApprovalStore{approvedRequest: approvedReq},
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	// Verify SourceIdentity contains approval ID (format: sentinel:user:approval-id:request-id)
+	if capturedSourceIdentity == "" {
+		t.Error("SourceIdentity should be set")
+	}
+	// When approval ID is present, format is sentinel:user:approval-id:request-id
+	expectedPrefix := "sentinel:testuser:approval-id-789:"
+	if len(capturedSourceIdentity) < len(expectedPrefix) || capturedSourceIdentity[:len(expectedPrefix)] != expectedPrefix {
+		t.Errorf("SourceIdentity = %s, should start with %s", capturedSourceIdentity, expectedPrefix)
+	}
+}
+
+func TestHandleRequest_BreakGlassDurationCap(t *testing.T) {
+	// Verify duration is capped to break-glass remaining time
+	var capturedDuration int32
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			if params.DurationSeconds != nil {
+				capturedDuration = *params.DurationSeconds
+			}
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	// Break-glass expires in 5 minutes
+	bgEvent := &breakglass.BreakGlassEvent{
+		ID:        "bg-event-cap",
+		Invoker:   "testuser",
+		Profile:   "arn:aws:iam::123456789012:role/prod-role",
+		Status:    breakglass.StatusActive,
+		CreatedAt: time.Now().Add(-55 * time.Minute),
+		ExpiresAt: time.Now().Add(5 * time.Minute), // 5 minutes remaining
+		Duration:  time.Hour,
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: denyAllPolicy()},
+		BreakGlassStore: &mockBreakGlassStore{activeEvent: bgEvent},
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute, // Default 15 min
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	// Duration should be capped to ~5 minutes (300 seconds), not 15 minutes
+	// Allow some tolerance for test execution time
+	if capturedDuration > 310 {
+		t.Errorf("Duration = %d seconds, should be capped to ~300 (break-glass remaining)", capturedDuration)
 	}
 }
