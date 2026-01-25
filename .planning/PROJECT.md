@@ -100,10 +100,16 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ `sentinel exec --remote-server <url>` for remote TVM — v1.14
 - ✓ SCP patterns to enforce TVM-only access (block direct AssumeRole) — v1.14
 - ✓ Terraform module and CDK example for Lambda TVM deployment — v1.14
+- ✓ Device posture schema with DeviceID and PostureStatus types — v1.15
+- ✓ MDM Provider interface with Jamf Pro implementation for server-side device verification — v1.15
+- ✓ Lambda TVM queries MDM APIs on credential requests with fail-open/fail-closed modes — v1.15
+- ✓ Policy device conditions (require_mdm, require_encryption, require_mdm_compliant) — v1.15
+- ✓ Session device binding with DeviceID field and ListByDeviceID query — v1.15
+- ✓ Device audit commands (device-sessions, devices) with anomaly detection — v1.15
 
 ### Active
 
-None pending for v1.14 (milestone complete).
+None pending for v1.15 (milestone complete).
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -111,36 +117,6 @@ None pending for v1.14 (milestone complete).
 - Daemon mode — CLI-first, no background process
 
 ### Future Milestones
-
-**v1.15 Device Posture (Server-Verified)**
-
-Zero Trust device context for credential decisions. Lambda TVM verifies posture server-side — clients cannot bypass enforcement.
-
-**Architecture:**
-- CLI collects device signals → sends to Lambda TVM
-- TVM validates claims against MDM/EDR APIs (server-side, tamper-proof)
-- Policy evaluates verified posture → issue or deny credentials
-- Device ID stamped in SourceIdentity for CloudTrail forensics
-
-**Phase 1: MDM Integration**
-- Lambda TVM queries MDM API (Jamf, Intune, Kandji) directly
-- `device.mdm_enrolled` and `device.mdm_compliant` policy conditions
-- Server-verified — cannot be faked by modified CLI
-
-**Phase 2: EDR Integration**
-- Lambda TVM queries EDR API (CrowdStrike, SentinelOne) directly
-- `device.edr_health` and `device.edr_threats` policy conditions
-- Block credentials when active threats detected
-
-**Phase 3: Hardware Attestation**
-- TPM/Secure Enclave cryptographic device identity
-- Device-bound keys for high-security roles
-- Attestation required for production access
-
-**Phase 4: Continuous Posture**
-- Server mode re-checks posture on each credential request
-- Revoke sessions when device drifts out of compliance
-- Webhook integration for real-time MDM/EDR events
 
 **v1.16 Policy Developer Experience**
 - `sentinel policy pull <profile>` — fetch policy from SSM to stdout/file for editing
@@ -150,7 +126,7 @@ Zero Trust device context for credential decisions. Lambda TVM verifies posture 
 
 ## Context
 
-Shipped v1.14 with 120,566 LOC Go.
+Shipped v1.15 with 129,040 LOC Go.
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy, aws-lambda-go, API Gateway v2.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -282,6 +258,14 @@ v1.14 adds server-side credential vending via Lambda TVM:
 - Security regression tests validating policy bypass prevention
 - Migration guide comparing CLI server mode vs Lambda TVM deployment models
 
+v1.15 adds device posture verification:
+- Device posture schema with DeviceID (64-char hex) and PostureStatus types
+- MDM Provider interface with Jamf Pro implementation for server-side verification
+- Lambda TVM queries MDM on credential requests (fail-open default, fail-closed optional)
+- Policy device conditions integrate into rule matching (require_mdm, require_encryption)
+- Session device binding for forensic correlation and device-based revocation
+- Device audit commands (device-sessions, devices) with anomaly detection
+
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
 ## Constraints
@@ -373,6 +357,14 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Trust policy requires TVM principal + SourceIdentity | Dual condition for protected role security | ✓ Good |
 | Security tests use SECURITY VIOLATION markers | Explicit failure identification in test output | ✓ Good |
 | Gradual rollout strategy | 4-phase migration from CLI server to Lambda TVM | ✓ Good |
+| DeviceID 64-char hex format | HMAC-SHA256 via machineid for cross-platform device fingerprinting | ✓ Good |
+| Pointer bools for device posture | Distinguishes not checked (nil) from checked and false | ✓ Good |
+| Fail-open MDM by default | RequireDevicePosture=false allows rollout before MDM enforcement | ✓ Good |
+| Device conditions affect rule matching | Rule doesn't match if posture fails (first-match-wins preserved) | ✓ Good |
+| Nil posture fails device conditions | Security: no posture data = rule doesn't match | ✓ Good |
+| Device ID as query parameter | Simple API design (?device_id=...) for MDM lookup | ✓ Good |
+| Device-bound session logging | Log device_bound=true flag rather than actual ID for privacy | ✓ Good |
+| Anomaly detection thresholds | MULTI_USER at >1 user, HIGH_PROFILE_COUNT at >5 profiles | ✓ Good |
 
 ---
-*Last updated: 2026-01-25 after v1.14 milestone*
+*Last updated: 2026-01-25 after v1.15 milestone*

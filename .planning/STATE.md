@@ -5,33 +5,26 @@
 See: .planning/PROJECT.md (updated 2026-01-25)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.15 Device Posture — verify device security before issuing credentials
+**Current focus:** v1.16 Security Hardening - Address security audit findings
 
 ## Current Position
 
-Phase: 112 of 112 (Device Audit Commands)
-Plan: 1 of 1 in current phase
-Status: Phase complete - MILESTONE COMPLETE
-Last activity: 2026-01-25 — Completed 112-01-PLAN.md
+Phase: 113 of 120 (Timing Attack Remediation)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-25 — Milestone v1.16 Security Hardening created
 
-Progress: ██████████ 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone Summary
 
-**v1.15 Device Posture (IN PROGRESS):**
-- 9 phases (104-112)
-- Plans: 2 completed (Phases 104, 105)
-- Goal: Verify device security posture before issuing credentials
-- Key feature: Device fingerprinting in decision logs and session metadata
-- Phase 104 complete: Device posture schema types, policy conditions, log fields
-- Phase 105 complete: Collector interface, MultiCollector, NoopCollector
-- Phase 106 complete: Device identity module with machineid library
-- Phase 107 complete: MDM Provider interface, JamfProvider, Lambda integration (3/3 plans)
-- Phase 108 complete: Policy device conditions wired into evaluation (1/1 plans)
-- Phase 109 complete: Device attestation flow from CLI to TVM (1/1 plans)
-- Phase 110 complete: Session device binding for forensics (1/1 plans)
-- Phase 111 complete: Decision logging enhancement with device ID (1/1 plans)
-- Phase 112 complete: Device audit commands for forensic analysis (1/1 plans)
+**v1.15 Device Posture (SHIPPED 2026-01-25):**
+- 9 phases (104-112), 12 plans
+- Server-verified device posture via MDM APIs in Lambda TVM
+- MDM Provider interface with Jamf Pro implementation
+- Policy device conditions for rule matching
+- Session device binding for forensics
+- Device audit commands with anomaly detection
 
 **v1.14 Server-Side Credential Vending (SHIPPED):**
 - 7 phases (97-103)
@@ -39,7 +32,7 @@ Progress: ██████████ 100%
 - Goal: Lambda TVM for server-side credential vending
 - Critical constraint: Lambda IS the trust boundary
 
-**Previous milestones (17 shipped):**
+**Previous milestones (18 shipped):**
 - v1.0 MVP: 8 phases, 16 plans (shipped 2026-01-14)
 - v1.1 Sentinel Fingerprint: 9 phases, 12 plans (shipped 2026-01-15)
 - v1.2 Approval Workflows: 9 phases, 17 plans (shipped 2026-01-15)
@@ -57,13 +50,14 @@ Progress: ██████████ 100%
 - v1.12 Infrastructure Provisioning: 6 phases, 15 plans (shipped 2026-01-22)
 - v1.13 Enforced Session Tracking: 3 phases, 10 plans (shipped 2026-01-24)
 - v1.14 Server-Side Credential Vending: 7 phases, 19 plans (shipped 2026-01-25)
+- v1.15 Device Posture: 9 phases, 12 plans (shipped 2026-01-25)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 201
+- Total plans completed: 213
 - Average duration: ~3.5 min
-- Total execution time: ~739 min
+- Total execution time: ~780 min
 
 **By Milestone:**
 
@@ -86,6 +80,7 @@ Progress: ██████████ 100%
 | v1.12 Infrastructure Provisioning | 6 | 15 | ~49 min |
 | v1.13 Enforced Session Tracking | 3 | 10 | ~35 min |
 | v1.14 Server-Side Credential Vending | 7 | 19 | ~49 min |
+| v1.15 Device Posture | 9 | 12 | ~41 min |
 
 ## Accumulated Context
 
@@ -138,18 +133,18 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 
 ### Pending Todos
 
-None — ready to plan v1.15.
+None — ready to plan next milestone.
 
 ### Blockers/Concerns
 
-None — fresh milestone.
+None — fresh start for next milestone.
 
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 112-01-PLAN.md (Device Audit Commands) - MILESTONE COMPLETE
+Stopped at: v1.16 Security Hardening milestone initialization
 Resume file: None
-Next: `/gsd:complete-milestone` to archive v1.15 and prepare for next
+Next: `/gsd:plan-phase 113` to plan Timing Attack Remediation
 
 ## Roadmap Evolution
 
@@ -170,4 +165,5 @@ Next: `/gsd:complete-milestone` to archive v1.15 and prepare for next
 - Milestone v1.12 shipped: 2026-01-22 — Infrastructure Provisioning (Phases 88-93)
 - Milestone v1.13 shipped: 2026-01-24 — Enforced Session Tracking (Phases 94-96)
 - Milestone v1.14 shipped: 2026-01-25 — Server-Side Credential Vending (Phases 97-103)
-- Milestone v1.15 created: 2026-01-25 — Device Posture, 9 phases (Phase 104-112)
+- Milestone v1.15 shipped: 2026-01-25 — Device Posture (Phases 104-112)
+- Milestone v1.16 created: 2026-01-25 — Security Hardening (Phases 113-120)

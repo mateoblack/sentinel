@@ -1,5 +1,31 @@
 # Project Milestones: Sentinel
 
+## v1.15 Device Posture (Shipped: 2026-01-25)
+
+**Delivered:** Server-verified device posture via MDM APIs in Lambda TVM. CLI sends device identifier only - TVM queries Jamf for actual posture, preventing clients from faking compliance.
+
+**Phases completed:** 104-112 (12 plans total)
+
+**Key accomplishments:**
+- Device posture schema with DeviceID (64-char hex), PostureStatus, and DeviceCondition for policy matching
+- MDM Provider interface with Jamf Pro implementation for server-side device verification
+- Lambda TVM queries MDM on credential requests (fail-open default, fail-closed optional)
+- Policy device conditions (require_mdm, require_encryption, require_mdm_compliant) integrated into rule matching
+- Session device binding with ListByDeviceID for forensic correlation and device-based revocation
+- Device audit commands (device-sessions, devices) with anomaly detection (MULTI_USER, HIGH_PROFILE_COUNT)
+
+**Stats:**
+- 64 files created/modified
+- 129,040 lines of Go (total codebase, +8,474 from v1.14)
+- 9 phases, 12 plans
+- 1 day (2026-01-25)
+
+**Git range:** `feat(104-01)` → `docs(112-01)`
+
+**What's next:** Device posture provides Zero Trust device context for credential decisions. Consider EDR integration (CrowdStrike, SentinelOne), hardware attestation (TPM/Secure Enclave), or continuous posture monitoring for future milestones.
+
+---
+
 ## v1.14 Server-Side Credential Vending (Shipped: 2026-01-25)
 
 **Delivered:** Lambda Token Vending Machine (TVM) enabling server-side credential vending where Lambda IS the trust boundary - protected roles trust only the Lambda execution role, preventing client-side policy bypass.

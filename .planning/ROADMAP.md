@@ -23,7 +23,8 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.12 Infrastructure Provisioning** — [milestones/v1.12-ROADMAP.md](milestones/v1.12-ROADMAP.md) (Phases 88-93, shipped 2026-01-22)
 - ✅ **v1.13 Enforced Session Tracking** — [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) (Phases 94-96, shipped 2026-01-24)
 - ✅ **v1.14 Server-Side Credential Vending** — [milestones/v1.14-ROADMAP.md](milestones/v1.14-ROADMAP.md) (Phases 97-103, shipped 2026-01-25)
-- 🚧 **v1.15 Device Posture** — Phases 104-113 (in progress)
+- ✅ **v1.15 Device Posture** — [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) (Phases 104-112, shipped 2026-01-25)
+- 🚧 **v1.16 Security Hardening** — Phases 113-120 (in progress)
 
 ## Completed Milestones
 
@@ -66,115 +67,109 @@ See [milestones/v1.14-ROADMAP.md](milestones/v1.14-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.15 Device Posture (In Progress)
+<details>
+<summary>✅ v1.15 Device Posture (Phases 104-112) — SHIPPED 2026-01-25</summary>
 
-**Milestone Goal:** Server-verified device posture via MDM/EDR APIs in Lambda TVM. CLI sends device identifier only — TVM queries Jamf/Intune/CrowdStrike for actual posture. Clients cannot fake compliance.
+- [x] Phase 104: Device Fingerprint Schema (1/1 plans) — completed 2026-01-25
+- [x] Phase 105: Device Collector Interface (1/1 plans) — completed 2026-01-25
+- [x] Phase 106: Device Identification (1/1 plans) — completed 2026-01-25
+- [x] Phase 107: MDM API Integration (3/3 plans) — completed 2026-01-25
+- [x] Phase 108: Policy Device Conditions (1/1 plans) — completed 2026-01-25
+- [x] Phase 109: Device Attestation Flow (1/1 plans) — completed 2026-01-25
+- [x] Phase 110: Session Device Binding (1/1 plans) — completed 2026-01-25
+- [x] Phase 111: Decision Logging Enhancement (1/1 plans) — completed 2026-01-25
+- [x] Phase 112: Device Audit Commands (1/1 plans) — completed 2026-01-25
 
-**Security Constraint:** No local CLI posture checks (can be bypassed). See .planning/CONSTRAINTS.md.
+See [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) for full details.
 
-#### Phase 104: Device Fingerprint Schema
+</details>
 
-**Goal**: Define device posture data model with device ID, attestation claims, and policy binding
-**Depends on**: v1.14 complete
-**Research**: Unlikely (internal design, extends existing types)
-**Plans**: 1 (1/1 complete)
+### 🚧 v1.16 Security Hardening (In Progress)
 
-Plans:
-- [x] 104-01: Device posture types, policy conditions, log fields — completed 2026-01-25
+**Milestone Goal:** Address security audit findings with timing attack fixes, secrets management, CI/CD security scanning, DynamoDB encryption, rate limiting, and comprehensive validation.
 
-#### Phase 105: Device Collector Interface
+#### Phase 113: Timing Attack Remediation
 
-**Goal**: Abstract interface for collecting device posture from multiple sources (MDM, local)
-**Depends on**: Phase 104
-**Research**: Unlikely (interface design)
-**Plans**: 1 (1/1 complete)
-
-Plans:
-- [x] 105-01: Collector interface and implementations — completed 2026-01-25
-
-#### Phase 106: Device Identification
-
-**Goal**: CLI collects stable hardware device ID only (NOT posture claims)
-**Depends on**: Phase 105
-**Research**: Likely (OS-specific hardware ID APIs)
-**Research topics**: macOS IOPlatformSerialNumber, Linux /etc/machine-id, Windows MachineGuid
-**Plans**: 1 (1/1 complete)
-
-Plans:
-- [x] 106-01: Device identity module with GetDeviceID() using machineid library — completed 2026-01-25
-
-#### Phase 107: MDM API Integration
-
-**Goal**: Lambda TVM queries MDM APIs (Jamf, Intune, Kandji) server-side to get actual device posture
-**Depends on**: Phase 106
-**Research**: Likely (MDM API authentication and endpoints)
-**Research topics**: Jamf Pro API, Microsoft Graph API for Intune, Kandji API
-**Plans**: 3 (3/3 complete)
-
-Plans:
-- [x] 107-01: MDM provider interface and configuration types — completed 2026-01-25
-- [x] 107-02: Jamf Pro MDM provider implementation — completed 2026-01-25
-- [x] 107-03: Lambda TVM MDM integration — completed 2026-01-25
-
-#### Phase 108: Policy Device Conditions
-
-**Goal**: Add device posture conditions to policy rules (require_encryption, require_mdm, etc.)
-**Depends on**: Phase 107
-**Research**: Unlikely (extends existing policy schema)
-**Plans**: 1
-
-Plans:
-- [ ] 108-01: Wire device posture into policy evaluation and Lambda handler
-
-#### Phase 109: Device Attestation Flow
-
-**Goal**: Wire device ID into credential request, TVM queries MDM, binds posture to session
-**Depends on**: Phase 108
-**Research**: Unlikely (internal integration with existing credential flow)
+**Goal**: Fix bearer token comparison vulnerability using crypto/subtle.ConstantTimeCompare()
+**Depends on**: v1.15 complete
+**Research**: Unlikely (standard Go crypto pattern)
 **Plans**: TBD
 
 Plans:
-- [ ] 109-01: TBD
+- [ ] 113-01: TBD (run /gsd:plan-phase 113 to break down)
 
-#### Phase 110: Session Device Binding
+#### Phase 114: Secrets Manager Migration
 
-**Goal**: Store device fingerprint in session metadata for forensic correlation and device-based revocation
-**Depends on**: Phase 109
-**Research**: Unlikely (extends existing session tracking)
-**Plans**: 1 (1/1 complete)
-
-Plans:
-- [x] 110-01: DeviceID field in ServerSession, ListByDeviceID query, Lambda integration — completed 2026-01-25
-
-#### Phase 111: Decision Logging Enhancement
-
-**Goal**: Add device context to decision logs for forensic analysis
-**Depends on**: Phase 110
-**Research**: Unlikely (extends existing logging patterns)
-**Plans**: 1 (1/1 complete)
-
-Plans:
-- [x] 111-01: Add device ID to CLI and server decision logs — completed 2026-01-25
-
-#### Phase 112: Device Audit Commands
-
-**Goal**: CLI commands to list devices, query sessions by device, and flag anomalies
-**Depends on**: Phase 111
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 1 (1/1 complete)
-
-Plans:
-- [x] 112-01: Device-sessions and devices commands with anomaly detection — completed 2026-01-25
-
-#### Phase 113: Documentation & Testing
-
-**Goal**: Device posture documentation and integration tests
-**Depends on**: Phase 112
-**Research**: Unlikely (documentation)
+**Goal**: Move MDM API token from environment variable to AWS Secrets Manager
+**Depends on**: Phase 113
+**Research**: Likely (AWS Secrets Manager API, Lambda integration patterns)
+**Research topics**: secrets-manager-go-sdk, Lambda secrets caching, rotation patterns
 **Plans**: TBD
 
 Plans:
-- [ ] 113-01: TBD
+- [ ] 114-01: TBD
+
+#### Phase 115: CI/CD Security Scanning
+
+**Goal**: Add govulncheck, gosec, and Trivy to GitHub Actions for SAST and dependency scanning
+**Depends on**: Phase 113
+**Research**: Likely (GitHub Actions integration, tool configuration)
+**Research topics**: govulncheck action, gosec action, trivy-action, sarif reporting
+**Plans**: TBD
+
+Plans:
+- [ ] 115-01: TBD
+
+#### Phase 116: DynamoDB Encryption
+
+**Goal**: Add explicit KMS encryption in Terraform for all DynamoDB tables
+**Depends on**: Phase 115
+**Research**: Likely (Terraform aws_dynamodb_table encryption, KMS key policies)
+**Research topics**: dynamodb server-side encryption, kms key rotation, terraform patterns
+**Plans**: TBD
+
+Plans:
+- [ ] 116-01: TBD
+
+#### Phase 117: API Rate Limiting
+
+**Goal**: Implement rate limiting for Lambda TVM and credential server endpoints
+**Depends on**: Phase 116
+**Research**: Unlikely (existing breakglass rate limiting patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 117-01: TBD
+
+#### Phase 118: Dependency Security Audit
+
+**Goal**: Audit all Go dependencies, update vulnerable packages, document security posture
+**Depends on**: Phase 117
+**Research**: Unlikely (go mod tools, govulncheck output)
+**Plans**: TBD
+
+Plans:
+- [ ] 118-01: TBD
+
+#### Phase 119: Error Sanitization
+
+**Goal**: Review and sanitize error messages to prevent information leakage
+**Depends on**: Phase 118
+**Research**: Unlikely (internal error handling patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 119-01: TBD
+
+#### Phase 120: Security Validation
+
+**Goal**: Integration tests for all security fixes and updated security documentation
+**Depends on**: Phase 119
+**Research**: Unlikely (existing test patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 120-01: TBD
 
 ## Domain Expertise
 
@@ -587,6 +582,7 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.12 Infrastructure Provisioning | 88-93 | 15/15 | ✅ Complete | 2026-01-22 |
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
-| v1.15 Device Posture | 104-112 | 12/12 | 🚧 Complete | 2026-01-25 |
+| v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
+| v1.16 Security Hardening | 113-120 | 0/? | 🚧 In Progress | - |
 
-**Totals:** 18 milestones shipped (112 phases, 201 plans shipped)
+**Totals:** 19 milestones shipped (112 phases, 213 plans shipped)
