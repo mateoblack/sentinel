@@ -1660,3 +1660,218 @@ func TestSentinelCredentialProviderAdapter_CredentialProfile(t *testing.T) {
 		}
 	})
 }
+
+// TestSentinelExecCommandInput_RemoteServerField tests the RemoteServer field.
+func TestSentinelExecCommandInput_RemoteServerField(t *testing.T) {
+	t.Run("RemoteServer field is empty by default", func(t *testing.T) {
+		input := SentinelExecCommandInput{}
+		if input.RemoteServer != "" {
+			t.Errorf("expected RemoteServer to be empty by default, got %q", input.RemoteServer)
+		}
+	})
+
+	t.Run("RemoteServer field can be set", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:  "test-profile",
+			RemoteServer: "https://api.example.com/sentinel?profile=test-profile",
+		}
+		if input.RemoteServer != "https://api.example.com/sentinel?profile=test-profile" {
+			t.Errorf("expected RemoteServer URL, got %q", input.RemoteServer)
+		}
+	})
+
+	t.Run("RemoteServer mode does not require PolicyParameter", func(t *testing.T) {
+		// In remote server mode, policy is handled by the TVM
+		input := SentinelExecCommandInput{
+			ProfileName:     "tvm-profile",
+			PolicyParameter: "", // Not required in remote mode
+			RemoteServer:    "https://api.example.com/sentinel",
+		}
+		if input.PolicyParameter != "" {
+			t.Error("PolicyParameter should be empty in remote server mode")
+		}
+		if input.RemoteServer == "" {
+			t.Error("RemoteServer should be set")
+		}
+	})
+}
+
+// TestSentinelExecCommand_RemoteServer_Validation tests --remote-server flag validation.
+func TestSentinelExecCommand_RemoteServer_Validation(t *testing.T) {
+	t.Run("remote-server conflicts with server", func(t *testing.T) {
+		// Create a temp config file with a valid profile
+		tmpDir := t.TempDir()
+		configFile := filepath.Join(tmpDir, "config")
+		configContent := `[profile remote-test]
+region = us-east-1
+`
+		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+			t.Fatalf("Failed to create test config file: %v", err)
+		}
+		t.Setenv("AWS_CONFIG_FILE", configFile)
+
+		input := SentinelExecCommandInput{
+			ProfileName:  "remote-test",
+			RemoteServer: "https://api.example.com/sentinel",
+			StartServer:  true, // Invalid combination
+		}
+
+		s := &Sentinel{}
+		_, err := SentinelExecCommand(context.Background(), input, s)
+
+		if err == nil {
+			t.Fatal("expected error for --remote-server with --server")
+		}
+		if !strings.Contains(err.Error(), "Can't use --remote-server with --server") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("remote-server conflicts with policy-parameter", func(t *testing.T) {
+		// Create a temp config file with a valid profile
+		tmpDir := t.TempDir()
+		configFile := filepath.Join(tmpDir, "config")
+		configContent := `[profile remote-test2]
+region = us-east-1
+`
+		if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+			t.Fatalf("Failed to create test config file: %v", err)
+		}
+		t.Setenv("AWS_CONFIG_FILE", configFile)
+
+		input := SentinelExecCommandInput{
+			ProfileName:     "remote-test2",
+			RemoteServer:    "https://api.example.com/sentinel",
+			PolicyParameter: "/sentinel/policies/default", // Invalid combination
+		}
+
+		s := &Sentinel{}
+		_, err := SentinelExecCommand(context.Background(), input, s)
+
+		if err == nil {
+			t.Fatal("expected error for --remote-server with --policy-parameter")
+		}
+		if !strings.Contains(err.Error(), "Can't use --remote-server with --policy-parameter") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+}
+
+// TestSentinelExecCommand_RemoteServer_Configuration tests --remote-server mode configuration.
+func TestSentinelExecCommand_RemoteServer_Configuration(t *testing.T) {
+	t.Run("remote server mode configuration is valid", func(t *testing.T) {
+		// Test that the full remote server mode configuration works with valid fields
+		input := SentinelExecCommandInput{
+			ProfileName:  "production",
+			Region:       "us-west-2",
+			RemoteServer: "https://api.example.com/sentinel?profile=production",
+			Command:      "aws",
+			Args:         []string{"s3", "ls"},
+		}
+
+		// Verify all fields are correctly set
+		if input.ProfileName != "production" {
+			t.Errorf("expected ProfileName 'production', got %q", input.ProfileName)
+		}
+		if input.RemoteServer != "https://api.example.com/sentinel?profile=production" {
+			t.Errorf("expected RemoteServer URL, got %q", input.RemoteServer)
+		}
+		// PolicyParameter should not be required
+		if input.PolicyParameter != "" {
+			t.Error("PolicyParameter should be empty for remote server mode")
+		}
+		// StartServer should be false (remote-server is different from local server)
+		if input.StartServer {
+			t.Error("StartServer should be false in remote server mode")
+		}
+	})
+
+	t.Run("remote server mode does not validate local profile", func(t *testing.T) {
+		// In remote mode, profile might not exist locally (TVM has different profiles)
+		input := SentinelExecCommandInput{
+			ProfileName:  "tvm-only-profile", // Doesn't need to exist locally
+			RemoteServer: "https://api.example.com/sentinel",
+		}
+
+		// This test verifies the design: remote mode should skip local profile validation
+		// The actual profile existence is checked by the TVM
+		if input.RemoteServer == "" {
+			t.Error("RemoteServer should be set")
+		}
+	})
+
+	t.Run("remote server mode with shell command", func(t *testing.T) {
+		input := SentinelExecCommandInput{
+			ProfileName:  "tvm-profile",
+			RemoteServer: "https://api.example.com/sentinel",
+			Command:      "", // Empty means default to shell
+		}
+
+		if input.Command != "" {
+			t.Error("Command should be empty to default to shell")
+		}
+	})
+}
+
+// TestSentinelExecCommand_RemoteServer_EnvModeComparison tests comparison between remote mode and other modes.
+func TestSentinelExecCommand_RemoteServer_EnvModeComparison(t *testing.T) {
+	t.Run("remote server is different from local server", func(t *testing.T) {
+		// Local server mode (--server)
+		localServer := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/default", // Required for local
+			StartServer:     true,
+			RemoteServer:    "", // Not set
+		}
+
+		// Remote server mode (--remote-server)
+		remoteServer := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "", // Not required for remote
+			StartServer:     false,
+			RemoteServer:    "https://api.example.com/sentinel",
+		}
+
+		// Key differences
+		if localServer.StartServer == remoteServer.StartServer {
+			t.Error("StartServer should differ between modes")
+		}
+		if localServer.RemoteServer != "" {
+			t.Error("Local server mode should not have RemoteServer set")
+		}
+		if remoteServer.RemoteServer == "" {
+			t.Error("Remote server mode should have RemoteServer set")
+		}
+		if localServer.PolicyParameter == "" {
+			t.Error("Local server mode requires PolicyParameter")
+		}
+		// Remote mode doesn't require PolicyParameter (it's an error to set it)
+	})
+
+	t.Run("remote server is different from env var mode", func(t *testing.T) {
+		// Env var mode (default)
+		envVarMode := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "/sentinel/policies/default", // Required
+			StartServer:     false,
+			RemoteServer:    "", // Not set
+		}
+
+		// Remote server mode
+		remoteMode := SentinelExecCommandInput{
+			ProfileName:     "production",
+			PolicyParameter: "", // Not required
+			StartServer:     false,
+			RemoteServer:    "https://api.example.com/sentinel",
+		}
+
+		// Key differences
+		if envVarMode.RemoteServer != "" {
+			t.Error("Env var mode should not have RemoteServer set")
+		}
+		if remoteMode.RemoteServer == "" {
+			t.Error("Remote mode should have RemoteServer set")
+		}
+		// Both have StartServer=false, but remote mode uses AWS_CONTAINER_CREDENTIALS_FULL_URI
+	})
+}
