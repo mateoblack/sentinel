@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 ## Current Position
 
-Phase: 113 of 120 (Timing Attack Remediation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-25 — Milestone v1.16 Security Hardening created
+Phase: 114 of 120 (Secrets Manager Migration)
+Plan: 0 of 2 in current phase
+Status: Phase planned
+Last activity: 2026-01-25 — Created 114-01-PLAN.md and 114-02-PLAN.md
 
-Progress: ░░░░░░░░░░ 0%
+Progress: █░░░░░░░░░ 12.5%
 
 ## Milestone Summary
 
@@ -119,6 +119,11 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Device audit commands: device-sessions queries by 64-char hex device ID, devices aggregates with anomaly detection
 - Anomaly thresholds: MULTI_USER at >1 user, HIGH_PROFILE_COUNT at >5 profiles (configurable)
 
+**v1.16 Security Hardening decisions (Phase 113):**
+- Use crypto/subtle.ConstantTimeCompare for all bearer token comparisons
+- Add inline security comments explaining vulnerability and mitigation
+- Verify timing attack fixes via AST parsing in tests (not timing measurements)
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -142,9 +147,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: v1.16 Security Hardening milestone initialization
+Stopped at: Phase 114 planned (2 plans created)
 Resume file: None
-Next: `/gsd:plan-phase 113` to plan Timing Attack Remediation
+Next: `/gsd:execute-phase 114` to execute Secrets Manager Migration
 
 ## Roadmap Evolution
 

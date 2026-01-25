@@ -93,21 +93,21 @@ See [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) for full details.
 **Goal**: Fix bearer token comparison vulnerability using crypto/subtle.ConstantTimeCompare()
 **Depends on**: v1.15 complete
 **Research**: Unlikely (standard Go crypto pattern)
-**Plans**: TBD
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 113-01: TBD (run /gsd:plan-phase 113 to break down)
+- [x] 113-01: Fix timing attack in withAuthorizationCheck functions — completed 2026-01-25
 
 #### Phase 114: Secrets Manager Migration
 
 **Goal**: Move MDM API token from environment variable to AWS Secrets Manager
 **Depends on**: Phase 113
-**Research**: Likely (AWS Secrets Manager API, Lambda integration patterns)
-**Research topics**: secrets-manager-go-sdk, Lambda secrets caching, rotation patterns
-**Plans**: TBD
+**Research**: Complete (aws-secretsmanager-caching-go v2 library)
+**Plans**: 2
 
 Plans:
-- [ ] 114-01: TBD
+- [ ] 114-01: Secrets Manager caching client and config integration
+- [ ] 114-02: Terraform module and documentation updates
 
 #### Phase 115: CI/CD Security Scanning
 
@@ -583,6 +583,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
-| v1.16 Security Hardening | 113-120 | 0/? | 🚧 In Progress | - |
+| v1.16 Security Hardening | 113-120 | 1/? | 🚧 In Progress | - |
 
 **Totals:** 19 milestones shipped (112 phases, 213 plans shipped)
