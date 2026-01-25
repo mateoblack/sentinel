@@ -265,6 +265,12 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		logger = logging.NewJSONLogger(io.MultiWriter(writers...))
 	}
 
+	// 1.5. Collect device ID for forensic logging (fail-open: continue without on error)
+	deviceID, deviceErr := device.GetDeviceID()
+	if deviceErr != nil {
+		log.Printf("Warning: failed to collect device ID for logging: %v", deviceErr)
+	}
+
 	// 2. Create AWS config for SSM and STS
 	// Use --aws-profile for credentials if specified, otherwise use --profile
 	credentialProfile := input.AWSProfile
@@ -558,6 +564,12 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		// Include break-glass event ID if credentials were issued via break-glass override
 		if activeBreakGlass != nil {
 			credFields.BreakGlassEventID = activeBreakGlass.ID
+		}
+		// Include device ID in logs for forensic correlation
+		if deviceID != "" {
+			credFields.DevicePosture = &device.DevicePosture{
+				DeviceID: deviceID,
+			}
 		}
 		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, input.PolicyParameter, credFields)
 		logger.LogDecision(entry)
