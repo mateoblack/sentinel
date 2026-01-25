@@ -971,6 +971,167 @@ Result: 4 issue(s) found
 | 0 | All sessions verified |
 | 1 | Issues found |
 
+### audit untracked-sessions
+
+Detect credential usage that bypassed session tracking by cross-referencing CloudTrail AssumeRole events with DynamoDB session records.
+
+**Usage:**
+```bash
+sentinel audit untracked-sessions --since DURATION --region REGION --table TABLE [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--since` | How far back to search (e.g., 7d, 24h, 30m) | Yes |
+| `--until` | End of search window (default: now) | No |
+| `--region` | AWS region for CloudTrail and DynamoDB | Yes |
+| `--table` | DynamoDB table name for sessions | Yes |
+| `--role` | Filter by role ARN | No |
+| `--profile` | Filter by AWS profile | No |
+| `--json` | Output in JSON format | No |
+| `--aws-profile` | AWS profile for credentials | No |
+
+**Examples:**
+
+```bash
+# Check last 7 days
+sentinel audit untracked-sessions \
+  --since 7d \
+  --region us-east-1 \
+  --table sentinel-sessions
+
+# Check specific time window (last 24h excluding last hour)
+sentinel audit untracked-sessions \
+  --since 24h \
+  --until 1h \
+  --region us-east-1 \
+  --table sentinel-sessions
+
+# Filter by role
+sentinel audit untracked-sessions \
+  --since 7d \
+  --region us-east-1 \
+  --table sentinel-sessions \
+  --role arn:aws:iam::123456789012:role/ProductionAdmin
+```
+
+**Output:**
+
+```
+Untracked Session Detection
+===========================
+
+Time Window: 2026-01-17T00:00:00Z to 2026-01-24T00:00:00Z
+
+Summary
+-------
+Total events:     42
+Tracked:          38 (90.5%)
+Untracked:        4
+Orphaned:         0
+
+Untracked Sessions (4)
+----------------------
+[no_source_identity] 2026-01-20T14:32:00Z
+  Event ID: abc123...
+  Role: arn:aws:iam::123456789012:role/ProductionAdmin
+  Source IP: 10.0.1.50
+  Reason: No SourceIdentity set on AssumeRole
+
+Result: 4 untracked session(s) detected - compliance gap
+```
+
+**Categories:**
+
+| Category | Description |
+|----------|-------------|
+| `no_source_identity` | AssumeRole without any SourceIdentity |
+| `non_sentinel_format` | SourceIdentity doesn't match `sentinel:*:*:*` format |
+| `orphaned` | Sentinel SourceIdentity but no matching DynamoDB session |
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | All sessions tracked |
+| 1 | Untracked sessions found |
+
+### audit session-compliance
+
+Report session tracking compliance by profile, comparing actual tracking against `require_server_session` policy requirements.
+
+**Usage:**
+```bash
+sentinel audit session-compliance --since DURATION --region REGION --table TABLE [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--since` | How far back to search (e.g., 7d, 24h, 30m) | Yes |
+| `--until` | End of search window (default: now) | No |
+| `--region` | AWS region for CloudTrail and DynamoDB | Yes |
+| `--table` | DynamoDB table name for sessions | Yes |
+| `--profile` | Check specific profile only | No |
+| `--policy` | Policy file for requirement checking | No |
+| `--json` | Output in JSON format | No |
+| `--aws-profile` | AWS profile for credentials | No |
+
+**Examples:**
+
+```bash
+# Check all profiles for last 7 days
+sentinel audit session-compliance \
+  --since 7d \
+  --region us-east-1 \
+  --table sentinel-sessions
+
+# Check specific profile with policy file
+sentinel audit session-compliance \
+  --since 7d \
+  --region us-east-1 \
+  --table sentinel-sessions \
+  --profile prod-admin \
+  --policy /path/to/policy.yaml
+```
+
+**Output:**
+
+```
+Session Compliance Report
+=========================
+
+Time Window: 2026-01-17T00:00:00Z to 2026-01-24T00:00:00Z
+
+Profile Compliance
+------------------
+Profile               Policy Required  Tracked     Untracked   Compliance
+dev                   No               15          3           83.3%
+staging               No               22          0           100.0%
+prod-admin            Yes              18          2           90.0% !
+prod-readonly         Yes              45          0           100.0%
+
+Summary
+-------
+Profiles with require_server_session: 2
+Fully compliant profiles: 3
+Profiles with gaps: 1
+
+Result: 1 profile(s) with compliance gaps
+```
+
+The `!` marker indicates profiles with compliance gaps (untracked sessions where policy requires tracking).
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | All required profiles compliant |
+| 1 | Compliance gaps found |
+
 ---
 
 ## Permissions Commands
