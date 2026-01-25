@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 ## Current Position
 
 Phase: 101 of 103 (Client Integration)
-Plan: 0 of 2 in current phase
-Status: Phase planned
-Last activity: 2026-01-25 — Created 101-01 and 101-02 PLAN.md
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-25 — Completed 101-01-PLAN.md
 
-Progress: █████████████████░░ 70% (203/295 total plans across all milestones)
+Progress: █████████████████░░ 71% (204/295 total plans across all milestones)
 
 ## Milestone Summary
 
@@ -92,6 +92,11 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions from v1
 - Profile extraction tries session lookup first (Sentinel format), falls back to role name
 - Non-zero exit code for compliance gaps (CI/CD integration)
 
+**v1.14 Phase 101 decisions:**
+- Use AWS_CONTAINER_CREDENTIALS_FULL_URI for SDK integration (automatic refresh)
+- Skip local profile validation in remote mode (TVM has different profiles)
+- --remote-server conflicts with both --server and --policy-parameter
+
 ### Pending Todos
 
 None yet for v1.14.
@@ -110,9 +115,9 @@ None — clean start for v1.14.
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Created Phase 101 plans (2 plans in 2 waves)
+Stopped at: Completed 101-01-PLAN.md
 Resume file: None
-Next: `/gsd:execute-phase 101`
+Next: `/gsd:execute-plan 101-02`
 
 ## Roadmap Evolution
 
