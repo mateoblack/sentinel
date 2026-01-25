@@ -103,11 +103,11 @@ Plans:
 **Goal**: Move MDM API token from environment variable to AWS Secrets Manager
 **Depends on**: Phase 113
 **Research**: Complete (aws-secretsmanager-caching-go v2 library)
-**Plans**: 1/2 complete
+**Plans**: 2/2 complete
 
 Plans:
 - [x] 114-01: Secrets Manager caching client and config integration — completed 2026-01-25
-- [ ] 114-02: Terraform module and documentation updates
+- [x] 114-02: Terraform module and documentation updates — completed 2026-01-25
 
 #### Phase 115: CI/CD Security Scanning
 
@@ -583,6 +583,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
-| v1.16 Security Hardening | 113-120 | 1/? | 🚧 In Progress | - |
+| v1.16 Security Hardening | 113-120 | 3/? | 🚧 In Progress | - |
 
 **Totals:** 19 milestones shipped (112 phases, 213 plans shipped)
