@@ -22,7 +22,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.11 Shell Integration** — [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) (Phases 84-87, shipped 2026-01-20)
 - ✅ **v1.12 Infrastructure Provisioning** — [milestones/v1.12-ROADMAP.md](milestones/v1.12-ROADMAP.md) (Phases 88-93, shipped 2026-01-22)
 - ✅ **v1.13 Enforced Session Tracking** — [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) (Phases 94-96, shipped 2026-01-24)
-- 🚧 **v1.14 Server-Side Credential Vending** — [milestones/v1.14-ROADMAP.md](milestones/v1.14-ROADMAP.md) (Phases 97-103, in progress)
+- ✅ **v1.14 Server-Side Credential Vending** — [milestones/v1.14-ROADMAP.md](milestones/v1.14-ROADMAP.md) (Phases 97-103, shipped 2026-01-25)
 
 ## Completed Milestones
 
@@ -50,9 +50,11 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 
 </details>
 
-## 🚧 v1.14 Server-Side Credential Vending (In Progress)
+## ✅ v1.14 Server-Side Credential Vending (Complete)
 
 **Milestone Goal:** Move credential vending to server-side infrastructure (Lambda TVM) so clients cannot bypass policy enforcement. Lambda IS the trust boundary - protected roles trust ONLY the Lambda execution role.
+
+**Shipped:** 2026-01-25
 
 ### Phase 97: Foundation
 
@@ -173,10 +175,11 @@ Plans:
   3. Load testing confirms <200ms p99 latency at target throughput
   4. LAMBDA_TVM.md deployment guide exists with setup instructions
   5. Migration guide exists comparing CLI server vs Lambda TVM (decision framework for users)
-**Plans**: TBD
+**Plans**: 2 plans in 1 wave — completed 2026-01-25
 
 Plans:
-- [ ] 103-01: TBD
+- [x] 103-01: Security regression tests and testing documentation — Wave 1 — completed 2026-01-25
+- [x] 103-02: Migration guide and CHANGELOG — Wave 1 — completed 2026-01-25
 
 ## Domain Expertise
 
@@ -588,6 +591,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.11 Shell Integration | 84-87 | 4/4 | ✅ Complete | 2026-01-20 |
 | v1.12 Infrastructure Provisioning | 88-93 | 15/15 | ✅ Complete | 2026-01-22 |
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
-| v1.14 Server-Side Credential Vending | 97-103 | 10/TBD | 🚧 In progress | - |
+| v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 
-**Totals:** 16 milestones shipped, 1 in progress (96 phases, 196 plans shipped)
+**Totals:** 17 milestones shipped (103 phases, 215 plans shipped)
