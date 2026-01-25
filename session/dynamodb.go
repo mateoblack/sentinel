@@ -465,6 +465,12 @@ func (s *DynamoDBStore) GetBySourceIdentity(ctx context.Context, sourceIdentity 
 	return fromItem(&item)
 }
 
+// ListByDeviceID returns all sessions from a specific device, ordered by created_at desc.
+// Returns empty slice if no sessions found for the device.
+func (s *DynamoDBStore) ListByDeviceID(ctx context.Context, deviceID string, limit int) ([]*ServerSession, error) {
+	return s.queryByIndex(ctx, GSIDeviceID, "device_id", deviceID, limit)
+}
+
 // queryByIndex executes a query against a GSI with the given partition key.
 // Results are ordered by created_at descending (newest first).
 func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, keyValue string, limit int) ([]*ServerSession, error) {

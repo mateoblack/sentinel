@@ -83,6 +83,9 @@ func (m *mockSessionStore) ListByTimeRange(ctx context.Context, start, end time.
 func (m *mockSessionStore) GetBySourceIdentity(ctx context.Context, sourceIdentity string) (*session.ServerSession, error) {
 	return nil, nil
 }
+func (m *mockSessionStore) ListByDeviceID(ctx context.Context, deviceID string, limit int) ([]*session.ServerSession, error) {
+	return nil, nil
+}
 
 func TestCreateSessionContext_NoStore(t *testing.T) {
 	cfg := &TVMConfig{SessionStore: nil}

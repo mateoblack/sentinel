@@ -82,4 +82,10 @@ type Store interface {
 	// Returns nil, nil if no session with the source identity is found.
 	// This is used for audit correlation between CloudTrail events and tracked sessions.
 	GetBySourceIdentity(ctx context.Context, sourceIdentity string) (*ServerSession, error)
+
+	// ListByDeviceID returns all sessions from a specific device, ordered by created_at desc.
+	// Returns empty slice if no sessions found for the device.
+	// If limit is 0, DefaultQueryLimit is used. Limit is capped at MaxQueryLimit.
+	// The deviceID should be a 64-char lowercase hex string (device.ValidateDeviceIdentifier format).
+	ListByDeviceID(ctx context.Context, deviceID string, limit int) ([]*ServerSession, error)
 }
