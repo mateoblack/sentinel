@@ -1,5 +1,7 @@
 # Sentinel
 
+[![Build Status](https://github.com/mateoblack/sentinel/actions/workflows/go.yml/badge.svg)](https://github.com/mateoblack/sentinel/actions/workflows/go.yml)
+
 > **Alpha Release** - APIs and features may change. Feedback welcome via issues.
 
 Policy-based credential gateway for AWS. Know not just *what* happened, but *why* it was allowed.
