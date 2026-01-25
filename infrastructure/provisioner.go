@@ -90,6 +90,8 @@ type ProvisionPlan struct {
 	TTLAttribute string `json:"ttl_attribute,omitempty"`
 	// BillingMode is the billing mode that would be set.
 	BillingMode string `json:"billing_mode,omitempty"`
+	// EncryptionType is the encryption type that would be set.
+	EncryptionType string `json:"encryption_type,omitempty"`
 }
 
 // Create provisions a DynamoDB table from the given schema.
@@ -229,6 +231,11 @@ func (p *TableProvisioner) Plan(ctx context.Context, schema TableSchema) (*Provi
 		plan.BillingMode = string(schema.BillingMode)
 	} else {
 		plan.BillingMode = string(BillingModePayPerRequest) // Default
+	}
+
+	// Set encryption type if configured
+	if schema.Encryption != nil {
+		plan.EncryptionType = string(schema.Encryption.Type)
 	}
 
 	return plan, nil
@@ -416,6 +423,29 @@ func schemaToCreateTableInput(schema TableSchema) *dynamodb.CreateTableInput {
 
 	if len(gsis) > 0 {
 		input.GlobalSecondaryIndexes = gsis
+	}
+
+	// Add SSESpecification if encryption is configured
+	if schema.Encryption != nil {
+		switch schema.Encryption.Type {
+		case EncryptionDefault:
+			// DEFAULT uses AWS owned encryption (AES256)
+			// DynamoDB default - no SSESpecification needed, but we can explicitly set it
+			// Omit SSESpecification for DEFAULT to maintain backward compatibility
+		case EncryptionKMS:
+			// KMS uses AWS managed KMS key
+			input.SSESpecification = &types.SSESpecification{
+				Enabled: aws.Bool(true),
+				SSEType: types.SSETypeKms,
+			}
+		case EncryptionCustomerKey:
+			// Customer-provided CMK
+			input.SSESpecification = &types.SSESpecification{
+				Enabled:        aws.Bool(true),
+				SSEType:        types.SSETypeKms,
+				KMSMasterKeyId: aws.String(schema.Encryption.KMSKeyARN),
+			}
+		}
 	}
 
 	return input

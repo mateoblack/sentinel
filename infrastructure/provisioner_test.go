@@ -829,3 +829,129 @@ func TestTableProvisioner_Create_ApprovalTableSchema(t *testing.T) {
 		t.Errorf("expected table name sentinel-requests, got %s", result.TableName)
 	}
 }
+
+// ============================================================================
+// SSESpecification (Encryption) Tests
+// ============================================================================
+
+func TestSchemaToCreateTableInput_NoEncryption(t *testing.T) {
+	// When Encryption is nil, no SSESpecification should be set (backward compatible)
+	schema := TableSchema{
+		TableName:    "test-table",
+		PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+		Encryption:   nil,
+	}
+
+	input := schemaToCreateTableInput(schema)
+
+	if input.SSESpecification != nil {
+		t.Errorf("expected nil SSESpecification for nil Encryption, got %v", input.SSESpecification)
+	}
+}
+
+func TestSchemaToCreateTableInput_EncryptionDefault(t *testing.T) {
+	// DEFAULT encryption type should not set SSESpecification (AWS owned encryption is default)
+	schema := TableSchema{
+		TableName:    "test-table",
+		PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+		Encryption:   &EncryptionConfig{Type: EncryptionDefault},
+	}
+
+	input := schemaToCreateTableInput(schema)
+
+	if input.SSESpecification != nil {
+		t.Errorf("expected nil SSESpecification for EncryptionDefault, got %v", input.SSESpecification)
+	}
+}
+
+func TestSchemaToCreateTableInput_EncryptionKMS(t *testing.T) {
+	// KMS encryption type should set SSESpecification with SSEType=KMS
+	schema := TableSchema{
+		TableName:    "test-table",
+		PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+		Encryption:   &EncryptionConfig{Type: EncryptionKMS},
+	}
+
+	input := schemaToCreateTableInput(schema)
+
+	if input.SSESpecification == nil {
+		t.Fatal("expected non-nil SSESpecification for EncryptionKMS")
+	}
+	if !aws.ToBool(input.SSESpecification.Enabled) {
+		t.Error("expected SSESpecification.Enabled = true")
+	}
+	if input.SSESpecification.SSEType != types.SSETypeKms {
+		t.Errorf("expected SSEType KMS, got %v", input.SSESpecification.SSEType)
+	}
+	if input.SSESpecification.KMSMasterKeyId != nil {
+		t.Errorf("expected nil KMSMasterKeyId for KMS (AWS managed), got %s", aws.ToString(input.SSESpecification.KMSMasterKeyId))
+	}
+}
+
+func TestSchemaToCreateTableInput_EncryptionCustomerKey(t *testing.T) {
+	// Customer key encryption should set SSESpecification with KMSMasterKeyId
+	kmsARN := "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+	schema := TableSchema{
+		TableName:    "test-table",
+		PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+		Encryption: &EncryptionConfig{
+			Type:      EncryptionCustomerKey,
+			KMSKeyARN: kmsARN,
+		},
+	}
+
+	input := schemaToCreateTableInput(schema)
+
+	if input.SSESpecification == nil {
+		t.Fatal("expected non-nil SSESpecification for EncryptionCustomerKey")
+	}
+	if !aws.ToBool(input.SSESpecification.Enabled) {
+		t.Error("expected SSESpecification.Enabled = true")
+	}
+	if input.SSESpecification.SSEType != types.SSETypeKms {
+		t.Errorf("expected SSEType KMS, got %v", input.SSESpecification.SSEType)
+	}
+	if aws.ToString(input.SSESpecification.KMSMasterKeyId) != kmsARN {
+		t.Errorf("expected KMSMasterKeyId = %q, got %q", kmsARN, aws.ToString(input.SSESpecification.KMSMasterKeyId))
+	}
+}
+
+func TestTableProvisioner_Plan_WithEncryption(t *testing.T) {
+	mock := &mockDynamoDBProvisionerClient{}
+	provisioner := newTableProvisionerWithClient(mock, "us-east-1")
+
+	schema := TableSchema{
+		TableName:    "test-table",
+		PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+		Encryption:   DefaultEncryptionKMS(),
+	}
+
+	plan, err := provisioner.Plan(context.Background(), schema)
+	if err != nil {
+		t.Fatalf("Plan() error = %v", err)
+	}
+
+	if plan.EncryptionType != string(EncryptionKMS) {
+		t.Errorf("expected EncryptionType = %q, got %q", EncryptionKMS, plan.EncryptionType)
+	}
+}
+
+func TestTableProvisioner_Plan_WithoutEncryption(t *testing.T) {
+	mock := &mockDynamoDBProvisionerClient{}
+	provisioner := newTableProvisionerWithClient(mock, "us-east-1")
+
+	schema := TableSchema{
+		TableName:    "test-table",
+		PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+		Encryption:   nil,
+	}
+
+	plan, err := provisioner.Plan(context.Background(), schema)
+	if err != nil {
+		t.Fatalf("Plan() error = %v", err)
+	}
+
+	if plan.EncryptionType != "" {
+		t.Errorf("expected empty EncryptionType for nil Encryption, got %q", plan.EncryptionType)
+	}
+}
