@@ -137,10 +137,11 @@ Plans:
   2. Documentation exists for manual credential URI setup without CLI changes (SDK-only clients)
   3. SCP example patterns exist to enforce TVM-only access (block direct AssumeRole calls)
   4. Integration test: sentinel exec --remote-server calls TVM endpoint and receives working credentials
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 101-01: TBD
+- [ ] 101-01: Remote TVM flag (--remote-server, RemoteCredentialClient) — Wave 1
+- [ ] 101-02: SCP patterns and documentation — Wave 2
 
 ### Phase 102: Infrastructure as Code
 
