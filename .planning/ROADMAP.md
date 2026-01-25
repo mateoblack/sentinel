@@ -104,9 +104,9 @@ Plans:
 
 Plans:
 - [x] 99-01: TVM configuration layer (TVMConfig + environment loading) — Wave 1 — completed 2026-01-25
-- [ ] 99-02: Policy evaluation integration — Wave 2
+- [x] 99-02: Policy evaluation integration — Wave 2 — completed 2026-01-25
 - [x] 99-03: Session tracking with session tagging — Wave 2 — completed 2026-01-25
-- [ ] 99-04: Approval, break-glass, and logging integration — Wave 3
+- [x] 99-04: Approval, break-glass, and logging integration — Wave 3 — completed 2026-01-25
 
 ### Phase 100: API Gateway
 
@@ -582,6 +582,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.11 Shell Integration | 84-87 | 4/4 | ✅ Complete | 2026-01-20 |
 | v1.12 Infrastructure Provisioning | 88-93 | 15/15 | ✅ Complete | 2026-01-22 |
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
-| v1.14 Server-Side Credential Vending | 97-103 | 6/TBD | 🚧 In progress | - |
+| v1.14 Server-Side Credential Vending | 97-103 | 10/TBD | 🚧 In progress | - |
 
-**Totals:** 16 milestones shipped, 1 in progress (96 phases, 192 plans shipped)
+**Totals:** 16 milestones shipped, 1 in progress (96 phases, 196 plans shipped)
