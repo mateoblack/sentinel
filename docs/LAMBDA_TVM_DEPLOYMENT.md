@@ -69,6 +69,11 @@ aws lambda create-function \
 | `SENTINEL_SESSION_TABLE` | No | DynamoDB table for session tracking |
 | `SENTINEL_APPROVAL_TABLE` | No | DynamoDB table for approval workflows |
 | `SENTINEL_BREAKGLASS_TABLE` | No | DynamoDB table for break-glass events |
+| `SENTINEL_MDM_PROVIDER` | No | MDM provider: 'jamf', 'intune', 'kandji' |
+| `SENTINEL_MDM_BASE_URL` | No | MDM API base URL |
+| `SENTINEL_MDM_API_SECRET_ID` | No | **Recommended:** Secrets Manager secret ARN for MDM API token |
+| `SENTINEL_MDM_API_TOKEN` | No | **Deprecated:** MDM API token via env var |
+| `SENTINEL_REQUIRE_DEVICE` | No | Set to "true" to require device verification |
 
 ## Step 2: Create API Gateway HTTP API
 
@@ -328,6 +333,58 @@ curl -H "X-Sentinel-Session-ID: session-xxx" https://api.example.com/sensitive
 curl "https://api.example.com/sensitive?sentinel_session_id=session-xxx"
 ```
 
+## Device Posture (MDM Integration)
+
+Enable device posture verification by integrating with your MDM provider. The Lambda TVM can verify device enrollment and compliance before issuing credentials.
+
+### Secrets Manager Setup (Recommended)
+
+Store MDM API token in Secrets Manager for automatic rotation, encryption, and audit logging:
+
+```bash
+# Create secret
+aws secretsmanager create-secret \
+  --name "sentinel/mdm-api-token" \
+  --description "Jamf Pro API token for Sentinel TVM" \
+  --secret-string "your-bearer-token"
+
+# Note the ARN for Terraform
+# arn:aws:secretsmanager:us-east-1:123456789012:secret:sentinel/mdm-api-token-AbCdEf
+```
+
+### Terraform Configuration
+
+```hcl
+module "sentinel_tvm" {
+  source = "./terraform/sentinel-tvm"
+
+  # ... other configuration ...
+
+  # MDM Configuration
+  mdm_provider       = "jamf"
+  mdm_base_url       = "https://company.jamfcloud.com"
+  mdm_api_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:sentinel/mdm-api-token-AbCdEf"
+
+  # Optional: require device verification (fail-closed mode)
+  # require_device_posture = true
+}
+```
+
+### Migration from Environment Variable
+
+If currently using `SENTINEL_MDM_API_TOKEN` environment variable:
+
+1. Create Secrets Manager secret with token value
+2. Update Terraform to use `mdm_api_secret_arn` instead of `mdm_api_token`
+3. Deploy - Lambda will load token from Secrets Manager
+4. The env var pattern is deprecated and will log a warning
+
+**Why Secrets Manager?**
+- Automatic rotation support
+- Encryption at rest with KMS
+- Fine-grained IAM access control
+- CloudTrail audit logging of secret access
+
 ## API Endpoints
 
 ### GET / - Credential Vending
@@ -426,6 +483,7 @@ Set up alarms for:
 4. **Session tracking**: Enable for audit trail and revocation
 5. **CloudWatch logging**: Enable for security monitoring
 6. **VPC deployment**: Consider VPC Lambda for network isolation
+7. **Secrets in Secrets Manager**: Store MDM API tokens in Secrets Manager, not environment variables
 
 ## Client Integration
 
