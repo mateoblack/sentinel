@@ -877,3 +877,242 @@ func TestSessionTableSchemaGSIServerInstanceSortKey(t *testing.T) {
 			serverInstanceGSI.SortKey.Name, "status")
 	}
 }
+
+// ============================================================================
+// Encryption Configuration Tests
+// ============================================================================
+
+// TestEncryptionTypeIsValid tests EncryptionType validation.
+func TestEncryptionTypeIsValid(t *testing.T) {
+	tests := []struct {
+		name     string
+		encType  EncryptionType
+		expected bool
+	}{
+		{"default encryption valid", EncryptionDefault, true},
+		{"KMS encryption valid", EncryptionKMS, true},
+		{"customer key encryption valid", EncryptionCustomerKey, true},
+		{"empty type invalid", EncryptionType(""), false},
+		{"lowercase default invalid", EncryptionType("default"), false},
+		{"invalid type", EncryptionType("INVALID"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.encType.IsValid()
+			if got != tt.expected {
+				t.Errorf("EncryptionType(%q).IsValid() = %v, want %v", tt.encType, got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestEncryptionTypeString tests EncryptionType string conversion.
+func TestEncryptionTypeString(t *testing.T) {
+	tests := []struct {
+		encType  EncryptionType
+		expected string
+	}{
+		{EncryptionDefault, "DEFAULT"},
+		{EncryptionKMS, "KMS"},
+		{EncryptionCustomerKey, "CUSTOMER_KEY"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			got := tt.encType.String()
+			if got != tt.expected {
+				t.Errorf("EncryptionType.String() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestEncryptionConfigValidate tests EncryptionConfig validation.
+func TestEncryptionConfigValidate(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    EncryptionConfig
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name:    "valid default encryption",
+			config:  EncryptionConfig{Type: EncryptionDefault},
+			wantErr: false,
+		},
+		{
+			name:    "valid KMS encryption",
+			config:  EncryptionConfig{Type: EncryptionKMS},
+			wantErr: false,
+		},
+		{
+			name: "valid customer key encryption",
+			config: EncryptionConfig{
+				Type:      EncryptionCustomerKey,
+				KMSKeyARN: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid customer key encryption with alias",
+			config: EncryptionConfig{
+				Type:      EncryptionCustomerKey,
+				KMSKeyARN: "arn:aws:kms:us-east-1:123456789012:alias/my-key",
+			},
+			wantErr: false,
+		},
+		{
+			name:      "invalid encryption type fails",
+			config:   EncryptionConfig{Type: EncryptionType("INVALID")},
+			wantErr:  true,
+			errSubstr: "invalid encryption type",
+		},
+		{
+			name:      "default encryption with KMSKeyARN fails",
+			config:   EncryptionConfig{Type: EncryptionDefault, KMSKeyARN: "arn:aws:kms:us-east-1:123456789012:key/123"},
+			wantErr:  true,
+			errSubstr: "KMSKeyARN must be empty",
+		},
+		{
+			name:      "KMS encryption with KMSKeyARN fails",
+			config:   EncryptionConfig{Type: EncryptionKMS, KMSKeyARN: "arn:aws:kms:us-east-1:123456789012:key/123"},
+			wantErr:  true,
+			errSubstr: "KMSKeyARN must be empty",
+		},
+		{
+			name:      "customer key encryption without KMSKeyARN fails",
+			config:   EncryptionConfig{Type: EncryptionCustomerKey},
+			wantErr:  true,
+			errSubstr: "KMSKeyARN is required",
+		},
+		{
+			name:      "customer key encryption with invalid ARN fails",
+			config:   EncryptionConfig{Type: EncryptionCustomerKey, KMSKeyARN: "invalid-arn"},
+			wantErr:  true,
+			errSubstr: "invalid KMSKeyARN format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("EncryptionConfig.Validate() = nil, want error containing %q", tt.errSubstr)
+				} else if !strings.Contains(err.Error(), tt.errSubstr) {
+					t.Errorf("EncryptionConfig.Validate() error = %q, want error containing %q", err.Error(), tt.errSubstr)
+				}
+			} else if err != nil {
+				t.Errorf("EncryptionConfig.Validate() = %v, want nil", err)
+			}
+		})
+	}
+}
+
+// TestDefaultEncryptionKMS tests the DefaultEncryptionKMS helper function.
+func TestDefaultEncryptionKMS(t *testing.T) {
+	config := DefaultEncryptionKMS()
+
+	if config == nil {
+		t.Fatal("DefaultEncryptionKMS() = nil, want non-nil")
+	}
+
+	if config.Type != EncryptionKMS {
+		t.Errorf("DefaultEncryptionKMS().Type = %q, want %q", config.Type, EncryptionKMS)
+	}
+
+	if config.KMSKeyARN != "" {
+		t.Errorf("DefaultEncryptionKMS().KMSKeyARN = %q, want empty", config.KMSKeyARN)
+	}
+
+	// Verify it passes validation
+	if err := config.Validate(); err != nil {
+		t.Errorf("DefaultEncryptionKMS().Validate() = %v, want nil", err)
+	}
+}
+
+// TestTableSchemaValidateWithEncryption tests TableSchema validation with encryption configuration.
+func TestTableSchemaValidateWithEncryption(t *testing.T) {
+	tests := []struct {
+		name      string
+		schema    TableSchema
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name: "valid schema with KMS encryption",
+			schema: TableSchema{
+				TableName:    "test-table",
+				PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+				Encryption:   DefaultEncryptionKMS(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid schema with default encryption",
+			schema: TableSchema{
+				TableName:    "test-table",
+				PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+				Encryption:   &EncryptionConfig{Type: EncryptionDefault},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid schema with customer key encryption",
+			schema: TableSchema{
+				TableName:    "test-table",
+				PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+				Encryption: &EncryptionConfig{
+					Type:      EncryptionCustomerKey,
+					KMSKeyARN: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid schema with nil encryption (backward compatible)",
+			schema: TableSchema{
+				TableName:    "test-table",
+				PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+				Encryption:   nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid encryption config in schema fails",
+			schema: TableSchema{
+				TableName:    "test-table",
+				PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+				Encryption:   &EncryptionConfig{Type: EncryptionType("INVALID")},
+			},
+			wantErr:   true,
+			errSubstr: "encryption",
+		},
+		{
+			name: "customer key without ARN in schema fails",
+			schema: TableSchema{
+				TableName:    "test-table",
+				PartitionKey: KeyAttribute{Name: "id", Type: KeyTypeString},
+				Encryption:   &EncryptionConfig{Type: EncryptionCustomerKey},
+			},
+			wantErr:   true,
+			errSubstr: "encryption",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.schema.Validate()
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("TableSchema.Validate() = nil, want error containing %q", tt.errSubstr)
+				} else if !strings.Contains(err.Error(), tt.errSubstr) {
+					t.Errorf("TableSchema.Validate() error = %q, want error containing %q", err.Error(), tt.errSubstr)
+				}
+			} else if err != nil {
+				t.Errorf("TableSchema.Validate() = %v, want nil", err)
+			}
+		})
+	}
+}

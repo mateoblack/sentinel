@@ -39,6 +39,84 @@ const (
 	BillingModeProvisioned BillingMode = "PROVISIONED"
 )
 
+// EncryptionType represents the encryption type for DynamoDB tables.
+type EncryptionType string
+
+const (
+	// EncryptionDefault uses AWS owned encryption (default for DynamoDB).
+	EncryptionDefault EncryptionType = "DEFAULT"
+	// EncryptionKMS uses AWS managed KMS key for encryption.
+	EncryptionKMS EncryptionType = "KMS"
+	// EncryptionCustomerKey uses a customer-provided CMK ARN.
+	EncryptionCustomerKey EncryptionType = "CUSTOMER_KEY"
+)
+
+// IsValid returns true if the EncryptionType is a valid encryption type.
+func (et EncryptionType) IsValid() bool {
+	return et == EncryptionDefault || et == EncryptionKMS || et == EncryptionCustomerKey
+}
+
+// String returns the string representation of the EncryptionType.
+func (et EncryptionType) String() string {
+	return string(et)
+}
+
+// EncryptionConfig represents the encryption configuration for a DynamoDB table.
+type EncryptionConfig struct {
+	// Type is the encryption type (required).
+	Type EncryptionType
+	// KMSKeyARN is the ARN of the customer-provided CMK (only used when Type is EncryptionCustomerKey).
+	KMSKeyARN string
+}
+
+// Validate checks if the EncryptionConfig has valid values.
+func (ec EncryptionConfig) Validate() error {
+	if !ec.Type.IsValid() {
+		return fmt.Errorf("invalid encryption type %q: must be DEFAULT, KMS, or CUSTOMER_KEY", ec.Type)
+	}
+	switch ec.Type {
+	case EncryptionDefault, EncryptionKMS:
+		// AWS managed encryption - KMSKeyARN must be empty
+		if ec.KMSKeyARN != "" {
+			return fmt.Errorf("KMSKeyARN must be empty for encryption type %s", ec.Type)
+		}
+	case EncryptionCustomerKey:
+		// Customer-provided CMK - KMSKeyARN is required
+		if ec.KMSKeyARN == "" {
+			return errors.New("KMSKeyARN is required for encryption type CUSTOMER_KEY")
+		}
+		// Basic ARN format validation
+		if !isValidKMSKeyARN(ec.KMSKeyARN) {
+			return fmt.Errorf("invalid KMSKeyARN format: %s", ec.KMSKeyARN)
+		}
+	}
+	return nil
+}
+
+// isValidKMSKeyARN performs basic validation of a KMS key ARN format.
+func isValidKMSKeyARN(arn string) bool {
+	// KMS key ARNs follow the pattern: arn:aws:kms:<region>:<account>:key/<key-id>
+	// or arn:aws:kms:<region>:<account>:alias/<alias-name>
+	return len(arn) > 20 && (contains(arn, ":key/") || contains(arn, ":alias/"))
+}
+
+// contains checks if s contains substr (helper to avoid importing strings package).
+func contains(s, substr string) bool {
+	for i := 0; i+len(substr) <= len(s); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// DefaultEncryptionKMS returns an EncryptionConfig with AWS managed KMS encryption.
+// This is the recommended default for new tables - provides encryption at rest
+// without the complexity of managing custom CMKs.
+func DefaultEncryptionKMS() *EncryptionConfig {
+	return &EncryptionConfig{Type: EncryptionKMS}
+}
+
 // IsValid returns true if the BillingMode is a valid DynamoDB billing mode.
 func (bm BillingMode) IsValid() bool {
 	return bm == BillingModePayPerRequest || bm == BillingModeProvisioned
@@ -136,6 +214,9 @@ type TableSchema struct {
 	TTLAttribute string
 	// BillingMode is the table's billing mode.
 	BillingMode BillingMode
+	// Encryption is the encryption configuration for the table.
+	// If nil, DynamoDB default encryption (AWS owned) is used.
+	Encryption *EncryptionConfig
 }
 
 // Validate checks if the TableSchema has valid values.
@@ -158,6 +239,11 @@ func (ts TableSchema) Validate() error {
 	}
 	if ts.BillingMode != "" && !ts.BillingMode.IsValid() {
 		return fmt.Errorf("invalid billing mode %q", ts.BillingMode)
+	}
+	if ts.Encryption != nil {
+		if err := ts.Encryption.Validate(); err != nil {
+			return fmt.Errorf("encryption: %w", err)
+		}
 	}
 	return nil
 }
