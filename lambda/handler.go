@@ -67,6 +67,21 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 			fmt.Sprintf("Could not extract username: %v", err))
 	}
 
+	// Check rate limit EARLY - before policy evaluation to minimize work for rejected requests.
+	// Rate limit by caller's IAM user ARN (not IP) since IAM auth identifies the caller.
+	if h.Config.RateLimiter != nil {
+		allowed, retryAfter, rlErr := h.Config.RateLimiter.Allow(ctx, caller.UserARN)
+		if rlErr != nil {
+			// Fail open on rate limiter errors - log warning but allow the request.
+			// Availability is preferred over strict rate limiting.
+			log.Printf("WARNING: Rate limit check failed: %v", rlErr)
+		} else if !allowed {
+			log.Printf("RATE_LIMITED: user=%s retry_after=%v", username, retryAfter)
+			return errorResponse(http.StatusTooManyRequests, "RATE_LIMITED",
+				fmt.Sprintf("Rate limit exceeded. Retry after %v", retryAfter))
+		}
+	}
+
 	// Parse profile parameter (required)
 	profile := req.QueryStringParameters["profile"]
 	if profile == "" {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/mdm"
 	"github.com/byteness/aws-vault/v7/policy"
+	"github.com/byteness/aws-vault/v7/ratelimit"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/session"
 )
@@ -34,6 +36,10 @@ const (
 	EnvMDMAPISecretID = "SENTINEL_MDM_API_SECRET_ID" // Secrets Manager secret ID/ARN (preferred)
 	EnvMDMAPIToken    = "SENTINEL_MDM_API_TOKEN"     // Bearer token (deprecated - use Secrets Manager)
 	EnvRequireDevice  = "SENTINEL_REQUIRE_DEVICE"    // "true" to require device verification
+
+	// Rate limiting configuration environment variables.
+	EnvRateLimitRequests = "SENTINEL_RATE_LIMIT_REQUESTS" // Max requests per window (default: 100, 0 to disable)
+	EnvRateLimitWindow   = "SENTINEL_RATE_LIMIT_WINDOW"   // Window duration in seconds (default: 60)
 )
 
 // Default configuration values.
@@ -45,6 +51,12 @@ const (
 	// DefaultPolicyCacheTTL is the default TTL for policy caching.
 	// Short TTL ensures policy changes take effect quickly while reducing SSM API calls.
 	DefaultPolicyCacheTTL = 30 * time.Second
+
+	// DefaultRateLimitRequests is the default max requests per window.
+	DefaultRateLimitRequests = 100
+
+	// DefaultRateLimitWindow is the default rate limit window duration.
+	DefaultRateLimitWindow = 60 * time.Second
 )
 
 // TVMConfig contains configuration for the Lambda TVM handler.
@@ -102,6 +114,11 @@ type TVMConfig struct {
 	// SecretsLoader loads secrets from Secrets Manager. If nil, created automatically.
 	// Exposed for testing (inject MockSecretsLoader).
 	SecretsLoader SecretsLoader
+
+	// RateLimiter limits API request rates per caller.
+	// If nil, rate limiting is disabled.
+	// Rate limits by caller's IAM user ARN (not IP) since IAM auth identifies the caller.
+	RateLimiter ratelimit.RateLimiter
 }
 
 // LoadConfigFromEnv creates a TVMConfig from environment variables.
@@ -186,6 +203,40 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 	// Parse RequireDevicePosture
 	if requireDevice := os.Getenv(EnvRequireDevice); requireDevice == "true" {
 		cfg.RequireDevicePosture = true
+	}
+
+	// Configure rate limiting
+	rateLimitRequests := DefaultRateLimitRequests
+	if reqStr := os.Getenv(EnvRateLimitRequests); reqStr != "" {
+		req, err := strconv.Atoi(reqStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s: %w", EnvRateLimitRequests, err)
+		}
+		rateLimitRequests = req
+	}
+
+	rateLimitWindow := DefaultRateLimitWindow
+	if windowStr := os.Getenv(EnvRateLimitWindow); windowStr != "" {
+		windowSec, err := strconv.Atoi(windowStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s: %w", EnvRateLimitWindow, err)
+		}
+		rateLimitWindow = time.Duration(windowSec) * time.Second
+	}
+
+	// Create rate limiter if enabled (requests > 0)
+	if rateLimitRequests > 0 {
+		limiter, err := ratelimit.NewMemoryRateLimiter(ratelimit.Config{
+			RequestsPerWindow: rateLimitRequests,
+			Window:            rateLimitWindow,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create rate limiter: %w", err)
+		}
+		cfg.RateLimiter = limiter
+		log.Printf("INFO: Rate limiting enabled: %d requests per %v", rateLimitRequests, rateLimitWindow)
+	} else {
+		log.Printf("INFO: Rate limiting disabled")
 	}
 
 	return cfg, nil

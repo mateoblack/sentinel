@@ -15,6 +15,7 @@ import (
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
+	"github.com/byteness/aws-vault/v7/ratelimit"
 	"github.com/byteness/aws-vault/v7/request"
 	"github.com/byteness/aws-vault/v7/session"
 )
@@ -1417,5 +1418,230 @@ func TestHandleRequest_BreakGlassDurationCap(t *testing.T) {
 	// Allow some tolerance for test execution time
 	if capturedDuration > 310 {
 		t.Errorf("Duration = %d seconds, should be capped to ~300 (break-glass remaining)", capturedDuration)
+	}
+}
+
+// ============================================================================
+// Rate Limiting Tests
+// ============================================================================
+
+// mockRateLimiter implements ratelimit.RateLimiter for testing.
+type mockRateLimiter struct {
+	allowed    bool
+	retryAfter time.Duration
+	err        error
+	callCount  int
+}
+
+func (m *mockRateLimiter) Allow(ctx context.Context, key string) (bool, time.Duration, error) {
+	m.callCount++
+	return m.allowed, m.retryAfter, m.err
+}
+
+func TestHandleRequest_RateLimited(t *testing.T) {
+	// Verify rate limiter rejects requests when limit exceeded
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called when rate limited")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	limiter := &mockRateLimiter{
+		allowed:    false,
+		retryAfter: 30 * time.Second,
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		RateLimiter:     limiter,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should return 429 Too Many Requests
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusTooManyRequests)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "RATE_LIMITED" {
+		t.Errorf("Error code = %s, want RATE_LIMITED", errResp.Code)
+	}
+
+	// Verify rate limiter was called
+	if limiter.callCount != 1 {
+		t.Errorf("Rate limiter call count = %d, want 1", limiter.callCount)
+	}
+}
+
+func TestHandleRequest_RateLimiterAllows(t *testing.T) {
+	// Verify requests proceed when rate limiter allows
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	limiter := &mockRateLimiter{
+		allowed: true,
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		RateLimiter:     limiter,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should succeed
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	// Verify rate limiter was called
+	if limiter.callCount != 1 {
+		t.Errorf("Rate limiter call count = %d, want 1", limiter.callCount)
+	}
+}
+
+func TestHandleRequest_RateLimiterError_FailsOpen(t *testing.T) {
+	// Verify requests proceed when rate limiter errors (fail-open behavior)
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	limiter := &mockRateLimiter{
+		allowed: false, // Would deny if no error
+		err:     errors.New("rate limiter internal error"),
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		RateLimiter:     limiter,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should succeed (fail-open on rate limiter errors)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HandleRequest() statusCode = %d, want %d (should fail open)", resp.StatusCode, http.StatusOK)
+	}
+}
+
+func TestHandleRequest_NoRateLimiter(t *testing.T) {
+	// Verify requests proceed when no rate limiter is configured
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		RateLimiter:     nil, // No rate limiter
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should succeed
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+}
+
+func TestHandleRequest_RateLimitIntegration(t *testing.T) {
+	// Integration test with real MemoryRateLimiter
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	limiter, err := ratelimit.NewMemoryRateLimiter(ratelimit.Config{
+		RequestsPerWindow: 2,
+		Window:            time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("NewMemoryRateLimiter failed: %v", err)
+	}
+	defer limiter.Close()
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		RateLimiter:     limiter,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+
+	// First 2 requests should succeed
+	for i := 0; i < 2; i++ {
+		resp, err := handler.HandleRequest(ctx, req)
+		if err != nil {
+			t.Fatalf("Request %d: HandleRequest() error: %v", i+1, err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Request %d: statusCode = %d, want %d", i+1, resp.StatusCode, http.StatusOK)
+		}
+	}
+
+	// Third request should be rate limited
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("Request 3: HandleRequest() error: %v", err)
+	}
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("Request 3: statusCode = %d, want %d", resp.StatusCode, http.StatusTooManyRequests)
 	}
 }
