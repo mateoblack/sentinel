@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/byteness/aws-vault/v7/device"
 )
 
 // Request represents a credential request to be evaluated.
@@ -12,8 +14,9 @@ type Request struct {
 	User             string
 	Profile          string
 	Time             time.Time
-	Mode             CredentialMode // Credential delivery mode (server, cli, credential_process)
-	SessionTableName string         // DynamoDB table name for session tracking (empty = no session tracking)
+	Mode             CredentialMode        // Credential delivery mode (server, cli, credential_process)
+	SessionTableName string                // DynamoDB table name for session tracking (empty = no session tracking)
+	DevicePosture    *device.DevicePosture // Device posture from MDM (nil = no device info available)
 }
 
 // Decision represents the outcome of policy evaluation.
@@ -122,6 +125,14 @@ func matchesConditions(c *Condition, req *Request) bool {
 	}
 	if !matchesMode(c.Mode, req.Mode) {
 		return false
+	}
+	// Check device conditions if specified in the rule
+	// Device conditions affect RULE MATCHING - if posture fails, this rule doesn't match
+	// and evaluation continues to the next rule (first-match-wins behavior).
+	if c.Device != nil && !c.Device.IsEmpty() {
+		if !c.Device.Matches(req.DevicePosture) {
+			return false
+		}
 	}
 	return true
 }

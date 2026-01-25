@@ -22,6 +22,7 @@ require (
 	github.com/byteness/keyring v1.7.1
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/google/go-cmp v0.7.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mattn/go-tty v0.0.7
@@ -29,7 +30,6 @@ require (
 	golang.org/x/term v0.39.0
 	golang.org/x/time v0.14.0
 	gopkg.in/ini.v1 v1.67.1
-	github.com/denisbrodbeck/machineid v1.0.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 

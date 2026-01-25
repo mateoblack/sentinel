@@ -3,6 +3,8 @@ package policy
 import (
 	"testing"
 	"time"
+
+	"github.com/byteness/aws-vault/v7/device"
 )
 
 func TestEvaluate(t *testing.T) {
@@ -1892,6 +1894,452 @@ func TestEvaluate_SessionTablePropagation(t *testing.T) {
 		// session_table should still be set even for deny rules
 		if decision.SessionTableName != "deny-audit-table" {
 			t.Errorf("SessionTableName = %q, want 'deny-audit-table'", decision.SessionTableName)
+		}
+	})
+}
+
+// ============================================================================
+// Device Condition Tests
+// ============================================================================
+
+// boolPtr is a helper to create bool pointers for tests.
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func TestEvaluate_DeviceConditions(t *testing.T) {
+	t.Run("rule with device conditions - posture matches - allow", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "require-mdm",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device: &DeviceCondition{
+							RequireMDM: true,
+						},
+					},
+					Reason: "MDM required for production",
+				},
+			},
+		}
+
+		posture := &device.DevicePosture{
+			DeviceID:    "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+			Status:      device.StatusCompliant,
+			MDMEnrolled: boolPtr(true),
+			CollectedAt: time.Now(),
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: posture,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Effect != EffectAllow {
+			t.Errorf("Effect = %v, want EffectAllow (posture matches)", decision.Effect)
+		}
+		if decision.MatchedRule != "require-mdm" {
+			t.Errorf("MatchedRule = %q, want 'require-mdm'", decision.MatchedRule)
+		}
+	})
+
+	t.Run("rule with device conditions - posture fails - rule not matched, falls through", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "require-mdm",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device: &DeviceCondition{
+							RequireMDM: true,
+						},
+					},
+					Reason: "MDM required for production",
+				},
+			},
+		}
+
+		// Device is not MDM enrolled - posture fails
+		posture := &device.DevicePosture{
+			DeviceID:    "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+			Status:      device.StatusNonCompliant,
+			MDMEnrolled: boolPtr(false), // Not enrolled
+			CollectedAt: time.Now(),
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: posture,
+		}
+
+		decision := Evaluate(policy, req)
+
+		// Rule doesn't match, falls through to default deny
+		if decision.Effect != EffectDeny {
+			t.Errorf("Effect = %v, want EffectDeny (posture fails, rule not matched)", decision.Effect)
+		}
+		if decision.MatchedRule != "" {
+			t.Errorf("MatchedRule = %q, want empty (no matching rule)", decision.MatchedRule)
+		}
+	})
+
+	t.Run("rule with device conditions - nil posture - rule not matched", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "require-mdm",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device: &DeviceCondition{
+							RequireMDM: true,
+						},
+					},
+					Reason: "MDM required for production",
+				},
+			},
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: nil, // No device posture available
+		}
+
+		decision := Evaluate(policy, req)
+
+		// Nil posture fails non-empty device condition, rule doesn't match
+		if decision.Effect != EffectDeny {
+			t.Errorf("Effect = %v, want EffectDeny (nil posture fails non-empty condition)", decision.Effect)
+		}
+		if decision.MatchedRule != "" {
+			t.Errorf("MatchedRule = %q, want empty (no matching rule)", decision.MatchedRule)
+		}
+	})
+
+	t.Run("rule without device conditions - any posture - matches (backward compatible)", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "allow-production",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						// No Device condition
+					},
+					Reason: "production allowed",
+				},
+			},
+		}
+
+		// Even with non-compliant posture, rule matches (no device condition)
+		posture := &device.DevicePosture{
+			DeviceID:    "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+			Status:      device.StatusNonCompliant,
+			MDMEnrolled: boolPtr(false),
+			CollectedAt: time.Now(),
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: posture,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Effect != EffectAllow {
+			t.Errorf("Effect = %v, want EffectAllow (no device condition = backward compatible)", decision.Effect)
+		}
+		if decision.MatchedRule != "allow-production" {
+			t.Errorf("MatchedRule = %q, want 'allow-production'", decision.MatchedRule)
+		}
+	})
+
+	t.Run("multiple rules - first has device condition that fails, second allows", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "strict-production-mdm",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device: &DeviceCondition{
+							RequireMDM: true,
+						},
+					},
+					Reason: "MDM required for production",
+				},
+				{
+					Name:   "fallback-production",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						// No device condition - fallback rule
+					},
+					Reason: "production allowed without MDM (fallback)",
+				},
+			},
+		}
+
+		// Device not enrolled - first rule fails, falls through to second
+		posture := &device.DevicePosture{
+			DeviceID:    "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+			Status:      device.StatusNonCompliant,
+			MDMEnrolled: boolPtr(false),
+			CollectedAt: time.Now(),
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: posture,
+		}
+
+		decision := Evaluate(policy, req)
+
+		// First rule doesn't match (device fails), second rule matches
+		if decision.Effect != EffectAllow {
+			t.Errorf("Effect = %v, want EffectAllow (second rule should match)", decision.Effect)
+		}
+		if decision.MatchedRule != "fallback-production" {
+			t.Errorf("MatchedRule = %q, want 'fallback-production'", decision.MatchedRule)
+		}
+		if decision.RuleIndex != 1 {
+			t.Errorf("RuleIndex = %d, want 1 (second rule)", decision.RuleIndex)
+		}
+	})
+
+	t.Run("rule with empty device condition - matches any posture", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "allow-with-empty-device",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device:   &DeviceCondition{}, // Empty device condition
+					},
+					Reason: "empty device condition",
+				},
+			},
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: nil, // Even nil posture should match empty device condition
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Effect != EffectAllow {
+			t.Errorf("Effect = %v, want EffectAllow (empty device condition matches any)", decision.Effect)
+		}
+	})
+
+	t.Run("require_encryption - posture has encryption", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "require-encryption",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device: &DeviceCondition{
+							RequireEncryption: true,
+						},
+					},
+				},
+			},
+		}
+
+		posture := &device.DevicePosture{
+			DeviceID:      "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+			Status:        device.StatusCompliant,
+			DiskEncrypted: boolPtr(true),
+			CollectedAt:   time.Now(),
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: posture,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Effect != EffectAllow {
+			t.Errorf("Effect = %v, want EffectAllow", decision.Effect)
+		}
+	})
+
+	t.Run("require_encryption - posture lacks encryption", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "require-encryption",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device: &DeviceCondition{
+							RequireEncryption: true,
+						},
+					},
+				},
+			},
+		}
+
+		posture := &device.DevicePosture{
+			DeviceID:      "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+			Status:        device.StatusNonCompliant,
+			DiskEncrypted: boolPtr(false), // Not encrypted
+			CollectedAt:   time.Now(),
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: posture,
+		}
+
+		decision := Evaluate(policy, req)
+
+		// Rule doesn't match, default deny
+		if decision.Effect != EffectDeny {
+			t.Errorf("Effect = %v, want EffectDeny", decision.Effect)
+		}
+	})
+
+	t.Run("require_mdm_compliant - posture is compliant", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "require-mdm-compliant",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device: &DeviceCondition{
+							RequireMDMCompliant: true,
+						},
+					},
+				},
+			},
+		}
+
+		posture := &device.DevicePosture{
+			DeviceID:     "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+			Status:       device.StatusCompliant,
+			MDMEnrolled:  boolPtr(true),
+			MDMCompliant: boolPtr(true),
+			CollectedAt:  time.Now(),
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: posture,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Effect != EffectAllow {
+			t.Errorf("Effect = %v, want EffectAllow", decision.Effect)
+		}
+	})
+
+	t.Run("require_mdm_compliant - posture is not compliant", func(t *testing.T) {
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "require-mdm-compliant",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device: &DeviceCondition{
+							RequireMDMCompliant: true,
+						},
+					},
+				},
+			},
+		}
+
+		posture := &device.DevicePosture{
+			DeviceID:     "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+			Status:       device.StatusNonCompliant,
+			MDMEnrolled:  boolPtr(true),
+			MDMCompliant: boolPtr(false), // Not compliant
+			CollectedAt:  time.Now(),
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: posture,
+		}
+
+		decision := Evaluate(policy, req)
+
+		// Rule doesn't match, default deny
+		if decision.Effect != EffectDeny {
+			t.Errorf("Effect = %v, want EffectDeny", decision.Effect)
+		}
+	})
+
+	t.Run("device condition with nil posture - defaults to empty condition behavior", func(t *testing.T) {
+		// Nil Device pointer should not panic
+		policy := &Policy{
+			Version: "1",
+			Rules: []Rule{
+				{
+					Name:   "no-device-condition",
+					Effect: EffectAllow,
+					Conditions: Condition{
+						Profiles: []string{"production"},
+						Device:   nil, // Explicitly nil
+					},
+				},
+			},
+		}
+
+		req := &Request{
+			User:          "alice",
+			Profile:       "production",
+			Time:          time.Now(),
+			DevicePosture: nil,
+		}
+
+		decision := Evaluate(policy, req)
+
+		if decision.Effect != EffectAllow {
+			t.Errorf("Effect = %v, want EffectAllow (nil device condition)", decision.Effect)
 		}
 	})
 }
