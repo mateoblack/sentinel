@@ -128,28 +128,28 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 116-01: TBD
+- [x] 116-01: Enable KMS encryption for all Sentinel DynamoDB tables — completed 2026-01-25
 
 #### Phase 117: API Rate Limiting
 
 **Goal**: Implement rate limiting for Lambda TVM and credential server endpoints
 **Depends on**: Phase 116
 **Research**: Unlikely (existing breakglass rate limiting patterns)
-**Plans**: 2
+**Plans**: 2/2 complete
 
 Plans:
-- [ ] 117-01: Rate limiter types and Lambda TVM integration
-- [ ] 117-02: Credential server rate limiting and security tests
+- [x] 117-01: Rate limiter types and Lambda TVM integration — completed 2026-01-25
+- [x] 117-02: Credential server rate limiting and security tests — completed 2026-01-25
 
 #### Phase 118: Dependency Security Audit
 
 **Goal**: Audit all Go dependencies, update vulnerable packages, document security posture
 **Depends on**: Phase 117
 **Research**: Unlikely (go mod tools, govulncheck output)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 118-01: TBD
+- [ ] 118-01: Dependency audit and security documentation
 
 #### Phase 119: Error Sanitization
 
