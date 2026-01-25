@@ -116,14 +116,78 @@ See [ENFORCEMENT.md](ENFORCEMENT.md) for trust policy patterns.
 3. **SNS Notifications**: Configure immediate alerts for break-glass events
 4. **IAM Boundaries**: Use permission boundaries to limit Sentinel's AWS access
 
+### Security Scanning
+
+Sentinel integrates with multiple security scanning tools for comprehensive coverage:
+
+1. **CI/CD Integration**: All PRs are automatically scanned for vulnerabilities before merge
+2. **Weekly Scheduled Scans**: Automated weekly scans catch newly disclosed vulnerabilities
+3. **GitHub Security Tab**: View all security alerts at the [GitHub Security tab](https://github.com/byteness/aws-vault/security)
+4. **Local Scanning**: Run `govulncheck ./...` to scan locally before committing
+
 ## Supported Versions
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.10.x  | :white_check_mark: |
-| 1.9.x   | :x:                |
-| 1.8.x   | :x:                |
-| 1.7.x   | :x:                |
-| < 1.7   | :x:                |
+| 1.16.x  | :white_check_mark: |
+| 1.15.x  | :x:                |
+| 1.14.x  | :x:                |
+| < 1.14  | :x:                |
 
 Security updates are provided for the latest minor version only. Users are encouraged to upgrade to the latest version.
+
+## Dependency Security
+
+### Automated Scanning
+
+Sentinel uses automated security scanning in CI/CD to continuously monitor for vulnerabilities:
+
+| Tool | Trigger | Purpose |
+|------|---------|---------|
+| [govulncheck](.github/workflows/govulncheck.yml) | PR, Push, Weekly | Go vulnerability database scanning |
+| [gosec](.github/workflows/goseccheck.yml) | PR, Push, Weekly | Static application security testing (SAST) |
+| [Trivy](.github/workflows/trivy-scan.yml) | PR, Push, Weekly | Container and filesystem vulnerability scanning |
+
+All security scan results are uploaded to GitHub Security tab for centralized vulnerability tracking.
+
+### Last Audit
+
+**Date**: 2026-01-25
+**Result**: Clean - no vulnerabilities found
+**govulncheck**: All dependencies at patched versions
+
+### Dependency Sources
+
+All direct dependencies in `go.mod` are:
+
+- **Trusted Sources**: Official AWS SDK, established Go standard library extensions, and vetted community libraries
+- **Actively Maintained**: All dependencies have commits within the last 12 months
+- **Security Patched**: Free of known vulnerabilities as of the last audit date
+
+Key security-relevant dependencies:
+
+| Package | Current Version | Notes |
+|---------|-----------------|-------|
+| golang.org/x/crypto | v0.47.0 | Patched against SSH vulnerabilities (>= v0.45.0 required) |
+| github.com/aws/aws-sdk-go-v2 | v1.41.x | Official AWS SDK, regularly updated |
+| github.com/aws/aws-lambda-go | v1.47.0 | Official AWS Lambda runtime |
+
+### Local Vulnerability Scanning
+
+Developers can run local vulnerability scans:
+
+```bash
+# Install govulncheck
+go install golang.org/x/vuln/cmd/govulncheck@latest
+
+# Scan the codebase
+govulncheck ./...
+```
+
+### Reporting Dependency Vulnerabilities
+
+If you discover a vulnerability in a Sentinel dependency, please:
+
+1. Check if the dependency has a newer patched version available
+2. Report via [GitHub Security Advisory](https://github.com/byteness/aws-vault/security/advisories/new) if it affects Sentinel
+3. For upstream vulnerabilities, also report to the dependency maintainer
