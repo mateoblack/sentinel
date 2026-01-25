@@ -58,3 +58,35 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# MDM Configuration
+variable "mdm_provider" {
+  description = "MDM provider type: 'jamf', 'intune', 'kandji', or '' (disabled)"
+  type        = string
+  default     = ""
+}
+
+variable "mdm_base_url" {
+  description = "Base URL for the MDM API (e.g., https://company.jamfcloud.com)"
+  type        = string
+  default     = ""
+}
+
+variable "mdm_api_secret_arn" {
+  description = "ARN of the Secrets Manager secret containing the MDM API token. Recommended over mdm_api_token."
+  type        = string
+  default     = ""
+}
+
+variable "mdm_api_token" {
+  description = "DEPRECATED: Use mdm_api_secret_arn instead. MDM API bearer token passed via environment variable."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "require_device_posture" {
+  description = "When true, reject credentials if device posture verification fails"
+  type        = bool
+  default     = false
+}
