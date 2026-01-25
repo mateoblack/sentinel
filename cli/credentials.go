@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/device"
 	"github.com/byteness/aws-vault/v7/enforce"
 	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 	"github.com/byteness/aws-vault/v7/identity"
@@ -140,6 +141,12 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 			writers = append(writers, f)
 		}
 		input.Logger = logging.NewJSONLogger(io.MultiWriter(writers...))
+	}
+
+	// 0.5. Collect device ID for forensic logging (fail-open: continue without on error)
+	deviceID, deviceErr := device.GetDeviceID()
+	if deviceErr != nil {
+		log.Printf("Warning: failed to collect device ID for logging: %v", deviceErr)
 	}
 
 	// 1. Validate profile exists in AWS config
@@ -407,6 +414,12 @@ func CredentialsCommand(ctx context.Context, input CredentialsCommandInput, s *S
 		if driftResult != nil {
 			credFields.DriftStatus = string(driftResult.Status)
 			credFields.DriftMessage = driftResult.Message
+		}
+		// Include device ID in logs for forensic correlation
+		if deviceID != "" {
+			credFields.DevicePosture = &device.DevicePosture{
+				DeviceID: deviceID,
+			}
 		}
 		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, input.PolicyParameter, credFields)
 		input.Logger.LogDecision(entry)
