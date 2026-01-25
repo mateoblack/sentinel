@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/device"
 	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/iso8601"
@@ -181,6 +183,28 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		// TVM handles policy evaluation, so skip local profile validation
 		// The profile parameter specifies which profile to request from TVM
 
+		// Collect device ID for MDM-based posture verification
+		// TVM will use this to query MDM for actual device posture
+		deviceID, deviceErr := device.GetDeviceID()
+		if deviceErr != nil {
+			log.Printf("Warning: failed to collect device ID: %v (continuing without device posture)", deviceErr)
+		}
+
+		// Build TVM URL with device_id if available
+		tvmURL := input.RemoteServer
+		if deviceID != "" {
+			parsedURL, parseErr := url.Parse(input.RemoteServer)
+			if parseErr != nil {
+				log.Printf("Warning: failed to parse remote server URL: %v", parseErr)
+			} else {
+				queryParams := parsedURL.Query()
+				queryParams.Set("device_id", deviceID)
+				parsedURL.RawQuery = queryParams.Encode()
+				tvmURL = parsedURL.String()
+				log.Printf("Including device_id in remote TVM request")
+			}
+		}
+
 		// Default to shell if no command specified
 		command := input.Command
 		if command == "" {
@@ -192,7 +216,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 
 		// Set AWS_CONTAINER_CREDENTIALS_FULL_URI to point to TVM
 		// AWS SDK handles credential refresh automatically
-		cmdEnv.Set("AWS_CONTAINER_CREDENTIALS_FULL_URI", input.RemoteServer)
+		cmdEnv.Set("AWS_CONTAINER_CREDENTIALS_FULL_URI", tvmURL)
 
 		// Prevent AWS SDK from reading config files - use container credentials only
 		cmdEnv.Set("AWS_CONFIG_FILE", "/dev/null")

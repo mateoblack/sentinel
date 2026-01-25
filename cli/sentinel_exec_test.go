@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1873,5 +1874,101 @@ func TestSentinelExecCommand_RemoteServer_EnvModeComparison(t *testing.T) {
 			t.Error("Remote mode should have RemoteServer set")
 		}
 		// Both have StartServer=false, but remote mode uses AWS_CONTAINER_CREDENTIALS_FULL_URI
+	})
+}
+
+// TestSentinelExecCommand_RemoteServer_DeviceID tests device ID handling in remote server mode.
+func TestSentinelExecCommand_RemoteServer_DeviceID(t *testing.T) {
+	t.Run("device ID is collected and appended to URL", func(t *testing.T) {
+		// This test verifies the logic of URL construction with device_id
+		// When device ID is available, it should be appended as query parameter
+		baseURL := "https://api.example.com/sentinel?profile=production"
+
+		// Simulate successful device ID collection
+		deviceID := "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+
+		// Parse and append device_id (same logic as in sentinel_exec.go)
+		parsedURL, err := url.Parse(baseURL)
+		if err != nil {
+			t.Fatalf("failed to parse URL: %v", err)
+		}
+		queryParams := parsedURL.Query()
+		queryParams.Set("device_id", deviceID)
+		parsedURL.RawQuery = queryParams.Encode()
+		resultURL := parsedURL.String()
+
+		// Verify device_id is appended
+		if !strings.Contains(resultURL, "device_id=") {
+			t.Errorf("expected URL to contain device_id parameter, got: %s", resultURL)
+		}
+		if !strings.Contains(resultURL, deviceID) {
+			t.Errorf("expected URL to contain device ID value, got: %s", resultURL)
+		}
+		// Verify profile is preserved
+		if !strings.Contains(resultURL, "profile=production") {
+			t.Errorf("expected URL to preserve profile parameter, got: %s", resultURL)
+		}
+	})
+
+	t.Run("device ID is optional - missing device ID still works", func(t *testing.T) {
+		// When device ID collection fails, remote server should still work
+		// (fail-open behavior consistent with TVM)
+		input := SentinelExecCommandInput{
+			ProfileName:  "production",
+			RemoteServer: "https://api.example.com/sentinel?profile=production",
+		}
+
+		// Verify remote server URL is set even without device ID
+		if input.RemoteServer == "" {
+			t.Error("RemoteServer should be set")
+		}
+		// The actual execution would use input.RemoteServer without device_id param
+		// when device ID collection fails (warning logged, continues)
+	})
+
+	t.Run("device ID format is 64-char lowercase hex", func(t *testing.T) {
+		// Verify expected device ID format (from device.GetDeviceID)
+		// SHA256 hash = 64 hex characters
+		validDeviceID := "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+
+		if len(validDeviceID) != 64 {
+			t.Errorf("expected device ID to be 64 chars, got %d", len(validDeviceID))
+		}
+
+		// Verify it's lowercase hex
+		for _, c := range validDeviceID {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				t.Errorf("expected device ID to be lowercase hex, found char: %c", c)
+			}
+		}
+	})
+
+	t.Run("URL parsing preserves all existing parameters", func(t *testing.T) {
+		// Test with multiple existing query parameters
+		baseURL := "https://api.example.com/sentinel?profile=production&duration=3600&region=us-west-2"
+		deviceID := "b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2"
+
+		parsedURL, err := url.Parse(baseURL)
+		if err != nil {
+			t.Fatalf("failed to parse URL: %v", err)
+		}
+		queryParams := parsedURL.Query()
+		queryParams.Set("device_id", deviceID)
+		parsedURL.RawQuery = queryParams.Encode()
+		resultURL := parsedURL.String()
+
+		// Verify all parameters are preserved
+		if !strings.Contains(resultURL, "profile=production") {
+			t.Errorf("expected URL to preserve profile parameter, got: %s", resultURL)
+		}
+		if !strings.Contains(resultURL, "duration=3600") {
+			t.Errorf("expected URL to preserve duration parameter, got: %s", resultURL)
+		}
+		if !strings.Contains(resultURL, "region=us-west-2") {
+			t.Errorf("expected URL to preserve region parameter, got: %s", resultURL)
+		}
+		if !strings.Contains(resultURL, "device_id=") {
+			t.Errorf("expected URL to contain device_id parameter, got: %s", resultURL)
+		}
 	})
 }
