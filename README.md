@@ -1,6 +1,6 @@
 # Sentinel
 
-[![Build Status](https://github.com/mateoblack/sentinel/actions/workflows/go.yml/badge.svg)](https://github.com/mateoblack/sentinel/actions/workflows/go.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/go.yml?branch=main)](https://github.com/mateoblack/sentinel/actions/workflows/go.yml)
 
 > **Alpha Release** - APIs and features may change. Feedback welcome via issues.
 
