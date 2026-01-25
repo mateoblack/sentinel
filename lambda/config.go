@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -18,6 +19,7 @@ import (
 // Environment variable names for TVM configuration.
 const (
 	EnvPolicyParameter = "SENTINEL_POLICY_PARAMETER"
+	EnvPolicyRoot      = "SENTINEL_POLICY_ROOT"
 	EnvApprovalTable   = "SENTINEL_APPROVAL_TABLE"
 	EnvBreakGlassTable = "SENTINEL_BREAKGLASS_TABLE"
 	EnvSessionTable    = "SENTINEL_SESSION_TABLE"
@@ -40,6 +42,11 @@ const (
 type TVMConfig struct {
 	// PolicyParameter is the SSM parameter path for policy (required).
 	PolicyParameter string
+
+	// PolicyRoot is the SSM path root for policy discovery (e.g., "/sentinel/policies").
+	// Used by profile discovery endpoint.
+	// If empty, defaults to extracting from PolicyParameter.
+	PolicyRoot string
 
 	// PolicyLoader is the cached policy loader.
 	PolicyLoader policy.PolicyLoader
@@ -80,6 +87,7 @@ type TVMConfig struct {
 func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 	cfg := &TVMConfig{
 		PolicyParameter:  os.Getenv(EnvPolicyParameter),
+		PolicyRoot:       os.Getenv(EnvPolicyRoot),
 		SessionTableName: os.Getenv(EnvSessionTable),
 		Region:           os.Getenv(EnvRegion),
 		DefaultDuration:  DefaultTVMDuration,
@@ -112,5 +120,21 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 	// Create JSON Lines logger (writes to stdout, captured by CloudWatch)
 	cfg.Logger = logging.NewJSONLogger(os.Stdout)
 
+	// Derive policy root from policy parameter if not explicitly set
+	// e.g., "/sentinel/policies/production" -> "/sentinel/policies"
+	if cfg.PolicyRoot == "" && cfg.PolicyParameter != "" {
+		cfg.PolicyRoot = extractPolicyRoot(cfg.PolicyParameter)
+	}
+
 	return cfg, nil
+}
+
+// extractPolicyRoot extracts the policy root directory from a full parameter path.
+// For example, "/sentinel/policies/production" -> "/sentinel/policies".
+func extractPolicyRoot(parameterPath string) string {
+	lastSlash := strings.LastIndex(parameterPath, "/")
+	if lastSlash <= 0 {
+		return "/sentinel/policies" // Default fallback
+	}
+	return parameterPath[:lastSlash]
 }
