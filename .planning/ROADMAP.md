@@ -84,7 +84,9 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 98-01: TBD
+- [x] 98-01: Credential vending function (VendCredentials, SourceIdentity stamping) — Wave 1 — completed 2026-01-25
+- [ ] 98-02: TBD
+- [ ] 98-03: TBD
 
 ### Phase 99: Policy & Session Integration
 
