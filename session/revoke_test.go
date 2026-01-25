@@ -81,6 +81,14 @@ func (m *mockStore) Touch(ctx context.Context, id string) error {
 	return nil
 }
 
+func (m *mockStore) ListByTimeRange(ctx context.Context, start, end time.Time, limit int) ([]*ServerSession, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetBySourceIdentity(ctx context.Context, sourceIdentity string) (*ServerSession, error) {
+	return nil, nil
+}
+
 // createActiveSession creates an active session for testing.
 func createActiveSession(id string) *ServerSession {
 	now := time.Now().UTC()

@@ -369,7 +369,7 @@ func TestSecurityRegression_SessionTrackingEnforcement(t *testing.T) {
 			},
 		}
 
-		sessionStore := &mockSessionStore{}
+		sessionStore := &handlerMockSessionStore{}
 
 		cfg := &TVMConfig{
 			PolicyParameter: "/test/policy",
@@ -414,7 +414,7 @@ func TestSecurityRegression_SessionTrackingEnforcement(t *testing.T) {
 		cfg := &TVMConfig{
 			PolicyParameter: "/test/policy",
 			PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
-			SessionStore:    &mockSessionStore{revoked: true}, // Session revoked
+			SessionStore:    &handlerMockSessionStore{revoked: true}, // Session revoked
 			STSClient:       mockClient,
 			Region:          "us-east-1",
 			DefaultDuration: 15 * time.Minute,
@@ -454,7 +454,7 @@ func TestSecurityRegression_SessionTrackingEnforcement(t *testing.T) {
 			},
 		}
 
-		sessionStore := &mockSessionStore{}
+		sessionStore := &handlerMockSessionStore{}
 
 		cfg := &TVMConfig{
 			PolicyParameter: "/test/policy",

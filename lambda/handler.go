@@ -222,7 +222,7 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	// Log decision with credential context
 	if h.Config.Logger != nil {
 		credFields := &logging.CredentialIssuanceFields{
-			RequestID:       vendOutput.SourceIdentity.RequestID(),
+			RequestID:       vendOutput.SourceIdentity.RequestID,
 			SourceIdentity:  vendOutput.SourceIdentity.Format(),
 			RoleARN:         roleARN,
 			SessionDuration: duration,
@@ -244,7 +244,7 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 
 	// Log successful credential issuance (for audit/debugging)
 	log.Printf("INFO: Credentials issued user=%s profile=%s account=%s source_identity_request_id=%s",
-		username, profile, caller.AccountID, vendOutput.SourceIdentity.RequestID())
+		username, profile, caller.AccountID, vendOutput.SourceIdentity.RequestID)
 
 	return successResponse(vendOutput.Credentials)
 }
