@@ -141,7 +141,7 @@ Plans:
 
 Plans:
 - [x] 101-01: Remote TVM flag (--remote-server, RemoteCredentialClient) — Wave 1 — completed 2026-01-25
-- [ ] 101-02: SCP patterns and documentation — Wave 2
+- [x] 101-02: SCP patterns and documentation — Wave 2 — completed 2026-01-25
 
 ### Phase 102: Infrastructure as Code
 
