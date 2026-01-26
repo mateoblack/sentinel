@@ -3,15 +3,18 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/byteness/aws-vault/v7/bootstrap"
@@ -43,12 +46,15 @@ type PolicyPushCommandInput struct {
 	AWSProfile      string // --aws-profile flag for credentials
 	NoBackup        bool   // --no-backup flag, skip fetching existing policy as backup
 	Force           bool   // --force flag, skip confirmation prompt
+	Sign            bool   // --sign flag, sign policy with KMS before pushing
+	KeyID           string // --key-id flag, KMS key ARN or alias for signing
 
 	// For testing
 	Stdin     io.Reader     // For testing confirmation input
 	Stdout    *os.File      // Not used currently, but for consistency
 	Stderr    *os.File      // For output messages
 	SSMClient policy.SSMAPI // For testing, nil = create from AWS config
+	KMSClient policy.KMSAPI // For testing KMS operations, nil = create from AWS config
 }
 
 // PolicyDiffCommandInput contains the input for policy diff.
@@ -152,6 +158,12 @@ func ConfigurePolicyCommand(app *kingpin.Application, s *Sentinel) {
 	pushCmd.Flag("force", "Skip confirmation prompt").
 		Short('f').
 		BoolVar(&pushInput.Force)
+
+	pushCmd.Flag("sign", "Sign policy with KMS before pushing").
+		BoolVar(&pushInput.Sign)
+
+	pushCmd.Flag("key-id", "KMS key ARN or alias for signing (required with --sign)").
+		StringVar(&pushInput.KeyID)
 
 	pushCmd.Action(func(c *kingpin.ParseContext) error {
 		exitCode, err := PolicyPushCommand(context.Background(), pushInput)
@@ -313,8 +325,8 @@ func PolicyPullCommand(ctx context.Context, input PolicyPullCommandInput) (int, 
 }
 
 // PolicyPushCommand executes the policy push command logic.
-// It validates the policy, optionally fetches backup, prompts for confirmation,
-// and uploads to SSM Parameter Store.
+// It validates the policy, optionally signs it with KMS, fetches backup,
+// prompts for confirmation, and uploads to SSM Parameter Store.
 // Returns exit code (0=success, 1=error) and any fatal error.
 func PolicyPushCommand(ctx context.Context, input PolicyPushCommandInput) (int, error) {
 	// Set up I/O
@@ -325,6 +337,13 @@ func PolicyPushCommand(ctx context.Context, input PolicyPushCommandInput) (int, 
 	stdin := input.Stdin
 	if stdin == nil {
 		stdin = os.Stdin
+	}
+
+	// Validate --sign requires --key-id
+	if input.Sign && input.KeyID == "" {
+		fmt.Fprintf(stderr, "Error: --key-id is required when --sign is specified\n")
+		fmt.Fprintf(stderr, "\nSuggestion: provide a KMS key ARN or alias with --key-id\n")
+		return 1, nil
 	}
 
 	// Read policy file from disk
@@ -433,6 +452,72 @@ func PolicyPushCommand(ctx context.Context, input PolicyPushCommandInput) (int, 
 	}
 
 	fmt.Fprintf(stderr, "Policy successfully pushed to %s\n", parameterPath)
+
+	// Sign and store signature if --sign is specified
+	if input.Sign {
+		// Create KMS client
+		var kmsClient policy.KMSAPI
+		if input.KMSClient != nil {
+			kmsClient = input.KMSClient
+		} else {
+			var opts []func(*awsconfig.LoadOptions) error
+			if input.AWSProfile != "" {
+				opts = append(opts, awsconfig.WithSharedConfigProfile(input.AWSProfile))
+			}
+			if input.Region != "" {
+				opts = append(opts, awsconfig.WithRegion(input.Region))
+			}
+			awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: failed to load AWS config for KMS: %v\n", err)
+				return 1, nil
+			}
+			kmsClient = kms.NewFromConfig(awsCfg)
+		}
+
+		// Sign the policy
+		signer := policy.NewPolicySignerWithClient(kmsClient, input.KeyID)
+		signature, err := signer.Sign(ctx, policyData)
+		if err != nil {
+			fmt.Fprintf(stderr, "Error: failed to sign policy: %v\n", err)
+			fmt.Fprintf(stderr, "\nSuggestion: verify KMS key ID and permissions\n")
+			return 1, nil
+		}
+
+		// Create signature envelope
+		sigEnvelope := policy.SignatureEnvelope{
+			Signature: signature,
+			Metadata: policy.SignatureMetadata{
+				KeyID:      input.KeyID,
+				Algorithm:  string(policy.DefaultSigningAlgorithm),
+				SignedAt:   time.Now().UTC(),
+				PolicyHash: policy.ComputePolicyHash(policyData),
+			},
+		}
+
+		sigJSON, err := json.Marshal(sigEnvelope)
+		if err != nil {
+			fmt.Fprintf(stderr, "Error: failed to marshal signature: %v\n", err)
+			return 1, nil
+		}
+
+		// Store signature in separate SSM parameter
+		sigParamPath := policy.SignatureParameterName(parameterPath)
+		_, err = ssmClient.PutParameter(ctx, &ssm.PutParameterInput{
+			Name:      aws.String(sigParamPath),
+			Value:     aws.String(string(sigJSON)),
+			Type:      types.ParameterTypeString,
+			Overwrite: aws.Bool(true),
+		})
+		if err != nil {
+			fmt.Fprintf(stderr, "Error: failed to write signature to SSM: %v\n", err)
+			fmt.Fprintf(stderr, "\nSuggestion: verify ssm:PutParameter permission for %s\n", sigParamPath)
+			return 1, nil
+		}
+
+		fmt.Fprintf(stderr, "Signature pushed to %s\n", sigParamPath)
+	}
+
 	return 0, nil
 }
 

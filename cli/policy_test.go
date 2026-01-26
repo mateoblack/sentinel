@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/byteness/aws-vault/v7/bootstrap"
@@ -1873,5 +1874,317 @@ rules:
 	// Should mention invalid effect
 	if !strings.Contains(errOutput, "effect") {
 		t.Errorf("stderr should mention 'effect', got: %s", errOutput)
+	}
+}
+
+// --- PolicyPushCommand Signing Tests ---
+
+// MockKMSClientForPush implements policy.KMSAPI for push command testing.
+type MockKMSClientForPush struct {
+	SignFunc   func(ctx context.Context, params *kms.SignInput, optFns ...func(*kms.Options)) (*kms.SignOutput, error)
+	VerifyFunc func(ctx context.Context, params *kms.VerifyInput, optFns ...func(*kms.Options)) (*kms.VerifyOutput, error)
+	SignCalls  []*kms.SignInput
+}
+
+// Sign implements policy.KMSAPI.
+func (m *MockKMSClientForPush) Sign(ctx context.Context, params *kms.SignInput, optFns ...func(*kms.Options)) (*kms.SignOutput, error) {
+	m.SignCalls = append(m.SignCalls, params)
+	if m.SignFunc != nil {
+		return m.SignFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("Sign not implemented")
+}
+
+// Verify implements policy.KMSAPI.
+func (m *MockKMSClientForPush) Verify(ctx context.Context, params *kms.VerifyInput, optFns ...func(*kms.Options)) (*kms.VerifyOutput, error) {
+	if m.VerifyFunc != nil {
+		return m.VerifyFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("Verify not implemented")
+}
+
+func TestPolicyPushCommand_WithSignFlag(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockSSM := &MockSSMClient{}
+
+	mockKMS := &MockKMSClientForPush{
+		SignFunc: func(ctx context.Context, params *kms.SignInput, optFns ...func(*kms.Options)) (*kms.SignOutput, error) {
+			return &kms.SignOutput{
+				Signature: []byte("test-signature-bytes"),
+			}, nil
+		},
+	}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		NoBackup:  true,
+		Sign:      true,
+		KeyID:     "alias/test-signing-key",
+		Stderr:    stderr,
+		SSMClient: mockSSM,
+		KMSClient: mockKMS,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		stderr.Seek(0, 0)
+		var buf bytes.Buffer
+		buf.ReadFrom(stderr)
+		t.Errorf("exitCode = %d, want 0. stderr: %s", exitCode, buf.String())
+	}
+
+	// Verify policy was pushed (PutParameter call 1)
+	if len(mockSSM.PutCalls) != 2 {
+		t.Fatalf("expected 2 PutParameter calls (policy + signature), got %d", len(mockSSM.PutCalls))
+	}
+
+	// Verify first call is the policy
+	policyCall := mockSSM.PutCalls[0]
+	if !strings.Contains(aws.ToString(policyCall.Name), "/sentinel/policies/dev") {
+		t.Errorf("first PutParameter should be policy path, got %s", aws.ToString(policyCall.Name))
+	}
+
+	// Verify second call is the signature
+	sigCall := mockSSM.PutCalls[1]
+	if !strings.Contains(aws.ToString(sigCall.Name), "/sentinel/signatures/dev") {
+		t.Errorf("second PutParameter should be signature path, got %s", aws.ToString(sigCall.Name))
+	}
+
+	// Verify KMS Sign was called
+	if len(mockKMS.SignCalls) != 1 {
+		t.Errorf("expected 1 KMS Sign call, got %d", len(mockKMS.SignCalls))
+	}
+	if aws.ToString(mockKMS.SignCalls[0].KeyId) != "alias/test-signing-key" {
+		t.Errorf("KMS Sign keyId = %q, want %q", aws.ToString(mockKMS.SignCalls[0].KeyId), "alias/test-signing-key")
+	}
+
+	// Verify stderr messages
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "Policy successfully pushed") {
+		t.Errorf("stderr should contain 'Policy successfully pushed', got: %s", errOutput)
+	}
+	if !strings.Contains(errOutput, "Signature pushed") {
+		t.Errorf("stderr should contain 'Signature pushed', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_SignWithoutKeyID(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockSSM := &MockSSMClient{}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		NoBackup:  true,
+		Sign:      true,
+		KeyID:     "", // Missing key ID
+		Stderr:    stderr,
+		SSMClient: mockSSM,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for missing key ID", exitCode)
+	}
+
+	// Verify no SSM calls were made
+	if len(mockSSM.PutCalls) != 0 {
+		t.Errorf("expected 0 PutParameter calls, got %d", len(mockSSM.PutCalls))
+	}
+
+	// Verify stderr contains error
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "--key-id is required") {
+		t.Errorf("stderr should contain '--key-id is required', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_KMSSignError(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockSSM := &MockSSMClient{}
+
+	mockKMS := &MockKMSClientForPush{
+		SignFunc: func(ctx context.Context, params *kms.SignInput, optFns ...func(*kms.Options)) (*kms.SignOutput, error) {
+			return nil, errors.New("KMS access denied")
+		},
+	}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		NoBackup:  true,
+		Sign:      true,
+		KeyID:     "alias/test-key",
+		Stderr:    stderr,
+		SSMClient: mockSSM,
+		KMSClient: mockKMS,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for KMS error", exitCode)
+	}
+
+	// Verify policy WAS pushed (before signing failed)
+	if len(mockSSM.PutCalls) != 1 {
+		t.Errorf("expected 1 PutParameter call (policy only), got %d", len(mockSSM.PutCalls))
+	}
+
+	// Verify stderr contains error
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "failed to sign policy") {
+		t.Errorf("stderr should contain 'failed to sign policy', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_SignatureSSMError(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	callCount := 0
+	mockSSM := &MockSSMClient{
+		PutParameterFunc: func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+			callCount++
+			if callCount == 2 {
+				// Fail on signature write
+				return nil, errors.New("access denied for signature")
+			}
+			return &ssm.PutParameterOutput{Version: 1}, nil
+		},
+	}
+
+	mockKMS := &MockKMSClientForPush{
+		SignFunc: func(ctx context.Context, params *kms.SignInput, optFns ...func(*kms.Options)) (*kms.SignOutput, error) {
+			return &kms.SignOutput{
+				Signature: []byte("test-signature"),
+			}, nil
+		},
+	}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		NoBackup:  true,
+		Sign:      true,
+		KeyID:     "alias/test-key",
+		Stderr:    stderr,
+		SSMClient: mockSSM,
+		KMSClient: mockKMS,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for signature SSM error", exitCode)
+	}
+
+	// Verify stderr contains error
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "failed to write signature to SSM") {
+		t.Errorf("stderr should contain 'failed to write signature to SSM', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_WithoutSignFlag(t *testing.T) {
+	// Verify that without --sign, no signature is stored
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockSSM := &MockSSMClient{}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		NoBackup:  true,
+		Sign:      false, // No signing
+		Stderr:    stderr,
+		SSMClient: mockSSM,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify only policy was pushed (no signature)
+	if len(mockSSM.PutCalls) != 1 {
+		t.Errorf("expected 1 PutParameter call (policy only), got %d", len(mockSSM.PutCalls))
+	}
+
+	// Verify it's the policy path
+	if !strings.Contains(aws.ToString(mockSSM.PutCalls[0].Name), "/sentinel/policies/") {
+		t.Errorf("PutParameter should be for policy path, got %s", aws.ToString(mockSSM.PutCalls[0].Name))
 	}
 }
