@@ -45,13 +45,21 @@ Policy signing prevents attackers from tampering with Sentinel policies stored i
 
 ### Fail-Closed Security
 
-When signature verification is enabled:
+**Enforcement is enabled by default.** When a signing key is configured:
 
 - **Invalid signature:** Credentials denied, error logged
-- **Missing signature:** Credentials denied (when enforcement enabled)
+- **Missing signature:** Credentials denied (enforcement is enabled by default)
 - **KMS verification error:** Credentials denied, error logged
 
 No credentials are ever issued for policies that fail signature verification.
+
+To allow unsigned policies during migration (not recommended for production):
+```go
+loader := policy.NewVerifyingLoader(policyLoader, sigLoader, signer,
+    policy.WithEnforcement(false),  // Warn only, do not reject unsigned
+)
+```
+Or set environment variable: `SENTINEL_ENFORCE_POLICY_SIGNING=false`
 
 ## Prerequisites
 
@@ -395,11 +403,15 @@ The `VerifyingLoader`:
 | `SENTINEL_POLICY_SIGNING_KEY` | `SENTINEL_ENFORCE_POLICY_SIGNING` | Behavior |
 |-------------------------------|-----------------------------------|----------|
 | Not set | Not set | Signature verification disabled |
-| Set | Not set (defaults to `true`) | Unsigned policies rejected |
+| Set | Not set | Unsigned policies rejected (enforcement enabled by default) |
 | Set | `"true"` | Unsigned policies rejected |
-| Set | `"false"` | Unsigned policies allowed with warning log |
+| Set | `"false"` | Unsigned policies allowed with warning log (migration only) |
 
-**Recommended:** Set both `SENTINEL_POLICY_SIGNING_KEY` and `SENTINEL_ENFORCE_POLICY_SIGNING=true` for fail-closed security.
+**Default behavior:** When a signing key is configured, enforcement is enabled automatically. Unsigned policies are rejected.
+
+**To disable enforcement** (migration only, not recommended for production):
+- Set `SENTINEL_ENFORCE_POLICY_SIGNING=false`
+- Or use `policy.WithEnforcement(false)` in Go code
 
 ## CI/CD Integration
 
