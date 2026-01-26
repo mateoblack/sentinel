@@ -58,6 +58,7 @@ Every credential issued through Sentinel is stamped with a `SourceIdentity` that
 | **SourceIdentity stamping** | Every session traceable to specific request |
 | **Time-based access** | Restrict access by day of week and hour (e.g., business hours only) |
 | **SSO integration** | Full AWS IAM Identity Center support with auto-login |
+| **Lambda TVM** | Server-side credential vending via Lambda (trust boundary enforcement) |
 
 ### Access Control
 
@@ -66,6 +67,7 @@ Every credential issued through Sentinel is stamped with a `SourceIdentity` that
 | **Approval workflows** | Require human approval for sensitive access |
 | **Break-glass access** | Emergency bypass with mandatory justification and rate limiting |
 | **Device posture verification** | Verify device security state (MDM enrollment, disk encryption) before issuing credentials |
+| **Policy signing** | KMS-based cryptographic policy integrity verification |
 | **Trust policy enforcement** | AWS rejects bypass attempts via IAM conditions |
 | **SCP enforcement** | Dangerous actions require Sentinel org-wide |
 
@@ -77,6 +79,7 @@ Every credential issued through Sentinel is stamped with a `SourceIdentity` that
 | **Instant revocation** | Change policy or revoke session, next request denied |
 | **Session tracking** | Track active sessions in DynamoDB |
 | **require_server effect** | Force server mode for sensitive profiles |
+| **Lambda TVM deployment** | Server-side credential vending with policy evaluation at the trust boundary |
 
 ```bash
 # Long-running process with revocation capability
@@ -99,8 +102,10 @@ sentinel server-revoke SESSION_ID --reason "Suspicious activity" \
 | **Permission validation** | `sentinel permissions check` validates your credentials |
 | **Config validation** | `sentinel config validate` checks policy YAML before deploy |
 | **Quick start templates** | `sentinel config generate` creates starter policies |
+| **Policy management** | `sentinel policy pull/push/diff/validate/sign/verify` for policy lifecycle |
 | **Audit verify** | `sentinel audit verify` checks CloudTrail for non-Sentinel sessions |
 | **Identity debugging** | `sentinel whoami` shows your AWS identity and policy username |
+| **Lambda TVM** | Terraform module and CDK example for Lambda TVM deployment |
 
 ## Example Policy
 
