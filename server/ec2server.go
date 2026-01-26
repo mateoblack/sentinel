@@ -64,7 +64,8 @@ func withSecurityChecks(next *http.ServeMux) http.HandlerFunc {
 		// See https://developer.apple.com/library/content/qa/qa1357/_index.html
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.Printf("ERROR: Invalid remote address: %v", err)
+			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
 		if !net.ParseIP(ip).IsLoopback() {
@@ -88,7 +89,8 @@ func credsHandler(credsProvider aws.CredentialsProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		creds, err := credsProvider.Retrieve(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusGatewayTimeout)
+			log.Printf("ERROR: Failed to retrieve credentials: %v", err)
+			http.Error(w, "Failed to retrieve credentials", http.StatusGatewayTimeout)
 			return
 		}
 
@@ -107,7 +109,8 @@ func credsHandler(credsProvider aws.CredentialsProvider) http.HandlerFunc {
 			"Expiration":      iso8601.Format(creds.Expires),
 		})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Printf("ERROR: Failed to encode credentials response: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 	}

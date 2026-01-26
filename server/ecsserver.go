@@ -49,7 +49,8 @@ func writeCredsToResponse(creds aws.Credentials, w http.ResponseWriter) {
 		"Expiration":      iso8601.Format(creds.Expires),
 	})
 	if err != nil {
-		writeErrorMessage(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to encode credentials response: %v", err)
+		writeErrorMessage(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
 }
@@ -117,7 +118,8 @@ func (e *EcsServer) Serve() error {
 func (e *EcsServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 	creds, err := e.baseCredsProvider.Retrieve(r.Context())
 	if err != nil {
-		writeErrorMessage(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to retrieve base credentials: %v", err)
+		writeErrorMessage(w, "Failed to retrieve credentials", http.StatusInternalServerError)
 		return
 	}
 	writeCredsToResponse(creds, w)
@@ -147,7 +149,8 @@ func (e *EcsServer) AssumeRoleArnRoute(w http.ResponseWriter, r *http.Request) {
 	roleProvider := e.getRoleProvider(roleArn)
 	creds, err := roleProvider.Retrieve(r.Context())
 	if err != nil {
-		writeErrorMessage(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to assume role %s: %v", roleArn, err)
+		writeErrorMessage(w, "Failed to retrieve credentials", http.StatusInternalServerError)
 		return
 	}
 	writeCredsToResponse(creds, w)
