@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 126 of 135 (Policy Integrity)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-26 — Milestone v1.18 created
+Plan: 1 of 1 in current phase
+Status: In progress
+Last activity: 2026-01-26 — Completed 126-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0%
+Progress: █░░░░░░░░░ 10%
 
 ## Milestone Summary
 
@@ -75,9 +75,9 @@ Progress: ░░░░░░░░░░ 0%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 228
+- Total plans completed: 229
 - Average duration: ~3.5 min
-- Total execution time: ~866 min
+- Total execution time: ~871 min
 
 **By Milestone:**
 
@@ -198,6 +198,12 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - No AWS credentials required - pure local YAML validation
 - Success message to stderr (unless --quiet) to keep stdout clean
 
+**v1.18 Critical Security Hardening decisions (Phase 126):**
+- Use MessageType RAW for KMS signing (KMS handles hashing internally)
+- Return (false, nil) for invalid signatures - not an error, just validation result
+- KMSInvalidSignatureException handled gracefully as (false, nil)
+- SHA-256 hex-encoded hash in metadata for quick tamper detection
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -221,9 +227,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Milestone v1.18 initialization
+Stopped at: Completed 126-01-PLAN.md (KMS policy signing infrastructure)
 Resume file: None
-Next: Plan Phase 126 (Policy Integrity)
+Next: Plan or execute remaining plans in Phase 126
 
 ## Roadmap Evolution
 
