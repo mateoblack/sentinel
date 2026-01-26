@@ -3,6 +3,7 @@ package lambda
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -52,6 +53,12 @@ const (
 	// TOTP secrets and SMS phones are stored in SSM as JSON.
 	EnvMFATOTPSecretsParam = "SENTINEL_MFA_TOTP_SECRETS_PARAM" // SSM parameter path for TOTP secrets JSON
 	EnvMFASMSPhonesParam   = "SENTINEL_MFA_SMS_PHONES_PARAM"   // SSM parameter path for SMS phone numbers JSON
+
+	// Log signing and CloudWatch forwarding configuration environment variables.
+	EnvLogSigningKey    = "SENTINEL_LOG_SIGNING_KEY"      // Hex-encoded HMAC key (64 chars for 32 bytes)
+	EnvLogSigningKeyID  = "SENTINEL_LOG_SIGNING_KEY_ID"   // Key identifier for rotation
+	EnvCloudWatchGroup  = "SENTINEL_CLOUDWATCH_LOG_GROUP" // CloudWatch log group (optional)
+	EnvCloudWatchStream = "SENTINEL_CLOUDWATCH_STREAM"    // CloudWatch log stream (default: function name)
 )
 
 // Default configuration values.
@@ -149,6 +156,25 @@ type TVMConfig struct {
 	// If nil, MFA verification is disabled.
 	// Environment variables: SENTINEL_MFA_TOTP_SECRETS_PARAM, SENTINEL_MFA_SMS_PHONES_PARAM
 	MFAVerifier mfa.Verifier
+
+	// LogSigningKey is the HMAC key for signing log entries.
+	// If set, all log entries will include a signature for integrity verification.
+	// Environment variable: SENTINEL_LOG_SIGNING_KEY (hex-encoded, 64 chars for 32 bytes)
+	LogSigningKey []byte
+
+	// LogSigningKeyID identifies the signing key for key rotation.
+	// Environment variable: SENTINEL_LOG_SIGNING_KEY_ID
+	LogSigningKeyID string
+
+	// CloudWatchLogGroup is the log group for CloudWatch forwarding.
+	// If empty, CloudWatch forwarding is disabled (logs go to stdout only).
+	// Environment variable: SENTINEL_CLOUDWATCH_LOG_GROUP
+	CloudWatchLogGroup string
+
+	// CloudWatchStream is the log stream name within the group.
+	// Defaults to AWS_LAMBDA_FUNCTION_NAME if not set.
+	// Environment variable: SENTINEL_CLOUDWATCH_STREAM
+	CloudWatchStream string
 }
 
 // LoadConfigFromEnv creates a TVMConfig from environment variables.
@@ -235,8 +261,11 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 		cfg.SessionStore = session.NewDynamoDBStore(awsCfg, cfg.SessionTableName)
 	}
 
-	// Create JSON Lines logger (writes to stdout, captured by CloudWatch)
-	cfg.Logger = logging.NewJSONLogger(os.Stdout)
+	// Configure logger based on signing and CloudWatch settings
+	cfg.Logger, err = configureLogger(awsCfg, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure logger: %w", err)
+	}
 
 	// Derive policy root from policy parameter if not explicitly set
 	// e.g., "/sentinel/policies/production" -> "/sentinel/policies"
@@ -505,4 +534,68 @@ func loadSMSPhones(ctx context.Context, client SSMAPI, paramPath string) (map[st
 	}
 
 	return phones, nil
+}
+
+// configureLogger creates the appropriate Logger based on configuration.
+// The logger selection depends on signing and CloudWatch settings:
+//   - No signing, no CloudWatch: JSONLogger to stdout (existing behavior)
+//   - Signing, no CloudWatch: SignedLogger to stdout
+//   - Signing + CloudWatch: CloudWatchLogger with SignConfig
+//   - No signing + CloudWatch: CloudWatchLogger without SignConfig
+func configureLogger(awsCfg aws.Config, cfg *TVMConfig) (logging.Logger, error) {
+	// Parse log signing configuration
+	signingKeyHex := os.Getenv(EnvLogSigningKey)
+	cfg.LogSigningKeyID = os.Getenv(EnvLogSigningKeyID)
+	cfg.CloudWatchLogGroup = os.Getenv(EnvCloudWatchGroup)
+	cfg.CloudWatchStream = os.Getenv(EnvCloudWatchStream)
+
+	// Default stream name to Lambda function name
+	if cfg.CloudWatchStream == "" {
+		cfg.CloudWatchStream = os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
+	}
+
+	// Parse and validate signing key if provided
+	if signingKeyHex != "" {
+		keyBytes, err := hex.DecodeString(signingKeyHex)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s: must be hex-encoded: %w", EnvLogSigningKey, err)
+		}
+		if len(keyBytes) < logging.MinKeyLength {
+			return nil, fmt.Errorf("invalid %s: must be at least %d bytes (got %d)",
+				EnvLogSigningKey, logging.MinKeyLength, len(keyBytes))
+		}
+		cfg.LogSigningKey = keyBytes
+	}
+
+	// Build logger based on configuration
+	if cfg.CloudWatchLogGroup != "" {
+		// CloudWatch forwarding enabled
+		cwConfig := &logging.CloudWatchConfig{
+			LogGroupName:  cfg.CloudWatchLogGroup,
+			LogStreamName: cfg.CloudWatchStream,
+		}
+		if len(cfg.LogSigningKey) > 0 {
+			cwConfig.SignConfig = &logging.SignatureConfig{
+				KeyID:     cfg.LogSigningKeyID,
+				SecretKey: cfg.LogSigningKey,
+			}
+			log.Printf("INFO: CloudWatch logging enabled with signing (group: %s, key: %s)",
+				cfg.CloudWatchLogGroup, cfg.LogSigningKeyID)
+		} else {
+			log.Printf("INFO: CloudWatch logging enabled without signing (group: %s)", cfg.CloudWatchLogGroup)
+		}
+		return logging.NewCloudWatchLogger(awsCfg, cwConfig), nil
+	} else if len(cfg.LogSigningKey) > 0 {
+		// Signing enabled, stdout output
+		signConfig := &logging.SignatureConfig{
+			KeyID:     cfg.LogSigningKeyID,
+			SecretKey: cfg.LogSigningKey,
+		}
+		log.Printf("INFO: Signed logging enabled to stdout (key: %s)", cfg.LogSigningKeyID)
+		return logging.NewSignedLogger(os.Stdout, signConfig), nil
+	}
+
+	// Default: unsigned stdout (existing behavior)
+	log.Printf("INFO: Logging to stdout (unsigned)")
+	return logging.NewJSONLogger(os.Stdout), nil
 }
