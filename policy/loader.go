@@ -18,10 +18,11 @@ import (
 // does not exist in SSM Parameter Store.
 var ErrPolicyNotFound = errors.New("policy not found")
 
-// SSMAPI defines the SSM operations used by Loader.
+// SSMAPI defines the SSM operations used by Loader and policy CLI commands.
 // This interface enables testing with mock implementations.
 type SSMAPI interface {
 	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
 }
 
 // Loader fetches policies from AWS SSM Parameter Store.
