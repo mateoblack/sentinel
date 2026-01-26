@@ -20,19 +20,22 @@ const (
 // BreakGlassLogEntry captures all context for a break-glass emergency access event.
 // Events include: breakglass.invoked, breakglass.closed, breakglass.expired.
 type BreakGlassLogEntry struct {
-	Timestamp     string `json:"timestamp"`               // ISO8601 format
-	Event         string `json:"event"`                   // "breakglass.invoked", "breakglass.closed", "breakglass.expired"
-	EventID       string `json:"event_id"`                // 16-char hex break-glass event ID
-	RequestID     string `json:"request_id"`              // 16-char hex request ID for CloudTrail correlation
-	Invoker       string `json:"invoker"`                 // Who invoked break-glass
-	Profile       string `json:"profile"`                 // AWS profile accessed
-	ReasonCode    string `json:"reason_code"`             // Incident category (incident, maintenance, security, recovery, other)
-	Justification string `json:"justification"`           // Mandatory detailed explanation (20-1000 chars)
-	Status        string `json:"status"`                  // Current status (active, closed, expired)
-	Duration      int    `json:"duration_seconds"`        // Requested duration in seconds
-	ExpiresAt     string `json:"expires_at"`              // ISO8601 expiration time
-	ClosedBy      string `json:"closed_by,omitempty"`     // Who closed (for closed events)
-	ClosedReason  string `json:"closed_reason,omitempty"` // Why closed early
+	Timestamp      string `json:"timestamp"`                  // ISO8601 format
+	Event          string `json:"event"`                      // "breakglass.invoked", "breakglass.closed", "breakglass.expired"
+	EventID        string `json:"event_id"`                   // 16-char hex break-glass event ID
+	RequestID      string `json:"request_id"`                 // 16-char hex request ID for CloudTrail correlation
+	Invoker        string `json:"invoker"`                    // Who invoked break-glass
+	Profile        string `json:"profile"`                    // AWS profile accessed
+	ReasonCode     string `json:"reason_code"`                // Incident category (incident, maintenance, security, recovery, other)
+	Justification  string `json:"justification"`              // Mandatory detailed explanation (20-1000 chars)
+	Status         string `json:"status"`                     // Current status (active, closed, expired)
+	Duration       int    `json:"duration_seconds"`           // Requested duration in seconds
+	ExpiresAt      string `json:"expires_at"`                 // ISO8601 expiration time
+	ClosedBy       string `json:"closed_by,omitempty"`        // Who closed (for closed events)
+	ClosedReason   string `json:"closed_reason,omitempty"`    // Why closed early
+	MFAVerified    bool   `json:"mfa_verified,omitempty"`     // Whether MFA was verified
+	MFAMethod      string `json:"mfa_method,omitempty"`       // MFA method used (totp, sms)
+	MFAChallengeID string `json:"mfa_challenge_id,omitempty"` // Challenge ID for SMS MFA
 }
 
 // NewBreakGlassLogEntry creates a BreakGlassLogEntry from a break-glass event.
@@ -40,19 +43,24 @@ type BreakGlassLogEntry struct {
 //   - breakglass.invoked: all mandatory fields, no closed fields
 //   - breakglass.closed: includes closed_by and closed_reason
 //   - breakglass.expired: includes status as expired, no closed_by/closed_reason
+//
+// MFA fields are populated from the event if MFAVerified is true.
 func NewBreakGlassLogEntry(event string, bg *breakglass.BreakGlassEvent) BreakGlassLogEntry {
 	entry := BreakGlassLogEntry{
-		Timestamp:     iso8601.Format(time.Now()),
-		Event:         event,
-		EventID:       bg.ID,
-		RequestID:     bg.RequestID,
-		Invoker:       bg.Invoker,
-		Profile:       bg.Profile,
-		ReasonCode:    string(bg.ReasonCode),
-		Justification: bg.Justification,
-		Status:        string(bg.Status),
-		Duration:      int(bg.Duration.Seconds()),
-		ExpiresAt:     iso8601.Format(bg.ExpiresAt),
+		Timestamp:      iso8601.Format(time.Now()),
+		Event:          event,
+		EventID:        bg.ID,
+		RequestID:      bg.RequestID,
+		Invoker:        bg.Invoker,
+		Profile:        bg.Profile,
+		ReasonCode:     string(bg.ReasonCode),
+		Justification:  bg.Justification,
+		Status:         string(bg.Status),
+		Duration:       int(bg.Duration.Seconds()),
+		ExpiresAt:      iso8601.Format(bg.ExpiresAt),
+		MFAVerified:    bg.MFAVerified,
+		MFAMethod:      bg.MFAMethod,
+		MFAChallengeID: bg.MFAChallengeID,
 	}
 
 	// Populate closed fields only for closed/expired events

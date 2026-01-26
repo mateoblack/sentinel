@@ -1171,3 +1171,224 @@ func TestBreakGlassLogEntry_JSONOmitempty(t *testing.T) {
 		}
 	}
 }
+
+// =============================================================================
+// MFA Field Tests
+// =============================================================================
+
+func TestBreakGlassLogEntry_MFAFieldsPopulated(t *testing.T) {
+	bg := &breakglass.BreakGlassEvent{
+		ID:             "a1b2c3d4e5f67890",
+		Invoker:        "alice",
+		Profile:        "production",
+		ReasonCode:     breakglass.ReasonIncident,
+		Justification:  "Production database is down, need emergency access to investigate",
+		Duration:       2 * time.Hour,
+		Status:         breakglass.StatusActive,
+		CreatedAt:      time.Now(),
+		ExpiresAt:      time.Now().Add(2 * time.Hour),
+		RequestID:      "fedcba0987654321",
+		MFAVerified:    true,
+		MFAMethod:      "totp",
+		MFAChallengeID: "",
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+	// Verify MFA fields are populated
+	if !entry.MFAVerified {
+		t.Error("expected MFAVerified to be true")
+	}
+	if entry.MFAMethod != "totp" {
+		t.Errorf("expected MFAMethod 'totp', got %q", entry.MFAMethod)
+	}
+}
+
+func TestBreakGlassLogEntry_MFAFieldsWithSMS(t *testing.T) {
+	bg := &breakglass.BreakGlassEvent{
+		ID:             "a1b2c3d4e5f67890",
+		Invoker:        "alice",
+		Profile:        "production",
+		ReasonCode:     breakglass.ReasonIncident,
+		Justification:  "Production database is down, need emergency access to investigate",
+		Duration:       2 * time.Hour,
+		Status:         breakglass.StatusActive,
+		CreatedAt:      time.Now(),
+		ExpiresAt:      time.Now().Add(2 * time.Hour),
+		RequestID:      "fedcba0987654321",
+		MFAVerified:    true,
+		MFAMethod:      "sms",
+		MFAChallengeID: "abc123def4567890",
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+	// Verify MFA fields are populated
+	if !entry.MFAVerified {
+		t.Error("expected MFAVerified to be true")
+	}
+	if entry.MFAMethod != "sms" {
+		t.Errorf("expected MFAMethod 'sms', got %q", entry.MFAMethod)
+	}
+	if entry.MFAChallengeID != "abc123def4567890" {
+		t.Errorf("expected MFAChallengeID 'abc123def4567890', got %q", entry.MFAChallengeID)
+	}
+}
+
+func TestBreakGlassLogEntry_MFAFieldsNotVerified(t *testing.T) {
+	bg := &breakglass.BreakGlassEvent{
+		ID:             "a1b2c3d4e5f67890",
+		Invoker:        "alice",
+		Profile:        "production",
+		ReasonCode:     breakglass.ReasonIncident,
+		Justification:  "Production database is down, need emergency access to investigate",
+		Duration:       2 * time.Hour,
+		Status:         breakglass.StatusActive,
+		CreatedAt:      time.Now(),
+		ExpiresAt:      time.Now().Add(2 * time.Hour),
+		RequestID:      "fedcba0987654321",
+		MFAVerified:    false,
+		MFAMethod:      "",
+		MFAChallengeID: "",
+	}
+
+	entry := NewBreakGlassLogEntry(BreakGlassEventInvoked, bg)
+
+	// Verify MFA fields reflect no verification
+	if entry.MFAVerified {
+		t.Error("expected MFAVerified to be false")
+	}
+	if entry.MFAMethod != "" {
+		t.Errorf("expected empty MFAMethod, got %q", entry.MFAMethod)
+	}
+	if entry.MFAChallengeID != "" {
+		t.Errorf("expected empty MFAChallengeID, got %q", entry.MFAChallengeID)
+	}
+}
+
+func TestBreakGlassLogEntry_MFAFieldsJSON(t *testing.T) {
+	entry := BreakGlassLogEntry{
+		Timestamp:      "2026-01-15T10:00:00Z",
+		Event:          BreakGlassEventInvoked,
+		EventID:        "a1b2c3d4e5f67890",
+		RequestID:      "fedcba0987654321",
+		Invoker:        "alice",
+		Profile:        "production",
+		ReasonCode:     "incident",
+		Justification:  "Emergency access for production incident",
+		Status:         "active",
+		Duration:       7200,
+		ExpiresAt:      "2026-01-15T12:00:00Z",
+		MFAVerified:    true,
+		MFAMethod:      "totp",
+		MFAChallengeID: "",
+	}
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("Failed to marshal entry: %v", err)
+	}
+
+	jsonStr := string(data)
+
+	// Verify MFA fields are in JSON with snake_case
+	if !strings.Contains(jsonStr, `"mfa_verified":true`) {
+		t.Errorf("expected JSON to contain mfa_verified:true, got: %s", jsonStr)
+	}
+	if !strings.Contains(jsonStr, `"mfa_method":"totp"`) {
+		t.Errorf("expected JSON to contain mfa_method:totp, got: %s", jsonStr)
+	}
+}
+
+func TestBreakGlassLogEntry_MFAFieldsOmitEmpty(t *testing.T) {
+	entry := BreakGlassLogEntry{
+		Timestamp:     "2026-01-15T10:00:00Z",
+		Event:         BreakGlassEventInvoked,
+		EventID:       "a1b2c3d4e5f67890",
+		RequestID:     "fedcba0987654321",
+		Invoker:       "alice",
+		Profile:       "production",
+		ReasonCode:    "incident",
+		Justification: "Emergency access without MFA",
+		Status:        "active",
+		Duration:      7200,
+		ExpiresAt:     "2026-01-15T12:00:00Z",
+		MFAVerified:   false,
+		MFAMethod:     "",
+		// MFAChallengeID intentionally left empty
+	}
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("Failed to marshal entry: %v", err)
+	}
+
+	jsonStr := string(data)
+
+	// MFA fields should be omitted when empty/false (omitempty)
+	if strings.Contains(jsonStr, "mfa_verified") {
+		t.Error("mfa_verified should be omitted when false (omitempty)")
+	}
+	if strings.Contains(jsonStr, "mfa_method") {
+		t.Error("mfa_method should be omitted when empty (omitempty)")
+	}
+	if strings.Contains(jsonStr, "mfa_challenge_id") {
+		t.Error("mfa_challenge_id should be omitted when empty (omitempty)")
+	}
+}
+
+func TestBreakGlassLogEntry_MFAChallengeIDOnlyInSMS(t *testing.T) {
+	// TOTP entries should have empty MFAChallengeID
+	totpEntry := BreakGlassLogEntry{
+		Timestamp:      "2026-01-15T10:00:00Z",
+		Event:          BreakGlassEventInvoked,
+		EventID:        "a1b2c3d4e5f67890",
+		RequestID:      "fedcba0987654321",
+		Invoker:        "alice",
+		Profile:        "production",
+		ReasonCode:     "incident",
+		Justification:  "Emergency access with TOTP",
+		Status:         "active",
+		Duration:       7200,
+		ExpiresAt:      "2026-01-15T12:00:00Z",
+		MFAVerified:    true,
+		MFAMethod:      "totp",
+		MFAChallengeID: "", // TOTP doesn't use challenge ID
+	}
+
+	totpData, err := json.Marshal(totpEntry)
+	if err != nil {
+		t.Fatalf("Failed to marshal TOTP entry: %v", err)
+	}
+
+	if strings.Contains(string(totpData), "mfa_challenge_id") {
+		t.Error("TOTP entry should not have mfa_challenge_id")
+	}
+
+	// SMS entries should have MFAChallengeID
+	smsEntry := BreakGlassLogEntry{
+		Timestamp:      "2026-01-15T10:00:00Z",
+		Event:          BreakGlassEventInvoked,
+		EventID:        "a1b2c3d4e5f67890",
+		RequestID:      "fedcba0987654321",
+		Invoker:        "alice",
+		Profile:        "production",
+		ReasonCode:     "incident",
+		Justification:  "Emergency access with SMS",
+		Status:         "active",
+		Duration:       7200,
+		ExpiresAt:      "2026-01-15T12:00:00Z",
+		MFAVerified:    true,
+		MFAMethod:      "sms",
+		MFAChallengeID: "abc123def4567890",
+	}
+
+	smsData, err := json.Marshal(smsEntry)
+	if err != nil {
+		t.Fatalf("Failed to marshal SMS entry: %v", err)
+	}
+
+	if !strings.Contains(string(smsData), `"mfa_challenge_id":"abc123def4567890"`) {
+		t.Error("SMS entry should have mfa_challenge_id")
+	}
+}
