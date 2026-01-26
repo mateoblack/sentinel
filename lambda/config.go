@@ -14,6 +14,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/logging"
@@ -59,6 +60,12 @@ const (
 	EnvLogSigningKeyID  = "SENTINEL_LOG_SIGNING_KEY_ID"   // Key identifier for rotation
 	EnvCloudWatchGroup  = "SENTINEL_CLOUDWATCH_LOG_GROUP" // CloudWatch log group (optional)
 	EnvCloudWatchStream = "SENTINEL_CLOUDWATCH_STREAM"    // CloudWatch log stream (default: function name)
+
+	// Distributed rate limiting configuration environment variable.
+	// EnvRateLimitTable is the DynamoDB table for distributed rate limiting.
+	// If set, uses DynamoDB instead of in-memory rate limiting.
+	// Table must have PK (string) partition key, TTL attribute named "TTL".
+	EnvRateLimitTable = "SENTINEL_RATE_LIMIT_TABLE"
 )
 
 // Default configuration values.
@@ -175,6 +182,12 @@ type TVMConfig struct {
 	// Defaults to AWS_LAMBDA_FUNCTION_NAME if not set.
 	// Environment variable: SENTINEL_CLOUDWATCH_STREAM
 	CloudWatchStream string
+
+	// RateLimitTableName is the DynamoDB table for distributed rate limiting.
+	// If set, uses DynamoDB rate limiter instead of in-memory.
+	// Required for consistent rate limiting across Lambda instances.
+	// Environment variable: SENTINEL_RATE_LIMIT_TABLE
+	RateLimitTableName string
 }
 
 // LoadConfigFromEnv creates a TVMConfig from environment variables.
@@ -334,15 +347,37 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 
 	// Create rate limiter if enabled (requests > 0)
 	if rateLimitRequests > 0 {
-		limiter, err := ratelimit.NewMemoryRateLimiter(ratelimit.Config{
-			RequestsPerWindow: rateLimitRequests,
-			Window:            rateLimitWindow,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create rate limiter: %w", err)
+		rateLimitTable := os.Getenv(EnvRateLimitTable)
+		if rateLimitTable != "" {
+			// Use DynamoDB for distributed rate limiting (recommended for Lambda)
+			cfg.RateLimitTableName = rateLimitTable
+			limiter, err := ratelimit.NewDynamoDBRateLimiter(
+				dynamodb.NewFromConfig(awsCfg),
+				rateLimitTable,
+				ratelimit.Config{
+					RequestsPerWindow: rateLimitRequests,
+					Window:            rateLimitWindow,
+				},
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create DynamoDB rate limiter: %w", err)
+			}
+			cfg.RateLimiter = limiter
+			log.Printf("INFO: Distributed rate limiting enabled: %d requests per %v (table: %s)",
+				rateLimitRequests, rateLimitWindow, rateLimitTable)
+		} else {
+			// Fall back to in-memory (single instance only - NOT recommended for Lambda)
+			limiter, err := ratelimit.NewMemoryRateLimiter(ratelimit.Config{
+				RequestsPerWindow: rateLimitRequests,
+				Window:            rateLimitWindow,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create rate limiter: %w", err)
+			}
+			cfg.RateLimiter = limiter
+			log.Printf("WARNING: Using in-memory rate limiting - not effective across Lambda instances. Set %s for distributed rate limiting.",
+				EnvRateLimitTable)
 		}
-		cfg.RateLimiter = limiter
-		log.Printf("INFO: Rate limiting enabled: %d requests per %v", rateLimitRequests, rateLimitWindow)
 	} else {
 		log.Printf("INFO: Rate limiting disabled")
 	}
