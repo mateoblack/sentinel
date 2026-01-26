@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 130-identity-hardening
-Plan: 0 of 1 in current phase
-Status: Planning complete
-Last activity: 2026-01-26 — Created 130-01-PLAN.md (Identity hardening)
+Plan: 1 of 1 complete in current phase
+Status: Phase complete
+Last activity: 2026-01-26 — Completed 130-01 (Identity hardening)
 
-Progress: ████████████████████░░ 88% (232/263 estimated total plans)
+Progress: ████████████████████░░ 89% (233/263 estimated total plans)
 
 ## Milestone Summary
 
 **v1.18 Critical Security Hardening (IN PROGRESS):**
 - 10 phases (126-135), security milestone
 - Phases 126-128 complete (Policy Integrity, Break-Glass MFA, Audit Log Integrity)
-- Phases 129-135 pending (Local Server Security, Identity Hardening, DynamoDB Security, Keyring Protection, Rate Limit Hardening, Input Sanitization, Security Validation)
+- Phases 131-135 pending (DynamoDB Security, Keyring Protection, Rate Limit Hardening, Input Sanitization, Security Validation)
 - Addresses P0 security threats from STRIDE threat model
 
 **v1.19 Documentation & Completeness Audit (PENDING v1.18):**
@@ -64,7 +64,7 @@ Last 5 milestones:
 - v1.15: 9 phases, 12 plans, ~41 min
 - v1.16: 8 phases, 9 plans, ~21 min
 - v1.17: 5 phases, 5 plans, ~25 min
-- v1.18: 4 phases complete (126-129), 6 phases remaining (130-135)
+- v1.18: 5 phases complete (126-130), 5 phases remaining (131-135)
 
 ## Accumulated Context
 
@@ -130,9 +130,15 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - EC2 server cannot use Unix sockets due to AWS SDK IMDS expectations
 - Security tests organized by threat category with AST verification
 
+**Phase 130 Identity Hardening (Plan 01):**
+- AWS ISO (DoD) and ISO-B (C2S) partition support added to ARN validation
+- Lambda TVM identity extraction consolidated to use identity.ExtractUsername
+- Security regression tests with TestSecurityRegression_ prefix for CI filtering
+- Sanitized usernames are alphanumeric-only (a-z, A-Z, 0-9)
+
 ### Pending Todos
 
-None — continuing Phase 129.
+None — Phase 130 complete.
 
 ### Blockers/Concerns
 
@@ -141,6 +147,6 @@ None — phases 129-135 are security implementation work.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Phase 130 planned (Identity Hardening)
+Stopped at: Phase 130 complete (Identity Hardening)
 Resume file: None
-Next: Execute Phase 130 Plan 01 (Identity hardening)
+Next: Plan Phase 131 (DynamoDB Security)
