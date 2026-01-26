@@ -187,7 +187,7 @@ Plans:
 **Plans**: 2
 
 Plans:
-- [ ] 131-01: Fix optimistic locking bug + state transition validation (session/dynamodb.go Update fix, request/breakglass state validation)
+- [x] 131-01: Fix optimistic locking bug + state transition validation (session/dynamodb.go Update fix, request/breakglass state validation) — completed 2026-01-26
 - [ ] 131-02: Security regression tests (TestSecurityRegression_ tests for all three DynamoDB stores)
 
 #### Phase 132: Keyring Protection
