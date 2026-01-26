@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.18 Critical Security Hardening (phases 133-135 remaining)
+**Current focus:** v1.18 Critical Security Hardening (phase 135 remaining)
 
 ## Current Position
 
-Phase: 134 of 135 (Input Sanitization)
-Plan: 2 of 2 in current phase
-Status: PHASE COMPLETE
-Last activity: 2026-01-26 — Completed 134-02-PLAN.md (shell security regression tests)
+Phase: 135 of 135 (Security Validation)
+Plan: 1 of 2 in current phase
+Status: IN PROGRESS
+Last activity: 2026-01-26 — Completed 135-01-PLAN.md (security test infrastructure)
 
-Progress: █████████████████████░ 94% (241/263 estimated total plans)
+Progress: █████████████████████░ 95% (242/263 estimated total plans)
 
 ## Milestone Summary
 
@@ -25,7 +25,7 @@ Progress: █████████████████████░ 94%
 - Phase 132 COMPLETE (Keyring Protection - 2/2 plans complete)
 - Phase 133 COMPLETE (Rate Limit Hardening - 2/2 plans complete)
 - Phase 134 COMPLETE (Input Sanitization - 2/2 plans complete)
-- Phase 135 pending (Security Validation)
+- Phase 135 IN PROGRESS (Security Validation - 1/2 plans complete)
 - Addresses P0 security threats from STRIDE threat model
 
 **v1.19 Documentation & Completeness Audit (PENDING v1.18):**
@@ -57,8 +57,8 @@ See complete history in ROADMAP.md
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 231
-- Estimated remaining: ~33 plans (6 security + ~27 documentation)
+- Total plans completed: 232
+- Estimated remaining: ~32 plans (5 security + ~27 documentation)
 - Average duration: ~3.5 min per plan
 
 **By Milestone:**
@@ -68,7 +68,7 @@ Last 5 milestones:
 - v1.15: 9 phases, 12 plans, ~41 min
 - v1.16: 8 phases, 9 plans, ~21 min
 - v1.17: 5 phases, 5 plans, ~25 min
-- v1.18: 8 phases complete (126-133), 2 phases remaining (134-135)
+- v1.18: 9 phases complete (126-134), phase 135 in progress (1/2 plans complete)
 
 ## Accumulated Context
 
@@ -174,17 +174,24 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Function name sanitization: alphanumeric + hyphen + sentinel- prefix
 - Security regression tests with TestSecurityRegression_ prefix (80+ attack vectors)
 
+**Phase 135 Security Validation (Plan 01):**
+- Security test runner script (scripts/security-test.sh) discovers 24 test files across 16 packages
+- Makefile targets: test-security, test-security-verbose, test-all for CI/CD
+- v1.18 integration tests validate cross-phase security features
+- File-based discovery ensures new security tests automatically included
+- -race and -count=1 flags for thoroughness over speed
+
 ### Pending Todos
 
-None — Phase 134 complete, ready for Phase 135
+None — Plan 135-01 complete, ready for 135-02
 
 ### Blockers/Concerns
 
-None — phase 135 is ready for planning.
+None — plan 135-02 is ready for execution.
 
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 134-02-PLAN.md (shell security regression tests)
+Stopped at: Completed 135-01-PLAN.md (security test infrastructure)
 Resume file: None
-Next: Plan Phase 135 (Security Validation)
+Next: Execute 135-02-PLAN.md (security documentation and checklist)
