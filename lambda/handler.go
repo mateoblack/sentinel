@@ -47,8 +47,9 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	if h.Config == nil {
 		cfg, err := LoadConfigFromEnv(ctx)
 		if err != nil {
+			log.Printf("ERROR: Failed to load configuration: %v", err)
 			return errorResponse(http.StatusInternalServerError, "CONFIG_ERROR",
-				"Failed to load configuration: "+err.Error())
+				"Failed to load configuration")
 		}
 		h.Config = cfg
 	}
@@ -56,15 +57,17 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	// Extract caller identity from IAM authorizer context
 	caller, err := ExtractCallerIdentity(req)
 	if err != nil {
+		log.Printf("ERROR: IAM authorization required: %v", err)
 		return errorResponse(http.StatusForbidden, "IAM_AUTH_REQUIRED",
-			fmt.Sprintf("IAM authorization required: %v", err))
+			"IAM authorization required")
 	}
 
 	// Extract username from caller ARN for policy evaluation
 	username, err := extractUsername(caller.UserARN)
 	if err != nil {
+		log.Printf("ERROR: Could not extract username from ARN: %v", err)
 		return errorResponse(http.StatusBadRequest, "INVALID_IDENTITY",
-			fmt.Sprintf("Could not extract username: %v", err))
+			"Could not extract username from identity")
 	}
 
 	// Check rate limit EARLY - before policy evaluation to minimize work for rejected requests.
@@ -108,8 +111,9 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 
 		// If RequireDevicePosture and lookup failed, deny
 		if h.Config.RequireDevicePosture && mdmErr != nil {
+			log.Printf("ERROR: Device verification failed for device=%s: %v", deviceID, mdmErr)
 			return errorResponse(http.StatusForbidden, "DEVICE_VERIFICATION_FAILED",
-				fmt.Sprintf("Device verification failed: %v", mdmErr))
+				"Device verification failed")
 		}
 	} else if deviceID != "" && h.Config.MDMProvider == nil {
 		log.Printf("INFO: Device ID provided but MDM not configured, skipping verification")
@@ -120,7 +124,7 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	parsedDuration, err := parseDuration(req.QueryStringParameters["duration"])
 	if err != nil {
 		return errorResponse(http.StatusBadRequest, "INVALID_DURATION",
-			fmt.Sprintf("Invalid duration: %v", err))
+			"Invalid duration parameter")
 	}
 
 	// Build policy request - Lambda TVM acts as server mode
@@ -345,8 +349,9 @@ func parseDuration(durationStr string) (time.Duration, error) {
 func successResponse(creds *TVMResponse) (events.APIGatewayV2HTTPResponse, error) {
 	body, err := json.Marshal(creds)
 	if err != nil {
+		log.Printf("ERROR: Failed to marshal credentials: %v", err)
 		return errorResponse(http.StatusInternalServerError, "MARSHAL_ERROR",
-			fmt.Sprintf("Failed to marshal credentials: %v", err))
+			"Failed to marshal credentials")
 	}
 
 	return events.APIGatewayV2HTTPResponse{
