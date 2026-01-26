@@ -1862,3 +1862,487 @@ sentinel-production aws s3 ls
 # With server mode (if --include-server was used):
 sentinel-production-server terraform plan
 ```
+
+---
+
+## Policy Commands
+
+Commands for managing Sentinel policies stored in AWS SSM Parameter Store. These commands enable a GitOps-style workflow for policy management with validation, diff previews, and cryptographic signing.
+
+### Policy Workflow
+
+The recommended workflow for policy changes:
+
+```bash
+# 1. Pull current policy from SSM
+sentinel policy pull myprofile -o policy.yaml
+
+# 2. Edit the policy locally
+$EDITOR policy.yaml
+
+# 3. Validate syntax locally (no AWS credentials needed)
+sentinel policy validate policy.yaml
+
+# 4. Preview changes before pushing
+sentinel policy diff myprofile policy.yaml
+
+# 5. Push the updated policy
+sentinel policy push myprofile policy.yaml
+
+# 6. Optional: Sign policy for integrity verification
+sentinel policy sign policy.yaml --key-id alias/sentinel-signing -o policy.sig
+sentinel policy push myprofile policy.yaml --sign --key-id alias/sentinel-signing
+```
+
+---
+
+### policy pull
+
+Fetch policy YAML from SSM Parameter Store.
+
+**Usage:**
+```bash
+sentinel policy pull PROFILE [flags]
+```
+
+**Arguments:**
+
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `PROFILE` | AWS profile name to pull policy for | Yes |
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--policy-root` | SSM parameter path prefix for policies | No (default: `/sentinel/policies`) |
+| `--policy-parameter` | Explicit SSM parameter path (overrides profile-based path) | No |
+| `--output` / `-o` | Output file path (omit for stdout) | No |
+| `--region` | AWS region for SSM operations | No |
+| `--aws-profile` | AWS profile for SSM credentials | No |
+
+**Examples:**
+
+```bash
+# Pull policy to stdout
+sentinel policy pull myprofile
+
+# Save to file
+sentinel policy pull myprofile -o policy.yaml
+
+# Use specific region
+sentinel policy pull myprofile --region us-west-2 -o policy.yaml
+
+# Use explicit SSM path
+sentinel policy pull myprofile --policy-parameter /custom/path/policy
+
+# Pipeline usage: pull, transform with yq, inspect
+sentinel policy pull myprofile | yq '.rules[] | select(.effect == "allow")'
+```
+
+**Output:**
+
+When using `-o`, the policy YAML is written to the specified file and a confirmation is printed to stderr:
+```
+Policy written to policy.yaml
+```
+
+When outputting to stdout, only the raw YAML is printed (suitable for piping).
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | Policy retrieved successfully |
+| 1 | Error (policy not found, AWS credentials issue, etc.) |
+
+---
+
+### policy push
+
+Validate and upload policy to SSM Parameter Store.
+
+**Usage:**
+```bash
+sentinel policy push PROFILE INPUT_FILE [flags]
+```
+
+**Arguments:**
+
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `PROFILE` | Target profile name for the policy | Yes |
+| `INPUT_FILE` | Path to policy YAML file | Yes |
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--policy-root` | SSM parameter path prefix for policies | No (default: `/sentinel/policies`) |
+| `--policy-parameter` | Explicit SSM parameter path (overrides profile-based path) | No |
+| `--region` | AWS region for SSM operations | No |
+| `--aws-profile` | AWS profile for SSM credentials | No |
+| `--no-backup` | Skip fetching existing policy as backup | No |
+| `--force` / `-f` | Skip confirmation prompt | No |
+| `--sign` | Sign policy with KMS before pushing | No |
+| `--key-id` | KMS key ARN or alias for signing (required with `--sign`) | With `--sign` |
+
+**Examples:**
+
+```bash
+# Push with confirmation prompt
+sentinel policy push myprofile policy.yaml
+
+# Push without confirmation (CI/CD)
+sentinel policy push myprofile policy.yaml --force
+
+# Push with signing
+sentinel policy push myprofile policy.yaml --sign --key-id alias/sentinel-signing
+
+# Push to specific region
+sentinel policy push myprofile policy.yaml --region us-west-2
+
+# Push without fetching backup
+sentinel policy push myprofile policy.yaml --no-backup
+```
+
+**Interactive Confirmation:**
+
+Without `--force`, the command shows a confirmation prompt:
+```
+Existing policy found (version 3)
+
+Parameter path: /sentinel/policies/myprofile
+Status: updating existing policy
+
+Proceed? [y/N]: y
+Policy successfully pushed to /sentinel/policies/myprofile
+```
+
+**With Signing:**
+
+When `--sign` is specified, the policy is signed and the signature is stored in a separate SSM parameter:
+```
+Policy successfully pushed to /sentinel/policies/myprofile
+Signature pushed to /sentinel/policies/myprofile/signature
+```
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | Policy pushed successfully (or cancelled by user) |
+| 1 | Error (validation failed, AWS credentials issue, etc.) |
+
+---
+
+### policy diff
+
+Show unified diff between local file and SSM policy.
+
+**Usage:**
+```bash
+sentinel policy diff PROFILE INPUT_FILE [flags]
+```
+
+**Arguments:**
+
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `PROFILE` | Target profile name for the policy | Yes |
+| `INPUT_FILE` | Path to local policy YAML file | Yes |
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--policy-root` | SSM parameter path prefix for policies | No (default: `/sentinel/policies`) |
+| `--policy-parameter` | Explicit SSM parameter path (overrides profile-based path) | No |
+| `--region` | AWS region for SSM operations | No |
+| `--aws-profile` | AWS profile for SSM credentials | No |
+| `--no-color` | Disable colorized output | No |
+
+**Examples:**
+
+```bash
+# Show diff with colors
+sentinel policy diff myprofile policy.yaml
+
+# Show diff without colors (for piping/logging)
+sentinel policy diff myprofile policy.yaml --no-color
+
+# CI/CD: Check if changes exist
+if sentinel policy diff myprofile policy.yaml --no-color > /dev/null 2>&1; then
+  echo "No changes"
+else
+  echo "Changes detected"
+fi
+```
+
+**Output:**
+
+Unified diff format with optional ANSI colors:
+```diff
+--- a//sentinel/policies/myprofile
++++ b/policy.yaml
+@@ -1,5 +1,6 @@
+ version: "1"
+ rules:
+   - name: allow-dev-access
+     effect: allow
++    conditions:
++      time_window: business_hours
+```
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | No changes (local matches remote) |
+| 1 | Changes exist (scripting-friendly for CI/CD change detection) |
+
+**Note:** Exit code 1 for "changes exist" is intentional for CI/CD scripting. This allows using the exit code to detect whether a policy needs to be pushed.
+
+---
+
+### policy validate
+
+Validate local policy YAML without AWS credentials.
+
+**Usage:**
+```bash
+sentinel policy validate INPUT_FILE [flags]
+```
+
+**Arguments:**
+
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `INPUT_FILE` | Path to policy YAML file | Yes |
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--quiet` / `-q` | Only show errors, no success message | No |
+
+**Examples:**
+
+```bash
+# Validate with success message
+sentinel policy validate policy.yaml
+# Output: Policy is valid
+
+# Quiet mode (for scripts)
+sentinel policy validate policy.yaml -q
+# No output on success
+
+# Validate in CI/CD pipeline
+if sentinel policy validate policy.yaml -q; then
+  echo "Validation passed"
+else
+  echo "Validation failed"
+  exit 1
+fi
+
+# Validate multiple files
+for f in policies/*.yaml; do
+  if ! sentinel policy validate "$f" -q; then
+    echo "Invalid: $f"
+    exit 1
+  fi
+done
+```
+
+**Output:**
+
+On success (without `--quiet`):
+```
+Policy is valid
+```
+
+On failure:
+```
+Error: invalid policy: rules[0].conditions: missing required field 'profiles'
+
+Suggestion: fix the policy YAML and try again
+```
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | Policy is valid |
+| 1 | Policy is invalid or file not found |
+
+---
+
+### policy sign
+
+Sign a policy file with KMS using RSASSA_PSS_SHA_256.
+
+**Usage:**
+```bash
+sentinel policy sign POLICY_FILE --key-id KEY [flags]
+```
+
+**Arguments:**
+
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `POLICY_FILE` | Path to policy YAML file to sign | Yes |
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--key-id` | KMS key ARN or alias for signing | Yes |
+| `--output` / `-o` | Output file for signature (omit for stdout) | No |
+| `--region` | AWS region for KMS operations | No |
+| `--aws-profile` | AWS profile for KMS credentials | No |
+
+**Examples:**
+
+```bash
+# Sign and output to stdout
+sentinel policy sign policy.yaml --key-id alias/sentinel-signing
+
+# Sign and save to file
+sentinel policy sign policy.yaml --key-id alias/sentinel-signing -o policy.sig
+
+# Sign with specific region
+sentinel policy sign policy.yaml --key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012 --region us-east-1
+```
+
+**Output (JSON):**
+
+```json
+{
+  "signature": "base64-encoded-signature...",
+  "metadata": {
+    "key_id": "alias/sentinel-signing",
+    "algorithm": "RSASSA_PSS_SHA_256",
+    "signed_at": "2026-01-20T10:30:00Z",
+    "policy_hash": "sha256:abcd1234..."
+  }
+}
+```
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | Policy signed successfully |
+| 1 | Error (invalid policy, KMS key issue, permissions, etc.) |
+
+---
+
+### policy verify
+
+Verify a detached KMS signature against a policy file.
+
+**Usage:**
+```bash
+sentinel policy verify POLICY_FILE --key-id KEY --signature FILE [flags]
+```
+
+**Arguments:**
+
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `POLICY_FILE` | Path to policy YAML file to verify | Yes |
+
+**Flags:**
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--key-id` | KMS key ARN or alias for verification | Yes |
+| `--signature` / `-s` | Signature file (JSON format from sign command) | Yes |
+| `--region` | AWS region for KMS operations | No |
+| `--aws-profile` | AWS profile for KMS credentials | No |
+
+**Examples:**
+
+```bash
+# Verify signature
+sentinel policy verify policy.yaml --key-id alias/sentinel-signing -s policy.sig
+
+# Verify with explicit key ARN
+sentinel policy verify policy.yaml \
+  --key-id arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012 \
+  -s policy.sig
+
+# CI/CD: Verify before deploying
+if sentinel policy verify policy.yaml --key-id alias/sentinel-signing -s policy.sig; then
+  sentinel policy push myprofile policy.yaml --force
+else
+  echo "Signature verification failed!"
+  exit 1
+fi
+```
+
+**Output:**
+
+On success:
+```
+Signature valid
+```
+
+On failure:
+```
+Signature invalid: policy content does not match signature
+  Expected hash: sha256:abcd1234...
+  Computed hash: sha256:efgh5678...
+```
+
+**Exit Codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0 | Signature is valid |
+| 1 | Signature is invalid or verification error |
+
+---
+
+### CI/CD Integration Examples
+
+**GitHub Actions - Policy Validation:**
+
+```yaml
+- name: Validate policies
+  run: |
+    for policy in policies/*.yaml; do
+      sentinel policy validate "$policy" -q
+    done
+```
+
+**GitHub Actions - Change Detection:**
+
+```yaml
+- name: Check for policy changes
+  id: diff
+  run: |
+    if sentinel policy diff production policies/prod.yaml --no-color; then
+      echo "changed=false" >> $GITHUB_OUTPUT
+    else
+      echo "changed=true" >> $GITHUB_OUTPUT
+    fi
+
+- name: Push if changed
+  if: steps.diff.outputs.changed == 'true'
+  run: sentinel policy push production policies/prod.yaml --force
+```
+
+**Signed Policy Workflow:**
+
+```bash
+# Developer signs policy
+sentinel policy sign policy.yaml --key-id alias/sentinel-signing -o policy.sig
+git add policy.yaml policy.sig
+git commit -m "Update production policy"
+git push
+
+# CI/CD verifies signature before deploying
+sentinel policy verify policy.yaml --key-id alias/sentinel-signing -s policy.sig
+sentinel policy push production policy.yaml --force
+```
