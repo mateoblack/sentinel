@@ -1,0 +1,29 @@
+# Example Sentinel policy with device posture conditions
+# Requires MDM enrollment and disk encryption for production access
+version: "1"
+rules:
+  # Production access requires managed, encrypted device
+  - name: prod-secure-device
+    effect: allow
+    conditions:
+      profiles: [production]
+      device:
+        require_mdm: true
+        require_encryption: true
+    reason: Production access from MDM-enrolled device with disk encryption
+
+  # Staging allows MDM-enrolled devices without encryption requirement
+  - name: staging-mdm
+    effect: allow
+    conditions:
+      profiles: [staging]
+      device:
+        require_mdm: true
+    reason: Staging access from MDM-enrolled device
+
+  # Development access without device requirements
+  - name: dev-any-device
+    effect: allow
+    conditions:
+      profiles: [dev]
+    reason: Development access
