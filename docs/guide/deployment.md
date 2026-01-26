@@ -634,7 +634,12 @@ Ship logs to CloudWatch for centralized analysis:
 
 ## Related Documentation
 
-- [Bootstrap Guide](../BOOTSTRAP.md) - Detailed SSM bootstrap documentation
-- [Enforcement Patterns](../ENFORCEMENT.md) - Trust policies and SCPs
-- [CloudTrail Correlation](../CLOUDTRAIL.md) - Audit log integration
 - [Assurance Guide](../ASSURANCE.md) - Verification and monitoring
+- [Bootstrap Guide](../BOOTSTRAP.md) - Detailed SSM bootstrap documentation
+- [CloudTrail Correlation](../CLOUDTRAIL.md) - Audit log integration
+- [Commands Reference](commands.md) - CLI reference including policy commands
+- [Device Posture](../DEVICE_POSTURE.md) - MDM integration for device trust
+- [Enforcement Patterns](../ENFORCEMENT.md) - Trust policies and SCPs
+- [Lambda TVM Deployment](../LAMBDA_TVM_DEPLOYMENT.md) - Server-side credential vending
+- [Policy Signing](../POLICY_SIGNING.md) - KMS-based policy integrity
+- [Security Hardening](../SECURITY_HARDENING.md) - v1.16+ security features
