@@ -62,6 +62,9 @@ func (s *Sentinel) Keyring() (keyring.Keyring, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Log keychain security status on first keyring access
+		vault.LogKeychainSecurityStatus()
 	}
 
 	return s.keyringImpl, nil

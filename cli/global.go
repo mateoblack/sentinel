@@ -92,6 +92,9 @@ func (a *AwsVault) Keyring() (keyring.Keyring, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Log keychain security status on first keyring access
+		vault.LogKeychainSecurityStatus()
 	}
 
 	return a.keyringImpl, nil
