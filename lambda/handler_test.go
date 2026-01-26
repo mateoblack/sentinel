@@ -1435,10 +1435,12 @@ type mockRateLimiter struct {
 	retryAfter time.Duration
 	err        error
 	callCount  int
+	lastKey    string // Capture the last key used for rate limiting
 }
 
 func (m *mockRateLimiter) Allow(ctx context.Context, key string) (bool, time.Duration, error) {
 	m.callCount++
+	m.lastKey = key
 	return m.allowed, m.retryAfter, m.err
 }
 
@@ -1647,6 +1649,190 @@ func TestHandleRequest_RateLimitIntegration(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 3: statusCode = %d, want %d", resp.StatusCode, http.StatusTooManyRequests)
+	}
+}
+
+func TestHandleRequest_RateLimitKeyIsIAMARN(t *testing.T) {
+	// SECURITY: Rate limit key must be caller's IAM ARN (not IP) since IAM auth identifies the caller.
+	// This ensures rate limits are per-user, not per-source-IP (which could be shared by NAT).
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	limiter := &mockRateLimiter{
+		allowed: true,
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		RateLimiter:     limiter,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	// Verify rate limiter was called with IAM ARN as key
+	expectedKey := "arn:aws:iam::123456789012:user/testuser"
+	if limiter.lastKey != expectedKey {
+		t.Errorf("Rate limit key = %s, want %s (must be caller's IAM ARN)", limiter.lastKey, expectedKey)
+	}
+}
+
+func TestHandleRequest_RateLimitKeyIsolation(t *testing.T) {
+	// SECURITY: Different IAM users should have independent rate limits.
+	// This test verifies that user isolation is maintained.
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	limiter, err := ratelimit.NewMemoryRateLimiter(ratelimit.Config{
+		RequestsPerWindow: 1, // Only 1 request allowed per user
+		Window:            time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("NewMemoryRateLimiter failed: %v", err)
+	}
+	defer limiter.Close()
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		RateLimiter:     limiter,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	// First request from user1 should succeed
+	req1 := events.APIGatewayV2HTTPRequest{
+		QueryStringParameters: map[string]string{"profile": "arn:aws:iam::123456789012:role/prod-role"},
+		RequestContext: events.APIGatewayV2HTTPRequestContext{
+			Authorizer: &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{
+				IAM: &events.APIGatewayV2HTTPRequestContextAuthorizerIAMDescription{
+					AccountID: "123456789012",
+					UserARN:   "arn:aws:iam::123456789012:user/alice",
+					UserID:    "AIDAALICE",
+				},
+			},
+		},
+	}
+	resp1, err := handler.HandleRequest(ctx, req1)
+	if err != nil {
+		t.Fatalf("Request 1 (alice): HandleRequest() error: %v", err)
+	}
+	if resp1.StatusCode != http.StatusOK {
+		t.Errorf("Request 1 (alice): statusCode = %d, want %d", resp1.StatusCode, http.StatusOK)
+	}
+
+	// Second request from user1 should be rate limited
+	resp2, err := handler.HandleRequest(ctx, req1)
+	if err != nil {
+		t.Fatalf("Request 2 (alice): HandleRequest() error: %v", err)
+	}
+	if resp2.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("Request 2 (alice): statusCode = %d, want %d", resp2.StatusCode, http.StatusTooManyRequests)
+	}
+
+	// First request from user2 should succeed (independent rate limit)
+	req2 := events.APIGatewayV2HTTPRequest{
+		QueryStringParameters: map[string]string{"profile": "arn:aws:iam::123456789012:role/prod-role"},
+		RequestContext: events.APIGatewayV2HTTPRequestContext{
+			Authorizer: &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{
+				IAM: &events.APIGatewayV2HTTPRequestContextAuthorizerIAMDescription{
+					AccountID: "123456789012",
+					UserARN:   "arn:aws:iam::123456789012:user/bob",
+					UserID:    "AIDABOB",
+				},
+			},
+		},
+	}
+	resp3, err := handler.HandleRequest(ctx, req2)
+	if err != nil {
+		t.Fatalf("Request 3 (bob): HandleRequest() error: %v", err)
+	}
+	if resp3.StatusCode != http.StatusOK {
+		t.Errorf("Request 3 (bob): statusCode = %d, want %d (should succeed - independent rate limit)", resp3.StatusCode, http.StatusOK)
+	}
+}
+
+func TestHandleRequest_RateLimitEnforced(t *testing.T) {
+	// Verify rate limiting is enforced in handler: N requests allowed, N+1 denied.
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	const allowedCount = 5
+
+	// Create rate limiter that allows exactly allowedCount requests
+	limiter, err := ratelimit.NewMemoryRateLimiter(ratelimit.Config{
+		RequestsPerWindow: allowedCount,
+		Window:            time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("NewMemoryRateLimiter failed: %v", err)
+	}
+	defer limiter.Close()
+
+	cfg := &TVMConfig{
+		PolicyParameter: "/test/policy",
+		PolicyLoader:    &mockPolicyLoader{policy: allowAllPolicy()},
+		RateLimiter:     limiter,
+		STSClient:       mockClient,
+		Region:          "us-east-1",
+		DefaultDuration: 15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+
+	// First allowedCount requests should succeed
+	for i := 0; i < allowedCount; i++ {
+		resp, err := handler.HandleRequest(ctx, req)
+		if err != nil {
+			t.Fatalf("Request %d: HandleRequest() error: %v", i+1, err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Request %d: statusCode = %d, want %d", i+1, resp.StatusCode, http.StatusOK)
+		}
+	}
+
+	// Request allowedCount+1 should be rate limited
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("Request %d: HandleRequest() error: %v", allowedCount+1, err)
+	}
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("SECURITY VIOLATION: Request %d should be rate limited, got statusCode = %d",
+			allowedCount+1, resp.StatusCode)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "RATE_LIMITED" {
+		t.Errorf("Error code = %s, want RATE_LIMITED", errResp.Code)
 	}
 }
 
