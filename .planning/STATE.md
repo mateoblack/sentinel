@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 131-dynamodb-security
-Plan: 1 of 2 complete in current phase
-Status: In progress
-Last activity: 2026-01-26 — Completed 131-01 (Optimistic locking fix + state transition validation)
+Plan: 2 of 2 complete in current phase (PHASE COMPLETE)
+Status: Ready for next phase (132-keyring-protection)
+Last activity: 2026-01-26 — Completed 131-02 (Security regression tests for all DynamoDB stores)
 
-Progress: ████████████████████░░ 89% (234/263 estimated total plans)
+Progress: ████████████████████░░ 89% (235/263 estimated total plans)
 
 ## Milestone Summary
 
 **v1.18 Critical Security Hardening (IN PROGRESS):**
 - 10 phases (126-135), security milestone
 - Phases 126-128 complete (Policy Integrity, Break-Glass MFA, Audit Log Integrity)
-- Phase 131 in progress (DynamoDB Security - 1/2 plans complete)
+- Phase 131 COMPLETE (DynamoDB Security - 2/2 plans complete)
 - Phases 132-135 pending (Keyring Protection, Rate Limit Hardening, Input Sanitization, Security Validation)
 - Addresses P0 security threats from STRIDE threat model
 
@@ -54,7 +54,7 @@ See complete history in ROADMAP.md
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 228
+- Total plans completed: 229
 - Estimated remaining: ~35 plans (7 security + ~28 documentation)
 - Average duration: ~3.5 min per plan
 
@@ -137,9 +137,16 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Security regression tests with TestSecurityRegression_ prefix for CI filtering
 - Sanitized usernames are alphanumeric-only (a-z, A-Z, 0-9)
 
+**Phase 131 DynamoDB Security (Plan 01-02):**
+- Fixed optimistic locking bug: Update() now saves originalUpdatedAt before overwriting
+- Added ValidTransition() method to RequestStatus and BreakGlassStatus types
+- Added ErrInvalidStateTransition sentinel error to request and breakglass stores
+- Security regression tests: TestSecurityRegression_* prefix covers all DynamoDB stores
+- Tests verify conditional writes, optimistic locking, and state transition validation
+
 ### Pending Todos
 
-Execute 131-02-PLAN.md (DynamoDB security regression tests)
+None — Phase 131 complete, ready for Phase 132 (Keyring Protection)
 
 ### Blockers/Concerns
 
@@ -148,6 +155,6 @@ None — phases 129-135 are security implementation work.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 131-01-PLAN.md (Optimistic locking + state transition validation)
+Stopped at: Completed Phase 131 (DynamoDB Security - both plans)
 Resume file: None
-Next: Execute 131-02-PLAN.md (DynamoDB Security Regression Tests)
+Next: Phase 132 (Keyring Protection)
