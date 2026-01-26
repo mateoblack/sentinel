@@ -846,8 +846,8 @@ func (m *mockApprovalStore) ListByStatus(ctx context.Context, status request.Req
 
 // mockBreakGlassStore implements breakglass.Store for testing.
 type mockBreakGlassStore struct {
-	activeEvent   *breakglass.BreakGlassEvent
-	listByInvErr  error
+	activeEvent  *breakglass.BreakGlassEvent
+	listByInvErr error
 }
 
 func (m *mockBreakGlassStore) Create(ctx context.Context, event *breakglass.BreakGlassEvent) error {
@@ -1087,7 +1087,7 @@ func TestHandleRequest_NeitherOverride(t *testing.T) {
 	cfg := &TVMConfig{
 		PolicyParameter: "/test/policy",
 		PolicyLoader:    &mockPolicyLoader{policy: denyAllPolicy()},
-		ApprovalStore:   &mockApprovalStore{}, // Empty
+		ApprovalStore:   &mockApprovalStore{},   // Empty
 		BreakGlassStore: &mockBreakGlassStore{}, // Empty
 		STSClient:       mockClient,
 		Region:          "us-east-1",
@@ -1643,5 +1643,154 @@ func TestHandleRequest_RateLimitIntegration(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("Request 3: statusCode = %d, want %d", resp.StatusCode, http.StatusTooManyRequests)
+	}
+}
+
+// ============================================================================
+// Policy Signature Verification Tests (126-03)
+// ============================================================================
+
+// mockPolicyLoaderWithSignatureError returns signature verification errors.
+type mockPolicyLoaderWithSignatureError struct {
+	err error
+}
+
+func (m *mockPolicyLoaderWithSignatureError) Load(ctx context.Context, param string) (*policy.Policy, error) {
+	return nil, m.err
+}
+
+func TestHandleRequest_PolicySignatureInvalid(t *testing.T) {
+	// Verify handler returns 500 and generic message when signature is invalid
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called when signature verification fails")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter:      "/test/policy",
+		PolicyLoader:         &mockPolicyLoaderWithSignatureError{err: policy.ErrSignatureInvalid},
+		PolicySigningKeyID:   "arn:aws:kms:us-east-1:123456789012:key/test-key",
+		EnforcePolicySigning: true,
+		STSClient:            mockClient,
+		Region:               "us-east-1",
+		DefaultDuration:      15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should return 500 for signature verification failure
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusInternalServerError)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "POLICY_ERROR" {
+		t.Errorf("Error code = %s, want POLICY_ERROR", errResp.Code)
+	}
+
+	// SECURITY: Verify error message does NOT contain sensitive details
+	if errResp.Message != "Failed to load policy" {
+		t.Errorf("Error message should be generic, got: %s", errResp.Message)
+	}
+}
+
+func TestHandleRequest_PolicySignatureEnforced(t *testing.T) {
+	// Verify handler returns 500 when unsigned policy is loaded with enforcement
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called when signature enforcement blocks request")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter:      "/test/policy",
+		PolicyLoader:         &mockPolicyLoaderWithSignatureError{err: policy.ErrSignatureEnforced},
+		PolicySigningKeyID:   "arn:aws:kms:us-east-1:123456789012:key/test-key",
+		EnforcePolicySigning: true,
+		STSClient:            mockClient,
+		Region:               "us-east-1",
+		DefaultDuration:      15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should return 500 for signature enforcement failure
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusInternalServerError)
+	}
+
+	var errResp TVMError
+	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+		t.Fatalf("Failed to unmarshal error: %v", err)
+	}
+	if errResp.Code != "POLICY_ERROR" {
+		t.Errorf("Error code = %s, want POLICY_ERROR", errResp.Code)
+	}
+}
+
+func TestHandleRequest_PolicySignatureVerificationSuccess(t *testing.T) {
+	// Verify handler succeeds when policy signature is valid
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := &TVMConfig{
+		PolicyParameter:      "/test/policy",
+		PolicyLoader:         &mockPolicyLoader{policy: allowAllPolicy()},
+		PolicySigningKeyID:   "arn:aws:kms:us-east-1:123456789012:key/test-key",
+		EnforcePolicySigning: true,
+		STSClient:            mockClient,
+		Region:               "us-east-1",
+		DefaultDuration:      15 * time.Minute,
+	}
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	req := validIAMRequest("arn:aws:iam::123456789012:role/prod-role")
+	resp, err := handler.HandleRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("HandleRequest() error: %v", err)
+	}
+
+	// Should succeed with valid signature (mocked via allowAllPolicy)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HandleRequest() statusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+}
+
+func TestTVMConfig_SigningFieldsDocumented(t *testing.T) {
+	// Verify the signing configuration fields exist and are documented
+	cfg := &TVMConfig{
+		PolicySigningKeyID:   "alias/sentinel-policy-signing",
+		EnforcePolicySigning: true,
+	}
+
+	// Verify fields are accessible
+	if cfg.PolicySigningKeyID != "alias/sentinel-policy-signing" {
+		t.Errorf("PolicySigningKeyID = %s, want alias/sentinel-policy-signing", cfg.PolicySigningKeyID)
+	}
+
+	if !cfg.EnforcePolicySigning {
+		t.Error("EnforcePolicySigning should be true")
 	}
 }

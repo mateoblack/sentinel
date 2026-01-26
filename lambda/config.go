@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/mdm"
@@ -155,10 +156,59 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
+	// Configure policy signing verification first to determine loader chain.
+	// This needs to be done early to properly wrap the policy loader.
+	cfg.PolicySigningKeyID = os.Getenv(EnvPolicySigningKey)
+	if cfg.PolicySigningKeyID != "" {
+		// Default to enforcing signatures when a signing key is configured
+		cfg.EnforcePolicySigning = true
+
+		// Allow explicit override via environment variable
+		if enforceStr := os.Getenv(EnvEnforcePolicySigning); enforceStr != "" {
+			cfg.EnforcePolicySigning = enforceStr == "true"
+		}
+	} else {
+		// No signing key - check if enforcement was explicitly requested
+		if enforceStr := os.Getenv(EnvEnforcePolicySigning); enforceStr == "true" {
+			cfg.EnforcePolicySigning = true
+		}
+	}
+
+	// Validate signing configuration
+	if err := cfg.ValidateSigning(); err != nil {
+		return nil, err
+	}
+
 	// Create SSM-based policy loader with caching.
-	// The Loader implements PolicyLoader interface and uses SSM to fetch policies.
-	ssmLoader := policy.NewLoader(awsCfg)
-	cfg.PolicyLoader = policy.NewCachedLoader(ssmLoader, DefaultPolicyCacheTTL)
+	// The loader chain depends on whether signing is configured:
+	// - Without signing: SSM Loader -> CachedLoader
+	// - With signing: SSM RawLoader -> VerifyingLoader -> CachedLoader
+	var basePolicyLoader policy.PolicyLoader
+
+	if cfg.PolicySigningKeyID != "" {
+		// Create verifying loader chain for signed policies
+		ssmClient := ssm.NewFromConfig(awsCfg)
+		rawPolicyLoader := policy.NewLoaderWithRaw(ssmClient)
+		rawSigLoader := policy.NewLoaderWithRaw(ssmClient)
+
+		signer := policy.NewPolicySigner(awsCfg, cfg.PolicySigningKeyID)
+		basePolicyLoader = policy.NewVerifyingLoader(
+			rawPolicyLoader,
+			rawSigLoader,
+			signer,
+			policy.WithEnforcement(cfg.EnforcePolicySigning),
+		)
+
+		log.Printf("INFO: Policy signature verification enabled (key: %s, enforce: %v)",
+			cfg.PolicySigningKeyID, cfg.EnforcePolicySigning)
+	} else {
+		// Use simple SSM loader without signature verification
+		basePolicyLoader = policy.NewLoader(awsCfg)
+		log.Printf("INFO: Policy signature verification disabled (%s not set)", EnvPolicySigningKey)
+	}
+
+	// Wrap with cache for both paths
+	cfg.PolicyLoader = policy.NewCachedLoader(basePolicyLoader, DefaultPolicyCacheTTL)
 
 	// Create DynamoDB stores if tables are configured
 	if approvalTable := os.Getenv(EnvApprovalTable); approvalTable != "" {
@@ -254,33 +304,6 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 		log.Printf("INFO: Rate limiting enabled: %d requests per %v", rateLimitRequests, rateLimitWindow)
 	} else {
 		log.Printf("INFO: Rate limiting disabled")
-	}
-
-	// Configure policy signing verification
-	cfg.PolicySigningKeyID = os.Getenv(EnvPolicySigningKey)
-	if cfg.PolicySigningKeyID != "" {
-		// Default to enforcing signatures when a signing key is configured
-		cfg.EnforcePolicySigning = true
-
-		// Allow explicit override via environment variable
-		if enforceStr := os.Getenv(EnvEnforcePolicySigning); enforceStr != "" {
-			cfg.EnforcePolicySigning = enforceStr == "true"
-		}
-
-		log.Printf("INFO: Policy signature verification enabled (key: %s, enforce: %v)",
-			cfg.PolicySigningKeyID, cfg.EnforcePolicySigning)
-	} else {
-		// No signing key - check if enforcement was explicitly requested
-		if enforceStr := os.Getenv(EnvEnforcePolicySigning); enforceStr == "true" {
-			cfg.EnforcePolicySigning = true
-		}
-
-		// Validate signing configuration
-		if err := cfg.ValidateSigning(); err != nil {
-			return nil, err
-		}
-
-		log.Printf("INFO: Policy signature verification disabled (%s not set)", EnvPolicySigningKey)
 	}
 
 	return cfg, nil
