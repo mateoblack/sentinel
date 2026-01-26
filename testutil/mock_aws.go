@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -356,6 +357,56 @@ func (m *MockCloudTrailClient) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.LookupEventsCalls = nil
+}
+
+// ============================================================================
+// MockKMSClient - KMS operations
+// ============================================================================
+
+// MockKMSClient implements KMS client operations for testing.
+// Supports Sign and Verify operations for policy signing.
+type MockKMSClient struct {
+	mu sync.Mutex
+
+	// Configurable behavior functions
+	SignFunc   func(ctx context.Context, params *kms.SignInput, optFns ...func(*kms.Options)) (*kms.SignOutput, error)
+	VerifyFunc func(ctx context.Context, params *kms.VerifyInput, optFns ...func(*kms.Options)) (*kms.VerifyOutput, error)
+
+	// Call tracking
+	SignCalls   []*kms.SignInput
+	VerifyCalls []*kms.VerifyInput
+}
+
+// Sign implements KMS Sign operation.
+func (m *MockKMSClient) Sign(ctx context.Context, params *kms.SignInput, optFns ...func(*kms.Options)) (*kms.SignOutput, error) {
+	m.mu.Lock()
+	m.SignCalls = append(m.SignCalls, params)
+	m.mu.Unlock()
+
+	if m.SignFunc != nil {
+		return m.SignFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("Sign not implemented")
+}
+
+// Verify implements KMS Verify operation.
+func (m *MockKMSClient) Verify(ctx context.Context, params *kms.VerifyInput, optFns ...func(*kms.Options)) (*kms.VerifyOutput, error) {
+	m.mu.Lock()
+	m.VerifyCalls = append(m.VerifyCalls, params)
+	m.mu.Unlock()
+
+	if m.VerifyFunc != nil {
+		return m.VerifyFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("Verify not implemented")
+}
+
+// Reset clears all call tracking data.
+func (m *MockKMSClient) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.SignCalls = nil
+	m.VerifyCalls = nil
 }
 
 // ============================================================================
