@@ -281,7 +281,8 @@ aws dynamodb create-table \
         "Projection": {"ProjectionType": "ALL"}
       }
     ]' \
-  --billing-mode PAY_PER_REQUEST
+  --billing-mode PAY_PER_REQUEST \
+  --sse-specification Enabled=true,SSEType=KMS
 ```
 
 ### Break-Glass Table
@@ -308,7 +309,8 @@ aws dynamodb create-table \
         "Projection": {"ProjectionType": "ALL"}
       }
     ]' \
-  --billing-mode PAY_PER_REQUEST
+  --billing-mode PAY_PER_REQUEST \
+  --sse-specification Enabled=true,SSEType=KMS
 ```
 
 ### Sessions Table (Server Mode)
@@ -337,7 +339,8 @@ aws dynamodb create-table \
         "Projection": {"ProjectionType": "ALL"}
       }
     ]' \
-  --billing-mode PAY_PER_REQUEST
+  --billing-mode PAY_PER_REQUEST \
+  --sse-specification Enabled=true,SSEType=KMS
 ```
 
 ## Multi-Profile Configuration
