@@ -218,22 +218,22 @@ Plans:
 Plans:
 - [x] 140-01: Security hardening guide (1/1 plans) - completed 2026-01-26
 
-#### Phase 141: README & Examples Update
+#### Phase 141: README & Examples Update - COMPLETE
 
 **Goal**: Update README feature list and add examples for new features
 **Depends on**: Phase 140
 **Requirements**: README-01, README-02, README-03, README-04, EX-01, EX-02, EX-03, EX-04
 **Success Criteria** (what must be TRUE):
-  1. README mentions Lambda TVM, device posture, and policy signing in feature list
-  2. README feature list is complete through v1.18
-  3. Example policy demonstrates policy signing workflow
-  4. Example policy demonstrates device posture conditions
-  5. Terraform example shows KMS signing key creation
-  6. Lambda TVM deployment example includes signature verification configuration
-**Plans**: TBD
+  1. README mentions Lambda TVM, device posture, and policy signing in feature list - DONE
+  2. README feature list is complete through v1.18 - DONE
+  3. Example policy demonstrates policy signing workflow - DONE
+  4. Example policy demonstrates device posture conditions - DONE
+  5. Terraform example shows KMS signing key creation - DONE (via variables.tf)
+  6. Lambda TVM deployment example includes signature verification configuration - DONE
+**Plans**: 1 plan completed
 
 Plans:
-- [ ] 141-01: TBD (run /gsd:plan-phase 141 to break down)
+- [x] 141-01: README feature tables and example files (1/1 plans) - completed 2026-01-26
 
 #### Phase 142: Deployment Guide Review
 
@@ -665,6 +665,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
-| v1.19 Documentation & Completeness Audit | 136-142 | 5/? | 🚧 In Progress | - |
+| v1.19 Documentation & Completeness Audit | 136-142 | 6/? | 🚧 In Progress | - |
 
 **Totals:** 22 milestones shipped (135 phases, 257 plans shipped), 1 milestone in progress (7 phases)
