@@ -235,3 +235,114 @@ func TestLoadMDMAPIToken_PrefersSecretsManagerOverEnvVar(t *testing.T) {
 		t.Errorf("expected secrets-manager-token, got %s", token)
 	}
 }
+
+// ============================================================================
+// Policy Signing Configuration Tests
+// ============================================================================
+
+func TestTVMConfig_ValidateSigning_MissingKey(t *testing.T) {
+	// EnforcePolicySigning=true but no key set should error
+	cfg := &TVMConfig{
+		EnforcePolicySigning: true,
+		PolicySigningKeyID:   "",
+	}
+
+	err := cfg.ValidateSigning()
+	if err == nil {
+		t.Error("expected error when EnforcePolicySigning=true but PolicySigningKeyID is empty")
+	}
+
+	expectedErr := "SENTINEL_POLICY_SIGNING_KEY required when SENTINEL_ENFORCE_POLICY_SIGNING=true"
+	if err.Error() != expectedErr {
+		t.Errorf("expected error %q, got %q", expectedErr, err.Error())
+	}
+}
+
+func TestTVMConfig_ValidateSigning_Valid(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     *TVMConfig
+		wantErr bool
+	}{
+		{
+			name: "enforce_true_with_key",
+			cfg: &TVMConfig{
+				EnforcePolicySigning: true,
+				PolicySigningKeyID:   "arn:aws:kms:us-east-1:123456789012:key/test-key",
+			},
+			wantErr: false,
+		},
+		{
+			name: "enforce_false_without_key",
+			cfg: &TVMConfig{
+				EnforcePolicySigning: false,
+				PolicySigningKeyID:   "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "enforce_false_with_key",
+			cfg: &TVMConfig{
+				EnforcePolicySigning: false,
+				PolicySigningKeyID:   "arn:aws:kms:us-east-1:123456789012:key/test-key",
+			},
+			wantErr: false,
+		},
+		{
+			name: "key_alias_format",
+			cfg: &TVMConfig{
+				EnforcePolicySigning: true,
+				PolicySigningKeyID:   "alias/sentinel-policy-signing",
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.ValidateSigning()
+			if tt.wantErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestTVMConfig_SigningFieldsExist(t *testing.T) {
+	// Verify signing fields are accessible on TVMConfig
+	cfg := &TVMConfig{
+		PolicySigningKeyID:   "test-key-id",
+		EnforcePolicySigning: true,
+	}
+
+	if cfg.PolicySigningKeyID != "test-key-id" {
+		t.Errorf("PolicySigningKeyID = %s, want test-key-id", cfg.PolicySigningKeyID)
+	}
+
+	if !cfg.EnforcePolicySigning {
+		t.Error("EnforcePolicySigning should be true")
+	}
+}
+
+func TestEnvVariableNames_PolicySigning(t *testing.T) {
+	// Verify environment variable names for policy signing
+	tests := []struct {
+		name     string
+		constant string
+		expected string
+	}{
+		{"PolicySigningKey", EnvPolicySigningKey, "SENTINEL_POLICY_SIGNING_KEY"},
+		{"EnforcePolicySigning", EnvEnforcePolicySigning, "SENTINEL_ENFORCE_POLICY_SIGNING"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, tt.constant)
+			}
+		})
+	}
+}

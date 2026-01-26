@@ -40,6 +40,10 @@ const (
 	// Rate limiting configuration environment variables.
 	EnvRateLimitRequests = "SENTINEL_RATE_LIMIT_REQUESTS" // Max requests per window (default: 100, 0 to disable)
 	EnvRateLimitWindow   = "SENTINEL_RATE_LIMIT_WINDOW"   // Window duration in seconds (default: 60)
+
+	// Policy signing configuration environment variables.
+	EnvPolicySigningKey     = "SENTINEL_POLICY_SIGNING_KEY"     // KMS key ARN for verifying policy signatures
+	EnvEnforcePolicySigning = "SENTINEL_ENFORCE_POLICY_SIGNING" // "true" to reject unsigned policies (default: true if signing key set)
 )
 
 // Default configuration values.
@@ -119,6 +123,19 @@ type TVMConfig struct {
 	// If nil, rate limiting is disabled.
 	// Rate limits by caller's IAM user ARN (not IP) since IAM auth identifies the caller.
 	RateLimiter ratelimit.RateLimiter
+
+	// PolicySigningKeyID is the KMS key ARN for verifying policy signatures.
+	// If set, policies will have their signatures validated before use.
+	// Unsigned policies are handled based on EnforcePolicySigning.
+	// Environment variable: SENTINEL_POLICY_SIGNING_KEY
+	PolicySigningKeyID string
+
+	// EnforcePolicySigning controls whether unsigned policies are rejected.
+	// If true, policies without valid signatures return an error.
+	// If false, unsigned policies are allowed with a warning log.
+	// Default: true when PolicySigningKeyID is set.
+	// Environment variable: SENTINEL_ENFORCE_POLICY_SIGNING (default: "true" if signing key set)
+	EnforcePolicySigning bool
 }
 
 // LoadConfigFromEnv creates a TVMConfig from environment variables.
@@ -239,6 +256,33 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 		log.Printf("INFO: Rate limiting disabled")
 	}
 
+	// Configure policy signing verification
+	cfg.PolicySigningKeyID = os.Getenv(EnvPolicySigningKey)
+	if cfg.PolicySigningKeyID != "" {
+		// Default to enforcing signatures when a signing key is configured
+		cfg.EnforcePolicySigning = true
+
+		// Allow explicit override via environment variable
+		if enforceStr := os.Getenv(EnvEnforcePolicySigning); enforceStr != "" {
+			cfg.EnforcePolicySigning = enforceStr == "true"
+		}
+
+		log.Printf("INFO: Policy signature verification enabled (key: %s, enforce: %v)",
+			cfg.PolicySigningKeyID, cfg.EnforcePolicySigning)
+	} else {
+		// No signing key - check if enforcement was explicitly requested
+		if enforceStr := os.Getenv(EnvEnforcePolicySigning); enforceStr == "true" {
+			cfg.EnforcePolicySigning = true
+		}
+
+		// Validate signing configuration
+		if err := cfg.ValidateSigning(); err != nil {
+			return nil, err
+		}
+
+		log.Printf("INFO: Policy signature verification disabled (%s not set)", EnvPolicySigningKey)
+	}
+
 	return cfg, nil
 }
 
@@ -300,4 +344,13 @@ func loadMDMAPIToken(ctx context.Context, awsCfg aws.Config, secretsLoader Secre
 
 	// Neither configured - return empty (MDM provider will fail to initialize)
 	return "", nil
+}
+
+// ValidateSigning validates the policy signing configuration.
+// Returns an error if enforcement is enabled but no signing key is set.
+func (c *TVMConfig) ValidateSigning() error {
+	if c.EnforcePolicySigning && c.PolicySigningKeyID == "" {
+		return fmt.Errorf("%s required when %s=true", EnvPolicySigningKey, EnvEnforcePolicySigning)
+	}
+	return nil
 }
