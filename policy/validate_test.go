@@ -477,3 +477,112 @@ func TestPolicy_Validate_EmptyVersion(t *testing.T) {
 		t.Errorf("error %q does not contain 'unsupported policy version'", err.Error())
 	}
 }
+
+func TestValidatePolicy_Valid(t *testing.T) {
+	validYAML := `
+version: "1"
+rules:
+  - name: "allow-prod"
+    effect: allow
+    conditions:
+      profiles:
+        - prod
+`
+	err := ValidatePolicy([]byte(validYAML))
+	if err != nil {
+		t.Errorf("ValidatePolicy failed for valid YAML: %v", err)
+	}
+}
+
+func TestValidatePolicy_InvalidYAML(t *testing.T) {
+	invalidYAML := `
+version: "1"
+rules:
+  - name: missing closing bracket
+    effect: [allow
+`
+	err := ValidatePolicy([]byte(invalidYAML))
+	if err == nil {
+		t.Error("expected error for invalid YAML, got nil")
+		return
+	}
+	if !strings.Contains(err.Error(), "parse error") {
+		t.Errorf("error %q does not contain 'parse error'", err.Error())
+	}
+}
+
+func TestValidatePolicy_InvalidSchema(t *testing.T) {
+	// Valid YAML but missing rule name
+	invalidSchema := `
+version: "1"
+rules:
+  - effect: allow
+    conditions:
+      profiles:
+        - prod
+`
+	err := ValidatePolicy([]byte(invalidSchema))
+	if err == nil {
+		t.Error("expected error for invalid schema, got nil")
+		return
+	}
+	if !strings.Contains(err.Error(), "validation error") {
+		t.Errorf("error %q does not contain 'validation error'", err.Error())
+	}
+	if !strings.Contains(err.Error(), "missing name") {
+		t.Errorf("error %q does not contain 'missing name'", err.Error())
+	}
+}
+
+func TestValidatePolicyFromReader(t *testing.T) {
+	validYAML := `
+version: "1"
+rules:
+  - name: "reader-test"
+    effect: deny
+    conditions:
+      users:
+        - admin
+`
+	reader := strings.NewReader(validYAML)
+	err := ValidatePolicyFromReader(reader)
+	if err != nil {
+		t.Errorf("ValidatePolicyFromReader failed for valid YAML: %v", err)
+	}
+}
+
+func TestValidatePolicyFromReader_Invalid(t *testing.T) {
+	invalidYAML := `not valid yaml: [[[`
+	reader := strings.NewReader(invalidYAML)
+	err := ValidatePolicyFromReader(reader)
+	if err == nil {
+		t.Error("expected error for invalid YAML, got nil")
+		return
+	}
+	if !strings.Contains(err.Error(), "parse error") {
+		t.Errorf("error %q does not contain 'parse error'", err.Error())
+	}
+}
+
+func TestValidatePolicy_UnsupportedVersion(t *testing.T) {
+	yamlWithBadVersion := `
+version: "99"
+rules:
+  - name: "test"
+    effect: allow
+    conditions:
+      profiles:
+        - test
+`
+	err := ValidatePolicy([]byte(yamlWithBadVersion))
+	if err == nil {
+		t.Error("expected error for unsupported version, got nil")
+		return
+	}
+	if !strings.Contains(err.Error(), "validation error") {
+		t.Errorf("error %q does not contain 'validation error'", err.Error())
+	}
+	if !strings.Contains(err.Error(), "unsupported policy version") {
+		t.Errorf("error %q does not contain 'unsupported policy version'", err.Error())
+	}
+}

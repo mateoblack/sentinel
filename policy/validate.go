@@ -2,6 +2,7 @@ package policy
 
 import (
 	"fmt"
+	"io"
 	"regexp"
 	"time"
 )
@@ -109,4 +110,28 @@ func validateHourFormat(timeStr string) error {
 		return fmt.Errorf("invalid hour format '%s'", timeStr)
 	}
 	return nil
+}
+
+// ValidatePolicy validates a policy from raw YAML bytes.
+// Returns a detailed error if validation fails, nil if valid.
+// This is the entry point for CLI validation commands.
+func ValidatePolicy(data []byte) error {
+	p, err := ParsePolicy(data)
+	if err != nil {
+		return fmt.Errorf("parse error: %w", err)
+	}
+	if err := p.Validate(); err != nil {
+		return fmt.Errorf("validation error: %w", err)
+	}
+	return nil
+}
+
+// ValidatePolicyFromReader validates a policy from an io.Reader.
+// Convenient for validating files.
+func ValidatePolicyFromReader(r io.Reader) error {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("failed to read policy: %w", err)
+	}
+	return ValidatePolicy(data)
 }
