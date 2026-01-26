@@ -55,12 +55,15 @@ func WithEnforcement(enforce bool) VerifyingLoaderOption {
 // policyLoader is used to load the policy YAML content.
 // sigLoader is used to load the signature parameters (can be the same loader, different prefix).
 // signer is used for cryptographic signature verification.
+//
+// By default, enforcement is enabled (enforce: true), which rejects unsigned policies.
+// Use WithEnforcement(false) to allow unsigned policies with a warning log.
 func NewVerifyingLoader(policyLoader, sigLoader RawPolicyLoader, signer *PolicySigner, opts ...VerifyingLoaderOption) *VerifyingLoader {
 	v := &VerifyingLoader{
 		policyLoader: policyLoader,
 		sigLoader:    sigLoader,
 		signer:       signer,
-		enforce:      false, // Default: warn only, for backward compatibility
+		enforce:      true, // Default: enforce (reject unsigned policies)
 	}
 	for _, opt := range opts {
 		opt(v)
