@@ -270,8 +270,8 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 	// Load policy
 	loadedPolicy, err := s.config.PolicyLoader.Load(ctx, s.config.PolicyParameter)
 	if err != nil {
-		log.Printf("Failed to load policy: %v", err)
-		writeErrorMessage(w, fmt.Sprintf("Failed to load policy: %v", err), http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to load policy from %s: %v", s.config.PolicyParameter, err)
+		writeErrorMessage(w, "Failed to load policy", http.StatusInternalServerError)
 		return
 	}
 
@@ -372,8 +372,8 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 	// Retrieve credentials with SourceIdentity stamping
 	creds, err := s.config.CredentialProvider.GetCredentialsWithSourceIdentity(ctx, credReq)
 	if err != nil {
-		log.Printf("Failed to retrieve credentials: %v", err)
-		writeErrorMessage(w, fmt.Sprintf("Failed to retrieve credentials: %v", err), http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to retrieve credentials for profile=%s: %v", s.config.ProfileName, err)
+		writeErrorMessage(w, "Failed to retrieve credentials", http.StatusInternalServerError)
 		return
 	}
 
