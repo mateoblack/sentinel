@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 
 ## Current Position
 
-Phase: 124 of 125 (Policy Diff Command)
+Phase: 125 of 125 (Policy Validate Command)
 Plan: 1 of 1 complete
-Status: Phase complete
-Last activity: 2026-01-26 — Completed 124-01-PLAN.md
+Status: Phase complete, Milestone complete
+Last activity: 2026-01-26 — Completed 125-01-PLAN.md
 
-Progress: ████████░░ 80%
+Progress: ██████████ 100%
 
 ## Milestone Summary
 
@@ -56,9 +56,9 @@ Progress: ████████░░ 80%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 223
+- Total plans completed: 228
 - Average duration: ~3.5 min
-- Total execution time: ~816 min
+- Total execution time: ~841 min
 
 **By Milestone:**
 
@@ -83,6 +83,7 @@ Progress: ████████░░ 80%
 | v1.14 Server-Side Credential Vending | 7 | 19 | ~49 min |
 | v1.15 Device Posture | 9 | 12 | ~41 min |
 | v1.16 Security Hardening | 8 | 9 | ~21 min |
+| v1.17 Policy Developer Experience | 5 | 5 | ~25 min |
 
 ## Accumulated Context
 
@@ -173,6 +174,11 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Use LCS algorithm for unified diff generation
 - Color output enabled by default, --no-color flag to disable
 
+**v1.17 Policy Developer Experience decisions (Phase 125):**
+- Exit code 0 = valid, exit code 1 = invalid (scripting-friendly)
+- No AWS credentials required - pure local YAML validation
+- Success message to stderr (unless --quiet) to keep stdout clean
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -196,9 +202,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 124-01-PLAN.md (Phase 124 complete)
+Stopped at: Completed 125-01-PLAN.md (Phase 125 complete, v1.17 milestone complete)
 Resume file: None
-Next: Phase 125 planning
+Next: Milestone completion
 
 ## Roadmap Evolution
 
