@@ -190,16 +190,16 @@ Plans:
 - [x] 131-01: Fix optimistic locking bug + state transition validation (session/dynamodb.go Update fix, request/breakglass state validation) — completed 2026-01-26
 - [x] 131-02: Security regression tests (TestSecurityRegression_ tests for all three DynamoDB stores) — completed 2026-01-26
 
-#### Phase 132: Keyring Protection (In Progress)
+#### Phase 132: Keyring Protection ✅
 
 **Goal**: Secure credential storage with access controls and encryption
 **Depends on**: Phase 131
-**Research**: Unlikely (existing keyring library provides platform-specific security options)
-**Plans**: 1/2
+**Completed**: 2026-01-26
+**Plans**: 2/2
 
 Plans:
 - [x] 132-01: Keyring security hardening (macOS Keychain ACLs, Linux keyctl permissions, iCloud sync prevention) — completed 2026-01-26
-- [ ] 132-02: Security regression tests (TestSecurityRegression_* tests for keyring item properties)
+- [x] 132-02: Security regression tests (TestSecurityRegression_* tests for keyring item properties) — completed 2026-01-26
 
 #### Phase 133: Rate Limit Hardening
 
@@ -762,7 +762,7 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
-| v1.18 Critical Security Hardening | 126-135 | 15/? | 🚧 In Progress | - |
+| v1.18 Critical Security Hardening | 126-135 | 16/? | 🚧 In Progress | - |
 | v1.19 Documentation & Completeness Audit | 136-142 | 0/? | ⏳ Pending | - |
 
 **Totals:** 21 milestones shipped (125 phases, 230 plans shipped), 1 milestone in progress (10 phases), 1 milestone pending (7 phases)

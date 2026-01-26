@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 
 ## Current Position
 
-Phase: 132-keyring-protection
-Plan: 1 of 2 complete
-Status: In progress
-Last activity: 2026-01-26 — Completed 132-01-PLAN.md (Keyring protection hardening)
+Phase: 132-keyring-protection COMPLETE
+Plan: 2 of 2 complete
+Status: Phase complete
+Last activity: 2026-01-26 — Completed 132-02-PLAN.md (Security regression tests)
 
-Progress: ████████████████████░░ 90% (236/263 estimated total plans)
+Progress: █████████████████████░ 91% (237/263 estimated total plans)
 
 ## Milestone Summary
 
@@ -22,7 +22,7 @@ Progress: ████████████████████░░ 90%
 - 10 phases (126-135), security milestone
 - Phases 126-128 complete (Policy Integrity, Break-Glass MFA, Audit Log Integrity)
 - Phase 131 COMPLETE (DynamoDB Security - 2/2 plans complete)
-- Phase 132 IN PROGRESS (Keyring Protection - 1/2 plans complete)
+- Phase 132 COMPLETE (Keyring Protection - 2/2 plans complete)
 - Phases 133-135 pending (Rate Limit Hardening, Input Sanitization, Security Validation)
 - Addresses P0 security threats from STRIDE threat model
 
@@ -66,7 +66,7 @@ Last 5 milestones:
 - v1.15: 9 phases, 12 plans, ~41 min
 - v1.16: 8 phases, 9 plans, ~21 min
 - v1.17: 5 phases, 5 plans, ~25 min
-- v1.18: 6 phases complete (126-131), 4 phases remaining (132-135)
+- v1.18: 7 phases complete (126-132), 3 phases remaining (133-135)
 
 ## Accumulated Context
 
@@ -145,15 +145,17 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Security regression tests: TestSecurityRegression_* prefix covers all DynamoDB stores
 - Tests verify conditional writes, optimistic locking, and state transition validation
 
-**Phase 132 Keyring Protection (Plan 01):**
+**Phase 132 Keyring Protection (Plan 01-02):**
 - macOS Keychain: KeychainAccessibleWhenUnlocked: false (locked device protection)
 - macOS Keychain: KeychainSynchronizable: false at config and item level (defense in depth)
 - macOS Keychain: KeychainNotTrustApplication: true on all items
 - Linux keyctl: possessor-only permissions (0x3f000000) prevents same-user access
+- Security regression tests for all keyring stores (Credential, Session, OIDC)
+- mockKeyringCapture pattern for verifying Item properties
 
 ### Pending Todos
 
-None — Phase 132 Plan 01 complete, ready for 132-02 security tests
+None — Phase 132 complete, ready for Phase 133 (Rate Limit Hardening)
 
 ### Blockers/Concerns
 
@@ -162,6 +164,6 @@ None — phases 129-135 are security implementation work.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 132-01-PLAN.md (Keyring protection hardening)
+Stopped at: Completed 132-02-PLAN.md (Security regression tests)
 Resume file: None
-Next: Execute 132-02-PLAN.md (Security regression tests)
+Next: Plan Phase 133 (Rate Limit Hardening)
