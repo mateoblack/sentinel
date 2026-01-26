@@ -5,18 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Planning next milestone (v2.0)
+**Current focus:** UAT fixes for v1.19
 
 ## Current Position
 
-Phase: 142 of 142 (complete)
-Plan: N/A
-Status: v1.19 Documentation & Completeness Audit shipped
-Last activity: 2026-01-26 — Completed v1.19 milestone
+Phase: 143 of 143 (143-uat-fixes)
+Plan: 1 of 1 in current phase
+Status: In progress
+Last activity: 2026-01-26 — Completed 143-01-PLAN.md
 
-Progress: ██████████████████████ 100% (23 milestones shipped, 142 phases complete)
+Progress: ██████████████████████ 100% (143 phases complete)
 
 ## Milestone Summary
+
+**143-uat-fixes (In Progress):**
+- Phase 143: UAT fixes for v1.19 verification testing
+- Fixed: panic removal, constant-time comparison, enforce default, keyring validation
 
 **v1.19 Documentation & Completeness Audit (SHIPPED 2026-01-26):**
 - 7 phases (136-142), documentation milestone
@@ -52,9 +56,14 @@ Key decisions logged in PROJECT.md Key Decisions table.
 
 v1.19 decisions archived in milestones/v1.19-ROADMAP.md.
 
+**143-01 decisions:**
+- Changed ProfileSection/SSOSessionSection to return (Type, bool, error) for graceful error handling
+- Used crypto/subtle.ConstantTimeCompare for security-sensitive hash comparisons
+- Flipped enforce default to true for security-by-default
+
 ### Pending Todos
 
-None — milestone complete, ready for v2.0 planning
+None — UAT fixes plan complete
 
 ### Blockers/Concerns
 
@@ -63,6 +72,6 @@ None
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed v1.19 Documentation & Completeness Audit milestone
+Stopped at: Completed 143-01-PLAN.md (UAT fixes)
 Resume file: None
-Next: /gsd:discuss-milestone for v2.0 planning
+Next: Continue with phase 143 or verify fixes
