@@ -27,6 +27,9 @@ var (
 	// ErrConcurrentModification is returned when an update fails due to optimistic
 	// locking - another process modified the event between read and write.
 	ErrConcurrentModification = errors.New("concurrent modification detected")
+
+	// ErrInvalidStateTransition is returned when attempting an invalid status transition.
+	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
 
 // Store defines the interface for break-glass event persistence.

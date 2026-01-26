@@ -74,15 +74,15 @@ type dynamoItem struct {
 	Profile       string `dynamodbav:"profile"`
 	ReasonCode    string `dynamodbav:"reason_code"`
 	Justification string `dynamodbav:"justification"`
-	Duration      int64  `dynamodbav:"duration"`     // nanoseconds
-	Status        string `dynamodbav:"status"`       // BreakGlassStatus as string
-	CreatedAt     string `dynamodbav:"created_at"`   // RFC3339Nano
-	UpdatedAt     string `dynamodbav:"updated_at"`   // RFC3339Nano
-	ExpiresAt     string `dynamodbav:"expires_at"`   // RFC3339Nano
-	TTL           int64  `dynamodbav:"ttl"`          // Unix timestamp for DynamoDB TTL
-	ClosedBy      string `dynamodbav:"closed_by"`    // may be empty
+	Duration      int64  `dynamodbav:"duration"`      // nanoseconds
+	Status        string `dynamodbav:"status"`        // BreakGlassStatus as string
+	CreatedAt     string `dynamodbav:"created_at"`    // RFC3339Nano
+	UpdatedAt     string `dynamodbav:"updated_at"`    // RFC3339Nano
+	ExpiresAt     string `dynamodbav:"expires_at"`    // RFC3339Nano
+	TTL           int64  `dynamodbav:"ttl"`           // Unix timestamp for DynamoDB TTL
+	ClosedBy      string `dynamodbav:"closed_by"`     // may be empty
 	ClosedReason  string `dynamodbav:"closed_reason"` // may be empty
-	RequestID     string `dynamodbav:"request_id"`   // may be empty
+	RequestID     string `dynamodbav:"request_id"`    // may be empty
 }
 
 // eventToItem converts a BreakGlassEvent to a DynamoDB item structure.
@@ -188,8 +188,23 @@ func (s *DynamoDBStore) Get(ctx context.Context, id string) (*BreakGlassEvent, e
 // Update modifies an existing event using optimistic locking.
 // Returns ErrEventNotFound if event doesn't exist.
 // Returns ErrConcurrentModification if event was modified since last read.
+// Returns ErrInvalidStateTransition if the status transition is not allowed.
 // Note: Update() sets UpdatedAt internally - callers should NOT set it before calling.
 func (s *DynamoDBStore) Update(ctx context.Context, event *BreakGlassEvent) error {
+	// Get current item to validate state transition
+	current, err := s.Get(ctx, event.ID)
+	if err != nil {
+		if errors.Is(err, ErrEventNotFound) {
+			return fmt.Errorf("%s: %w", event.ID, ErrEventNotFound)
+		}
+		return err
+	}
+
+	// Validate state transition
+	if !current.Status.ValidTransition(event.Status) {
+		return fmt.Errorf("%s to %s: %w", current.Status, event.Status, ErrInvalidStateTransition)
+	}
+
 	// Save original UpdatedAt for optimistic lock condition check
 	originalUpdatedAt := event.UpdatedAt
 
@@ -338,10 +353,10 @@ func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, ke
 	}
 
 	output, err := s.client.Query(ctx, &dynamodb.QueryInput{
-		TableName:                 aws.String(s.tableName),
-		IndexName:                 aws.String(indexName),
-		KeyConditionExpression:    aws.String(keyCondition),
-		ExpressionAttributeNames:  exprAttrNames,
+		TableName:                aws.String(s.tableName),
+		IndexName:                aws.String(indexName),
+		KeyConditionExpression:   aws.String(keyCondition),
+		ExpressionAttributeNames: exprAttrNames,
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":v": &types.AttributeValueMemberS{Value: keyValue},
 		},

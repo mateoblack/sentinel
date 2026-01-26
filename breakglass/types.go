@@ -81,6 +81,26 @@ func (s BreakGlassStatus) IsTerminal() bool {
 	return false
 }
 
+// ValidTransition returns true if transitioning from current status to newStatus is allowed.
+// Break-glass events only allow forward transitions from active to closed/expired.
+func (s BreakGlassStatus) ValidTransition(newStatus BreakGlassStatus) bool {
+	// Same status is always valid (idempotent update)
+	if s == newStatus {
+		return true
+	}
+	// Only active can transition to other states
+	if s != StatusActive {
+		return false
+	}
+	// From active, can only go to closed or expired
+	switch newStatus {
+	case StatusClosed, StatusExpired:
+		return true
+	default:
+		return false
+	}
+}
+
 // ReasonCode represents predefined categories for break-glass justification.
 // Users must select a reason code and provide detailed justification.
 type ReasonCode string
