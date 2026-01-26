@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 126 of 135 (Policy Integrity)
-Plan: 1 of 1 in current phase
-Status: In progress
-Last activity: 2026-01-26 — Completed 126-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Complete
+Last activity: 2026-01-26 — Completed 126-02-PLAN.md
 
-Progress: █░░░░░░░░░ 10%
+Progress: ██░░░░░░░░ 20%
 
 ## Milestone Summary
 
@@ -75,9 +75,9 @@ Progress: █░░░░░░░░░ 10%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 229
+- Total plans completed: 231
 - Average duration: ~3.5 min
-- Total execution time: ~871 min
+- Total execution time: ~886 min
 
 **By Milestone:**
 
@@ -198,11 +198,18 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - No AWS credentials required - pure local YAML validation
 - Success message to stderr (unless --quiet) to keep stdout clean
 
-**v1.18 Critical Security Hardening decisions (Phase 126):**
+**v1.18 Critical Security Hardening decisions (Phase 126, Plan 01):**
 - Use MessageType RAW for KMS signing (KMS handles hashing internally)
 - Return (false, nil) for invalid signatures - not an error, just validation result
 - KMSInvalidSignatureException handled gracefully as (false, nil)
 - SHA-256 hex-encoded hash in metadata for quick tamper detection
+
+**v1.18 Critical Security Hardening decisions (Phase 126, Plan 02):**
+- RawPolicyLoader interface for signature verification on raw bytes
+- SignatureEnvelope JSON format for storing signature + metadata
+- Base64-encoded signatures in JSON output for portability
+- Exit code 0 = valid, 1 = invalid for scripting (verify command)
+- Policy push signs AFTER uploading policy (not atomic but simpler)
 
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
@@ -227,9 +234,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 126-01-PLAN.md (KMS policy signing infrastructure)
+Stopped at: Completed 126-02-PLAN.md (Signed policy verification and CLI commands)
 Resume file: None
-Next: Plan or execute remaining plans in Phase 126
+Next: Plan or execute Phase 127
 
 ## Roadmap Evolution
 
