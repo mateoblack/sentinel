@@ -154,6 +154,17 @@ type BreakGlassEvent struct {
 
 	// RequestID is the Sentinel request ID for CloudTrail correlation.
 	RequestID string `yaml:"request_id,omitempty" json:"request_id,omitempty"`
+
+	// MFAVerified indicates whether MFA was successfully verified before access.
+	MFAVerified bool `yaml:"mfa_verified,omitempty" json:"mfa_verified,omitempty"`
+
+	// MFAMethod is the MFA method used for verification (totp, sms).
+	// Empty if MFAVerified is false.
+	MFAMethod string `yaml:"mfa_method,omitempty" json:"mfa_method,omitempty"`
+
+	// MFAChallengeID is the challenge ID used for MFA verification.
+	// Empty for TOTP (stateless) or if MFAVerified is false.
+	MFAChallengeID string `yaml:"mfa_challenge_id,omitempty" json:"mfa_challenge_id,omitempty"`
 }
 
 // breakGlassIDRegex matches valid break-glass IDs (16 lowercase hex chars).

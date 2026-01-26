@@ -14,6 +14,7 @@ import (
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
+	"github.com/byteness/aws-vault/v7/mfa"
 	"github.com/byteness/aws-vault/v7/notification"
 )
 
@@ -50,16 +51,30 @@ type BreakGlassCommandInput struct {
 	// STSClient is an optional STS client for AWS identity extraction.
 	// If nil, a new client will be created from AWS config.
 	STSClient identity.STSAPI
+
+	// MFAVerifier is an optional MFA verifier for multi-factor authentication.
+	// If nil and policy requires MFA, the command will fail.
+	MFAVerifier mfa.Verifier
+
+	// MFACode is an optional pre-provided MFA code for non-interactive use.
+	// If provided along with MFAChallengeID, skips the challenge phase.
+	MFACode string
+
+	// MFAChallengeID is an optional challenge ID for SMS MFA verification.
+	// Must be provided with MFACode for SMS verification.
+	MFAChallengeID string
 }
 
 // BreakGlassCommandOutput represents the JSON output from the breakglass command.
 type BreakGlassCommandOutput struct {
-	EventID    string    `json:"event_id"`
-	Profile    string    `json:"profile"`
-	ReasonCode string    `json:"reason_code"`
-	Status     string    `json:"status"`
-	ExpiresAt  time.Time `json:"expires_at"`
-	RequestID  string    `json:"request_id,omitempty"`
+	EventID     string    `json:"event_id"`
+	Profile     string    `json:"profile"`
+	ReasonCode  string    `json:"reason_code"`
+	Status      string    `json:"status"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	RequestID   string    `json:"request_id,omitempty"`
+	MFAVerified bool      `json:"mfa_verified,omitempty"`
+	MFAMethod   string    `json:"mfa_method,omitempty"`
 }
 
 // ConfigureBreakGlassCommand sets up the breakglass command with kingpin.
@@ -93,6 +108,12 @@ func ConfigureBreakGlassCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses --profile if not specified)").
 		StringVar(&input.AWSProfile)
+
+	cmd.Flag("mfa-code", "MFA verification code (6 digits)").
+		StringVar(&input.MFACode)
+
+	cmd.Flag("mfa-challenge-id", "MFA challenge ID (for SMS verification)").
+		StringVar(&input.MFAChallengeID)
 
 	cmd.Action(func(c *kingpin.ParseContext) error {
 		err := BreakGlassCommand(context.Background(), input, s)
@@ -149,9 +170,10 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 	}
 
 	// 4.5 Check break-glass policy authorization if policy is provided
+	var matchedRule *breakglass.BreakGlassPolicyRule
 	if input.BreakGlassPolicy != nil {
-		rule := breakglass.FindBreakGlassPolicyRule(input.BreakGlassPolicy, input.ProfileName)
-		if rule == nil {
+		matchedRule = breakglass.FindBreakGlassPolicyRule(input.BreakGlassPolicy, input.ProfileName)
+		if matchedRule == nil {
 			// Policy exists but no rule matches - deny access
 			errMsg := fmt.Sprintf("No break-glass policy rule matches profile %q", input.ProfileName)
 			fmt.Fprintf(os.Stderr, "%s\n", errMsg)
@@ -159,17 +181,17 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 		}
 
 		// Check full authorization (user, reason code, time window, duration)
-		if !breakglass.IsBreakGlassAllowed(rule, username, reasonCode, time.Now(), input.Duration) {
+		if !breakglass.IsBreakGlassAllowed(matchedRule, username, reasonCode, time.Now(), input.Duration) {
 			// Determine specific reason for denial
-			if !breakglass.CanInvokeBreakGlass(rule, username) {
+			if !breakglass.CanInvokeBreakGlass(matchedRule, username) {
 				errMsg := fmt.Sprintf("Not authorized to invoke break-glass for profile %q", input.ProfileName)
 				fmt.Fprintf(os.Stderr, "%s\n", errMsg)
 				return errors.New(errMsg)
 			}
 			// Check reason code (empty = all allowed)
-			if len(rule.AllowedReasonCodes) > 0 {
+			if len(matchedRule.AllowedReasonCodes) > 0 {
 				found := false
-				for _, rc := range rule.AllowedReasonCodes {
+				for _, rc := range matchedRule.AllowedReasonCodes {
 					if rc == reasonCode {
 						found = true
 						break
@@ -182,17 +204,78 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 				}
 			}
 			// Check time window
-			if rule.Time != nil {
+			if matchedRule.Time != nil {
 				errMsg := "Break-glass not allowed at this time"
 				fmt.Fprintf(os.Stderr, "%s\n", errMsg)
 				return errors.New(errMsg)
 			}
 			// Check duration cap
-			if rule.MaxDuration > 0 && input.Duration > rule.MaxDuration {
-				errMsg := fmt.Sprintf("Duration %v exceeds maximum allowed %v for this profile", input.Duration, rule.MaxDuration)
+			if matchedRule.MaxDuration > 0 && input.Duration > matchedRule.MaxDuration {
+				errMsg := fmt.Sprintf("Duration %v exceeds maximum allowed %v for this profile", input.Duration, matchedRule.MaxDuration)
 				fmt.Fprintf(os.Stderr, "%s\n", errMsg)
 				return errors.New(errMsg)
 			}
+		}
+	}
+
+	// 4.6 Perform MFA verification if required by policy
+	var mfaVerified bool
+	var mfaMethod string
+	var mfaChallengeID string
+	if matchedRule != nil && matchedRule.RequiresMFA() {
+		if input.MFAVerifier == nil {
+			errMsg := "MFA required but no MFA verifier configured"
+			fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+			return errors.New(errMsg)
+		}
+
+		// If MFA code is pre-provided, verify directly
+		if input.MFACode != "" {
+			challengeID := input.MFAChallengeID
+			if challengeID == "" {
+				// TOTP doesn't need challenge ID (stateless)
+				challengeID = username
+			}
+			valid, err := input.MFAVerifier.Verify(ctx, challengeID, input.MFACode)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "MFA verification error: %v\n", err)
+				return err
+			}
+			if !valid {
+				errMsg := "MFA verification failed: invalid code"
+				fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+				return errors.New(errMsg)
+			}
+			mfaVerified = true
+			mfaChallengeID = challengeID
+			// Determine method from challenge ID format (TOTP uses username, SMS uses hex ID)
+			if mfa.ValidateChallengeID(challengeID) && challengeID != username {
+				mfaMethod = string(mfa.MethodSMS)
+			} else {
+				mfaMethod = string(mfa.MethodTOTP)
+			}
+		} else {
+			// Interactive flow: initiate challenge first
+			challenge, err := input.MFAVerifier.Challenge(ctx, username)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "MFA challenge failed: %v\n", err)
+				return err
+			}
+
+			// Check if method is allowed by policy
+			if !matchedRule.IsMethodAllowed(string(challenge.Method)) {
+				errMsg := fmt.Sprintf("MFA method %q not allowed by policy", challenge.Method)
+				fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+				return errors.New(errMsg)
+			}
+
+			// For non-interactive use, return challenge info and error
+			errMsg := fmt.Sprintf("MFA required: challenge_id=%s method=%s", challenge.ID, challenge.Method)
+			if challenge.Target != "" {
+				errMsg += fmt.Sprintf(" target=%s", challenge.Target)
+			}
+			fmt.Fprintf(os.Stderr, "%s\n", errMsg)
+			return errors.New("MFA challenge pending - provide --mfa-code and --mfa-challenge-id")
 		}
 	}
 
@@ -248,17 +331,20 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 	now := time.Now()
 	requestID := breakglass.NewBreakGlassID() // Generate unique request ID for CloudTrail correlation
 	event := &breakglass.BreakGlassEvent{
-		ID:            breakglass.NewBreakGlassID(),
-		Invoker:       username,
-		Profile:       input.ProfileName,
-		ReasonCode:    reasonCode,
-		Justification: input.Justification,
-		Duration:      duration,
-		Status:        breakglass.StatusActive, // Break-glass starts active immediately
-		CreatedAt:     now,
-		UpdatedAt:     now,
-		ExpiresAt:     now.Add(duration),
-		RequestID:     requestID,
+		ID:             breakglass.NewBreakGlassID(),
+		Invoker:        username,
+		Profile:        input.ProfileName,
+		ReasonCode:     reasonCode,
+		Justification:  input.Justification,
+		Duration:       duration,
+		Status:         breakglass.StatusActive, // Break-glass starts active immediately
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		ExpiresAt:      now.Add(duration),
+		RequestID:      requestID,
+		MFAVerified:    mfaVerified,
+		MFAMethod:      mfaMethod,
+		MFAChallengeID: mfaChallengeID,
 	}
 
 	// 9. Validate event
@@ -290,12 +376,14 @@ func BreakGlassCommand(ctx context.Context, input BreakGlassCommandInput, s *Sen
 
 	// 13. Output success JSON
 	output := BreakGlassCommandOutput{
-		EventID:    event.ID,
-		Profile:    event.Profile,
-		ReasonCode: string(event.ReasonCode),
-		Status:     string(event.Status),
-		ExpiresAt:  event.ExpiresAt,
-		RequestID:  requestID,
+		EventID:     event.ID,
+		Profile:     event.Profile,
+		ReasonCode:  string(event.ReasonCode),
+		Status:      string(event.Status),
+		ExpiresAt:   event.ExpiresAt,
+		RequestID:   requestID,
+		MFAVerified: event.MFAVerified,
+		MFAMethod:   event.MFAMethod,
 	}
 
 	jsonBytes, err := json.MarshalIndent(&output, "", "  ")
