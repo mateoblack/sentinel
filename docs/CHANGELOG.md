@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Comprehensive security hardening guide (see [SECURITY_HARDENING.md](SECURITY_HARDENING.md))
 - Timing-safe bearer token comparison via `crypto/subtle.ConstantTimeCompare`
 - AWS Secrets Manager integration for MDM API tokens with 1-hour client-side caching
 - CI/CD security scanning with govulncheck, gosec, and Trivy in GitHub Actions

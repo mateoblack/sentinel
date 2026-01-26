@@ -156,6 +156,7 @@ rules:
 | [Enforcement Patterns](docs/ENFORCEMENT.md) | Trust policies and SCPs |
 | [Policy Signing](docs/POLICY_SIGNING.md) | KMS-based policy integrity |
 | [Device Posture](docs/DEVICE_POSTURE.md) | MDM integration and device verification |
+| [Security Hardening](docs/SECURITY_HARDENING.md) | Timing attacks, rate limiting, encryption |
 | [Troubleshooting](docs/guide/troubleshooting.md) | Common issues and fixes |
 
 ## Built On
