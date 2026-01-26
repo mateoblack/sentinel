@@ -26,7 +26,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.15 Device Posture** — [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) (Phases 104-112, shipped 2026-01-25)
 - ✅ **v1.16 Security Hardening** — [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) (Phases 113-120, shipped 2026-01-26)
 - ✅ **v1.17 Policy Developer Experience** — [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) (Phases 121-125, shipped 2026-01-26)
-- 🚧 **v1.18 Critical Security Hardening** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phases 126-135, in progress)
+- ✅ **v1.18 Critical Security Hardening** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phases 126-135, shipped 2026-01-26)
 
 - ⏳ **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, pending v1.18)
 ## Completed Milestones
@@ -116,9 +116,12 @@ See [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.18 Critical Security Hardening (In Progress)
+### ✅ v1.18 Critical Security Hardening (Complete)
 
 **Milestone Goal:** Address P0 security threats and high-risk vulnerabilities identified in STRIDE threat model analysis, including policy cache poisoning, break-glass bypass, audit log tampering, and credential exposure.
+
+**Completed:** 2026-01-26
+**Security tests:** 153 regression tests across 13 packages
 
 #### Phase 126: Policy Integrity ✅
 
@@ -169,15 +172,15 @@ Plans:
 - [x] 129-03: Credential server integration (SentinelServer Unix mode, CLI flags, integration tests) — completed 2026-01-26
 - [x] 129-04: ECS/EC2 Unix mode & security tests (EcsServer Unix mode, EC2 security docs, regression tests) — completed 2026-01-26
 
-#### Phase 130: Identity Hardening
+#### Phase 130: Identity Hardening ✅
 
 **Goal**: Strengthen AWS STS identity validation, remove OS username dependency
 **Depends on**: Phase 129
-**Research**: Unlikely (extends v1.7.1 STS identity work)
-**Plans**: TBD
+**Completed**: 2026-01-26
+**Plans**: 1/1
 
 Plans:
-- [ ] 130-01: TBD (run /gsd:plan-phase 130 to break down)
+- [x] 130-01: Partition validation & identity extraction (aws-iso, aws-iso-b support, ExtractUsername consolidation) — completed 2026-01-26
 
 #### Phase 131: DynamoDB Security ✅
 
@@ -223,21 +226,22 @@ Plans:
 - [x] 134-01: Input validation utilities & Lambda handler hardening (validate package, profile validation) — completed 2026-01-26
 - [x] 134-02: Shell escaping security regression tests (shellEscape, sanitizeFunctionName tests) — completed 2026-01-26
 
-#### Phase 135: Security Validation
+#### Phase 135: Security Validation ✅
 
 **Goal**: Comprehensive security regression testing for all P0 and high-risk findings
 **Depends on**: Phase 134
-**Research**: Unlikely (extends existing test framework)
-**Plans**: TBD
+**Completed**: 2026-01-26
+**Plans**: 2/2
 
 Plans:
-- [ ] 135-01: TBD (run /gsd:plan-phase 135 to break down)
+- [x] 135-01: Security test infrastructure (scripts/security-test.sh, Makefile targets, v1.18 integration tests) — completed 2026-01-26
+- [x] 135-02: Security documentation and CI workflow (docs/SECURITY_TESTING.md, test-security.yml workflow) — completed 2026-01-26
 
 ### ⏳ v1.19 Documentation & Completeness Audit (Pending v1.18)
 
 **Milestone Goal:** Close documentation gaps for v1.13-v1.18 features, ensuring all capabilities shipped in recent milestones are properly documented for users and operators.
 
-**Status:** Waiting for v1.18 Critical Security Hardening to complete (phases 129-135 remaining).
+**Status:** Ready to start (v1.18 Critical Security Hardening complete).
 
 #### Phase 136: CHANGELOG Completion
 
