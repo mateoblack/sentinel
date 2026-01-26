@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 128-audit-log-integrity
-Plan: 02 of 03 (CloudWatch Logs Forwarder) - COMPLETE
-Status: Plan 02 complete, ready for plan 03
-Last activity: 2026-01-26 — Plan 128-02 completed (CloudWatch Logs forwarder)
+Plan: 03 of 03 (Log Verification CLI & Security Tests) - COMPLETE
+Status: Phase 128 complete, all 3 plans shipped
+Last activity: 2026-01-26 — Plan 128-03 completed (verify-logs CLI, security tests)
 
 Progress: ████████████████████░░ 89% (233/263 estimated total plans)
 
@@ -75,7 +75,7 @@ Last 5 milestones:
 
 Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 
-**Phase 128 Audit Log Integrity (Plan 01-02):**
+**Phase 128 Audit Log Integrity (Plan 01-03):**
 - Entry stored as json.RawMessage to preserve exact bytes for verification after JSON round-trip
 - Signature covers entry + timestamp + key_id for replay protection
 - Fail-open on signing errors (log to stderr, continue with unsigned entries)
@@ -83,6 +83,9 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Fail-open on CloudWatch errors (availability over security)
 - Logger selection: CloudWatch+signing > CloudWatch > signing > stdout
 - Default stream name from AWS_LAMBDA_FUNCTION_NAME
+- verify-logs command: exit 0 for all valid, 1 for any failures
+- Security tests: AST verification for timing-safe comparison
+- Key from --key-file preferred for security (avoids CLI history)
 
 **v1.18 Critical Security Hardening (Phase 126):**
 - Use MessageType RAW for KMS signing (KMS handles hashing internally)
@@ -122,6 +125,6 @@ None — v1.19 is documentation work with no code dependencies.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Phase 128-02 complete (CloudWatch Logs forwarder)
+Stopped at: Phase 128-03 complete (verify-logs CLI, security tests)
 Resume file: None
-Next: Run /gsd:execute-plan 03 of phase 128-audit-log-integrity for key rotation
+Next: Phase 128 complete - proceed to next phase or documentation milestone
