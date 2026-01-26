@@ -404,3 +404,76 @@ func TestHourRangeValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestPolicy_Validate_UnsupportedVersion(t *testing.T) {
+	policy := Policy{
+		Version: Version("99"),
+		Rules: []Rule{
+			{
+				Name:   "test-rule",
+				Effect: EffectAllow,
+				Conditions: Condition{
+					Profiles: []string{"prod"},
+				},
+			},
+		},
+	}
+
+	err := policy.Validate()
+	if err == nil {
+		t.Error("expected error for unsupported version, got nil")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "unsupported policy version") {
+		t.Errorf("error %q does not contain 'unsupported policy version'", err.Error())
+	}
+	if !strings.Contains(err.Error(), "99") {
+		t.Errorf("error %q does not contain version '99'", err.Error())
+	}
+}
+
+func TestPolicy_Validate_ValidVersion(t *testing.T) {
+	policy := Policy{
+		Version: Version("1"),
+		Rules: []Rule{
+			{
+				Name:   "test-rule",
+				Effect: EffectAllow,
+				Conditions: Condition{
+					Profiles: []string{"prod"},
+				},
+			},
+		},
+	}
+
+	err := policy.Validate()
+	if err != nil {
+		t.Errorf("unexpected error for valid version: %v", err)
+	}
+}
+
+func TestPolicy_Validate_EmptyVersion(t *testing.T) {
+	policy := Policy{
+		Version: Version(""),
+		Rules: []Rule{
+			{
+				Name:   "test-rule",
+				Effect: EffectAllow,
+				Conditions: Condition{
+					Profiles: []string{"prod"},
+				},
+			},
+		},
+	}
+
+	err := policy.Validate()
+	if err == nil {
+		t.Error("expected error for empty version, got nil")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "unsupported policy version") {
+		t.Errorf("error %q does not contain 'unsupported policy version'", err.Error())
+	}
+}

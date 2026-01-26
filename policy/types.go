@@ -6,12 +6,48 @@ package policy
 
 import "time"
 
+// Schema version constants for policy versioning.
+const (
+	// SchemaVersion1 is the current (and original) policy schema version.
+	SchemaVersion1 = "1"
+	// CurrentSchemaVersion is the latest supported schema version.
+	CurrentSchemaVersion = SchemaVersion1
+)
+
+// SupportedVersions lists all schema versions this codebase can process.
+// Used for validation and future migration support.
+var SupportedVersions = []string{SchemaVersion1}
+
+// Version represents a policy schema version string.
+// It provides validation methods for version checking.
+type Version string
+
+// IsValid returns true if the version is in SupportedVersions.
+func (v Version) IsValid() bool {
+	for _, sv := range SupportedVersions {
+		if string(v) == sv {
+			return true
+		}
+	}
+	return false
+}
+
+// IsCurrent returns true if the version matches CurrentSchemaVersion.
+func (v Version) IsCurrent() bool {
+	return string(v) == CurrentSchemaVersion
+}
+
+// String returns the string representation of the Version.
+func (v Version) String() string {
+	return string(v)
+}
+
 // Policy is the top-level container for access rules.
 // It contains a version identifier and a list of rules that are
 // evaluated in order to determine access decisions.
 type Policy struct {
-	Version string `yaml:"version" json:"version"`
-	Rules   []Rule `yaml:"rules" json:"rules"`
+	Version Version `yaml:"version" json:"version"`
+	Rules   []Rule  `yaml:"rules" json:"rules"`
 }
 
 // Rule defines a single access control rule.

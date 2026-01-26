@@ -10,9 +10,14 @@ import (
 var hourFormatRegex = regexp.MustCompile(`^([01][0-9]|2[0-3]):([0-5][0-9])$`)
 
 // Validate checks if the Policy is semantically correct.
-// It verifies version is present, at least one rule exists,
+// It verifies version is present and valid, at least one rule exists,
 // and all rules are valid.
 func (p *Policy) Validate() error {
+	// Validate version is supported
+	if !p.Version.IsValid() {
+		return fmt.Errorf("unsupported policy version '%s', supported versions: %v", p.Version, SupportedVersions)
+	}
+
 	if len(p.Rules) == 0 {
 		return fmt.Errorf("policy must have at least one rule")
 	}

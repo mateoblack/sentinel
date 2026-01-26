@@ -97,7 +97,7 @@ rules:
 				return
 			}
 
-			if policy.Version != tc.wantVersion {
+			if string(policy.Version) != tc.wantVersion {
 				t.Errorf("got version %q, want %q", policy.Version, tc.wantVersion)
 			}
 
@@ -125,7 +125,7 @@ rules:
 		return
 	}
 
-	if policy.Version != "1" {
+	if string(policy.Version) != "1" {
 		t.Errorf("got version %q, want %q", policy.Version, "1")
 	}
 
