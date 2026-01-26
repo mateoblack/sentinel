@@ -695,6 +695,12 @@ const (
 	editInsert
 )
 
+// changeRange represents a range of changed lines for diff hunks
+type changeRange struct {
+	start int
+	end   int
+}
+
 // splitLines splits a string into lines, handling empty strings
 func splitLines(s string) []string {
 	if s == "" {
@@ -788,11 +794,6 @@ func groupEditsIntoHunks(edits []edit, oldLines, newLines []string) []string {
 	var currentHunk strings.Builder
 
 	// Find ranges of changes
-	type changeRange struct {
-		start int
-		end   int
-	}
-
 	var ranges []changeRange
 	inChange := false
 	changeStart := 0
@@ -915,6 +916,7 @@ func mergeCloseRanges(ranges []changeRange, gap, maxLen int) []changeRange {
 
 // PolicyValidateCommand validates a local policy file without AWS access.
 // It returns exit code 0 if valid, 1 if invalid or file not found.
+// After schema validation passes, it runs lint checks and outputs warnings.
 func PolicyValidateCommand(ctx context.Context, input PolicyValidateCommandInput) (int, error) {
 	// Set up I/O
 	stderr := input.Stderr
@@ -935,18 +937,37 @@ func PolicyValidateCommand(ctx context.Context, input PolicyValidateCommandInput
 		return 1, nil
 	}
 
-	// Validate policy using policy.ValidatePolicy(data)
-	if err := policy.ValidatePolicy(policyData); err != nil {
-		fmt.Fprintf(stderr, "Error: %v\n", err)
+	// Parse policy first to get structured data
+	p, err := policy.ParsePolicy(policyData)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: parse error: %v\n", err)
 		fmt.Fprintf(stderr, "\nSuggestion: fix the policy YAML and try again\n")
 		return 1, nil
 	}
 
-	// Success - print message unless --quiet
-	if !input.Quiet {
+	// Validate policy schema
+	if err := p.Validate(); err != nil {
+		fmt.Fprintf(stderr, "Error: validation error: %v\n", err)
+		fmt.Fprintf(stderr, "\nSuggestion: fix the policy YAML and try again\n")
+		return 1, nil
+	}
+
+	// Run lint checks on valid policy
+	lintIssues := policy.LintPolicy(p)
+
+	// Output lint warnings unless --quiet
+	if !input.Quiet && len(lintIssues) > 0 {
+		for _, issue := range lintIssues {
+			fmt.Fprintf(stderr, "lint: %s: %s\n", issue.Type, issue.Message)
+		}
+	}
+
+	// Success message only if no lint issues (lint warnings are the output)
+	if !input.Quiet && len(lintIssues) == 0 {
 		fmt.Fprintf(stderr, "Policy is valid\n")
 	}
 
+	// Lint warnings do NOT change exit code - exit 0 if schema valid
 	return 0, nil
 }
 
