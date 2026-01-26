@@ -126,6 +126,17 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ `sentinel policy push --sign` uploads both policy and signature to SSM — v1.18 Phase 126
 - ✓ Lambda TVM signature verification integration with SSM → Verifying → Cached pipeline — v1.18 Phase 126
 - ✓ Security regression tests for policy tampering and cache poisoning prevention — v1.18 Phase 126
+- ✓ Break-glass MFA enforcement (TOTP + SMS) to prevent emergency access abuse — v1.18 Phase 127
+- ✓ MFA Verifier interface with timing-safe verification and RFC 6238 compliance — v1.18 Phase 127
+- ✓ HMAC-SHA256 signed audit logs with CloudWatch forwarding — v1.18 Phase 128
+- ✓ `sentinel audit verify-logs` command for tamper detection — v1.18 Phase 128
+- ✓ Unix socket credential servers with process authentication (SO_PEERCRED/LOCAL_PEERCRED) — v1.18 Phase 129
+- ✓ AWS ISO and ISO-B partition support in ARN validation — v1.18 Phase 130
+- ✓ DynamoDB optimistic locking fix and state transition validation — v1.18 Phase 131
+- ✓ Keyring protection hardening (macOS ACLs, Linux keyctl permissions, iCloud sync prevention) — v1.18 Phase 132
+- ✓ Distributed rate limiting with DynamoDB atomic counters — v1.18 Phase 133
+- ✓ Input validation (profile names, shell escaping, log sanitization) — v1.18 Phase 134
+- ✓ Security test infrastructure (153 regression tests, CI workflow, documentation) — v1.18 Phase 135
 
 ### Active
 
@@ -146,7 +157,7 @@ Target work:
 
 ## Context
 
-Shipped v1.17 with 136,949 LOC Go (+3,332 from v1.16).
+Shipped v1.18 with ~156,407 LOC Go (+19,458 from v1.17).
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy, aws-lambda-go, API Gateway v2.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -420,5 +431,16 @@ Target users: Platform engineers and security teams who need guardrails without 
 | LCS algorithm for unified diff | Standard unified diff format with @@ markers | ✓ Good |
 | Color output default with --no-color flag | Terminal readability with pipe compatibility | ✓ Good |
 
+v1.18 adds comprehensive security hardening:
+- KMS-based policy signing prevents cache poisoning (VerifyingLoader with fail-closed security)
+- Break-glass MFA enforcement (TOTP + SMS) prevents emergency access abuse
+- HMAC-SHA256 signed audit logs with CloudWatch forwarding for tamper detection
+- Unix socket credential servers with process authentication prevent local credential theft
+- DynamoDB optimistic locking fix and state transition validation prevent state manipulation
+- Keyring protection hardening (macOS ACLs, Linux keyctl permissions) prevents credential theft
+- Distributed rate limiting with DynamoDB atomic counters prevents bypass across Lambda instances
+- Input validation (profile names, shell escaping) prevents command injection
+- 153 security regression tests across 13 packages with CI enforcement
+
 ---
-*Last updated: 2026-01-26 after v1.17 milestone*
+*Last updated: 2026-01-26 after v1.18 milestone*

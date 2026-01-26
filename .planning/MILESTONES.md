@@ -1,5 +1,32 @@
 # Project Milestones: Sentinel
 
+## v1.18 Critical Security Hardening (Shipped: 2026-01-26)
+
+**Delivered:** Comprehensive security hardening addressing P0 threats from STRIDE threat model with KMS-based policy signing, break-glass MFA enforcement, tamper-evident audit logs, Unix socket process authentication, distributed rate limiting, and 153 security regression tests.
+
+**Phases completed:** 126-135 (24 plans total)
+
+**Key accomplishments:**
+- KMS-based policy signing with VerifyingLoader prevents cache poisoning (fail-closed security)
+- Break-glass MFA enforcement (TOTP + SMS) prevents emergency access abuse
+- HMAC-SHA256 signed audit logs with CloudWatch forwarding enable tamper detection
+- Unix socket credential servers with process authentication prevent local credential theft
+- DynamoDB distributed rate limiting with atomic counters prevents bypass across Lambda instances
+- Input validation (profile names, shell escaping, log sanitization) prevents command injection
+- 153 security regression tests across 13 packages with CI workflow enforcement
+
+**Stats:**
+- 24 plans completed across 10 phases
+- +19,458 lines of Go (156,407 total)
+- 153 security regression tests
+- 1 day (2026-01-26)
+
+**Git range:** `feat(126-01)` → `docs(135-02)`
+
+**What's next:** v1.19 Documentation & Completeness Audit to close documentation gaps for v1.13-v1.18 features.
+
+---
+
 ## v1.17 Policy Developer Experience (Shipped: 2026-01-26)
 
 **Delivered:** Complete policy developer workflow with pull, push, diff, and validate commands for SSM-backed policies. Enables policy developers to fetch, edit, compare, and validate Sentinel policies locally before pushing changes.
