@@ -24,8 +24,14 @@ type MockSSMClient struct {
 	// GetParameterFunc allows custom behavior override.
 	GetParameterFunc func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
 
+	// PutParameterFunc allows custom behavior override for PutParameter.
+	PutParameterFunc func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+
 	// Calls tracks GetParameter calls for assertions.
 	Calls []*ssm.GetParameterInput
+
+	// PutCalls tracks PutParameter calls for assertions.
+	PutCalls []*ssm.PutParameterInput
 }
 
 // GetParameter implements policy.SSMAPI.
@@ -52,6 +58,20 @@ func (m *MockSSMClient) GetParameter(ctx context.Context, params *ssm.GetParamet
 	}
 
 	return nil, &types.ParameterNotFound{Message: aws.String("Parameter not found")}
+}
+
+// PutParameter implements policy.SSMAPI.
+func (m *MockSSMClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+	m.PutCalls = append(m.PutCalls, params)
+
+	if m.PutParameterFunc != nil {
+		return m.PutParameterFunc(ctx, params, optFns...)
+	}
+
+	// Default success behavior
+	return &ssm.PutParameterOutput{
+		Version: 1,
+	}, nil
 }
 
 // validPolicyYAML returns a minimal valid policy YAML for testing.
@@ -517,5 +537,559 @@ func TestPolicyPullCommand_WithDecryption(t *testing.T) {
 	// This is verified by the loader tests, but we can at least verify the call was made
 	if len(mockClient.Calls) == 0 {
 		t.Error("expected GetParameter to be called")
+	}
+}
+
+// createTempPolicyFile creates a temporary file with the given content and returns its path.
+func createTempPolicyFile(t *testing.T, content string) string {
+	t.Helper()
+	tmpFile, err := os.CreateTemp("", "policy-*.yaml")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("failed to close temp file: %v", err)
+	}
+	return tmpFile.Name()
+}
+
+func TestPolicyPushCommand_Success(t *testing.T) {
+	// Create temp file with valid policy
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{
+		Policies: map[string]string{}, // No existing policy
+	}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true, // Skip confirmation prompt
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		stderr.Seek(0, 0)
+		var buf bytes.Buffer
+		buf.ReadFrom(stderr)
+		t.Errorf("exitCode = %d, want 0. stderr: %s", exitCode, buf.String())
+	}
+
+	// Verify PutParameter was called
+	if len(mockClient.PutCalls) != 1 {
+		t.Fatalf("expected 1 PutParameter call, got %d", len(mockClient.PutCalls))
+	}
+
+	// Verify correct path
+	expectedPath := bootstrap.DefaultPolicyParameterName(bootstrap.DefaultPolicyRoot, "dev")
+	if aws.ToString(mockClient.PutCalls[0].Name) != expectedPath {
+		t.Errorf("PutParameter path = %q, want %q", aws.ToString(mockClient.PutCalls[0].Name), expectedPath)
+	}
+
+	// Verify Overwrite=true
+	if !aws.ToBool(mockClient.PutCalls[0].Overwrite) {
+		t.Error("expected Overwrite=true")
+	}
+
+	// Verify content matches
+	if !strings.Contains(aws.ToString(mockClient.PutCalls[0].Value), "version:") {
+		t.Error("PutParameter value should contain policy content")
+	}
+
+	// Verify stderr contains success message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "successfully pushed") {
+		t.Errorf("stderr should contain 'successfully pushed', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_ValidationError(t *testing.T) {
+	// Create temp file with invalid policy YAML
+	invalidPolicy := `version: "1"
+rules: []
+`
+	policyFile := createTempPolicyFile(t, invalidPolicy)
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for validation error", exitCode)
+	}
+
+	// Verify no PutParameter was called
+	if len(mockClient.PutCalls) != 0 {
+		t.Errorf("expected 0 PutParameter calls, got %d", len(mockClient.PutCalls))
+	}
+
+	// Verify stderr contains validation error
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "validation error") {
+		t.Errorf("stderr should contain 'validation error', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_FileNotFound(t *testing.T) {
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: "/nonexistent/path/policy.yaml",
+		Force:     true,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for file not found", exitCode)
+	}
+
+	// Verify stderr contains file not found message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "file not found") {
+		t.Errorf("stderr should contain 'file not found', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_SSMError(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{
+		PutParameterFunc: func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+			return nil, errors.New("access denied")
+		},
+	}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		NoBackup:  true, // Skip backup check
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for SSM error", exitCode)
+	}
+
+	// Verify stderr contains error message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "failed to write policy to SSM") {
+		t.Errorf("stderr should contain 'failed to write policy to SSM', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_NoBackupFlag(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		NoBackup:  true, // Skip backup fetch
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify GetParameter was NOT called (no backup fetch)
+	if len(mockClient.Calls) != 0 {
+		t.Errorf("expected 0 GetParameter calls with --no-backup, got %d", len(mockClient.Calls))
+	}
+
+	// Verify PutParameter WAS called
+	if len(mockClient.PutCalls) != 1 {
+		t.Errorf("expected 1 PutParameter call, got %d", len(mockClient.PutCalls))
+	}
+}
+
+func TestPolicyPushCommand_ForceFlag(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	// With --force, no stdin input is needed
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		NoBackup:  true,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify PutParameter was called without waiting for stdin
+	if len(mockClient.PutCalls) != 1 {
+		t.Errorf("expected 1 PutParameter call, got %d", len(mockClient.PutCalls))
+	}
+}
+
+func TestPolicyPushCommand_PolicyParameterOverride(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	explicitPath := "/custom/path/to/policy"
+
+	mockClient := &MockSSMClient{}
+
+	input := PolicyPushCommandInput{
+		Profile:         "ignored-profile",
+		InputFile:       policyFile,
+		PolicyParameter: explicitPath,
+		Force:           true,
+		NoBackup:        true,
+		Stderr:          stderr,
+		SSMClient:       mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify the explicit path was used
+	if len(mockClient.PutCalls) != 1 {
+		t.Fatalf("expected 1 PutParameter call, got %d", len(mockClient.PutCalls))
+	}
+	if aws.ToString(mockClient.PutCalls[0].Name) != explicitPath {
+		t.Errorf("PutParameter path = %q, want %q (explicit path)", aws.ToString(mockClient.PutCalls[0].Name), explicitPath)
+	}
+}
+
+func TestPolicyPushCommand_BackupFetch(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{
+		Policies: map[string]string{
+			"/sentinel/policies/dev": validPolicyYAML(), // Existing policy
+		},
+	}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true, // Skip confirmation, but NOT skipping backup
+		// NoBackup is false - so it should fetch existing policy
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		stderr.Seek(0, 0)
+		var buf bytes.Buffer
+		buf.ReadFrom(stderr)
+		t.Errorf("exitCode = %d, want 0. stderr: %s", exitCode, buf.String())
+	}
+
+	// Verify GetParameter WAS called (backup fetch)
+	if len(mockClient.Calls) != 1 {
+		t.Errorf("expected 1 GetParameter call for backup, got %d", len(mockClient.Calls))
+	}
+
+	// Verify stderr contains existing policy message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "Existing policy found") {
+		t.Errorf("stderr should contain 'Existing policy found', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_ConfirmationYes(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	// Simulate "y\n" input for confirmation
+	stdinBuf := strings.NewReader("y\n")
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     false, // NOT forcing, so confirmation is required
+		NoBackup:  true,
+		Stdin:     stdinBuf,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		stderr.Seek(0, 0)
+		var buf bytes.Buffer
+		buf.ReadFrom(stderr)
+		t.Errorf("exitCode = %d, want 0. stderr: %s", exitCode, buf.String())
+	}
+
+	// Verify PutParameter was called after confirmation
+	if len(mockClient.PutCalls) != 1 {
+		t.Errorf("expected 1 PutParameter call after 'y' confirmation, got %d", len(mockClient.PutCalls))
+	}
+}
+
+func TestPolicyPushCommand_ConfirmationNo(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	// Simulate "n\n" input for rejection
+	stdinBuf := strings.NewReader("n\n")
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     false, // NOT forcing, so confirmation is required
+		NoBackup:  true,
+		Stdin:     stdinBuf,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Cancellation should exit with 0 (not an error, just cancelled)
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0 for cancellation", exitCode)
+	}
+
+	// Verify PutParameter was NOT called after rejection
+	if len(mockClient.PutCalls) != 0 {
+		t.Errorf("expected 0 PutParameter calls after 'n' confirmation, got %d", len(mockClient.PutCalls))
+	}
+
+	// Verify stderr contains cancelled message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "Cancelled") {
+		t.Errorf("stderr should contain 'Cancelled', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_ParseError(t *testing.T) {
+	// Create temp file with malformed YAML (not just invalid policy, but unparseable)
+	malformedYAML := `version: "1"
+rules:
+  - name: test
+  effect: allow  # wrong indentation - parse error
+`
+	policyFile := createTempPolicyFile(t, malformedYAML)
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for parse error", exitCode)
+	}
+
+	// Verify stderr contains parse error
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "parse error") {
+		t.Errorf("stderr should contain 'parse error', got: %s", errOutput)
+	}
+}
+
+func TestPolicyPushCommand_ParameterTypeString(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	input := PolicyPushCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Force:     true,
+		NoBackup:  true,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyPushCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify ParameterTypeString was used (not SecureString)
+	if len(mockClient.PutCalls) != 1 {
+		t.Fatalf("expected 1 PutParameter call, got %d", len(mockClient.PutCalls))
+	}
+	if mockClient.PutCalls[0].Type != types.ParameterTypeString {
+		t.Errorf("Type = %v, want ParameterTypeString", mockClient.PutCalls[0].Type)
 	}
 }
