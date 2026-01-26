@@ -130,10 +130,10 @@ Plans:
 **Goal**: Validate and upload policy to SSM with confirmation and backup
 **Depends on**: Phase 122
 **Research**: Unlikely (existing SSM writer patterns from bootstrap)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 123-01: TBD
+- [x] 123-01: Policy push command implementation — completed 2026-01-26
 
 #### Phase 124: Policy Diff Command
 
@@ -568,6 +568,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
-| v1.17 Policy Developer Experience | 121-125 | 1/? | 🚧 In Progress | - |
+| v1.17 Policy Developer Experience | 121-125 | 3/? | 🚧 In Progress | - |
 
 **Totals:** 20 milestones shipped (120 phases, 223 plans shipped)

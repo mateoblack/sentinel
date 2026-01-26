@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 
 ## Current Position
 
-Phase: 122 of 125 (Policy Pull Command)
+Phase: 123 of 125 (Policy Push Command)
 Plan: 1 of 1 complete
 Status: Phase complete
-Last activity: 2026-01-26 — Completed 122-01-PLAN.md
+Last activity: 2026-01-26 — Completed 123-01-PLAN.md
 
-Progress: ████░░░░░░ 40%
+Progress: █████░░░░░ 60%
 
 ## Milestone Summary
 
@@ -161,6 +161,12 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - SupportedVersions as slice for future schema extensibility
 - ValidatePolicy distinguishes parse errors from validation errors for CLI UX
 
+**v1.17 Policy Developer Experience decisions (Phase 123):**
+- Extended existing SSMAPI interface with PutParameter (unified read/write)
+- Use types.ParameterTypeString (not SecureString) matching bootstrap pattern
+- Confirmation prompt with --force flag for automation bypass
+- Cancel on confirmation exits with code 0 (not an error)
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -184,9 +190,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 122-01-PLAN.md (Phase 122 complete)
+Stopped at: Completed 123-01-PLAN.md (Phase 123 complete)
 Resume file: None
-Next: Phase 123 planning
+Next: Phase 124 planning
 
 ## Roadmap Evolution
 
