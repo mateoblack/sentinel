@@ -13,6 +13,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/byteness/aws-vault/v7/breakglass"
@@ -23,6 +24,7 @@ import (
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/ratelimit"
 	"github.com/byteness/aws-vault/v7/request"
+	"github.com/byteness/aws-vault/v7/server"
 	"github.com/byteness/aws-vault/v7/session"
 )
 
@@ -119,6 +121,28 @@ type SentinelServerConfig struct {
 	// RateLimitConfig is used to create a default rate limiter if RateLimiter is nil.
 	// If both are nil, rate limiting is disabled.
 	RateLimitConfig *ratelimit.Config
+
+	// UseUnixSocket enables Unix domain socket mode instead of TCP.
+	// When enabled, the server uses process-based authentication via peer credentials.
+	// This prevents credential theft from other local processes.
+	// Default: false (TCP mode for backward compatibility)
+	UseUnixSocket bool
+
+	// UnixSocketPath is the path for the Unix domain socket.
+	// Only used when UseUnixSocket is true.
+	// If empty, a temporary socket is created at /tmp/sentinel-<pid>.sock
+	UnixSocketPath string
+
+	// UnixSocketMode is the file mode for the Unix socket.
+	// Only used when UseUnixSocket is true.
+	// Default: 0600 (owner only)
+	UnixSocketMode os.FileMode
+
+	// AllowProcessAuthFallback allows TCP connections when Unix sockets are unavailable.
+	// Only used when UseUnixSocket is true.
+	// When true, falls back to TCP with standard bearer token auth (less secure).
+	// Default: false (strict Unix socket enforcement)
+	AllowProcessAuthFallback bool
 }
 
 // SentinelServer is an HTTP server that serves policy-gated AWS credentials.
@@ -137,6 +161,12 @@ type SentinelServer struct {
 	// deviceID is the device identifier collected at server startup for decision logging.
 	// Empty string if device ID collection failed (fail-open).
 	deviceID string
+
+	// unixServer is the Unix domain socket server (nil if TCP mode)
+	unixServer *server.UnixServer
+
+	// processAuth is the process authenticator for Unix socket mode
+	processAuth *server.ProcessAuthenticator
 }
 
 // NewSentinelServer creates a new SentinelServer that listens on the specified port.
