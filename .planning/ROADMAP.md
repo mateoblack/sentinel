@@ -212,16 +212,16 @@ Plans:
 - [x] 133-01: DynamoDB rate limiter implementation (atomic counters, fail-open, TTL) — completed 2026-01-26
 - [x] 133-02: Lambda TVM integration & security tests (config, handler tests, regression tests) — completed 2026-01-26
 
-#### Phase 134: Input Sanitization
+#### Phase 134: Input Sanitization ✅
 
 **Goal**: Command injection prevention in MFA process and all user inputs
 **Depends on**: Phase 133
-**Research**: Unlikely (input validation patterns, shell escaping)
+**Completed**: 2026-01-26
 **Plans**: 2/2
 
 Plans:
-- [ ] 134-01: Input validation utilities & Lambda handler hardening (validate package, profile validation) — planned 2026-01-26
-- [ ] 134-02: Shell escaping security regression tests (shellEscape, sanitizeFunctionName tests) — planned 2026-01-26
+- [x] 134-01: Input validation utilities & Lambda handler hardening (validate package, profile validation) — completed 2026-01-26
+- [x] 134-02: Shell escaping security regression tests (shellEscape, sanitizeFunctionName tests) — completed 2026-01-26
 
 #### Phase 135: Security Validation
 
@@ -764,7 +764,7 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
-| v1.18 Critical Security Hardening | 126-135 | 16/? | 🚧 In Progress | - |
+| v1.18 Critical Security Hardening | 126-135 | 18/? | 🚧 In Progress | - |
 | v1.19 Documentation & Completeness Audit | 136-142 | 0/? | ⏳ Pending | - |
 
 **Totals:** 21 milestones shipped (125 phases, 230 plans shipped), 1 milestone in progress (10 phases), 1 milestone pending (7 phases)
