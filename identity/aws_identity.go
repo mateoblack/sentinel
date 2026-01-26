@@ -40,6 +40,8 @@ var validPartitions = map[string]bool{
 	"aws":        true, // Commercial
 	"aws-cn":     true, // China
 	"aws-us-gov": true, // GovCloud
+	"aws-iso":    true, // Isolated Cloud (DoD)
+	"aws-iso-b":  true, // Isolated Cloud C2S
 }
 
 // STSAPI defines the STS operations needed for identity extraction.

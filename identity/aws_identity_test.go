@@ -147,6 +147,40 @@ func TestParseARN(t *testing.T) {
 			wantRawUsername: "session",
 			wantAccountID:   "123456789012",
 		},
+		// ISO partition tests (DoD)
+		{
+			name:            "ISO partition IAM user",
+			arn:             "arn:aws-iso:iam::123456789012:user/alice",
+			wantType:        IdentityTypeUser,
+			wantUsername:    "alice",
+			wantRawUsername: "alice",
+			wantAccountID:   "123456789012",
+		},
+		{
+			name:            "ISO partition assumed role",
+			arn:             "arn:aws-iso:sts::123456789012:assumed-role/MyRole/session",
+			wantType:        IdentityTypeAssumedRole,
+			wantUsername:    "session",
+			wantRawUsername: "session",
+			wantAccountID:   "123456789012",
+		},
+		// ISO-B partition tests (C2S)
+		{
+			name:            "ISO-B partition IAM user",
+			arn:             "arn:aws-iso-b:iam::123456789012:user/bob",
+			wantType:        IdentityTypeUser,
+			wantUsername:    "bob",
+			wantRawUsername: "bob",
+			wantAccountID:   "123456789012",
+		},
+		{
+			name:            "ISO-B partition assumed role",
+			arn:             "arn:aws-iso-b:sts::123456789012:assumed-role/MyRole/session",
+			wantType:        IdentityTypeAssumedRole,
+			wantUsername:    "session",
+			wantRawUsername: "session",
+			wantAccountID:   "123456789012",
+		},
 	}
 
 	for _, tt := range tests {
