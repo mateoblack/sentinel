@@ -13,16 +13,23 @@ import (
 // sentinelKeyringConfigDefaults mirrors the aws-vault keyring config
 // to share the same credential store.
 var sentinelKeyringConfigDefaults = keyring.Config{
-	ServiceName:              "aws-vault",
-	FilePasswordFunc:         fileKeyringPassphrasePrompt,
-	LibSecretCollectionName:  "awsvault",
-	KWalletAppID:             "aws-vault",
-	KWalletFolder:            "aws-vault",
-	KeychainTrustApplication: true,
-	WinCredPrefix:            "aws-vault",
-	OPConnectTokenEnv:        "AWS_VAULT_OP_CONNECT_TOKEN",
-	OPTokenEnv:               "AWS_VAULT_OP_SERVICE_ACCOUNT_TOKEN",
-	OPTokenFunc:              keyringPassphrasePrompt,
+	ServiceName:             "aws-vault",
+	FilePasswordFunc:        fileKeyringPassphrasePrompt,
+	LibSecretCollectionName: "awsvault",
+	KWalletAppID:            "aws-vault",
+	KWalletFolder:           "aws-vault",
+	WinCredPrefix:           "aws-vault",
+	OPConnectTokenEnv:       "AWS_VAULT_OP_CONNECT_TOKEN",
+	OPTokenEnv:              "AWS_VAULT_OP_SERVICE_ACCOUNT_TOKEN",
+	OPTokenFunc:             keyringPassphrasePrompt,
+
+	// macOS Keychain security hardening:
+	// - TrustApplication: allows this app to access items it created without prompting
+	// - AccessibleWhenUnlocked: false = credentials unavailable when device locked
+	// - Synchronizable: false = prevent credential sync to iCloud
+	KeychainTrustApplication:       true,
+	KeychainAccessibleWhenUnlocked: false,
+	KeychainSynchronizable:         false,
 }
 
 // Sentinel holds shared state for all sentinel commands.
