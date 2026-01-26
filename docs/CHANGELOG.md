@@ -52,6 +52,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **v1.14 Milestone Complete:** Lambda TVM provides server-side credential vending with enforced policy evaluation. Protected roles trust only the Lambda execution role, preventing client-side bypass.
 
+## [1.16.0] - 2026-01-26
+
+### Added
+
+- Timing-safe bearer token comparison via `crypto/subtle.ConstantTimeCompare`
+- AWS Secrets Manager integration for MDM API tokens with 1-hour client-side caching
+- CI/CD security scanning with govulncheck, gosec, and Trivy in GitHub Actions
+- DynamoDB KMS encryption by default for all Sentinel tables
+- API rate limiting (100 req/min sliding window) for Lambda TVM and credential servers
+- Error sanitization across all credential endpoints (log details, return generic messages)
+- Security integration tests validating hardening patterns
+
 ## [1.15.0] - 2026-01-25
 
 ### Added
