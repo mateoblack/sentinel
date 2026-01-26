@@ -156,10 +156,10 @@ Plans:
 **Goal**: Review and sanitize error messages to prevent information leakage
 **Depends on**: Phase 118
 **Research**: Unlikely (internal error handling patterns)
-**Plans**: TBD
+**Plans**: 1/1 complete
 
 Plans:
-- [ ] 119-01: TBD
+- [x] 119-01: Sanitize error responses across Lambda TVM, Sentinel, EC2/ECS servers — completed 2026-01-26
 
 #### Phase 120: Security Validation
 
@@ -583,6 +583,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
-| v1.16 Security Hardening | 113-120 | 5/? | 🚧 In Progress | - |
+| v1.16 Security Hardening | 113-120 | 6/? | 🚧 In Progress | - |
 
 **Totals:** 19 milestones shipped (112 phases, 213 plans shipped)

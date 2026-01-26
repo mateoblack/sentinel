@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 ## Current Position
 
-Phase: 118 of 120 (Dependency Security Audit)
+Phase: 119 of 120 (Error Sanitization)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-25 — Completed 118-01-PLAN.md
+Last activity: 2026-01-26 — Completed 119-01-PLAN.md
 
-Progress: █████░░░░░ 50%
+Progress: █████████░ 88%
 
 ## Milestone Summary
 
@@ -143,6 +143,11 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - RFC 7231 compliant Retry-After header with 429 responses
 - Rate limiter closed on shutdown if implements io.Closer
 
+**v1.16 Security Hardening decisions (Phase 119):**
+- Error sanitization pattern: log.Printf details internally, return generic message to client
+- Rate limit and policy deny messages preserved (intentional user-facing information)
+- ERROR: prefix for internal error logs for consistency
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -165,10 +170,10 @@ None — fresh start for next milestone.
 
 ## Session Continuity
 
-Last session: 2026-01-25
-Stopped at: Completed 118-01-PLAN.md (Phase 118 complete)
+Last session: 2026-01-26
+Stopped at: Completed 119-01-PLAN.md (Phase 119 complete)
 Resume file: None
-Next: Phase 119 (Error Sanitization)
+Next: Phase 120 (Security Validation)
 
 ## Roadmap Evolution
 
