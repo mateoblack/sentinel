@@ -4,6 +4,7 @@ package policy
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"strings"
@@ -116,10 +117,13 @@ func (m *SignatureMetadata) Validate() error {
 // Note: A matching hash does not guarantee the signature is valid - it only
 // confirms the policy content hasn't changed since the metadata was created.
 // Always use PolicySigner.Verify() for cryptographic verification.
+//
+// Uses constant-time comparison to prevent timing attacks that could leak
+// information about the expected hash value.
 func (s *SignedPolicy) ValidateHash(policyYAML []byte) bool {
 	if s.Metadata.PolicyHash == "" {
 		return false
 	}
 	computedHash := ComputePolicyHash(policyYAML)
-	return s.Metadata.PolicyHash == computedHash
+	return subtle.ConstantTimeCompare([]byte(s.Metadata.PolicyHash), []byte(computedHash)) == 1
 }
