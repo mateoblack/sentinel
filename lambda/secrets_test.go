@@ -170,7 +170,7 @@ func TestCachedSecretsLoader_GetSecret(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Error("expected error, got nil")
-				} else if tt.wantErrSubstr != "" && !containsSubstring(err.Error(), tt.wantErrSubstr) {
+				} else if tt.wantErrSubstr != "" && !secretsContainsSubstring(err.Error(), tt.wantErrSubstr) {
 					t.Errorf("expected error containing %q, got %q", tt.wantErrSubstr, err.Error())
 				}
 				return
@@ -310,13 +310,13 @@ func TestWithTTL(t *testing.T) {
 	}
 }
 
-// containsSubstring checks if s contains substr (case-sensitive).
-func containsSubstring(s, substr string) bool {
+// secretsContainsSubstring checks if s contains substr (case-sensitive).
+func secretsContainsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
+		(len(s) > 0 && len(substr) > 0 && secretsFindSubstring(s, substr)))
 }
 
-func findSubstring(s, substr string) bool {
+func secretsFindSubstring(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
 			return true

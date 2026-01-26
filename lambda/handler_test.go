@@ -973,6 +973,10 @@ func (m *handlerMockSessionStore) GetBySourceIdentity(ctx context.Context, sourc
 	return nil, nil
 }
 
+func (m *handlerMockSessionStore) ListByDeviceID(ctx context.Context, deviceID string, limit int) ([]*session.ServerSession, error) {
+	return []*session.ServerSession{}, nil
+}
+
 // mockLogger implements logging.Logger for testing.
 type mockLogger struct {
 	entries []logging.DecisionLogEntry
