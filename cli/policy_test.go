@@ -1093,3 +1093,487 @@ func TestPolicyPushCommand_ParameterTypeString(t *testing.T) {
 		t.Errorf("Type = %v, want ParameterTypeString", mockClient.PutCalls[0].Type)
 	}
 }
+
+// --- PolicyDiffCommand Tests ---
+
+func TestPolicyDiffCommand_NoChanges(t *testing.T) {
+	// Create temp file with valid policy
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	// Remote has same policy (normalized form)
+	mockClient := &MockSSMClient{
+		Policies: map[string]string{
+			"/sentinel/policies/dev": validPolicyYAML(),
+		},
+	}
+
+	input := PolicyDiffCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Stdout:    stdout,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyDiffCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Exit code 0 means no changes
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0 for no changes", exitCode)
+	}
+
+	// Verify stdout is empty (no diff output)
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	if output != "" {
+		t.Errorf("expected empty stdout for no changes, got: %s", output)
+	}
+}
+
+func TestPolicyDiffCommand_WithChanges(t *testing.T) {
+	// Create temp file with modified policy
+	localPolicy := `version: "1"
+rules:
+  - name: allow-dev
+    effect: allow
+    conditions:
+      profiles:
+        - "dev-*"
+`
+	policyFile := createTempPolicyFile(t, localPolicy)
+	defer os.Remove(policyFile)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	// Remote has original policy
+	mockClient := &MockSSMClient{
+		Policies: map[string]string{
+			"/sentinel/policies/dev": validPolicyYAML(),
+		},
+	}
+
+	input := PolicyDiffCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		NoColor:   true, // Easier to verify without ANSI codes
+		Stdout:    stdout,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyDiffCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Exit code 1 means changes exist
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for changes exist", exitCode)
+	}
+
+	// Verify stdout contains diff output
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	if !strings.Contains(output, "---") {
+		t.Errorf("output should contain '---' header, got: %s", output)
+	}
+	if !strings.Contains(output, "+++") {
+		t.Errorf("output should contain '+++' header, got: %s", output)
+	}
+	if !strings.Contains(output, "@@") {
+		t.Errorf("output should contain '@@' hunk markers, got: %s", output)
+	}
+	// Should show the change from "allow-all" to "allow-dev"
+	if !strings.Contains(output, "-") && !strings.Contains(output, "+") {
+		t.Errorf("output should contain +/- lines, got: %s", output)
+	}
+}
+
+func TestPolicyDiffCommand_RemoteNotFound(t *testing.T) {
+	// Create temp file with valid policy
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	// Remote has no policy (ParameterNotFound)
+	mockClient := &MockSSMClient{
+		Policies: map[string]string{}, // Empty - will return ParameterNotFound
+	}
+
+	input := PolicyDiffCommandInput{
+		Profile:   "newprofile",
+		InputFile: policyFile,
+		NoColor:   true,
+		Stdout:    stdout,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyDiffCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Exit code 1 means changes exist (all lines are additions)
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for new policy (all additions)", exitCode)
+	}
+
+	// Verify stdout contains diff output with all additions
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	if !strings.Contains(output, "+++") {
+		t.Errorf("output should contain '+++' header, got: %s", output)
+	}
+	// All lines should be additions (+) since remote is empty
+	if !strings.Contains(output, "+version:") {
+		t.Errorf("output should show +version: for new policy, got: %s", output)
+	}
+}
+
+func TestPolicyDiffCommand_ValidationError(t *testing.T) {
+	// Create temp file with invalid policy YAML
+	invalidPolicy := `version: "1"
+rules: []
+`
+	policyFile := createTempPolicyFile(t, invalidPolicy)
+	defer os.Remove(policyFile)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	input := PolicyDiffCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Stdout:    stdout,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyDiffCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for validation error", exitCode)
+	}
+
+	// Verify stderr contains validation error
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "validation error") {
+		t.Errorf("stderr should contain 'validation error', got: %s", errOutput)
+	}
+}
+
+func TestPolicyDiffCommand_FileNotFound(t *testing.T) {
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{}
+
+	input := PolicyDiffCommandInput{
+		Profile:   "dev",
+		InputFile: "/nonexistent/path/policy.yaml",
+		Stdout:    stdout,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyDiffCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for file not found", exitCode)
+	}
+
+	// Verify stderr contains file not found message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "file not found") {
+		t.Errorf("stderr should contain 'file not found', got: %s", errOutput)
+	}
+}
+
+func TestPolicyDiffCommand_SSMError(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{
+		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return nil, errors.New("access denied")
+		},
+	}
+
+	input := PolicyDiffCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		Stdout:    stdout,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyDiffCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for SSM error", exitCode)
+	}
+
+	// Verify stderr contains error message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "failed to fetch remote policy") {
+		t.Errorf("stderr should contain 'failed to fetch remote policy', got: %s", errOutput)
+	}
+}
+
+func TestPolicyDiffCommand_NoColorFlag(t *testing.T) {
+	// Create temp file with different policy
+	localPolicy := `version: "1"
+rules:
+  - name: modified-rule
+    effect: allow
+    conditions:
+      profiles:
+        - "test-*"
+`
+	policyFile := createTempPolicyFile(t, localPolicy)
+	defer os.Remove(policyFile)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{
+		Policies: map[string]string{
+			"/sentinel/policies/dev": validPolicyYAML(),
+		},
+	}
+
+	input := PolicyDiffCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		NoColor:   true, // --no-color flag
+		Stdout:    stdout,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyDiffCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for changes exist", exitCode)
+	}
+
+	// Verify stdout does NOT contain ANSI color codes
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	if strings.Contains(output, "\033[") {
+		t.Errorf("output should not contain ANSI codes with --no-color, got: %s", output)
+	}
+	// Should still have diff markers
+	if !strings.Contains(output, "---") || !strings.Contains(output, "+++") {
+		t.Errorf("output should contain diff markers, got: %s", output)
+	}
+}
+
+func TestPolicyDiffCommand_PolicyParameterOverride(t *testing.T) {
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	explicitPath := "/custom/path/to/policy"
+
+	mockClient := &MockSSMClient{
+		Policies: map[string]string{
+			explicitPath: validPolicyYAML(),
+		},
+	}
+
+	input := PolicyDiffCommandInput{
+		Profile:         "ignored-profile",
+		InputFile:       policyFile,
+		PolicyParameter: explicitPath,
+		Stdout:          stdout,
+		Stderr:          stderr,
+		SSMClient:       mockClient,
+	}
+
+	exitCode, err := PolicyDiffCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Should be 0 (no changes) since same policy
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify the explicit path was used (not derived from profile)
+	if len(mockClient.Calls) != 1 {
+		t.Fatalf("expected 1 GetParameter call, got %d", len(mockClient.Calls))
+	}
+	if aws.ToString(mockClient.Calls[0].Name) != explicitPath {
+		t.Errorf("GetParameter path = %q, want %q (explicit path)", aws.ToString(mockClient.Calls[0].Name), explicitPath)
+	}
+}
+
+func TestPolicyDiffCommand_WithColorOutput(t *testing.T) {
+	// Create temp file with different policy
+	localPolicy := `version: "1"
+rules:
+  - name: color-test
+    effect: allow
+    conditions:
+      profiles:
+        - "color-*"
+`
+	policyFile := createTempPolicyFile(t, localPolicy)
+	defer os.Remove(policyFile)
+
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{
+		Policies: map[string]string{
+			"/sentinel/policies/dev": validPolicyYAML(),
+		},
+	}
+
+	input := PolicyDiffCommandInput{
+		Profile:   "dev",
+		InputFile: policyFile,
+		NoColor:   false, // Color enabled (default)
+		Stdout:    stdout,
+		Stderr:    stderr,
+		SSMClient: mockClient,
+	}
+
+	exitCode, err := PolicyDiffCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for changes exist", exitCode)
+	}
+
+	// Verify stdout CONTAINS ANSI color codes
+	stdout.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stdout)
+	output := buf.String()
+
+	if !strings.Contains(output, "\033[") {
+		t.Errorf("output should contain ANSI codes with color enabled, got: %s", output)
+	}
+}
