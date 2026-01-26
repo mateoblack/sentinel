@@ -147,13 +147,18 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ### Active
 
-**v2.0 Planning** — Define next milestone goals
+**v1.20 CLI Security & Deployment Helpers** — Complete CLI feature set before backend automation
 
-Potential focus areas:
-- Multi-account support and cross-account credential management
-- Web UI for policy management and approval workflows
-- Kubernetes integration with credential injection
-- Enhanced observability with metrics and dashboards
+**Goal:** Provide policy validation, trust policy auditing, and self-service AWS account hardening helpers.
+
+**Target features:**
+- Policy linting (detect rule conflicts, unreachable rules, overlapping conditions)
+- Trust policy validation (overly broad principals, missing SourceIdentity)
+- Deployment validation (SCP/DynamoDB/SSM/KMS monitoring status audit)
+- SCP deployment helper (deploy recommended SCP to management account)
+- DynamoDB hardening (enable deletion protection + PITR)
+- SSM hardening (enable versioning, create backups)
+- CloudTrail monitoring (create alarms for security events)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -448,4 +453,4 @@ v1.18 adds comprehensive security hardening:
 - 153 security regression tests across 13 packages with CI enforcement
 
 ---
-*Last updated: 2026-01-26 after v1.19 milestone*
+*Last updated: 2026-01-26 after starting v1.20 milestone*
