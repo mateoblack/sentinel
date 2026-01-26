@@ -36,6 +36,15 @@ var keyringConfigDefaults = keyring.Config{
 	KeychainTrustApplication:       true,
 	KeychainAccessibleWhenUnlocked: false,
 	KeychainSynchronizable:         false,
+
+	// Linux kernel keyring security:
+	// - KeyCtlScope: "user" = keys visible only to current user's keyring
+	// - KeyCtlPerm: possessor-only permissions (0x3f000000)
+	//   Possessor: all permissions (bits 24-29)
+	//   User/Group/Other: no permissions
+	//   This prevents other processes (even same user) from accessing keys
+	KeyCtlScope: "user",
+	KeyCtlPerm:  keyring.KEYCTL_PERM_ALL << keyring.KEYCTL_PERM_PROCESS,
 }
 
 type AwsVault struct {
