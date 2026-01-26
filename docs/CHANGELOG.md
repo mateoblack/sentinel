@@ -52,6 +52,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **v1.14 Milestone Complete:** Lambda TVM provides server-side credential vending with enforced policy evaluation. Protected roles trust only the Lambda execution role, preventing client-side bypass.
 
+## [1.15.0] - 2026-01-25
+
+### Added
+
+- Device posture schema with DeviceID (64-char hex) and PostureStatus types
+- MDM Provider interface with Jamf Pro implementation for server-side device verification
+- Lambda TVM queries MDM APIs on credential requests (fail-open default, fail-closed option)
+- Policy device conditions: `require_mdm`, `require_encryption`, `require_mdm_compliant`
+- Session device binding with DeviceID field for forensic correlation
+- `sentinel device-sessions` command to list sessions by device
+- `sentinel devices` command with anomaly detection (multi-user, high-profile-count)
+- Device-based session revocation via `--device-id` flag
+
 ## [1.13.0] - 2026-01-24
 
 ### Added
