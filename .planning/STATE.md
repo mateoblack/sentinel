@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.18 Critical Security Hardening (phases 132-135 remaining)
+**Current focus:** v1.18 Critical Security Hardening (phases 133-135 remaining)
 
 ## Current Position
 
-Phase: 132-keyring-protection COMPLETE
-Plan: 2 of 2 complete
-Status: Phase complete
-Last activity: 2026-01-26 — Completed 132-02-PLAN.md (Security regression tests)
+Phase: 133 of 135 (Rate Limit Hardening)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-26 — Completed 133-01-PLAN.md (DynamoDB rate limiter)
 
-Progress: █████████████████████░ 91% (237/263 estimated total plans)
+Progress: █████████████████████░ 92% (238/263 estimated total plans)
 
 ## Milestone Summary
 
@@ -23,7 +23,8 @@ Progress: █████████████████████░ 91%
 - Phases 126-128 complete (Policy Integrity, Break-Glass MFA, Audit Log Integrity)
 - Phase 131 COMPLETE (DynamoDB Security - 2/2 plans complete)
 - Phase 132 COMPLETE (Keyring Protection - 2/2 plans complete)
-- Phases 133-135 pending (Rate Limit Hardening, Input Sanitization, Security Validation)
+- Phase 133 IN PROGRESS (Rate Limit Hardening - 1/2 plans complete)
+- Phases 134-135 pending (Input Sanitization, Security Validation)
 - Addresses P0 security threats from STRIDE threat model
 
 **v1.19 Documentation & Completeness Audit (PENDING v1.18):**
@@ -55,8 +56,8 @@ See complete history in ROADMAP.md
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 229
-- Estimated remaining: ~35 plans (7 security + ~28 documentation)
+- Total plans completed: 230
+- Estimated remaining: ~33 plans (6 security + ~27 documentation)
 - Average duration: ~3.5 min per plan
 
 **By Milestone:**
@@ -73,6 +74,12 @@ Last 5 milestones:
 ### Decisions
 
 Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
+
+**Phase 133 Rate Limit Hardening (Plan 01):**
+- Use UpdateItem with condition expression for atomic increment/window reset
+- Fail-open policy: log warning on DynamoDB errors, allow request
+- TTL = window end + 1 hour buffer for cleanup
+- Key format: RL# prefix for single-table design compatibility
 
 **Phase 128 Audit Log Integrity (Plan 01-03):**
 - Entry stored as json.RawMessage to preserve exact bytes for verification after JSON round-trip
@@ -155,15 +162,15 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 
 ### Pending Todos
 
-None — Phase 132 complete, ready for Phase 133 (Rate Limit Hardening)
+None — Plan 133-01 complete, ready for 133-02
 
 ### Blockers/Concerns
 
-None — phases 129-135 are security implementation work.
+None — phases 133-135 are security implementation work.
 
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 132-02-PLAN.md (Security regression tests)
+Stopped at: Completed 133-01-PLAN.md (DynamoDB rate limiter)
 Resume file: None
-Next: Plan Phase 133 (Rate Limit Hardening)
+Next: Execute 133-02-PLAN.md (Lambda TVM rate limiter integration)
