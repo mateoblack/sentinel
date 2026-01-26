@@ -52,6 +52,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **v1.14 Milestone Complete:** Lambda TVM provides server-side credential vending with enforced policy evaluation. Protected roles trust only the Lambda execution role, preventing client-side bypass.
 
+## [1.17.0] - 2026-01-26
+
+### Added
+
+- Policy schema Version type with `IsValid()` and `IsCurrent()` validation methods
+- `MarshalPolicy` for YAML serialization and round-trip policy editing
+- `sentinel policy pull <profile>` fetches policy from SSM to stdout or file
+- `sentinel policy push <profile> <file>` validates and uploads to SSM with confirmation
+- `sentinel policy diff <profile> <file>` shows unified diff with color output
+- `sentinel policy validate <file>` validates policy locally without AWS credentials
+
 ## [1.16.0] - 2026-01-26
 
 ### Added
