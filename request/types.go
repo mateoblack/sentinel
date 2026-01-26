@@ -83,6 +83,26 @@ func (s RequestStatus) IsTerminal() bool {
 	return false
 }
 
+// ValidTransition returns true if transitioning from current status to newStatus is allowed.
+// The request state machine only allows forward transitions from pending.
+func (s RequestStatus) ValidTransition(newStatus RequestStatus) bool {
+	// Same status is always valid (idempotent update)
+	if s == newStatus {
+		return true
+	}
+	// Only pending can transition to other states
+	if s != StatusPending {
+		return false
+	}
+	// From pending, can only go to approved, denied, expired, or cancelled
+	switch newStatus {
+	case StatusApproved, StatusDenied, StatusExpired, StatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Request represents an approval request for AWS profile access.
 // It contains the requester's information, what they're requesting,
 // why they need it, and the current state of the approval workflow.

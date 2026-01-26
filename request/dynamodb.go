@@ -180,8 +180,23 @@ func (s *DynamoDBStore) Get(ctx context.Context, id string) (*Request, error) {
 // Update modifies an existing request using optimistic locking.
 // Returns ErrRequestNotFound if request doesn't exist.
 // Returns ErrConcurrentModification if request was modified since last read.
+// Returns ErrInvalidStateTransition if the status transition is not allowed.
 // Note: Update() sets UpdatedAt internally - callers should NOT set it before calling.
 func (s *DynamoDBStore) Update(ctx context.Context, req *Request) error {
+	// Get current item to validate state transition
+	current, err := s.Get(ctx, req.ID)
+	if err != nil {
+		if errors.Is(err, ErrRequestNotFound) {
+			return fmt.Errorf("%s: %w", req.ID, ErrRequestNotFound)
+		}
+		return err
+	}
+
+	// Validate state transition
+	if !current.Status.ValidTransition(req.Status) {
+		return fmt.Errorf("%s to %s: %w", current.Status, req.Status, ErrInvalidStateTransition)
+	}
+
 	// Save original UpdatedAt for optimistic lock condition check
 	originalUpdatedAt := req.UpdatedAt
 
@@ -311,10 +326,10 @@ func (s *DynamoDBStore) queryByIndex(ctx context.Context, indexName, keyAttr, ke
 	}
 
 	output, err := s.client.Query(ctx, &dynamodb.QueryInput{
-		TableName:                 aws.String(s.tableName),
-		IndexName:                 aws.String(indexName),
-		KeyConditionExpression:    aws.String(keyCondition),
-		ExpressionAttributeNames:  exprAttrNames,
+		TableName:                aws.String(s.tableName),
+		IndexName:                aws.String(indexName),
+		KeyConditionExpression:   aws.String(keyCondition),
+		ExpressionAttributeNames: exprAttrNames,
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":v": &types.AttributeValueMemberS{Value: keyValue},
 		},
