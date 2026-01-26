@@ -227,6 +227,10 @@ func ConfigurePolicyCommand(app *kingpin.Application, s *Sentinel) {
 		}
 		return nil
 	})
+
+	// Configure sign and verify subcommands
+	ConfigurePolicySign(app, s)
+	ConfigurePolicyVerify(app, s)
 }
 
 // PolicyPullCommand executes the policy pull command logic.
