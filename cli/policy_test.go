@@ -1577,3 +1577,301 @@ rules:
 		t.Errorf("output should contain ANSI codes with color enabled, got: %s", output)
 	}
 }
+
+// --- PolicyValidateCommand Tests ---
+
+func TestPolicyValidateCommand_ValidPolicy(t *testing.T) {
+	// Create temp file with valid policy
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Exit code 0 = valid
+	if exitCode != 0 {
+		stderr.Seek(0, 0)
+		var buf bytes.Buffer
+		buf.ReadFrom(stderr)
+		t.Errorf("exitCode = %d, want 0 for valid policy. stderr: %s", exitCode, buf.String())
+	}
+
+	// Verify stderr contains success message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "Policy is valid") {
+		t.Errorf("stderr should contain 'Policy is valid', got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_InvalidYAML(t *testing.T) {
+	// Create temp file with malformed YAML syntax
+	malformedYAML := `version: "1"
+rules:
+  - name: test
+  effect: allow  # wrong indentation - parse error
+`
+	policyFile := createTempPolicyFile(t, malformedYAML)
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	// Exit code 1 = invalid
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for invalid YAML", exitCode)
+	}
+
+	// Verify stderr contains parse error
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "parse error") {
+		t.Errorf("stderr should contain 'parse error', got: %s", errOutput)
+	}
+	if !strings.Contains(errOutput, "Suggestion:") {
+		t.Errorf("stderr should contain 'Suggestion:', got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_ValidationError(t *testing.T) {
+	// Create temp file with valid YAML but invalid policy (no rules)
+	invalidPolicy := `version: "1"
+rules: []
+`
+	policyFile := createTempPolicyFile(t, invalidPolicy)
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	// Exit code 1 = invalid
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for validation error", exitCode)
+	}
+
+	// Verify stderr contains validation error
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "validation error") {
+		t.Errorf("stderr should contain 'validation error', got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_FileNotFound(t *testing.T) {
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: "/nonexistent/path/policy.yaml",
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	// Exit code 1 = file not found
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for file not found", exitCode)
+	}
+
+	// Verify stderr contains file not found message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "file not found") {
+		t.Errorf("stderr should contain 'file not found', got: %s", errOutput)
+	}
+	if !strings.Contains(errOutput, "Suggestion:") {
+		t.Errorf("stderr should contain 'Suggestion:', got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_QuietMode(t *testing.T) {
+	// Create temp file with valid policy
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     true, // --quiet flag
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Exit code 0 = valid
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0 for valid policy", exitCode)
+	}
+
+	// Verify stderr is empty (no success message in quiet mode)
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if errOutput != "" {
+		t.Errorf("stderr should be empty in quiet mode on success, got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_InvalidVersion(t *testing.T) {
+	// Create temp file with unsupported version
+	invalidVersionPolicy := `version: "99"
+rules:
+  - name: allow-all
+    effect: allow
+    conditions:
+      profiles:
+        - "*"
+`
+	policyFile := createTempPolicyFile(t, invalidVersionPolicy)
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	// Exit code 1 = invalid
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for invalid version", exitCode)
+	}
+
+	// Verify stderr contains validation error about version
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "validation error") {
+		t.Errorf("stderr should contain 'validation error', got: %s", errOutput)
+	}
+	// Should mention the unsupported version
+	if !strings.Contains(errOutput, "version") {
+		t.Errorf("stderr should mention 'version', got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_InvalidEffect(t *testing.T) {
+	// Create temp file with invalid effect value
+	invalidEffectPolicy := `version: "1"
+rules:
+  - name: invalid-effect
+    effect: invalid_effect_value
+    conditions:
+      profiles:
+        - "*"
+`
+	policyFile := createTempPolicyFile(t, invalidEffectPolicy)
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	// Exit code 1 = invalid
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for invalid effect", exitCode)
+	}
+
+	// Verify stderr contains validation error about effect
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "validation error") {
+		t.Errorf("stderr should contain 'validation error', got: %s", errOutput)
+	}
+	// Should mention invalid effect
+	if !strings.Contains(errOutput, "effect") {
+		t.Errorf("stderr should mention 'effect', got: %s", errOutput)
+	}
+}
