@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 
 ## Current Position
 
-Phase: 121 of 125 (Policy Schema Enhancements)
+Phase: 122 of 125 (Policy Pull Command)
 Plan: 1 of 1 complete
 Status: Phase complete
-Last activity: 2026-01-26 — Completed 121-01-PLAN.md
+Last activity: 2026-01-26 — Completed 122-01-PLAN.md
 
-Progress: ██░░░░░░░░ 20%
+Progress: ████░░░░░░ 40%
 
 ## Milestone Summary
 
@@ -184,9 +184,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 121-01-PLAN.md (Phase 121 complete)
+Stopped at: Completed 122-01-PLAN.md (Phase 122 complete)
 Resume file: None
-Next: Phase 122 planning
+Next: Phase 123 planning
 
 ## Roadmap Evolution
 

@@ -120,10 +120,10 @@ Plans:
 **Goal**: Fetch policy from SSM to stdout or file with formatting options
 **Depends on**: Phase 121
 **Research**: Unlikely (existing SSM loader patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 122-01: TBD
+- [x] 122-01: Policy pull command implementation — completed 2026-01-26
 
 #### Phase 123: Policy Push Command
 
