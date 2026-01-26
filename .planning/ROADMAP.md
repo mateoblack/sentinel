@@ -169,21 +169,21 @@ Plans:
 Plans:
 - [x] 137-01: Policy command documentation (1/1 plans) - completed 2026-01-26
 
-#### Phase 138: Policy Signing Guide
+#### Phase 138: Policy Signing Guide - COMPLETE
 
 **Goal**: Create POLICY_SIGNING.md explaining KMS-based policy integrity
 **Depends on**: Phase 137
 **Requirements**: PSIGN-01, PSIGN-02, PSIGN-03, PSIGN-04, PSIGN-05, PSIGN-06
 **Success Criteria** (what must be TRUE):
-  1. User understands why policy signing prevents attacks (threat model documented)
-  2. User can create KMS signing key following documented steps
-  3. User can sign and verify policies locally
-  4. Operator can configure Lambda TVM signature verification
-  5. Troubleshooting section addresses common signature errors
-**Plans**: TBD
+  1. User understands why policy signing prevents attacks (threat model documented) - DONE
+  2. User can create KMS signing key following documented steps - DONE
+  3. User can sign and verify policies locally - DONE
+  4. Operator can configure Lambda TVM signature verification - DONE
+  5. Troubleshooting section addresses common signature errors - DONE
+**Plans**: 1 plan completed
 
 Plans:
-- [ ] 138-01: TBD (run /gsd:plan-phase 138 to break down)
+- [x] 138-01: Policy signing guide (1/1 plans) - completed 2026-01-26
 
 #### Phase 139: Device Posture Guide
 
@@ -665,6 +665,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
-| v1.19 Documentation & Completeness Audit | 136-142 | 2/? | 🚧 In Progress | - |
+| v1.19 Documentation & Completeness Audit | 136-142 | 3/? | 🚧 In Progress | - |
 
 **Totals:** 22 milestones shipped (135 phases, 255 plans shipped), 1 milestone in progress (7 phases)
