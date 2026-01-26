@@ -7,9 +7,45 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/byteness/aws-vault/v7/logging"
 )
+
+// ConfigureAuditVerifyLogsCommand sets up the audit verify-logs command.
+func ConfigureAuditVerifyLogsCommand(app *kingpin.Application, s *Sentinel) {
+	// Get or create the audit command (might already exist from other audit commands)
+	auditCmd := app.GetCommand("audit")
+	if auditCmd == nil {
+		auditCmd = app.Command("audit", "Audit and verification commands")
+	}
+
+	var file, keyHex, keyFile string
+
+	cmd := auditCmd.Command("verify-logs", "Verify HMAC signatures in audit log files")
+
+	cmd.Arg("file", "Path to log file (use - for stdin)").
+		Required().
+		StringVar(&file)
+
+	cmd.Flag("key", "Hex-encoded HMAC key (64 chars for 32 bytes)").
+		StringVar(&keyHex)
+
+	cmd.Flag("key-file", "Path to file containing hex-encoded key").
+		StringVar(&keyFile)
+
+	cmd.Action(func(c *kingpin.ParseContext) error {
+		err := AuditVerifyLogsCommand(file, keyHex, keyFile)
+		if err != nil {
+			if strings.Contains(err.Error(), "verification failed") {
+				os.Exit(1)
+			}
+			app.FatalIfError(err, "audit verify-logs")
+		}
+		return nil
+	})
+}
 
 // AuditVerifyLogsInput contains the input for the audit verify-logs command.
 type AuditVerifyLogsInput struct {
