@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 
 ## Current Position
 
-Phase: 119 of 120 (Error Sanitization)
+Phase: 120 of 120 (Security Validation)
 Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-26 — Completed 119-01-PLAN.md
+Status: Phase complete, milestone complete
+Last activity: 2026-01-26 — Completed 120-01-PLAN.md
 
-Progress: █████████░ 88%
+Progress: ██████████ 100%
 
 ## Milestone Summary
 
@@ -55,9 +55,9 @@ Progress: █████████░ 88%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 215
+- Total plans completed: 216
 - Average duration: ~3.5 min
-- Total execution time: ~785 min
+- Total execution time: ~789 min
 
 **By Milestone:**
 
@@ -148,6 +148,12 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Rate limit and policy deny messages preserved (intentional user-facing information)
 - ERROR: prefix for internal error logs for consistency
 
+**v1.16 Security Hardening decisions (Phase 120):**
+- Lambda TVM uses IAM auth from API Gateway, not local token comparison
+- Security tests use AST parsing to verify constant-time comparison patterns
+- Error sanitization tests verify both what IS exposed and what is NOT exposed
+- Security test naming convention: TestSecurityIntegration_* for combined validation
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -171,9 +177,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 119-01-PLAN.md (Phase 119 complete)
+Stopped at: Completed 120-01-PLAN.md (Phase 120 complete, v1.16 milestone complete)
 Resume file: None
-Next: Phase 120 (Security Validation)
+Next: v1.17 milestone planning
 
 ## Roadmap Evolution
 
