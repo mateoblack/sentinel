@@ -139,20 +139,20 @@ See [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) for full details.
 
 **Status:** Ready to start (v1.18 Critical Security Hardening complete).
 
-#### Phase 136: CHANGELOG Completion
+#### Phase 136: CHANGELOG Completion - COMPLETE
 
 **Goal**: Update CHANGELOG with all shipped v1.13-v1.18 releases
 **Depends on**: v1.18 complete (Phase 135)
 **Requirements**: CHLOG-01, CHLOG-02, CHLOG-03, CHLOG-04, CHLOG-05, CHLOG-06
 **Success Criteria** (what must be TRUE):
-  1. CHANGELOG shows v1.13-v1.18 as released with ship dates (not "Unreleased")
-  2. Each version entry lists all major features shipped
-  3. Ship dates match actual milestone completion dates from git history
-  4. CHANGELOG follows consistent format with previous entries
-**Plans**: TBD
+  1. CHANGELOG shows v1.13-v1.18 as released with ship dates (not "Unreleased") - DONE
+  2. Each version entry lists all major features shipped - DONE
+  3. Ship dates match actual milestone completion dates from git history - DONE
+  4. CHANGELOG follows consistent format with previous entries - DONE
+**Plans**: 1 plan completed
 
 Plans:
-- [ ] 136-01: TBD (run /gsd:plan-phase 136 to break down)
+- [x] 136-01: CHANGELOG completion (1/1 plans) - completed 2026-01-26
 
 #### Phase 137: Command Documentation
 
