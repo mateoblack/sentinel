@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- KMS-based policy signing with `sentinel policy sign` and `sentinel policy verify` commands
+- KMS-based policy signing with `sentinel policy sign` and `sentinel policy verify` commands (see [POLICY_SIGNING.md](POLICY_SIGNING.md))
 - `--sign` flag for `sentinel policy push` to upload signed policies
 - VerifyingLoader for signature-validated policy loading with fail-closed security
 - Lambda TVM signature verification integration

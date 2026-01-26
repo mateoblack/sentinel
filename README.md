@@ -153,6 +153,7 @@ rules:
 | [Approval Workflows](docs/guide/approval-workflows.md) | Request/approve flow |
 | [Break-Glass Access](docs/guide/break-glass.md) | Emergency access |
 | [Enforcement Patterns](docs/ENFORCEMENT.md) | Trust policies and SCPs |
+| [Policy Signing](docs/POLICY_SIGNING.md) | KMS-based policy integrity |
 | [Troubleshooting](docs/guide/troubleshooting.md) | Common issues and fixes |
 
 ## Built On
