@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 133 of 135 (Rate Limit Hardening)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-26 — Completed 133-01-PLAN.md (DynamoDB rate limiter)
+Plan: 2 of 2 in current phase
+Status: COMPLETE
+Last activity: 2026-01-26 — Completed 133-02-PLAN.md (Lambda TVM integration)
 
-Progress: █████████████████████░ 92% (238/263 estimated total plans)
+Progress: █████████████████████░ 93% (239/263 estimated total plans)
 
 ## Milestone Summary
 
@@ -23,7 +23,7 @@ Progress: █████████████████████░ 92%
 - Phases 126-128 complete (Policy Integrity, Break-Glass MFA, Audit Log Integrity)
 - Phase 131 COMPLETE (DynamoDB Security - 2/2 plans complete)
 - Phase 132 COMPLETE (Keyring Protection - 2/2 plans complete)
-- Phase 133 IN PROGRESS (Rate Limit Hardening - 1/2 plans complete)
+- Phase 133 COMPLETE (Rate Limit Hardening - 2/2 plans complete)
 - Phases 134-135 pending (Input Sanitization, Security Validation)
 - Addresses P0 security threats from STRIDE threat model
 
@@ -56,7 +56,7 @@ See complete history in ROADMAP.md
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 230
+- Total plans completed: 231
 - Estimated remaining: ~33 plans (6 security + ~27 documentation)
 - Average duration: ~3.5 min per plan
 
@@ -75,11 +75,14 @@ Last 5 milestones:
 
 Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 
-**Phase 133 Rate Limit Hardening (Plan 01):**
+**Phase 133 Rate Limit Hardening (Plan 01-02):**
 - Use UpdateItem with condition expression for atomic increment/window reset
 - Fail-open policy: log warning on DynamoDB errors, allow request
 - TTL = window end + 1 hour buffer for cleanup
 - Key format: RL# prefix for single-table design compatibility
+- SENTINEL_RATE_LIMIT_TABLE env var for DynamoDB table configuration
+- Rate limit key is IAM ARN (not IP) for per-user rate limiting with IAM auth
+- Warning log when in-memory rate limiter used (not recommended for Lambda)
 
 **Phase 128 Audit Log Integrity (Plan 01-03):**
 - Entry stored as json.RawMessage to preserve exact bytes for verification after JSON round-trip
@@ -162,15 +165,15 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 
 ### Pending Todos
 
-None — Plan 133-01 complete, ready for 133-02
+None — Phase 133 complete, ready for phase 134
 
 ### Blockers/Concerns
 
-None — phases 133-135 are security implementation work.
+None — phases 134-135 are security implementation work.
 
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 133-01-PLAN.md (DynamoDB rate limiter)
+Stopped at: Completed 133-02-PLAN.md (Lambda TVM integration)
 Resume file: None
-Next: Execute 133-02-PLAN.md (Lambda TVM rate limiter integration)
+Next: Create 134-01-PLAN.md (Input Sanitization phase)
