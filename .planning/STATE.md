@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 128-audit-log-integrity
-Plan: 01 of 03 (HMAC Signature Infrastructure) - COMPLETE
-Status: Plan 01 complete, ready for plan 02
-Last activity: 2026-01-26 — Plan 128-01 completed (HMAC signature infrastructure)
+Plan: 02 of 03 (CloudWatch Logs Forwarder) - COMPLETE
+Status: Plan 02 complete, ready for plan 03
+Last activity: 2026-01-26 — Plan 128-02 completed (CloudWatch Logs forwarder)
 
-Progress: ████████████████████░░ 88% (232/263 estimated total plans)
+Progress: ████████████████████░░ 89% (233/263 estimated total plans)
 
 ## Milestone Summary
 
@@ -75,11 +75,14 @@ Last 5 milestones:
 
 Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 
-**Phase 128 Audit Log Integrity (Plan 01):**
+**Phase 128 Audit Log Integrity (Plan 01-02):**
 - Entry stored as json.RawMessage to preserve exact bytes for verification after JSON round-trip
 - Signature covers entry + timestamp + key_id for replay protection
 - Fail-open on signing errors (log to stderr, continue with unsigned entries)
 - Minimum key length 32 bytes (256 bits) for HMAC-SHA256
+- Fail-open on CloudWatch errors (availability over security)
+- Logger selection: CloudWatch+signing > CloudWatch > signing > stdout
+- Default stream name from AWS_LAMBDA_FUNCTION_NAME
 
 **v1.18 Critical Security Hardening (Phase 126):**
 - Use MessageType RAW for KMS signing (KMS handles hashing internally)
@@ -119,6 +122,6 @@ None — v1.19 is documentation work with no code dependencies.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Phase 128-01 complete (HMAC signature infrastructure)
+Stopped at: Phase 128-02 complete (CloudWatch Logs forwarder)
 Resume file: None
-Next: Run /gsd:execute-plan 02 of phase 128-audit-log-integrity for verification utilities
+Next: Run /gsd:execute-plan 03 of phase 128-audit-log-integrity for key rotation
