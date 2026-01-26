@@ -5,6 +5,70 @@ All notable changes to Sentinel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-01-26
+
+### Added
+
+- KMS-based policy signing with `sentinel policy sign` and `sentinel policy verify` commands
+- `--sign` flag for `sentinel policy push` to upload signed policies
+- VerifyingLoader for signature-validated policy loading with fail-closed security
+- Lambda TVM signature verification integration
+- Break-glass MFA enforcement (TOTP + SMS) with `MFAVerifier` interface
+- HMAC-SHA256 signed audit logs with CloudWatch forwarding
+- `sentinel audit verify-logs` command for tamper detection
+- Unix socket credential servers with process authentication (SO_PEERCRED/LOCAL_PEERCRED)
+- AWS ISO and ISO-B partition support in ARN validation
+- DynamoDB optimistic locking fix and state transition validation
+- Keyring protection hardening (macOS ACLs, Linux keyctl permissions)
+- Distributed rate limiting with DynamoDB atomic counters
+- Input validation for profile names and shell escaping
+- 153 security regression tests across 13 packages
+
+### Security
+
+- Policy cache poisoning prevention via KMS signature verification
+- Break-glass bypass prevention via MFA enforcement
+- Audit log tampering prevention via HMAC signing
+- Local credential theft prevention via Unix socket process auth
+- State manipulation prevention via DynamoDB optimistic locking
+- Command injection prevention via input validation
+
+## [1.17.0] - 2026-01-26
+
+### Added
+
+- Policy schema Version type with `IsValid()` and `IsCurrent()` validation methods
+- `MarshalPolicy` for YAML serialization and round-trip policy editing
+- `sentinel policy pull <profile>` fetches policy from SSM to stdout or file
+- `sentinel policy push <profile> <file>` validates and uploads to SSM with confirmation
+- `sentinel policy diff <profile> <file>` shows unified diff with color output
+- `sentinel policy validate <file>` validates policy locally without AWS credentials
+
+## [1.16.0] - 2026-01-26
+
+### Added
+
+- Timing-safe bearer token comparison via `crypto/subtle.ConstantTimeCompare`
+- AWS Secrets Manager integration for MDM API tokens with 1-hour client-side caching
+- CI/CD security scanning with govulncheck, gosec, and Trivy in GitHub Actions
+- DynamoDB KMS encryption by default for all Sentinel tables
+- API rate limiting (100 req/min sliding window) for Lambda TVM and credential servers
+- Error sanitization across all credential endpoints (log details, return generic messages)
+- Security integration tests validating hardening patterns
+
+## [1.15.0] - 2026-01-25
+
+### Added
+
+- Device posture schema with DeviceID (64-char hex) and PostureStatus types
+- MDM Provider interface with Jamf Pro implementation for server-side device verification
+- Lambda TVM queries MDM APIs on credential requests (fail-open default, fail-closed option)
+- Policy device conditions: `require_mdm`, `require_encryption`, `require_mdm_compliant`
+- Session device binding with DeviceID field for forensic correlation
+- `sentinel device-sessions` command to list sessions by device
+- `sentinel devices` command with anomaly detection (multi-user, high-profile-count)
+- Device-based session revocation via `--device-id` flag
+
 ## [1.14.0] - 2026-01-25
 
 ### Added
@@ -51,42 +115,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Complete v1.14 milestone documentation
 
 **v1.14 Milestone Complete:** Lambda TVM provides server-side credential vending with enforced policy evaluation. Protected roles trust only the Lambda execution role, preventing client-side bypass.
-
-## [1.17.0] - 2026-01-26
-
-### Added
-
-- Policy schema Version type with `IsValid()` and `IsCurrent()` validation methods
-- `MarshalPolicy` for YAML serialization and round-trip policy editing
-- `sentinel policy pull <profile>` fetches policy from SSM to stdout or file
-- `sentinel policy push <profile> <file>` validates and uploads to SSM with confirmation
-- `sentinel policy diff <profile> <file>` shows unified diff with color output
-- `sentinel policy validate <file>` validates policy locally without AWS credentials
-
-## [1.16.0] - 2026-01-26
-
-### Added
-
-- Timing-safe bearer token comparison via `crypto/subtle.ConstantTimeCompare`
-- AWS Secrets Manager integration for MDM API tokens with 1-hour client-side caching
-- CI/CD security scanning with govulncheck, gosec, and Trivy in GitHub Actions
-- DynamoDB KMS encryption by default for all Sentinel tables
-- API rate limiting (100 req/min sliding window) for Lambda TVM and credential servers
-- Error sanitization across all credential endpoints (log details, return generic messages)
-- Security integration tests validating hardening patterns
-
-## [1.15.0] - 2026-01-25
-
-### Added
-
-- Device posture schema with DeviceID (64-char hex) and PostureStatus types
-- MDM Provider interface with Jamf Pro implementation for server-side device verification
-- Lambda TVM queries MDM APIs on credential requests (fail-open default, fail-closed option)
-- Policy device conditions: `require_mdm`, `require_encryption`, `require_mdm_compliant`
-- Session device binding with DeviceID field for forensic correlation
-- `sentinel device-sessions` command to list sessions by device
-- `sentinel devices` command with anomaly detection (multi-user, high-profile-count)
-- Device-based session revocation via `--device-id` flag
 
 ## [1.13.0] - 2026-01-24
 
