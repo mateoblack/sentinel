@@ -90,3 +90,16 @@ variable "require_device_posture" {
   type        = bool
   default     = false
 }
+
+# Policy Signing Configuration
+variable "policy_signing_key_arn" {
+  description = "KMS key ARN or alias for policy signature verification. When set, policies must have valid signatures."
+  type        = string
+  default     = ""
+}
+
+variable "enforce_policy_signing" {
+  description = "When true, reject policies without valid signatures. Defaults to true when policy_signing_key_arn is set."
+  type        = bool
+  default     = null # Will default to true when signing key is set
+}

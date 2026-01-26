@@ -202,3 +202,27 @@ resource "aws_iam_role_policy" "secrets_manager" {
     ]
   })
 }
+
+# Policy: Policy Signature Verification (conditional - only if policy_signing_key_arn is specified)
+# Required for verifying KMS signatures on policies
+resource "aws_iam_role_policy" "policy_signing" {
+  count = var.policy_signing_key_arn != "" ? 1 : 0
+
+  name = "${var.function_name}-policy-signing"
+  role = aws_iam_role.tvm_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowPolicySignatureVerification"
+        Effect = "Allow"
+        Action = [
+          "kms:Verify",
+          "kms:DescribeKey"
+        ]
+        Resource = var.policy_signing_key_arn
+      }
+    ]
+  })
+}

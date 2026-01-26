@@ -52,6 +52,11 @@ locals {
     } : {},
     var.require_device_posture ? {
       SENTINEL_REQUIRE_DEVICE = "true"
+    } : {},
+    # Policy Signing Configuration
+    var.policy_signing_key_arn != "" ? {
+      SENTINEL_POLICY_SIGNING_KEY     = var.policy_signing_key_arn
+      SENTINEL_ENFORCE_POLICY_SIGNING = coalesce(var.enforce_policy_signing, true) ? "true" : "false"
     } : {}
   )
 }
