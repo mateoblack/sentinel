@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 
 ## Current Position
 
-Phase: 123 of 125 (Policy Push Command)
+Phase: 124 of 125 (Policy Diff Command)
 Plan: 1 of 1 complete
 Status: Phase complete
-Last activity: 2026-01-26 — Completed 123-01-PLAN.md
+Last activity: 2026-01-26 — Completed 124-01-PLAN.md
 
-Progress: █████░░░░░ 60%
+Progress: ████████░░ 80%
 
 ## Milestone Summary
 
@@ -167,6 +167,12 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Confirmation prompt with --force flag for automation bypass
 - Cancel on confirmation exits with code 0 (not an error)
 
+**v1.17 Policy Developer Experience decisions (Phase 124):**
+- Exit code 0 = no changes, 1 = changes exist (scripting-friendly)
+- Normalize policies via parse/marshal before comparison
+- Use LCS algorithm for unified diff generation
+- Color output enabled by default, --no-color flag to disable
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -190,9 +196,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 123-01-PLAN.md (Phase 123 complete)
+Stopped at: Completed 124-01-PLAN.md (Phase 124 complete)
 Resume file: None
-Next: Phase 124 planning
+Next: Phase 125 planning
 
 ## Roadmap Evolution
 

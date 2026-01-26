@@ -140,10 +140,10 @@ Plans:
 **Goal**: Show pending changes between local file and SSM with unified diff format
 **Depends on**: Phase 123
 **Research**: Unlikely (standard diff algorithms)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 124-01: TBD
+- [x] 124-01: Policy diff command implementation — completed 2026-01-26
 
 #### Phase 125: Policy Validate Command
 
@@ -568,6 +568,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
-| v1.17 Policy Developer Experience | 121-125 | 3/? | 🚧 In Progress | - |
+| v1.17 Policy Developer Experience | 121-125 | 4/? | 🚧 In Progress | - |
 
 **Totals:** 20 milestones shipped (120 phases, 223 plans shipped)
