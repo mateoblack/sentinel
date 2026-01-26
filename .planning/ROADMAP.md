@@ -185,38 +185,38 @@ Plans:
 Plans:
 - [x] 138-01: Policy signing guide (1/1 plans) - completed 2026-01-26
 
-#### Phase 139: Device Posture Guide
+#### Phase 139: Device Posture Guide - COMPLETE
 
 **Goal**: Create DEVICE_POSTURE.md explaining MDM integration and device verification
 **Depends on**: Phase 138
 **Requirements**: DPOST-01, DPOST-02, DPOST-03, DPOST-04, DPOST-05
 **Success Criteria** (what must be TRUE):
-  1. User understands device posture threat model and use cases
-  2. Operator can configure Jamf Pro MDM provider following documented steps
-  3. User can write policy rules with device conditions (require_mdm, require_encryption)
-  4. Operator can audit device compliance using device-sessions and devices commands
-  5. Troubleshooting section addresses common device verification failures
-**Plans**: TBD
+  1. User understands device posture threat model and use cases - DONE
+  2. Operator can configure Jamf Pro MDM provider following documented steps - DONE
+  3. User can write policy rules with device conditions (require_mdm, require_encryption) - DONE
+  4. Operator can audit device compliance using device-sessions and devices commands - DONE
+  5. Troubleshooting section addresses common device verification failures - DONE
+**Plans**: 1 plan completed
 
 Plans:
-- [ ] 139-01: TBD (run /gsd:plan-phase 139 to break down)
+- [x] 139-01: Device posture guide (1/1 plans) - completed 2026-01-26
 
-#### Phase 140: Security Hardening Guide
+#### Phase 140: Security Hardening Guide - COMPLETE
 
 **Goal**: Create SECURITY_HARDENING.md documenting v1.16 hardening features
 **Depends on**: Phase 139
 **Requirements**: HARD-01, HARD-02, HARD-03, HARD-04, HARD-05, HARD-06
 **Success Criteria** (what must be TRUE):
-  1. Security team understands all v1.16 hardening features and their purpose
-  2. Timing attack mitigation is explained with crypto/subtle.ConstantTimeCompare example
-  3. Secrets Manager integration is documented with configuration examples
-  4. Rate limiting configuration is documented for Lambda TVM and credential servers
-  5. Error sanitization pattern is explained (log details, return generic messages)
-  6. DynamoDB KMS encryption is documented with deployment examples
-**Plans**: TBD
+  1. Security team understands all v1.16 hardening features and their purpose - DONE
+  2. Timing attack mitigation is explained with crypto/subtle.ConstantTimeCompare example - DONE
+  3. Secrets Manager integration is documented with configuration examples - DONE
+  4. Rate limiting configuration is documented for Lambda TVM and credential servers - DONE
+  5. Error sanitization pattern is explained (log details, return generic messages) - DONE
+  6. DynamoDB KMS encryption is documented with deployment examples - DONE
+**Plans**: 1 plan completed
 
 Plans:
-- [ ] 140-01: TBD (run /gsd:plan-phase 140 to break down)
+- [x] 140-01: Security hardening guide (1/1 plans) - completed 2026-01-26
 
 #### Phase 141: README & Examples Update
 
@@ -665,6 +665,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
-| v1.19 Documentation & Completeness Audit | 136-142 | 3/? | 🚧 In Progress | - |
+| v1.19 Documentation & Completeness Audit | 136-142 | 5/? | 🚧 In Progress | - |
 
-**Totals:** 22 milestones shipped (135 phases, 255 plans shipped), 1 milestone in progress (7 phases)
+**Totals:** 22 milestones shipped (135 phases, 257 plans shipped), 1 milestone in progress (7 phases)

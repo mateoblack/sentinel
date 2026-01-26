@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 
 ## Current Position
 
-Phase: 138 of 142 (Policy Signing Guide)
+Phase: 140 of 142 (Security Hardening Guide)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-26 — Completed 138-01-PLAN.md
+Last activity: 2026-01-26 — Completed 140-01-PLAN.md
 
 Progress: ████████████████████░░ 97% (22 milestones shipped, v1.19 in progress)
 
@@ -24,6 +24,8 @@ Progress: ████████████████████░░ 97%
 - Phase 136 complete: CHANGELOG updated with v1.13-v1.18 releases
 - Phase 137 complete: Policy commands documented in commands.md
 - Phase 138 complete: Policy signing guide (POLICY_SIGNING.md)
+- Phase 139 complete: Device posture guide (DEVICE_POSTURE.md)
+- Phase 140 complete: Security hardening guide (SECURITY_HARDENING.md)
 
 **v1.18 Critical Security Hardening (SHIPPED 2026-01-26):**
 - 10 phases (126-135), 24 plans
@@ -44,8 +46,8 @@ See complete history in ROADMAP.md and milestones/
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 255
-- Estimated remaining: ~6 plans (documentation)
+- Total plans completed: 256
+- Estimated remaining: ~5 plans (documentation)
 - Average duration: ~3.5 min per plan
 
 **By Milestone:**
@@ -76,6 +78,6 @@ None
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 138-01-PLAN.md
+Stopped at: Completed 140-01-PLAN.md
 Resume file: None
-Next: /gsd:plan-phase 139 for Device Posture Guide
+Next: /gsd:plan-phase 141 for README & Examples Update
