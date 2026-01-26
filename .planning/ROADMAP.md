@@ -27,7 +27,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.16 Security Hardening** — [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) (Phases 113-120, shipped 2026-01-26)
 - ✅ **v1.17 Policy Developer Experience** — [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) (Phases 121-125, shipped 2026-01-26)
 - ✅ **v1.18 Critical Security Hardening** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phases 126-135, shipped 2026-01-26)
-- ✅ **v1.19 Documentation & Completeness Audit** — Phases 136-142 (shipped 2026-01-26)
+- ✅ **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, shipped 2026-01-26)
 ## Completed Milestones
 
 <details>
@@ -133,122 +133,20 @@ See [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.19 Documentation & Completeness Audit (Current)
+<details>
+<summary>✅ v1.19 Documentation & Completeness Audit (Phases 136-142) — SHIPPED 2026-01-26</summary>
 
-**Milestone Goal:** Close documentation gaps for v1.13-v1.18 features, ensuring all capabilities shipped in recent milestones are properly documented for users and operators.
+- [x] Phase 136: CHANGELOG Completion (1/1 plans) — completed 2026-01-26
+- [x] Phase 137: Command Documentation (1/1 plans) — completed 2026-01-26
+- [x] Phase 138: Policy Signing Guide (1/1 plans) — completed 2026-01-26
+- [x] Phase 139: Device Posture Guide (1/1 plans) — completed 2026-01-26
+- [x] Phase 140: Security Hardening Guide (1/1 plans) — completed 2026-01-26
+- [x] Phase 141: README & Examples Update (1/1 plans) — completed 2026-01-26
+- [x] Phase 142: Deployment Guide Review (1/1 plans) — completed 2026-01-26
 
-**Status:** Ready to start (v1.18 Critical Security Hardening complete).
+See [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) for full details.
 
-#### Phase 136: CHANGELOG Completion - COMPLETE
-
-**Goal**: Update CHANGELOG with all shipped v1.13-v1.18 releases
-**Depends on**: v1.18 complete (Phase 135)
-**Requirements**: CHLOG-01, CHLOG-02, CHLOG-03, CHLOG-04, CHLOG-05, CHLOG-06
-**Success Criteria** (what must be TRUE):
-  1. CHANGELOG shows v1.13-v1.18 as released with ship dates (not "Unreleased") - DONE
-  2. Each version entry lists all major features shipped - DONE
-  3. Ship dates match actual milestone completion dates from git history - DONE
-  4. CHANGELOG follows consistent format with previous entries - DONE
-**Plans**: 1 plan completed
-
-Plans:
-- [x] 136-01: CHANGELOG completion (1/1 plans) - completed 2026-01-26
-
-#### Phase 137: Command Documentation - COMPLETE
-
-**Goal**: Document all policy commands in commands.md with syntax and examples
-**Depends on**: Phase 136
-**Requirements**: CMD-01, CMD-02, CMD-03, CMD-04, CMD-05, CMD-06
-**Success Criteria** (what must be TRUE):
-  1. User can find all 6 policy commands documented in commands.md - DONE
-  2. Each command shows syntax, flags, and practical examples - DONE
-  3. Policy workflow is clear (pull → edit → validate → diff → push) - DONE
-  4. Examples demonstrate both basic and advanced usage - DONE
-**Plans**: 1 plan completed
-
-Plans:
-- [x] 137-01: Policy command documentation (1/1 plans) - completed 2026-01-26
-
-#### Phase 138: Policy Signing Guide - COMPLETE
-
-**Goal**: Create POLICY_SIGNING.md explaining KMS-based policy integrity
-**Depends on**: Phase 137
-**Requirements**: PSIGN-01, PSIGN-02, PSIGN-03, PSIGN-04, PSIGN-05, PSIGN-06
-**Success Criteria** (what must be TRUE):
-  1. User understands why policy signing prevents attacks (threat model documented) - DONE
-  2. User can create KMS signing key following documented steps - DONE
-  3. User can sign and verify policies locally - DONE
-  4. Operator can configure Lambda TVM signature verification - DONE
-  5. Troubleshooting section addresses common signature errors - DONE
-**Plans**: 1 plan completed
-
-Plans:
-- [x] 138-01: Policy signing guide (1/1 plans) - completed 2026-01-26
-
-#### Phase 139: Device Posture Guide - COMPLETE
-
-**Goal**: Create DEVICE_POSTURE.md explaining MDM integration and device verification
-**Depends on**: Phase 138
-**Requirements**: DPOST-01, DPOST-02, DPOST-03, DPOST-04, DPOST-05
-**Success Criteria** (what must be TRUE):
-  1. User understands device posture threat model and use cases - DONE
-  2. Operator can configure Jamf Pro MDM provider following documented steps - DONE
-  3. User can write policy rules with device conditions (require_mdm, require_encryption) - DONE
-  4. Operator can audit device compliance using device-sessions and devices commands - DONE
-  5. Troubleshooting section addresses common device verification failures - DONE
-**Plans**: 1 plan completed
-
-Plans:
-- [x] 139-01: Device posture guide (1/1 plans) - completed 2026-01-26
-
-#### Phase 140: Security Hardening Guide - COMPLETE
-
-**Goal**: Create SECURITY_HARDENING.md documenting v1.16 hardening features
-**Depends on**: Phase 139
-**Requirements**: HARD-01, HARD-02, HARD-03, HARD-04, HARD-05, HARD-06
-**Success Criteria** (what must be TRUE):
-  1. Security team understands all v1.16 hardening features and their purpose - DONE
-  2. Timing attack mitigation is explained with crypto/subtle.ConstantTimeCompare example - DONE
-  3. Secrets Manager integration is documented with configuration examples - DONE
-  4. Rate limiting configuration is documented for Lambda TVM and credential servers - DONE
-  5. Error sanitization pattern is explained (log details, return generic messages) - DONE
-  6. DynamoDB KMS encryption is documented with deployment examples - DONE
-**Plans**: 1 plan completed
-
-Plans:
-- [x] 140-01: Security hardening guide (1/1 plans) - completed 2026-01-26
-
-#### Phase 141: README & Examples Update - COMPLETE
-
-**Goal**: Update README feature list and add examples for new features
-**Depends on**: Phase 140
-**Requirements**: README-01, README-02, README-03, README-04, EX-01, EX-02, EX-03, EX-04
-**Success Criteria** (what must be TRUE):
-  1. README mentions Lambda TVM, device posture, and policy signing in feature list - DONE
-  2. README feature list is complete through v1.18 - DONE
-  3. Example policy demonstrates policy signing workflow - DONE
-  4. Example policy demonstrates device posture conditions - DONE
-  5. Terraform example shows KMS signing key creation - DONE (via variables.tf)
-  6. Lambda TVM deployment example includes signature verification configuration - DONE
-**Plans**: 1 plan completed
-
-Plans:
-- [x] 141-01: README feature tables and example files (1/1 plans) - completed 2026-01-26
-
-#### Phase 142: Deployment Guide Review - COMPLETE
-
-**Goal**: Review and update deployment.md for accuracy with v1.18
-**Depends on**: Phase 141
-**Requirements**: DEPLOY-01, DEPLOY-02, DEPLOY-03
-**Success Criteria** (what must be TRUE):
-  1. Deployment.md examples are accurate for v1.18 - DONE
-  2. DynamoDB encryption examples are verified - DONE (KMS encryption added to all CLI examples)
-  3. All Terraform examples use current syntax - DONE
-  4. No outdated commands or deprecated flags in examples - DONE
-**Plans**: 1 plan completed
-
-Plans:
-- [x] 142-01: Deployment guide review (1/1 plans) - completed 2026-01-26
+</details>
 
 ## Domain Expertise
 

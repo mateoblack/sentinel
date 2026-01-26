@@ -1,5 +1,32 @@
 # Project Milestones: Sentinel
 
+## v1.19 Documentation & Completeness Audit (Shipped: 2026-01-26)
+
+**Delivered:** Complete documentation for v1.13-v1.18 features including policy signing, device posture, and security hardening guides. Closed all documentation gaps with CHANGELOG updates, command documentation, and deployment guide modernization.
+
+**Phases completed:** 136-142 (7 plans total)
+
+**Key accomplishments:**
+- CHANGELOG.md updated with v1.13-v1.18 releases showing accurate ship dates and features
+- All 6 policy CLI commands documented in commands.md with CI/CD integration examples
+- POLICY_SIGNING.md created with KMS key setup, Lambda TVM configuration, and threat model
+- DEVICE_POSTURE.md created with Jamf Pro MDM integration and device audit commands
+- SECURITY_HARDENING.md created covering timing attacks, Secrets Manager, rate limiting, encryption
+- README feature tables updated through v1.18 with Terraform policy signing support
+- Deployment guide modernized with KMS encryption and v1.17 policy commands
+
+**Stats:**
+- 7 plans completed across 7 phases
+- 33 files modified
+- +5,497 lines (documentation)
+- 1 day (2026-01-26)
+
+**Git range:** `docs(136-01)` → `docs(142-01)`
+
+**What's next:** v2.0 planning — consider multi-account support, web UI, Kubernetes integration, or enhanced observability.
+
+---
+
 ## v1.18 Critical Security Hardening (Shipped: 2026-01-26)
 
 **Delivered:** Comprehensive security hardening addressing P0 threats from STRIDE threat model with KMS-based policy signing, break-glass MFA enforcement, tamper-evident audit logs, Unix socket process authentication, distributed rate limiting, and 153 security regression tests.
