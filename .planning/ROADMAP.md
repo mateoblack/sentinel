@@ -156,18 +156,18 @@ Plans:
 - [x] 128-02: CloudWatch Logs forwarder and Lambda TVM integration — completed 2026-01-26
 - [x] 128-03: verify-logs CLI command and security regression tests — completed 2026-01-26
 
-#### Phase 129: Local Server Security
+#### Phase 129: Local Server Security ✅
 
 **Goal**: Process-based authentication for credential servers to prevent local access
 **Depends on**: Phase 128
-**Research**: Unlikely (internal patterns, process auth established)
-**Plans**: 4
+**Completed**: 2026-01-26
+**Plans**: 4/4
 
 Plans:
 - [x] 129-01: Peer credential infrastructure (PeerCredentials types, GetPeerCredentials, Linux/macOS/fallback) — completed 2026-01-26
 - [x] 129-02: Unix server with process auth (ProcessAuthenticator, UnixServer, WithProcessAuth middleware) — completed 2026-01-26
-- [ ] 129-03: TBD
-- [ ] 129-04: TBD
+- [x] 129-03: Credential server integration (SentinelServer Unix mode, CLI flags, integration tests) — completed 2026-01-26
+- [x] 129-04: ECS/EC2 Unix mode & security tests (EcsServer Unix mode, EC2 security docs, regression tests) — completed 2026-01-26
 
 #### Phase 130: Identity Hardening
 
