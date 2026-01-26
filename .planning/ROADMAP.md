@@ -190,15 +190,15 @@ Plans:
 - [x] 131-01: Fix optimistic locking bug + state transition validation (session/dynamodb.go Update fix, request/breakglass state validation) — completed 2026-01-26
 - [x] 131-02: Security regression tests (TestSecurityRegression_ tests for all three DynamoDB stores) — completed 2026-01-26
 
-#### Phase 132: Keyring Protection
+#### Phase 132: Keyring Protection (In Progress)
 
 **Goal**: Secure credential storage with access controls and encryption
 **Depends on**: Phase 131
 **Research**: Unlikely (existing keyring library provides platform-specific security options)
-**Plans**: 2
+**Plans**: 1/2
 
 Plans:
-- [ ] 132-01: Keyring security hardening (macOS Keychain ACLs, Linux keyctl permissions, iCloud sync prevention)
+- [x] 132-01: Keyring security hardening (macOS Keychain ACLs, Linux keyctl permissions, iCloud sync prevention) — completed 2026-01-26
 - [ ] 132-02: Security regression tests (TestSecurityRegression_* tests for keyring item properties)
 
 #### Phase 133: Rate Limit Hardening
