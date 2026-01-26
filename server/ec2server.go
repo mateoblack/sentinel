@@ -15,6 +15,30 @@ import (
 
 const ec2CredentialsServerAddr = "127.0.0.1:9099"
 
+// SECURITY NOTE: EC2 Metadata Server Limitations
+//
+// The EC2 metadata server emulates the EC2 Instance Metadata Service (IMDS)
+// at 169.254.169.254. Unlike the ECS container credentials server:
+//
+// 1. NO TOKEN AUTHENTICATION: AWS SDKs expect IMDS to be unauthenticated.
+//    The server relies on network-level security (loopback check, host check).
+//
+// 2. NO PROCESS AUTHENTICATION: Cannot use Unix sockets because SDKs expect
+//    to connect to a specific IP address (169.254.169.254).
+//
+// 3. LOCAL PROCESS EXPOSURE: Any process on the local machine that can route
+//    to the loopback interface can potentially access credentials.
+//
+// Security mitigations:
+// - withSecurityChecks middleware validates loopback source and correct host
+// - Credentials have short TTL (governed by session duration)
+// - For higher security requirements, use SentinelServer with --server flag
+//   or the Lambda TVM with --remote-server
+//
+// The EC2 metadata server is provided for legacy compatibility with tools that
+// require IMDS emulation. For new deployments, prefer container credentials
+// (ECS server) or SentinelServer which support token authentication.
+
 // StartEc2CredentialsServer starts a EC2 Instance Metadata server and endpoint proxy
 func StartEc2CredentialsServer(ctx context.Context, credsProvider aws.CredentialsProvider, region string) error {
 	credsCache := aws.NewCredentialsCache(credsProvider)
