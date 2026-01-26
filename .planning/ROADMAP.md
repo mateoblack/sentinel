@@ -119,27 +119,29 @@ See [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) for full details.
 
 **Milestone Goal:** Address P0 security threats and high-risk vulnerabilities identified in STRIDE threat model analysis, including policy cache poisoning, break-glass bypass, audit log tampering, and credential exposure.
 
-#### Phase 126: Policy Integrity
+#### Phase 126: Policy Integrity ✅
 
 **Goal**: KMS-signed policy validation to prevent cache poisoning attacks
 **Depends on**: v1.17 complete
-**Research**: Likely (KMS signing patterns, policy signature verification)
-**Research topics**: KMS asymmetric signing, policy signature format, verification caching
-**Plans**: TBD
+**Completed**: 2026-01-26
+**Plans**: 3/3
 
 Plans:
-- [ ] 126-01: TBD (run /gsd:plan-phase 126 to break down)
+- [x] 126-01: KMS signing infrastructure (KMSAPI interface, PolicySigner, signature types) — completed 2026-01-26
+- [x] 126-02: Verifying loader & CLI commands (VerifyingLoader, policy sign/verify, push --sign) — completed 2026-01-26
+- [x] 126-03: Lambda TVM integration & security tests (config, handler integration, security tests) — completed 2026-01-26
 
 #### Phase 127: Break-Glass MFA
 
 **Goal**: Secondary verification (SMS/push) for emergency access to prevent abuse
 **Depends on**: Phase 126
-**Research**: Likely (SNS/push notification integration for MFA)
-**Research topics**: SNS SMS, push notification providers, TOTP integration
-**Plans**: TBD
+**Research**: Completed (inline during planning)
+**Plans**: 3
 
 Plans:
-- [ ] 127-01: TBD (run /gsd:plan-phase 127 to break down)
+- [ ] 127-01: MFA infrastructure (types, TOTP verifier, SMS verifier via SNS)
+- [ ] 127-02: Break-glass MFA integration (policy MFA requirements, CLI flow, logging)
+- [ ] 127-03: Security tests & CLI config (regression tests, SSM-based MFA configuration)
 
 #### Phase 128: Audit Log Integrity
 
