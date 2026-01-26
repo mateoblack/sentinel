@@ -3,7 +3,7 @@ BUILD_FLAGS=-ldflags="-s -w -X main.Version=$(VERSION)" -trimpath
 CERT_ID ?= Developer ID Application: ByteNess (R)
 SRC=$(shell find . -name '*.go') go.mod
 INSTALL_DIR ?= ~/bin
-.PHONY: binaries clean release install snapshot run coverage coverage-report coverage-check test-coverage
+.PHONY: binaries clean release install snapshot run coverage coverage-report coverage-check test-coverage test-security test-security-verbose test-all
 
 ifeq ($(shell uname), Darwin)
 aws-vault: $(SRC)
@@ -55,6 +55,14 @@ coverage-check: ## Check coverage meets threshold (80% for Sentinel packages)
 	@./scripts/coverage.sh
 
 test-coverage: coverage coverage-check ## Run tests with coverage enforcement
+
+test-security: ## Run security regression tests
+	@./scripts/security-test.sh
+
+test-security-verbose: ## Run security tests with verbose output
+	@./scripts/security-test.sh -v
+
+test-all: test test-security ## Run all tests including security regression
 
 release: binaries SHA256SUMS
 
