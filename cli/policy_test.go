@@ -2188,3 +2188,231 @@ func TestPolicyPushCommand_WithoutSignFlag(t *testing.T) {
 		t.Errorf("PutParameter should be for policy path, got %s", aws.ToString(mockSSM.PutCalls[0].Name))
 	}
 }
+
+// --- PolicyValidateCommand Lint Integration Tests ---
+
+// policyWithLintIssuesYAML returns a policy YAML that triggers lint warnings
+func policyWithLintIssuesYAML() string {
+	return `version: "1"
+rules:
+  - name: allow-prod
+    effect: allow
+    conditions:
+      profiles:
+        - prod
+  - name: deny-prod
+    effect: deny
+    conditions:
+      profiles:
+        - prod
+`
+}
+
+func TestPolicyValidateCommand_LintWarnings(t *testing.T) {
+	// Create temp file with policy that has lint issues
+	policyFile := createTempPolicyFile(t, policyWithLintIssuesYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Exit code 0 - lint warnings don't affect exit code
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0 (lint warnings don't change exit code)", exitCode)
+	}
+
+	// Verify stderr contains lint warnings
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "lint:") {
+		t.Errorf("stderr should contain lint warnings, got: %s", errOutput)
+	}
+	if !strings.Contains(errOutput, "allow-before-deny") {
+		t.Errorf("stderr should contain 'allow-before-deny', got: %s", errOutput)
+	}
+
+	// Should NOT contain "Policy is valid" when lint issues exist
+	if strings.Contains(errOutput, "Policy is valid") {
+		t.Errorf("stderr should NOT contain 'Policy is valid' when lint issues exist, got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_LintWarnings_ValidWithoutIssues(t *testing.T) {
+	// Valid policy without lint issues
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify stderr contains "Policy is valid" message
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if !strings.Contains(errOutput, "Policy is valid") {
+		t.Errorf("stderr should contain 'Policy is valid', got: %s", errOutput)
+	}
+
+	// Should NOT contain lint warnings
+	if strings.Contains(errOutput, "lint:") {
+		t.Errorf("stderr should NOT contain lint warnings, got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_LintWarnings_InvalidPolicyNoLintOutput(t *testing.T) {
+	// Invalid policy (empty rules) - should fail validation before linting
+	invalidPolicy := `version: "1"
+rules: []
+`
+	policyFile := createTempPolicyFile(t, invalidPolicy)
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected fatal error: %v", err)
+	}
+	// Exit code 1 - validation error
+	if exitCode != 1 {
+		t.Errorf("exitCode = %d, want 1 for validation error", exitCode)
+	}
+
+	// Verify stderr does NOT contain lint warnings (fails before linting)
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if strings.Contains(errOutput, "lint:") {
+		t.Errorf("stderr should NOT contain lint warnings for invalid policy, got: %s", errOutput)
+	}
+	if !strings.Contains(errOutput, "validation error") {
+		t.Errorf("stderr should contain 'validation error', got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_LintQuiet(t *testing.T) {
+	// Valid policy with lint issues + --quiet flag
+	policyFile := createTempPolicyFile(t, policyWithLintIssuesYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     true, // --quiet flag
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Exit code 0 - lint warnings don't affect exit code
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify stderr is empty (--quiet suppresses lint output too)
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	if errOutput != "" {
+		t.Errorf("stderr should be empty with --quiet, got: %s", errOutput)
+	}
+}
+
+func TestPolicyValidateCommand_LintOutput_Format(t *testing.T) {
+	// Verify exact output format: lint: {type}: {message}
+	policyFile := createTempPolicyFile(t, policyWithLintIssuesYAML())
+	defer os.Remove(policyFile)
+
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	input := PolicyValidateCommandInput{
+		InputFile: policyFile,
+		Quiet:     false,
+		Stderr:    stderr,
+	}
+
+	exitCode, err := PolicyValidateCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify output format
+	stderr.Seek(0, 0)
+	var buf bytes.Buffer
+	buf.ReadFrom(stderr)
+	errOutput := buf.String()
+
+	// Should start with "lint: " prefix
+	if !strings.HasPrefix(errOutput, "lint: ") {
+		t.Errorf("lint output should start with 'lint: ', got: %s", errOutput)
+	}
+
+	// Should have the format: lint: {type}: {message}
+	// e.g., "lint: allow-before-deny: allow rule 'allow-prod' at index 0 precedes deny rule 'deny-prod' for same profiles"
+	if !strings.Contains(errOutput, "lint: allow-before-deny:") {
+		t.Errorf("lint output should contain 'lint: allow-before-deny:', got: %s", errOutput)
+	}
+}
