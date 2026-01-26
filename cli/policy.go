@@ -67,6 +67,16 @@ type PolicyDiffCommandInput struct {
 	SSMClient policy.SSMAPI // For testing, nil = create from AWS config
 }
 
+// PolicyValidateCommandInput contains the input for policy validate.
+type PolicyValidateCommandInput struct {
+	InputFile string // Positional arg - path to policy YAML file
+	Quiet     bool   // --quiet / -q flag - only show errors, no success message
+
+	// For testing
+	Stdout *os.File
+	Stderr *os.File
+}
+
 // policyCmd holds the policy command reference for subcommand registration.
 var policyCmd *kingpin.CmdClause
 
@@ -187,6 +197,30 @@ func ConfigurePolicyCommand(app *kingpin.Application, s *Sentinel) {
 		exitCode, err := PolicyDiffCommand(context.Background(), diffInput)
 		if err != nil {
 			app.FatalIfError(err, "policy diff")
+		}
+		if exitCode != 0 {
+			os.Exit(exitCode)
+		}
+		return nil
+	})
+
+	// Configure validate subcommand
+	validateInput := PolicyValidateCommandInput{}
+
+	validateCmd := policyCmd.Command("validate", "Validate local policy file syntax and schema")
+
+	validateCmd.Arg("input-file", "Path to policy YAML file").
+		Required().
+		StringVar(&validateInput.InputFile)
+
+	validateCmd.Flag("quiet", "Only show errors, no success message").
+		Short('q').
+		BoolVar(&validateInput.Quiet)
+
+	validateCmd.Action(func(c *kingpin.ParseContext) error {
+		exitCode, err := PolicyValidateCommand(context.Background(), validateInput)
+		if err != nil {
+			app.FatalIfError(err, "policy validate")
 		}
 		if exitCode != 0 {
 			os.Exit(exitCode)
@@ -788,6 +822,43 @@ func mergeCloseRanges(ranges []changeRange, gap, maxLen int) []changeRange {
 		}
 	}
 	return merged
+}
+
+// PolicyValidateCommand validates a local policy file without AWS access.
+// It returns exit code 0 if valid, 1 if invalid or file not found.
+func PolicyValidateCommand(ctx context.Context, input PolicyValidateCommandInput) (int, error) {
+	// Set up I/O
+	stderr := input.Stderr
+	if stderr == nil {
+		stderr = os.Stderr
+	}
+
+	// Read policy file from disk
+	policyData, err := os.ReadFile(input.InputFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Fprintf(stderr, "Error: file not found: %s\n", input.InputFile)
+			fmt.Fprintf(stderr, "\nSuggestion: verify the file path is correct\n")
+			return 1, nil
+		}
+		fmt.Fprintf(stderr, "Error: failed to read file: %v\n", err)
+		fmt.Fprintf(stderr, "\nSuggestion: check file permissions\n")
+		return 1, nil
+	}
+
+	// Validate policy using policy.ValidatePolicy(data)
+	if err := policy.ValidatePolicy(policyData); err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		fmt.Fprintf(stderr, "\nSuggestion: fix the policy YAML and try again\n")
+		return 1, nil
+	}
+
+	// Success - print message unless --quiet
+	if !input.Quiet {
+		fmt.Fprintf(stderr, "Policy is valid\n")
+	}
+
+	return 0, nil
 }
 
 // colorizeDiff adds ANSI color codes to diff output
