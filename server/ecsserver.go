@@ -70,6 +70,10 @@ type EcsServer struct {
 	cache             sync.Map
 	baseCredsProvider aws.CredentialsProvider
 	config            *vault.ProfileConfig
+
+	// Unix socket mode fields
+	unixServer  *UnixServer
+	processAuth *ProcessAuthenticator
 }
 
 func NewEcsServer(ctx context.Context, baseCredsProvider aws.CredentialsProvider, config *vault.ProfileConfig, authToken string, port int, lazyLoadBaseCreds bool) (*EcsServer, error) {
@@ -158,4 +162,33 @@ func (e *EcsServer) AssumeRoleArnRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeCredsToResponse(creds, w)
+}
+
+// ServeUnix starts serving on the Unix domain socket. This call blocks.
+func (e *EcsServer) ServeUnix() error {
+	if e.unixServer == nil {
+		return fmt.Errorf("Unix server not initialized - use NewEcsServerUnix")
+	}
+	return e.unixServer.Serve()
+}
+
+// ShutdownUnix gracefully shuts down the Unix socket server.
+func (e *EcsServer) ShutdownUnix(ctx context.Context) error {
+	if e.unixServer == nil {
+		return nil
+	}
+	return e.unixServer.Shutdown(ctx)
+}
+
+// UnixSocketPath returns the path to the Unix socket.
+func (e *EcsServer) UnixSocketPath() string {
+	if e.unixServer == nil {
+		return ""
+	}
+	return e.unixServer.SocketPath()
+}
+
+// IsUnixMode returns true if the server is using Unix domain sockets.
+func (e *EcsServer) IsUnixMode() bool {
+	return e.unixServer != nil
 }
