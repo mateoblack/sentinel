@@ -165,7 +165,7 @@ Plans:
 
 Plans:
 - [x] 129-01: Peer credential infrastructure (PeerCredentials types, GetPeerCredentials, Linux/macOS/fallback) — completed 2026-01-26
-- [ ] 129-02: Credential server integration (ECS/EC2/Sentinel server peer auth)
+- [x] 129-02: Unix server with process auth (ProcessAuthenticator, UnixServer, WithProcessAuth middleware) — completed 2026-01-26
 - [ ] 129-03: TBD
 - [ ] 129-04: TBD
 

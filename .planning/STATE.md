@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 129-local-server-security
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-26 — Completed 129-01-PLAN.md (peer credential infrastructure)
+Last activity: 2026-01-26 — Completed 129-02-PLAN.md (Unix server with process auth)
 
-Progress: ████████████████████░░ 87% (229/263 estimated total plans)
+Progress: ████████████████████░░ 87% (230/263 estimated total plans)
 
 ## Milestone Summary
 
@@ -64,7 +64,7 @@ Last 5 milestones:
 - v1.15: 9 phases, 12 plans, ~41 min
 - v1.16: 8 phases, 9 plans, ~21 min
 - v1.17: 5 phases, 5 plans, ~25 min
-- v1.18: 3 phases complete (126-128), phase 129 in progress (1/4 plans), 6 phases remaining (130-135)
+- v1.18: 3 phases complete (126-128), phase 129 in progress (2/4 plans), 6 phases remaining (130-135)
 
 ## Accumulated Context
 
@@ -117,11 +117,15 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Device conditions affect rule matching (nil posture fails conditions)
 - Device audit commands with anomaly detection
 
-**Phase 129 Local Server Security (Plan 01):**
+**Phase 129 Local Server Security (Plan 01-02):**
 - Use golang.org/x/sys/unix for SO_PEERCRED (already indirect dependency)
 - Separate syscall implementations per platform with build tags
 - Return typed errors (ErrNotUnixSocket, ErrPeerCredentialsUnavailable)
 - macOS requires two separate syscalls (LOCAL_PEERCRED + LOCAL_PEERPID)
+- Constant-time token comparison using crypto/subtle to prevent timing attacks
+- Token binding: PID=0 tokens get bound on first successful use
+- Fallback mode for backward compatibility during migration
+- Default socket permissions 0600 (owner only)
 
 ### Pending Todos
 
@@ -134,6 +138,6 @@ None — phases 129-135 are security implementation work.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Phase 129-01 complete (peer credential infrastructure)
+Stopped at: Phase 129-02 complete (Unix server with process auth)
 Resume file: None
-Next: Execute Plan 129-02 (credential server integration)
+Next: Execute Plan 129-03 (credential server integration)
