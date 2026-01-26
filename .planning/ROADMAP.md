@@ -136,10 +136,11 @@ Plans:
 **Goal**: Secondary verification (SMS/push) for emergency access to prevent abuse
 **Depends on**: Phase 126
 **Research**: Completed (inline during planning)
+**Status**: In progress
 **Plans**: 3
 
 Plans:
-- [ ] 127-01: MFA infrastructure (types, TOTP verifier, SMS verifier via SNS)
+- [x] 127-01: MFA infrastructure (types, TOTP verifier, SMS verifier via SNS) — completed 2026-01-26
 - [ ] 127-02: Break-glass MFA integration (policy MFA requirements, CLI flow, logging)
 - [ ] 127-03: Security tests & CLI config (regression tests, SSM-based MFA configuration)
 

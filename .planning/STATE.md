@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.19 Documentation & Completeness Audit
+**Current focus:** v1.18 Critical Security Hardening
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v1.19
-Last activity: 2026-01-26 — Started v1.19 Documentation & Completeness Audit milestone
+Phase: 127 of 135 (Break-Glass MFA)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-26 — Completed 127-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0%
+Progress: ██░░░░░░░░ 22%
 
 ## Milestone Summary
 
@@ -218,6 +218,14 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - TestSecurity_ prefix for security tests (matches codebase conventions)
 - Fail-closed: KMS errors prevent policy loading (no silent bypass)
 
+**v1.18 Critical Security Hardening decisions (Phase 127, Plan 01):**
+- 16-char hex challenge IDs matching break-glass ID format for consistency
+- TOTP uses HMAC-SHA1 per RFC 6238 standard (authenticator app compatibility)
+- TOTP skew default 1 period (30s each direction) for clock drift tolerance
+- SMS uses SNS direct publish with PhoneNumber param and Transactional SMS type
+- crypto/subtle.ConstantTimeCompare for all code verification (timing attack prevention)
+- SMS challenges one-time use (deleted after any verification attempt)
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -241,9 +249,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 126-03-PLAN.md (Lambda TVM signature verification integration)
+Stopped at: Completed 127-01-PLAN.md (MFA verification infrastructure)
 Resume file: None
-Next: Plan or execute Phase 127
+Next: Execute 127-02-PLAN.md
 
 ## Roadmap Evolution
 
