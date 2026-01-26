@@ -65,6 +65,7 @@ Every credential issued through Sentinel is stamped with a `SourceIdentity` that
 |---------|-------------|
 | **Approval workflows** | Require human approval for sensitive access |
 | **Break-glass access** | Emergency bypass with mandatory justification and rate limiting |
+| **Device posture verification** | Verify device security state (MDM enrollment, disk encryption) before issuing credentials |
 | **Trust policy enforcement** | AWS rejects bypass attempts via IAM conditions |
 | **SCP enforcement** | Dangerous actions require Sentinel org-wide |
 
@@ -154,6 +155,7 @@ rules:
 | [Break-Glass Access](docs/guide/break-glass.md) | Emergency access |
 | [Enforcement Patterns](docs/ENFORCEMENT.md) | Trust policies and SCPs |
 | [Policy Signing](docs/POLICY_SIGNING.md) | KMS-based policy integrity |
+| [Device Posture](docs/DEVICE_POSTURE.md) | MDM integration and device verification |
 | [Troubleshooting](docs/guide/troubleshooting.md) | Common issues and fixes |
 
 ## Built On

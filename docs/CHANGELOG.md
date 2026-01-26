@@ -60,13 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Device posture schema with DeviceID (64-char hex) and PostureStatus types
+- Device posture schema with DeviceID (32-char hex) and PostureStatus types (see [DEVICE_POSTURE.md](DEVICE_POSTURE.md))
 - MDM Provider interface with Jamf Pro implementation for server-side device verification
 - Lambda TVM queries MDM APIs on credential requests (fail-open default, fail-closed option)
-- Policy device conditions: `require_mdm`, `require_encryption`, `require_mdm_compliant`
+- Policy device conditions: `require_mdm`, `require_encryption`, `require_mdm_compliant`, `require_firewall`, `min_os_version`, `allowed_os_types`
 - Session device binding with DeviceID field for forensic correlation
 - `sentinel device-sessions` command to list sessions by device
-- `sentinel devices` command with anomaly detection (multi-user, high-profile-count)
+- `sentinel devices` command with anomaly detection (MULTI_USER, HIGH_PROFILE_COUNT)
 - Device-based session revocation via `--device-id` flag
 
 ## [1.14.0] - 2026-01-25
