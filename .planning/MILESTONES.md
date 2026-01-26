@@ -1,5 +1,31 @@
 # Project Milestones: Sentinel
 
+## v1.17 Policy Developer Experience (Shipped: 2026-01-26)
+
+**Delivered:** Complete policy developer workflow with pull, push, diff, and validate commands for SSM-backed policies. Enables policy developers to fetch, edit, compare, and validate Sentinel policies locally before pushing changes.
+
+**Phases completed:** 121-125 (5 plans total)
+
+**Key accomplishments:**
+- Policy schema Version type with validation helpers (IsValid, IsCurrent) for schema evolution
+- MarshalPolicy YAML serialization for round-trip policy editing
+- `sentinel policy pull <profile>` fetches policy from SSM to stdout or file
+- `sentinel policy push <profile> <file>` validates and uploads to SSM with confirmation prompt
+- `sentinel policy diff <profile> <file>` shows unified diff with color output (exit 0=same, 1=different)
+- `sentinel policy validate <file>` validates locally without AWS credentials
+
+**Stats:**
+- 10 files created/modified
+- +3,332 lines of Go
+- 5 phases, 5 plans
+- 1 day (2026-01-26)
+
+**Git range:** `docs(121)` → `docs(125-01)`
+
+**What's next:** Policy developer experience complete. Consider audit trail export, policy testing framework, or multi-environment policy promotion for future milestones.
+
+---
+
 ## v1.16 Security Hardening (Shipped: 2026-01-26)
 
 **Delivered:** Comprehensive security hardening addressing audit findings with timing attack mitigation, secrets management, CI/CD security scanning, DynamoDB encryption, API rate limiting, error sanitization, and security validation tests.

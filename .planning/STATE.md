@@ -5,18 +5,30 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.17 Policy Developer Experience
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 125 of 125 (Policy Validate Command)
-Plan: 1 of 1 complete
-Status: Phase complete, Milestone complete
-Last activity: 2026-01-26 — Completed 125-01-PLAN.md
+Phase: 125 of 125 complete
+Plan: All plans complete
+Status: v1.17 milestone shipped
+Last activity: 2026-01-26 — v1.17 Policy Developer Experience milestone complete
 
 Progress: ██████████ 100%
 
 ## Milestone Summary
+
+**v1.17 Policy Developer Experience (SHIPPED 2026-01-26):**
+- 5 phases (121-125), 5 plans
+- Policy schema Version type with validation helpers
+- Policy CLI commands: pull, push, diff, validate
+- Complete workflow for editing SSM-backed policies locally
+
+**v1.16 Security Hardening (SHIPPED 2026-01-26):**
+- 8 phases (113-120), 9 plans
+- Timing attack mitigation, Secrets Manager, rate limiting
+- DynamoDB encryption, error sanitization
+- Security integration tests
 
 **v1.15 Device Posture (SHIPPED 2026-01-25):**
 - 9 phases (104-112), 12 plans
@@ -52,13 +64,14 @@ Progress: ██████████ 100%
 - v1.14 Server-Side Credential Vending: 7 phases, 19 plans (shipped 2026-01-25)
 - v1.15 Device Posture: 9 phases, 12 plans (shipped 2026-01-25)
 - v1.16 Security Hardening: 8 phases, 9 plans (shipped 2026-01-26)
+- v1.17 Policy Developer Experience: 5 phases, 5 plans (shipped 2026-01-26)
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 228
 - Average duration: ~3.5 min
-- Total execution time: ~841 min
+- Total execution time: ~866 min
 
 **By Milestone:**
 
@@ -202,9 +215,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 125-01-PLAN.md (Phase 125 complete, v1.17 milestone complete)
+Stopped at: v1.17 milestone shipped
 Resume file: None
-Next: Milestone completion
+Next: Plan next milestone
 
 ## Roadmap Evolution
 
@@ -227,4 +240,4 @@ Next: Milestone completion
 - Milestone v1.14 shipped: 2026-01-25 — Server-Side Credential Vending (Phases 97-103)
 - Milestone v1.15 shipped: 2026-01-25 — Device Posture (Phases 104-112)
 - Milestone v1.16 shipped: 2026-01-26 — Security Hardening (Phases 113-120)
-- Milestone v1.17 created: 2026-01-26 — Policy Developer Experience (Phases 121-125)
+- Milestone v1.17 shipped: 2026-01-26 — Policy Developer Experience (Phases 121-125)

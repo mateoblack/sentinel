@@ -113,27 +113,25 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ API rate limiting (100 req/min) for Lambda TVM and credential servers — v1.16
 - ✓ Error sanitization across all credential endpoints — v1.16
 - ✓ Security integration tests for hardening validation — v1.16
+- ✓ Policy schema Version type with validation helpers (IsValid, IsCurrent) — v1.17
+- ✓ MarshalPolicy YAML serialization for policy export — v1.17
+- ✓ `sentinel policy pull <profile>` fetches policy from SSM to stdout or file — v1.17
+- ✓ `sentinel policy push <profile> <file>` validates and uploads to SSM with confirmation — v1.17
+- ✓ `sentinel policy diff <profile> <file>` shows unified diff with color output — v1.17
+- ✓ `sentinel policy validate <file>` validates locally without AWS credentials — v1.17
 
 ### Active
 
-None pending for v1.16 (milestone complete).
+None pending for v1.17 (milestone complete).
 
 ### Out of Scope
 - User management — AWS SSO handles identity
 - Authorization inside AWS resources — IAM/SCPs handle that
 - Daemon mode — CLI-first, no background process
 
-### Future Milestones
-
-**v1.17 Policy Developer Experience**
-- `sentinel policy pull <profile>` — fetch policy from SSM to stdout/file for editing
-- `sentinel policy push <profile>` — validate and upload policy to SSM
-- `sentinel policy diff <profile>` — show pending changes before push
-- `sentinel policy validate <file>` — validate YAML syntax without uploading
-
 ## Context
 
-Shipped v1.16 with 136,759 LOC Go (+7,719 from v1.15).
+Shipped v1.17 with 136,949 LOC Go (+3,332 from v1.16).
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy, aws-lambda-go, API Gateway v2.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -282,6 +280,14 @@ v1.16 adds comprehensive security hardening:
 - Error sanitization across all credential endpoints (log details, return generic messages)
 - Security integration tests validating hardening patterns
 
+v1.17 adds policy developer experience:
+- Policy schema Version type with IsValid() and IsCurrent() validation methods
+- MarshalPolicy for YAML serialization and round-trip policy editing
+- `sentinel policy pull <profile>` fetches policy from SSM to stdout or file
+- `sentinel policy push <profile> <file>` validates and uploads to SSM with confirmation prompt
+- `sentinel policy diff <profile> <file>` shows unified diff with color output (exit 0=same, 1=different)
+- `sentinel policy validate <file>` validates locally without AWS credentials
+
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
 ## Constraints
@@ -388,6 +394,16 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Fail-open on rate limiter errors | Availability preferred over strict limiting | ✓ Good |
 | Error sanitization pattern | Log details internally, return generic messages | ✓ Good |
 | AWS managed KMS encryption | Simpler than customer CMK, no key management | ✓ Good |
+| Version as type alias (type Version string) | YAML serialization compatibility with existing policies | ✓ Good |
+| SupportedVersions as slice | Future extensibility when schema evolves | ✓ Good |
+| ValidatePolicy distinguishes parse vs validation errors | Better CLI UX with actionable error messages | ✓ Good |
+| Extended SSMAPI interface with PutParameter | Unified read/write interface for testing | ✓ Good |
+| ParameterTypeString (not SecureString) | Policy YAML is not sensitive, matches bootstrap pattern | ✓ Good |
+| Confirmation prompt with --force bypass | Safety default with automation support | ✓ Good |
+| Exit code 0=no changes, 1=changes for diff | Scripting-friendly exit codes | ✓ Good |
+| Normalize policies via parse/marshal before diff | Avoid false positives from formatting differences | ✓ Good |
+| LCS algorithm for unified diff | Standard unified diff format with @@ markers | ✓ Good |
+| Color output default with --no-color flag | Terminal readability with pipe compatibility | ✓ Good |
 
 ---
-*Last updated: 2026-01-26 after v1.16 milestone*
+*Last updated: 2026-01-26 after v1.17 milestone*

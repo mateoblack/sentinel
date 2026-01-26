@@ -101,59 +101,18 @@ See [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) for full details.
 
 </details>
 
-### ✅ v1.17 Policy Developer Experience (Complete)
+<details>
+<summary>✅ v1.17 Policy Developer Experience (Phases 121-125) — SHIPPED 2026-01-26</summary>
 
-**Milestone Goal:** Developer workflow for policy editing with pull, push, diff, and validate commands for SSM-backed policies.
+- [x] Phase 121: Policy Schema Enhancements (1/1 plans) — completed 2026-01-26
+- [x] Phase 122: Policy Pull Command (1/1 plans) — completed 2026-01-26
+- [x] Phase 123: Policy Push Command (1/1 plans) — completed 2026-01-26
+- [x] Phase 124: Policy Diff Command (1/1 plans) — completed 2026-01-26
+- [x] Phase 125: Policy Validate Command (1/1 plans) — completed 2026-01-26
 
-#### Phase 121: Policy Schema Enhancements
+See [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) for full details.
 
-**Goal**: Extend policy schema with version field and validation helpers for tooling
-**Depends on**: v1.16 complete
-**Research**: Unlikely (internal policy schema patterns)
-**Plans**: 1
-
-Plans:
-- [x] 121-01: Schema version validation and YAML helpers — completed 2026-01-26
-
-#### Phase 122: Policy Pull Command
-
-**Goal**: Fetch policy from SSM to stdout or file with formatting options
-**Depends on**: Phase 121
-**Research**: Unlikely (existing SSM loader patterns)
-**Plans**: 1
-
-Plans:
-- [x] 122-01: Policy pull command implementation — completed 2026-01-26
-
-#### Phase 123: Policy Push Command
-
-**Goal**: Validate and upload policy to SSM with confirmation and backup
-**Depends on**: Phase 122
-**Research**: Unlikely (existing SSM writer patterns from bootstrap)
-**Plans**: 1
-
-Plans:
-- [x] 123-01: Policy push command implementation — completed 2026-01-26
-
-#### Phase 124: Policy Diff Command
-
-**Goal**: Show pending changes between local file and SSM with unified diff format
-**Depends on**: Phase 123
-**Research**: Unlikely (standard diff algorithms)
-**Plans**: 1
-
-Plans:
-- [x] 124-01: Policy diff command implementation — completed 2026-01-26
-
-#### Phase 125: Policy Validate Command
-
-**Goal**: Local YAML syntax and schema validation without SSM access
-**Depends on**: Phase 124
-**Research**: Unlikely (existing validation patterns)
-**Plans**: 1
-
-Plans:
-- [x] 125-01: Policy validate command implementation — completed 2026-01-26
+</details>
 
 ## Domain Expertise
 
