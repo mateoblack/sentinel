@@ -15,6 +15,7 @@ import (
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
+	"github.com/byteness/aws-vault/v7/validate"
 )
 
 // Duration validation constants (AWS STS limits).
@@ -90,6 +91,14 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	if profile == "" {
 		return errorResponse(http.StatusBadRequest, "MISSING_PROFILE",
 			"Missing required 'profile' query parameter")
+	}
+
+	// Validate profile name format to prevent injection attacks
+	// This MUST happen before any use of the profile value.
+	if err := validate.ValidateProfileName(profile); err != nil {
+		log.Printf("ERROR: Invalid profile name: %s - %v", validate.SanitizeForLog(profile, 50), err)
+		return errorResponse(http.StatusBadRequest, "INVALID_PROFILE",
+			"Invalid profile name format")
 	}
 
 	// Extract device ID from request (optional - used for session binding and MDM lookup)
