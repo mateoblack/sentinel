@@ -25,6 +25,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.14 Server-Side Credential Vending** — [milestones/v1.14-ROADMAP.md](milestones/v1.14-ROADMAP.md) (Phases 97-103, shipped 2026-01-25)
 - ✅ **v1.15 Device Posture** — [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) (Phases 104-112, shipped 2026-01-25)
 - ✅ **v1.16 Security Hardening** — [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) (Phases 113-120, shipped 2026-01-26)
+- 🚧 **v1.17 Policy Developer Experience** — Phases 121-125 (in progress)
 
 ## Completed Milestones
 
@@ -99,6 +100,60 @@ See [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) for full details.
 See [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) for full details.
 
 </details>
+
+### 🚧 v1.17 Policy Developer Experience (In Progress)
+
+**Milestone Goal:** Developer workflow for policy editing with pull, push, diff, and validate commands for SSM-backed policies.
+
+#### Phase 121: Policy Schema Enhancements
+
+**Goal**: Extend policy schema with version field and validation helpers for tooling
+**Depends on**: v1.16 complete
+**Research**: Unlikely (internal policy schema patterns)
+**Plans**: 1
+
+Plans:
+- [x] 121-01: Schema version validation and YAML helpers — completed 2026-01-26
+
+#### Phase 122: Policy Pull Command
+
+**Goal**: Fetch policy from SSM to stdout or file with formatting options
+**Depends on**: Phase 121
+**Research**: Unlikely (existing SSM loader patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 122-01: TBD
+
+#### Phase 123: Policy Push Command
+
+**Goal**: Validate and upload policy to SSM with confirmation and backup
+**Depends on**: Phase 122
+**Research**: Unlikely (existing SSM writer patterns from bootstrap)
+**Plans**: TBD
+
+Plans:
+- [ ] 123-01: TBD
+
+#### Phase 124: Policy Diff Command
+
+**Goal**: Show pending changes between local file and SSM with unified diff format
+**Depends on**: Phase 123
+**Research**: Unlikely (standard diff algorithms)
+**Plans**: TBD
+
+Plans:
+- [ ] 124-01: TBD
+
+#### Phase 125: Policy Validate Command
+
+**Goal**: Local YAML syntax and schema validation without SSM access
+**Depends on**: Phase 124
+**Research**: Unlikely (existing validation patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 125-01: TBD
 
 ## Domain Expertise
 
@@ -513,5 +568,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
+| v1.17 Policy Developer Experience | 121-125 | 1/? | 🚧 In Progress | - |
 
-**Totals:** 20 milestones shipped (120 phases, 222 plans shipped)
+**Totals:** 20 milestones shipped (120 phases, 223 plans shipped)

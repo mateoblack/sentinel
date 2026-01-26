@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.16 Security Hardening shipped — Ready for next milestone
+**Current focus:** v1.17 Policy Developer Experience
 
 ## Current Position
 
-Phase: 120 of 120 (Security Validation) — v1.16 SHIPPED
-Plan: All plans complete
-Status: Milestone archived
-Last activity: 2026-01-26 — v1.16 Security Hardening shipped
+Phase: 121 of 125 (Policy Schema Enhancements)
+Plan: 1 of 1 complete
+Status: Phase complete
+Last activity: 2026-01-26 — Completed 121-01-PLAN.md
 
-Progress: ██████████ 100%
+Progress: ██░░░░░░░░ 20%
 
 ## Milestone Summary
 
@@ -56,9 +56,9 @@ Progress: ██████████ 100%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 222
+- Total plans completed: 223
 - Average duration: ~3.5 min
-- Total execution time: ~810 min
+- Total execution time: ~816 min
 
 **By Milestone:**
 
@@ -156,6 +156,11 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Error sanitization tests verify both what IS exposed and what is NOT exposed
 - Security test naming convention: TestSecurityIntegration_* for combined validation
 
+**v1.17 Policy Developer Experience decisions (Phase 121):**
+- Version as type alias (type Version string) for YAML compatibility
+- SupportedVersions as slice for future schema extensibility
+- ValidatePolicy distinguishes parse errors from validation errors for CLI UX
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -179,9 +184,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: v1.16 Security Hardening milestone shipped
+Stopped at: Completed 121-01-PLAN.md (Phase 121 complete)
 Resume file: None
-Next: v1.17 milestone planning (Policy Developer Experience)
+Next: Phase 122 planning
 
 ## Roadmap Evolution
 
@@ -204,3 +209,4 @@ Next: v1.17 milestone planning (Policy Developer Experience)
 - Milestone v1.14 shipped: 2026-01-25 — Server-Side Credential Vending (Phases 97-103)
 - Milestone v1.15 shipped: 2026-01-25 — Device Posture (Phases 104-112)
 - Milestone v1.16 shipped: 2026-01-26 — Security Hardening (Phases 113-120)
+- Milestone v1.17 created: 2026-01-26 — Policy Developer Experience (Phases 121-125)
