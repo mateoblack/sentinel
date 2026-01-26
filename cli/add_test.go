@@ -270,7 +270,7 @@ func TestAddCommand_WithAddConfig(t *testing.T) {
 		t.Fatalf("failed to reload config: %v", err)
 	}
 
-	_, hasProfile := configFile.ProfileSection("newprofile")
+	_, hasProfile, _ := configFile.ProfileSection("newprofile")
 	if !hasProfile {
 		t.Error("expected profile to be added to config file")
 	}

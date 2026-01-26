@@ -39,7 +39,10 @@ func GetSSOConfigForProfile(configFile *vault.ConfigFile, profileName string) (*
 	}
 
 	// Load profile section
-	profileSection, ok := configFile.ProfileSection(profileName)
+	profileSection, ok, err := configFile.ProfileSection(profileName)
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
 		// Profile not found - return nil (no SSO config available)
 		return nil, nil
@@ -51,7 +54,10 @@ func GetSSOConfigForProfile(configFile *vault.ConfigFile, profileName string) (*
 
 	// If profile uses sso_session, get the SSO config from the sso-session section
 	if profileSection.SSOSession != "" {
-		ssoSession, ok := configFile.SSOSessionSection(profileSection.SSOSession)
+		ssoSession, ok, err := configFile.SSOSessionSection(profileSection.SSOSession)
+		if err != nil {
+			return nil, err
+		}
 		if ok {
 			if ssoSession.SSOStartURL != "" {
 				startURL = ssoSession.SSOStartURL

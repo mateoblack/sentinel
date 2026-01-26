@@ -1257,7 +1257,7 @@ region = us-west-2
 		}
 
 		// Verify the profile has SSO settings
-		profile, ok := configFile.ProfileSection("sso-profile")
+		profile, ok, _ := configFile.ProfileSection("sso-profile")
 		if !ok {
 			t.Fatal("expected to find sso-profile")
 		}
@@ -1354,7 +1354,7 @@ sso_role_name = TestRole
 		}
 
 		// Verify SSO profile can be found
-		profile, ok := input.ConfigFile.ProfileSection("sso-test")
+		profile, ok, _ := input.ConfigFile.ProfileSection("sso-test")
 		if !ok {
 			t.Fatal("expected to find sso-test profile")
 		}

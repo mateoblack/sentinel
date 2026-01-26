@@ -836,7 +836,7 @@ region = eu-west-1
 		}
 
 		// Verify the profile has SSO settings
-		profile, ok := configFile.ProfileSection("whoami-sso-profile")
+		profile, ok, _ := configFile.ProfileSection("whoami-sso-profile")
 		if !ok {
 			t.Fatal("expected to find whoami-sso-profile")
 		}

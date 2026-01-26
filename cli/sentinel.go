@@ -88,7 +88,10 @@ func (s *Sentinel) ValidateProfile(profileName string) error {
 		return fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	_, ok := configFile.ProfileSection(profileName)
+	_, ok, err := configFile.ProfileSection(profileName)
+	if err != nil {
+		return fmt.Errorf("failed to parse profile %q: %w", profileName, err)
+	}
 	if !ok {
 		availableProfiles := configFile.ProfileNames()
 		return fmt.Errorf("profile %q not found in AWS config; available profiles: %v", profileName, availableProfiles)

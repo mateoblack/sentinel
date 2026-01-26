@@ -148,7 +148,7 @@ func ListCommand(input ListCommandInput, awsConfigFile *vault.ConfigFile, keyrin
 		var sessionLabels []string
 
 		// check oidc keyring
-		if profileSection, ok := awsConfigFile.ProfileSection(profileName); ok {
+		if profileSection, ok, _ := awsConfigFile.ProfileSection(profileName); ok {
 			if exists, _ := oidcTokenKeyring.Has(profileSection.SSOStartURL); exists {
 				sessionLabels = append(sessionLabels, fmt.Sprintf("oidc:%s", profileSection.SSOStartURL))
 			}
@@ -172,7 +172,7 @@ func ListCommand(input ListCommandInput, awsConfigFile *vault.ConfigFile, keyrin
 
 	// show credentials that don't have profiles
 	for _, credentialName := range credentialsNames {
-		_, ok := awsConfigFile.ProfileSection(credentialName)
+		_, ok, _ := awsConfigFile.ProfileSection(credentialName)
 		if !ok {
 			fmt.Fprintf(w, "-\t%s\t-\t\n", credentialName)
 		}

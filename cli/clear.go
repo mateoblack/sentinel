@@ -61,7 +61,9 @@ func ClearCommand(input ClearCommandInput, awsConfigFile *vault.ConfigFile, keyr
 			return err
 		}
 
-		if profileSection, ok := awsConfigFile.ProfileSection(input.ProfileName); ok {
+		if profileSection, ok, parseErr := awsConfigFile.ProfileSection(input.ProfileName); parseErr != nil {
+			return parseErr
+		} else if ok {
 			if exists, _ := oidcTokens.Has(profileSection.SSOStartURL); exists {
 				err = oidcTokens.Remove(profileSection.SSOStartURL)
 				if err != nil {

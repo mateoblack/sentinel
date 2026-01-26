@@ -690,7 +690,7 @@ region = eu-west-1
 		}
 
 		// Verify the profile has SSO settings
-		profile, ok := configFile.ProfileSection("exec-sso-profile")
+		profile, ok, _ := configFile.ProfileSection("exec-sso-profile")
 		if !ok {
 			t.Fatal("expected to find exec-sso-profile")
 		}
@@ -860,7 +860,7 @@ sso_role_name = ExecTestRole
 		}
 
 		// Verify SSO profile can be found
-		profile, ok := input.ConfigFile.ProfileSection("sso-exec-test")
+		profile, ok, _ := input.ConfigFile.ProfileSection("sso-exec-test")
 		if !ok {
 			t.Fatal("expected to find sso-exec-test profile")
 		}
@@ -903,7 +903,7 @@ sso_role_name = AdminRole
 		}
 
 		// Verify SSO session profile can be found
-		profile, ok := input.ConfigFile.ProfileSection("sso-session-test")
+		profile, ok, _ := input.ConfigFile.ProfileSection("sso-session-test")
 		if !ok {
 			t.Fatal("expected to find sso-session-test profile")
 		}
@@ -912,7 +912,7 @@ sso_role_name = AdminRole
 		}
 
 		// Verify SSO session section can be found
-		ssoSession, ok := input.ConfigFile.SSOSessionSection("my-sso")
+		ssoSession, ok, _ := input.ConfigFile.SSOSessionSection("my-sso")
 		if !ok {
 			t.Fatal("expected to find my-sso session section")
 		}

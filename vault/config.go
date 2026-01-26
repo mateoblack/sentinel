@@ -171,7 +171,7 @@ func (c *ConfigFile) ProfileSections() []ProfileSection {
 	}
 	for _, section := range c.iniFile.SectionStrings() {
 		if section == defaultSectionName || strings.HasPrefix(section, "profile ") {
-			profile, _ := c.ProfileSection(strings.TrimPrefix(section, "profile "))
+			profile, _, _ := c.ProfileSection(strings.TrimPrefix(section, "profile "))
 
 			// ignore the default profile if it's empty
 			if section == defaultSectionName && profile.IsEmpty() {
@@ -193,12 +193,13 @@ func (c *ConfigFile) ProfileSections() []ProfileSection {
 
 // ProfileSection returns the profile section with the matching name. If there isn't any,
 // an empty profile with the provided name is returned, along with false.
-func (c *ConfigFile) ProfileSection(name string) (ProfileSection, bool) {
+// Returns an error if the profile section exists but cannot be parsed (malformed config).
+func (c *ConfigFile) ProfileSection(name string) (ProfileSection, bool, error) {
 	profile := ProfileSection{
 		Name: name,
 	}
 	if c.iniFile == nil {
-		return profile, false
+		return profile, false, nil
 	}
 	// default profile name has a slightly different section format
 	sectionName := "profile " + name
@@ -207,32 +208,33 @@ func (c *ConfigFile) ProfileSection(name string) (ProfileSection, bool) {
 	}
 	section, err := c.iniFile.GetSection(sectionName)
 	if err != nil {
-		return profile, false
+		return profile, false, nil
 	}
 	if err = section.MapTo(&profile); err != nil {
-		panic(err)
+		return ProfileSection{}, false, fmt.Errorf("failed to parse profile %q: %w", name, err)
 	}
-	return profile, true
+	return profile, true, nil
 }
 
 // SSOSessionSection returns the [sso-session] section with the matching name. If there isn't any,
 // an empty sso-session with the provided name is returned, along with false.
-func (c *ConfigFile) SSOSessionSection(name string) (SSOSessionSection, bool) {
+// Returns an error if the sso-session section exists but cannot be parsed (malformed config).
+func (c *ConfigFile) SSOSessionSection(name string) (SSOSessionSection, bool, error) {
 	ssoSession := SSOSessionSection{
 		Name: name,
 	}
 	if c.iniFile == nil {
-		return ssoSession, false
+		return ssoSession, false, nil
 	}
 	sectionName := "sso-session " + name
 	section, err := c.iniFile.GetSection(sectionName)
 	if err != nil {
-		return ssoSession, false
+		return ssoSession, false, nil
 	}
 	if err = section.MapTo(&ssoSession); err != nil {
-		panic(err)
+		return SSOSessionSection{}, false, fmt.Errorf("failed to parse sso-session %q: %w", name, err)
 	}
-	return ssoSession, true
+	return ssoSession, true, nil
 }
 
 func (c *ConfigFile) Save() error {
@@ -319,7 +321,10 @@ func (cl *ConfigLoader) populateFromConfigFile(config *ProfileConfig, profileNam
 		return fmt.Errorf("Loop detected in config file for profile '%s'", profileName)
 	}
 
-	psection, ok := cl.File.ProfileSection(profileName)
+	psection, ok, err := cl.File.ProfileSection(profileName)
+	if err != nil {
+		return err
+	}
 	if !ok {
 		// ignore missing profiles
 		log.Printf("Profile '%s' missing in config file", profileName)
@@ -350,7 +355,10 @@ func (cl *ConfigLoader) populateFromConfigFile(config *ProfileConfig, profileNam
 		config.SSOSession = psection.SSOSession
 		if psection.SSOSession != "" {
 			// Populate profile with values from [sso-session].
-			ssoSection, ok := cl.File.SSOSessionSection(psection.SSOSession)
+			ssoSection, ok, err := cl.File.SSOSessionSection(psection.SSOSession)
+			if err != nil {
+				return err
+			}
 			if ok {
 				config.SSOStartURL = ssoSection.SSOStartURL
 				config.SSORegion = ssoSection.SSORegion

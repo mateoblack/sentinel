@@ -52,7 +52,7 @@ func ConfigureAddCommand(app *kingpin.Application, a *AwsVault) {
 func AddCommand(input AddCommandInput, keyring keyring.Keyring, awsConfigFile *vault.ConfigFile) error {
 	var accessKeyID, secretKey, mfaSerial string
 
-	p, _ := awsConfigFile.ProfileSection(input.ProfileName)
+	p, _, _ := awsConfigFile.ProfileSection(input.ProfileName)
 	if p.SourceProfile != "" {
 		return fmt.Errorf("Your profile has a source_profile of %s, adding credentials to %s won't have any effect",
 			p.SourceProfile, input.ProfileName)
@@ -92,7 +92,7 @@ func AddCommand(input AddCommandInput, keyring keyring.Keyring, awsConfigFile *v
 		fmt.Printf("Deleted %d existing sessions.\n", n)
 	}
 
-	if _, hasProfile := awsConfigFile.ProfileSection(input.ProfileName); !hasProfile {
+	if _, hasProfile, _ := awsConfigFile.ProfileSection(input.ProfileName); !hasProfile {
 		if input.AddConfig {
 			newProfileSection := vault.ProfileSection{
 				Name:      input.ProfileName,

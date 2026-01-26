@@ -91,7 +91,10 @@ func TestProfileNameCaseSensitivity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	def, ok := cfg.ProfileSection("withMFA")
+	def, ok, err := cfg.ProfileSection("withMFA")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	if !ok {
 		t.Fatalf("Expected to match profile withMFA")
 	}
@@ -124,7 +127,10 @@ func TestConfigParsingProfiles(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("profile_%s", tc.expected.Name), func(t *testing.T) {
-			actual, ok := cfg.ProfileSection(tc.expected.Name)
+			actual, ok, err := cfg.ProfileSection(tc.expected.Name)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
 			if ok != tc.ok {
 				t.Fatalf("Expected second param to be %v, got %v", tc.ok, ok)
 			}
@@ -144,7 +150,10 @@ func TestConfigParsingDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	def, ok := cfg.ProfileSection("default")
+	def, ok, err := cfg.ProfileSection("default")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	if !ok {
 		t.Fatalf("Expected to find default profile")
 	}
@@ -365,7 +374,10 @@ source_profile=foo
 		t.Fatal(err)
 	}
 
-	def, ok := configFile.ProfileSection("foo")
+	def, ok, parseErr := configFile.ProfileSection("foo")
+	if parseErr != nil {
+		t.Fatalf("Unexpected error: %v", parseErr)
+	}
 	if !ok {
 		t.Fatalf("Couldn't load profile foo")
 	}
@@ -402,7 +414,10 @@ source_profile=root
 		t.Fatal(err)
 	}
 
-	def, ok := configFile.ProfileSection("foo")
+	def, ok, parseErr := configFile.ProfileSection("foo")
+	if parseErr != nil {
+		t.Fatalf("Unexpected error: %v", parseErr)
+	}
 	if !ok {
 		t.Fatalf("Couldn't load profile foo")
 	}

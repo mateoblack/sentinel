@@ -1413,7 +1413,7 @@ region = us-west-2
 		}
 
 		// Verify the profile has SSO settings
-		profile, ok := configFile.ProfileSection("bootstrap-sso")
+		profile, ok, _ := configFile.ProfileSection("bootstrap-sso")
 		if !ok {
 			t.Fatal("expected to find bootstrap-sso profile")
 		}
