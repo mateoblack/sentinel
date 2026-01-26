@@ -183,12 +183,12 @@ Plans:
 
 **Goal**: State integrity validation with conditional writes to prevent manipulation
 **Depends on**: Phase 130
-**Research**: Likely (DynamoDB conditional expressions, optimistic locking)
-**Research topics**: ConditionExpression patterns, version vectors, conflict detection
-**Plans**: TBD
+**Research**: Unlikely (extends existing DynamoDB patterns)
+**Plans**: 2
 
 Plans:
-- [ ] 131-01: TBD (run /gsd:plan-phase 131 to break down)
+- [ ] 131-01: Fix optimistic locking bug + state transition validation (session/dynamodb.go Update fix, request/breakglass state validation)
+- [ ] 131-02: Security regression tests (TestSecurityRegression_ tests for all three DynamoDB stores)
 
 #### Phase 132: Keyring Protection
 
