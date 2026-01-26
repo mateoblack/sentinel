@@ -5,16 +5,24 @@
 // - Fail-open behavior is consistent
 // - Configuration validation rejects invalid values
 // - Window boundary handling is secure
+// - DynamoDB atomic operations (distributed rate limiting)
+// - Key isolation between users (DynamoDB)
 
 package ratelimit
 
 import (
 	"context"
+	"errors"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // ============================================================================
@@ -647,5 +655,239 @@ func TestSecurity_RetryAfterAccurate(t *testing.T) {
 	}
 	if retryAfter > window {
 		t.Errorf("retryAfter %v exceeds window %v", retryAfter, window)
+	}
+}
+
+// ============================================================================
+// DynamoDB Security Regression Tests (Distributed Rate Limiting)
+// ============================================================================
+
+// securityCaptureMockDynamoDB captures which DynamoDB operations are called
+// to verify atomic operations are used (UpdateItem), not read-modify-write (GetItem+PutItem).
+type securityCaptureMockDynamoDB struct {
+	updateItemCalled int
+	getItemCalled    int
+	putItemCalled    int
+	lastUpdateExpr   string
+	lastCondExpr     string
+}
+
+func (m *securityCaptureMockDynamoDB) UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	m.updateItemCalled++
+	if params.UpdateExpression != nil {
+		m.lastUpdateExpr = *params.UpdateExpression
+	}
+	if params.ConditionExpression != nil {
+		m.lastCondExpr = *params.ConditionExpression
+	}
+	return &dynamodb.UpdateItemOutput{
+		Attributes: map[string]types.AttributeValue{
+			"Count": &types.AttributeValueMemberN{Value: "1"},
+		},
+	}, nil
+}
+
+// TestSecurityRegression_DynamoDBAtomicIncrement verifies that DynamoDBRateLimiter
+// uses atomic UpdateItem with ADD operation, not read-modify-write pattern.
+// THREAT: Race condition in distributed increment could allow rate limit bypass.
+// PREVENTION: Use DynamoDB atomic ADD operation via UpdateItem, not GetItem/PutItem.
+func TestSecurityRegression_DynamoDBAtomicIncrement(t *testing.T) {
+	ctx := context.Background()
+	cfg := Config{
+		RequestsPerWindow: 10,
+		Window:            time.Minute,
+	}
+
+	mock := &securityCaptureMockDynamoDB{}
+	limiter, err := NewDynamoDBRateLimiter(mock, "test-table", cfg)
+	if err != nil {
+		t.Fatalf("NewDynamoDBRateLimiter failed: %v", err)
+	}
+
+	_, _, err = limiter.Allow(ctx, "test-key")
+	if err != nil {
+		t.Fatalf("Allow returned error: %v", err)
+	}
+
+	// SECURITY: Must use UpdateItem for atomic increment
+	if mock.updateItemCalled == 0 {
+		t.Error("SECURITY VIOLATION: Must use UpdateItem for atomic increment")
+	}
+
+	// SECURITY: Must NOT use GetItem/PutItem pattern (has race conditions)
+	if mock.getItemCalled > 0 {
+		t.Error("SECURITY VIOLATION: Must NOT use GetItem (race condition risk)")
+	}
+	if mock.putItemCalled > 0 {
+		t.Error("SECURITY VIOLATION: Must NOT use PutItem without condition (race condition risk)")
+	}
+
+	// SECURITY: Update expression must use atomic if_not_exists pattern
+	if !strings.Contains(mock.lastUpdateExpr, "if_not_exists") {
+		t.Errorf("SECURITY VIOLATION: UpdateExpression must use if_not_exists for atomic increment, got: %s",
+			mock.lastUpdateExpr)
+	}
+
+	// SECURITY: Must have condition expression to prevent stale window overwrites
+	if mock.lastCondExpr == "" {
+		t.Error("SECURITY VIOLATION: Must have ConditionExpression to prevent race conditions")
+	}
+}
+
+// securityErrorMockDynamoDB returns errors for testing fail-open behavior.
+type securityErrorMockDynamoDB struct {
+	err error
+}
+
+func (m *securityErrorMockDynamoDB) UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	return nil, m.err
+}
+
+// TestSecurityRegression_DynamoDBFailOpen verifies that DynamoDB errors result
+// in fail-open behavior (allow the request) rather than blocking all requests.
+// THREAT: DynamoDB outage could block all credential requests (DoS).
+// PREVENTION: Fail-open on DynamoDB errors (availability over strict rate limiting).
+func TestSecurityRegression_DynamoDBFailOpen(t *testing.T) {
+	ctx := context.Background()
+	cfg := Config{
+		RequestsPerWindow: 10,
+		Window:            time.Minute,
+	}
+
+	mock := &securityErrorMockDynamoDB{err: errors.New("DynamoDB unavailable")}
+	limiter, err := NewDynamoDBRateLimiter(mock, "test-table", cfg)
+	if err != nil {
+		t.Fatalf("NewDynamoDBRateLimiter failed: %v", err)
+	}
+
+	allowed, _, rlErr := limiter.Allow(ctx, "test-key")
+
+	// SECURITY: Must fail-open (return allowed=true) on DynamoDB errors
+	if !allowed {
+		t.Error("SECURITY VIOLATION: DynamoDB errors must fail-open, not block requests")
+	}
+
+	// SECURITY: Must return error for logging (observability)
+	if rlErr == nil {
+		t.Error("SECURITY: Error should be returned for logging (but allowed=true)")
+	}
+}
+
+// securityCountingMockDynamoDB tracks counts per key for isolation testing.
+type securityCountingMockDynamoDB struct {
+	counts map[string]int
+	mu     sync.Mutex
+}
+
+func (m *securityCountingMockDynamoDB) UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.counts == nil {
+		m.counts = make(map[string]int)
+	}
+
+	// Extract key from PK
+	pk := ""
+	if pkAttr, ok := params.Key["PK"].(*types.AttributeValueMemberS); ok {
+		pk = pkAttr.Value
+	}
+
+	m.counts[pk]++
+
+	return &dynamodb.UpdateItemOutput{
+		Attributes: map[string]types.AttributeValue{
+			"Count": &types.AttributeValueMemberN{Value: strconv.Itoa(m.counts[pk])},
+		},
+	}, nil
+}
+
+// TestSecurityRegression_KeyIsolation verifies that different IAM ARNs have
+// completely separate rate limit buckets in DynamoDB.
+// THREAT: Shared rate limit buckets could cause DoS across different users.
+// PREVENTION: Rate limit key includes full IAM ARN for complete isolation.
+func TestSecurityRegression_KeyIsolation(t *testing.T) {
+	ctx := context.Background()
+	cfg := Config{
+		RequestsPerWindow: 2, // Low limit to trigger rate limiting
+		Window:            time.Minute,
+	}
+
+	mock := &securityCountingMockDynamoDB{}
+	limiter, err := NewDynamoDBRateLimiter(mock, "test-table", cfg)
+	if err != nil {
+		t.Fatalf("NewDynamoDBRateLimiter failed: %v", err)
+	}
+
+	// User Alice makes 2 requests (at limit)
+	aliceARN := "arn:aws:iam::123456789012:user/alice"
+	for i := 0; i < 2; i++ {
+		allowed, _, _ := limiter.Allow(ctx, aliceARN)
+		if !allowed {
+			t.Errorf("Alice request %d should be allowed", i+1)
+		}
+	}
+
+	// Alice's 3rd request should be denied
+	allowed, _, _ := limiter.Allow(ctx, aliceARN)
+	if allowed {
+		t.Error("Alice's 3rd request should be denied (at limit)")
+	}
+
+	// User Bob should have independent rate limit (his requests should succeed)
+	bobARN := "arn:aws:iam::123456789012:user/bob"
+	for i := 0; i < 2; i++ {
+		allowed, _, _ := limiter.Allow(ctx, bobARN)
+		if !allowed {
+			t.Errorf("SECURITY VIOLATION: Bob request %d should be allowed (keys not isolated from Alice)", i+1)
+		}
+	}
+
+	// Verify keys are stored separately in DynamoDB
+	expectedAliceKey := "RL#" + aliceARN
+	expectedBobKey := "RL#" + bobARN
+
+	if mock.counts[expectedAliceKey] == 0 {
+		t.Error("SECURITY VIOLATION: Alice's key not found in DynamoDB - keys not isolated")
+	}
+	if mock.counts[expectedBobKey] == 0 {
+		t.Error("SECURITY VIOLATION: Bob's key not found in DynamoDB - keys not isolated")
+	}
+	if mock.counts[expectedAliceKey] == mock.counts[expectedBobKey] {
+		// They should have different counts (3 for Alice due to denied request, 2 for Bob)
+		// But more importantly, they should be stored under different keys
+		t.Logf("INFO: Both users have same count (%d), but stored under separate keys",
+			mock.counts[expectedAliceKey])
+	}
+}
+
+// TestSecurityRegression_DynamoDBConditionPreventsOverwrite verifies that
+// the condition expression prevents race conditions during window rollover.
+// THREAT: Without condition, concurrent requests during window change could
+// lose increments (count=1 overwrites count=5 from another instance).
+// PREVENTION: Use condition expression to detect stale window and retry.
+func TestSecurityRegression_DynamoDBConditionPreventsOverwrite(t *testing.T) {
+	ctx := context.Background()
+	cfg := Config{
+		RequestsPerWindow: 10,
+		Window:            time.Minute,
+	}
+
+	mock := &securityCaptureMockDynamoDB{}
+	limiter, err := NewDynamoDBRateLimiter(mock, "test-table", cfg)
+	if err != nil {
+		t.Fatalf("NewDynamoDBRateLimiter failed: %v", err)
+	}
+
+	_, _, err = limiter.Allow(ctx, "test-key")
+	if err != nil {
+		t.Fatalf("Allow returned error: %v", err)
+	}
+
+	// SECURITY: Condition expression must check window to prevent overwrites
+	if !strings.Contains(mock.lastCondExpr, "attribute_not_exists") &&
+		!strings.Contains(mock.lastCondExpr, "#ws") {
+		t.Errorf("SECURITY VIOLATION: ConditionExpression must check WindowStart to prevent overwrites, got: %s",
+			mock.lastCondExpr)
 	}
 }
