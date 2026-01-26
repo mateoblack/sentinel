@@ -179,27 +179,27 @@ Plans:
 Plans:
 - [ ] 130-01: TBD (run /gsd:plan-phase 130 to break down)
 
-#### Phase 131: DynamoDB Security
+#### Phase 131: DynamoDB Security ✅
 
 **Goal**: State integrity validation with conditional writes to prevent manipulation
 **Depends on**: Phase 130
-**Research**: Unlikely (extends existing DynamoDB patterns)
-**Plans**: 2
+**Completed**: 2026-01-26
+**Plans**: 2/2
 
 Plans:
 - [x] 131-01: Fix optimistic locking bug + state transition validation (session/dynamodb.go Update fix, request/breakglass state validation) — completed 2026-01-26
-- [ ] 131-02: Security regression tests (TestSecurityRegression_ tests for all three DynamoDB stores)
+- [x] 131-02: Security regression tests (TestSecurityRegression_ tests for all three DynamoDB stores) — completed 2026-01-26
 
 #### Phase 132: Keyring Protection
 
 **Goal**: Secure credential storage with access controls and encryption
 **Depends on**: Phase 131
-**Research**: Likely (keyring security, platform-specific patterns)
-**Research topics**: macOS Keychain ACLs, Linux secret service, Windows Credential Manager
-**Plans**: TBD
+**Research**: Unlikely (existing keyring library provides platform-specific security options)
+**Plans**: 2
 
 Plans:
-- [ ] 132-01: TBD (run /gsd:plan-phase 132 to break down)
+- [ ] 132-01: Keyring security hardening (macOS Keychain ACLs, Linux keyctl permissions, iCloud sync prevention)
+- [ ] 132-02: Security regression tests (TestSecurityRegression_* tests for keyring item properties)
 
 #### Phase 133: Rate Limit Hardening
 
@@ -762,7 +762,7 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
-| v1.18 Critical Security Hardening | 126-135 | 9/? | 🚧 In Progress | - |
+| v1.18 Critical Security Hardening | 126-135 | 15/? | 🚧 In Progress | - |
 | v1.19 Documentation & Completeness Audit | 136-142 | 0/? | ⏳ Pending | - |
 
-**Totals:** 21 milestones shipped (125 phases, 228 plans shipped), 1 milestone in progress (10 phases), 1 milestone pending (7 phases)
+**Totals:** 21 milestones shipped (125 phases, 230 plans shipped), 1 milestone in progress (10 phases), 1 milestone pending (7 phases)
