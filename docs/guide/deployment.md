@@ -94,7 +94,36 @@ This creates `/myorg/sentinel/policies/myapp`.
 
 ### Updating Policies
 
-Edit policies via AWS CLI, Console, or Infrastructure as Code:
+Use the Sentinel CLI policy commands (v1.17+) for the recommended workflow:
+
+```bash
+# Download policy
+sentinel policy pull prod -o policy.yaml
+
+# Edit policy.yaml
+
+# Validate locally (no AWS credentials needed)
+sentinel policy validate policy.yaml
+
+# Preview changes
+sentinel policy diff prod policy.yaml
+
+# Upload (with confirmation prompt)
+sentinel policy push prod policy.yaml
+```
+
+For high-security deployments with policy signing (v1.18+):
+
+```bash
+# Push with KMS signature
+sentinel policy push prod policy.yaml --sign --key-id alias/sentinel-signing
+```
+
+See [Policy Signing](../POLICY_SIGNING.md) for complete signing setup.
+
+**Alternative: AWS CLI**
+
+For environments without Sentinel installed:
 
 ```bash
 # Download
