@@ -89,6 +89,10 @@ func (m *mockStore) GetBySourceIdentity(ctx context.Context, sourceIdentity stri
 	return nil, nil
 }
 
+func (m *mockStore) ListByDeviceID(ctx context.Context, deviceID string, limit int) ([]*ServerSession, error) {
+	return nil, nil
+}
+
 // createActiveSession creates an active session for testing.
 func createActiveSession(id string) *ServerSession {
 	now := time.Now().UTC()
