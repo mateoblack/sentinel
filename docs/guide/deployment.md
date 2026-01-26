@@ -544,6 +544,11 @@ resource "aws_dynamodb_table" "sentinel_requests" {
     range_key       = "gsi1sk"
     projection_type = "ALL"
   }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.sentinel.arn  # Optional: use customer-managed CMK
+  }
 }
 
 # For server mode session tracking
@@ -578,6 +583,11 @@ resource "aws_dynamodb_table" "sentinel_sessions" {
     hash_key        = "gsi1pk"
     range_key       = "gsi1sk"
     projection_type = "ALL"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.sentinel.arn  # Optional: use customer-managed CMK
   }
 }
 ```

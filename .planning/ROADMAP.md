@@ -26,9 +26,9 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.15 Device Posture** — [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) (Phases 104-112, shipped 2026-01-25)
 - ✅ **v1.16 Security Hardening** — [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) (Phases 113-120, shipped 2026-01-26)
 - ✅ **v1.17 Policy Developer Experience** — [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) (Phases 121-125, shipped 2026-01-26)
-- ✅ **v1.18 Policy Integrity** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phase 126, shipped 2026-01-26)
+- 🚧 **v1.18 Critical Security Hardening** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phases 126-135, in progress)
 
-- 🚧 **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, in progress)
+- ⏳ **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, pending v1.18)
 ## Completed Milestones
 
 <details>
@@ -116,26 +116,128 @@ See [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) for full details.
 
 </details>
 
-<details>
-<summary>✅ v1.18 Policy Integrity (Phase 126) — SHIPPED 2026-01-26</summary>
+### 🚧 v1.18 Critical Security Hardening (In Progress)
 
-- [x] Phase 126: Policy Integrity (3/3 plans) — completed 2026-01-26
-  - [x] 126-01: KMS signing infrastructure (KMSAPI interface, PolicySigner, signature types) — completed 2026-01-26
-  - [x] 126-02: Verifying loader & CLI commands (VerifyingLoader, policy sign/verify, push --sign) — completed 2026-01-26
-  - [x] 126-03: Lambda TVM integration & security tests (config, handler integration, security tests) — completed 2026-01-26
+**Milestone Goal:** Address P0 security threats and high-risk vulnerabilities identified in STRIDE threat model analysis, including policy cache poisoning, break-glass bypass, audit log tampering, and credential exposure.
 
-See [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) for full details.
+#### Phase 126: Policy Integrity ✅
 
-</details>
+**Goal**: KMS-signed policy validation to prevent cache poisoning attacks
+**Depends on**: v1.17 complete
+**Completed**: 2026-01-26
+**Plans**: 3/3
 
-### 🚧 v1.19 Documentation & Completeness Audit (In Progress)
+Plans:
+- [x] 126-01: KMS signing infrastructure (KMSAPI interface, PolicySigner, signature types) — completed 2026-01-26
+- [x] 126-02: Verifying loader & CLI commands (VerifyingLoader, policy sign/verify, push --sign) — completed 2026-01-26
+- [x] 126-03: Lambda TVM integration & security tests (config, handler integration, security tests) — completed 2026-01-26
+
+#### Phase 127: Break-Glass MFA ✅
+
+**Goal**: Secondary verification (SMS/push) for emergency access to prevent abuse
+**Depends on**: Phase 126
+**Completed**: 2026-01-26
+**Plans**: 3/3
+
+Plans:
+- [x] 127-01: MFA infrastructure (types, TOTP verifier, SMS verifier via SNS) — completed 2026-01-26
+- [x] 127-02: Break-glass MFA integration (policy MFA requirements, CLI flow, logging) — completed 2026-01-26
+- [x] 127-03: Security tests & CLI config (regression tests, SSM-based MFA configuration) — completed 2026-01-26
+
+#### Phase 128: Audit Log Integrity ✅
+
+**Goal**: CloudWatch forwarding with HMAC signatures for tamper-evident logging
+**Depends on**: Phase 127
+**Completed**: 2026-01-26
+**Plans**: 3/3
+
+Plans:
+- [x] 128-01: HMAC signature types and SignedLogger wrapper — completed 2026-01-26
+- [x] 128-02: CloudWatch Logs forwarder and Lambda TVM integration — completed 2026-01-26
+- [x] 128-03: verify-logs CLI command and security regression tests — completed 2026-01-26
+
+#### Phase 129: Local Server Security
+
+**Goal**: Process-based authentication for credential servers to prevent local access
+**Depends on**: Phase 128
+**Research**: Unlikely (internal patterns, process auth established)
+**Plans**: TBD
+
+Plans:
+- [ ] 129-01: TBD (run /gsd:plan-phase 129 to break down)
+
+#### Phase 130: Identity Hardening
+
+**Goal**: Strengthen AWS STS identity validation, remove OS username dependency
+**Depends on**: Phase 129
+**Research**: Unlikely (extends v1.7.1 STS identity work)
+**Plans**: TBD
+
+Plans:
+- [ ] 130-01: TBD (run /gsd:plan-phase 130 to break down)
+
+#### Phase 131: DynamoDB Security
+
+**Goal**: State integrity validation with conditional writes to prevent manipulation
+**Depends on**: Phase 130
+**Research**: Likely (DynamoDB conditional expressions, optimistic locking)
+**Research topics**: ConditionExpression patterns, version vectors, conflict detection
+**Plans**: TBD
+
+Plans:
+- [ ] 131-01: TBD (run /gsd:plan-phase 131 to break down)
+
+#### Phase 132: Keyring Protection
+
+**Goal**: Secure credential storage with access controls and encryption
+**Depends on**: Phase 131
+**Research**: Likely (keyring security, platform-specific patterns)
+**Research topics**: macOS Keychain ACLs, Linux secret service, Windows Credential Manager
+**Plans**: TBD
+
+Plans:
+- [ ] 132-01: TBD (run /gsd:plan-phase 132 to break down)
+
+#### Phase 133: Rate Limit Hardening
+
+**Goal**: Distributed rate limiting with DynamoDB to prevent bypass attacks
+**Depends on**: Phase 132
+**Research**: Unlikely (extends v1.16 rate limiting)
+**Plans**: TBD
+
+Plans:
+- [ ] 133-01: TBD (run /gsd:plan-phase 133 to break down)
+
+#### Phase 134: Input Sanitization
+
+**Goal**: Command injection prevention in MFA process and all user inputs
+**Depends on**: Phase 133
+**Research**: Unlikely (input validation patterns, shell escaping)
+**Plans**: TBD
+
+Plans:
+- [ ] 134-01: TBD (run /gsd:plan-phase 134 to break down)
+
+#### Phase 135: Security Validation
+
+**Goal**: Comprehensive security regression testing for all P0 and high-risk findings
+**Depends on**: Phase 134
+**Research**: Unlikely (extends existing test framework)
+**Plans**: TBD
+
+Plans:
+- [ ] 135-01: TBD (run /gsd:plan-phase 135 to break down)
+
+### ⏳ v1.19 Documentation & Completeness Audit (Pending v1.18)
 
 **Milestone Goal:** Close documentation gaps for v1.13-v1.18 features, ensuring all capabilities shipped in recent milestones are properly documented for users and operators.
+
+**Status:** Waiting for v1.18 Critical Security Hardening to complete (phases 129-135 remaining).
 
 #### Phase 136: CHANGELOG Completion
 
 **Goal**: Update CHANGELOG with all shipped v1.13-v1.18 releases
-**Depends on**: v1.18 complete
+**Depends on**: v1.18 complete (Phase 135)
 **Requirements**: CHLOG-01, CHLOG-02, CHLOG-03, CHLOG-04, CHLOG-05, CHLOG-06
 **Success Criteria** (what must be TRUE):
   1. CHANGELOG shows v1.13-v1.18 as released with ship dates (not "Unreleased")
@@ -657,7 +759,7 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
-| v1.18 Policy Integrity | 126 | 3/3 | ✅ Complete | 2026-01-26 |
+| v1.18 Critical Security Hardening | 126-135 | 9/? | 🚧 In Progress | - |
+| v1.19 Documentation & Completeness Audit | 136-142 | 0/? | ⏳ Pending | - |
 
-| v1.19 Documentation & Completeness Audit | 136-142 | 0/? | 🚧 In Progress | - |
-**Totals:** 22 milestones shipped (126 phases, 231 plans shipped), 1 milestone in progress (7 phases)
+**Totals:** 21 milestones shipped (125 phases, 228 plans shipped), 1 milestone in progress (10 phases), 1 milestone pending (7 phases)

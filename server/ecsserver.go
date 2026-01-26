@@ -55,12 +55,12 @@ func writeCredsToResponse(creds aws.Credentials, w http.ResponseWriter) {
 	}
 }
 
-func generateRandomString() string {
+func generateRandomString() (string, error) {
 	b := make([]byte, 30)
 	if _, err := rand.Read(b); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to generate random string: %w", err)
 	}
-	return base64.RawURLEncoding.EncodeToString(b)
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 type EcsServer struct {
@@ -78,7 +78,11 @@ func NewEcsServer(ctx context.Context, baseCredsProvider aws.CredentialsProvider
 		return nil, err
 	}
 	if authToken == "" {
-		authToken = generateRandomString()
+		var err error
+		authToken, err = generateRandomString()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate auth token: %w", err)
+		}
 	}
 
 	credsCache := aws.NewCredentialsCache(baseCredsProvider)

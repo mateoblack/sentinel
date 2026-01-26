@@ -151,7 +151,11 @@ func NewSentinelServer(ctx context.Context, config SentinelServerConfig, authTok
 
 	// Generate random auth token if not provided
 	if authToken == "" {
-		authToken = generateRandomString()
+		var err error
+		authToken, err = generateRandomString()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate auth token: %w", err)
+		}
 	}
 
 	// Prefetch credentials to ensure validity unless LazyLoad is enabled
@@ -543,10 +547,10 @@ func writeCredsToResponse(creds *CredentialResult, w http.ResponseWriter) {
 }
 
 // generateRandomString generates a cryptographically random base64 string.
-func generateRandomString() string {
+func generateRandomString() (string, error) {
 	b := make([]byte, 30)
 	if _, err := rand.Read(b); err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to generate random string: %w", err)
 	}
-	return base64.RawURLEncoding.EncodeToString(b)
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }

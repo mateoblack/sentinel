@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -690,7 +691,10 @@ func TestGenerateRandomString(t *testing.T) {
 
 	// Generate multiple strings and verify uniqueness
 	for i := 0; i < 100; i++ {
-		s := generateRandomString()
+		s, err := generateRandomString()
+		if err != nil {
+			t.Fatalf("generateRandomString() failed: %v", err)
+		}
 		if seen[s] {
 			t.Errorf("Duplicate random string generated: %s", s)
 		}
