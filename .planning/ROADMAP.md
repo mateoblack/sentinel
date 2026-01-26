@@ -26,8 +26,9 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.15 Device Posture** — [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) (Phases 104-112, shipped 2026-01-25)
 - ✅ **v1.16 Security Hardening** — [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) (Phases 113-120, shipped 2026-01-26)
 - ✅ **v1.17 Policy Developer Experience** — [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) (Phases 121-125, shipped 2026-01-26)
-- 🚧 **v1.18 Critical Security Hardening** — Phases 126-135 (in progress)
+- ✅ **v1.18 Policy Integrity** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phase 126, shipped 2026-01-26)
 
+- 🚧 **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, in progress)
 ## Completed Milestones
 
 <details>
@@ -115,117 +116,132 @@ See [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.18 Critical Security Hardening (In Progress)
+<details>
+<summary>✅ v1.18 Policy Integrity (Phase 126) — SHIPPED 2026-01-26</summary>
 
-**Milestone Goal:** Address P0 security threats and high-risk vulnerabilities identified in STRIDE threat model analysis, including policy cache poisoning, break-glass bypass, audit log tampering, and credential exposure.
+- [x] Phase 126: Policy Integrity (3/3 plans) — completed 2026-01-26
+  - [x] 126-01: KMS signing infrastructure (KMSAPI interface, PolicySigner, signature types) — completed 2026-01-26
+  - [x] 126-02: Verifying loader & CLI commands (VerifyingLoader, policy sign/verify, push --sign) — completed 2026-01-26
+  - [x] 126-03: Lambda TVM integration & security tests (config, handler integration, security tests) — completed 2026-01-26
 
-#### Phase 126: Policy Integrity ✅
+See [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) for full details.
 
-**Goal**: KMS-signed policy validation to prevent cache poisoning attacks
-**Depends on**: v1.17 complete
-**Completed**: 2026-01-26
-**Plans**: 3/3
+</details>
 
-Plans:
-- [x] 126-01: KMS signing infrastructure (KMSAPI interface, PolicySigner, signature types) — completed 2026-01-26
-- [x] 126-02: Verifying loader & CLI commands (VerifyingLoader, policy sign/verify, push --sign) — completed 2026-01-26
-- [x] 126-03: Lambda TVM integration & security tests (config, handler integration, security tests) — completed 2026-01-26
+### 🚧 v1.19 Documentation & Completeness Audit (In Progress)
 
-#### Phase 127: Break-Glass MFA
+**Milestone Goal:** Close documentation gaps for v1.13-v1.18 features, ensuring all capabilities shipped in recent milestones are properly documented for users and operators.
 
-**Goal**: Secondary verification (SMS/push) for emergency access to prevent abuse
-**Depends on**: Phase 126
-**Research**: Completed (inline during planning)
-**Status**: In progress
-**Plans**: 3
+#### Phase 136: CHANGELOG Completion
 
-Plans:
-- [x] 127-01: MFA infrastructure (types, TOTP verifier, SMS verifier via SNS) — completed 2026-01-26
-- [ ] 127-02: Break-glass MFA integration (policy MFA requirements, CLI flow, logging)
-- [ ] 127-03: Security tests & CLI config (regression tests, SSM-based MFA configuration)
-
-#### Phase 128: Audit Log Integrity
-
-**Goal**: CloudWatch forwarding with HMAC signatures for tamper-evident logging
-**Depends on**: Phase 127
-**Research**: Likely (CloudWatch Logs agent, HMAC patterns)
-**Research topics**: CloudWatch Logs API, HMAC-SHA256 signatures, log integrity verification
+**Goal**: Update CHANGELOG with all shipped v1.13-v1.18 releases
+**Depends on**: v1.18 complete
+**Requirements**: CHLOG-01, CHLOG-02, CHLOG-03, CHLOG-04, CHLOG-05, CHLOG-06
+**Success Criteria** (what must be TRUE):
+  1. CHANGELOG shows v1.13-v1.18 as released with ship dates (not "Unreleased")
+  2. Each version entry lists all major features shipped
+  3. Ship dates match actual milestone completion dates from git history
+  4. CHANGELOG follows consistent format with previous entries
 **Plans**: TBD
 
 Plans:
-- [ ] 128-01: TBD (run /gsd:plan-phase 128 to break down)
+- [ ] 136-01: TBD (run /gsd:plan-phase 136 to break down)
 
-#### Phase 129: Local Server Security
+#### Phase 137: Command Documentation
 
-**Goal**: Process-based authentication for credential servers to prevent local access
-**Depends on**: Phase 128
-**Research**: Unlikely (internal patterns, process auth established)
+**Goal**: Document all policy commands in commands.md with syntax and examples
+**Depends on**: Phase 136
+**Requirements**: CMD-01, CMD-02, CMD-03, CMD-04, CMD-05, CMD-06
+**Success Criteria** (what must be TRUE):
+  1. User can find all 6 policy commands documented in commands.md
+  2. Each command shows syntax, flags, and practical examples
+  3. Policy workflow is clear (pull → edit → validate → diff → push)
+  4. Examples demonstrate both basic and advanced usage
 **Plans**: TBD
 
 Plans:
-- [ ] 129-01: TBD (run /gsd:plan-phase 129 to break down)
+- [ ] 137-01: TBD (run /gsd:plan-phase 137 to break down)
 
-#### Phase 130: Identity Hardening
+#### Phase 138: Policy Signing Guide
 
-**Goal**: Strengthen AWS STS identity validation, remove OS username dependency
-**Depends on**: Phase 129
-**Research**: Unlikely (extends v1.7.1 STS identity work)
+**Goal**: Create POLICY_SIGNING.md explaining KMS-based policy integrity
+**Depends on**: Phase 137
+**Requirements**: PSIGN-01, PSIGN-02, PSIGN-03, PSIGN-04, PSIGN-05, PSIGN-06
+**Success Criteria** (what must be TRUE):
+  1. User understands why policy signing prevents attacks (threat model documented)
+  2. User can create KMS signing key following documented steps
+  3. User can sign and verify policies locally
+  4. Operator can configure Lambda TVM signature verification
+  5. Troubleshooting section addresses common signature errors
 **Plans**: TBD
 
 Plans:
-- [ ] 130-01: TBD (run /gsd:plan-phase 130 to break down)
+- [ ] 138-01: TBD (run /gsd:plan-phase 138 to break down)
 
-#### Phase 131: DynamoDB Security
+#### Phase 139: Device Posture Guide
 
-**Goal**: State integrity validation with conditional writes to prevent manipulation
-**Depends on**: Phase 130
-**Research**: Likely (DynamoDB conditional expressions, optimistic locking)
-**Research topics**: ConditionExpression patterns, version vectors, conflict detection
+**Goal**: Create DEVICE_POSTURE.md explaining MDM integration and device verification
+**Depends on**: Phase 138
+**Requirements**: DPOST-01, DPOST-02, DPOST-03, DPOST-04, DPOST-05
+**Success Criteria** (what must be TRUE):
+  1. User understands device posture threat model and use cases
+  2. Operator can configure Jamf Pro MDM provider following documented steps
+  3. User can write policy rules with device conditions (require_mdm, require_encryption)
+  4. Operator can audit device compliance using device-sessions and devices commands
+  5. Troubleshooting section addresses common device verification failures
 **Plans**: TBD
 
 Plans:
-- [ ] 131-01: TBD (run /gsd:plan-phase 131 to break down)
+- [ ] 139-01: TBD (run /gsd:plan-phase 139 to break down)
 
-#### Phase 132: Keyring Protection
+#### Phase 140: Security Hardening Guide
 
-**Goal**: Secure credential storage with access controls and encryption
-**Depends on**: Phase 131
-**Research**: Likely (keyring security, platform-specific patterns)
-**Research topics**: macOS Keychain ACLs, Linux secret service, Windows Credential Manager
+**Goal**: Create SECURITY_HARDENING.md documenting v1.16 hardening features
+**Depends on**: Phase 139
+**Requirements**: HARD-01, HARD-02, HARD-03, HARD-04, HARD-05, HARD-06
+**Success Criteria** (what must be TRUE):
+  1. Security team understands all v1.16 hardening features and their purpose
+  2. Timing attack mitigation is explained with crypto/subtle.ConstantTimeCompare example
+  3. Secrets Manager integration is documented with configuration examples
+  4. Rate limiting configuration is documented for Lambda TVM and credential servers
+  5. Error sanitization pattern is explained (log details, return generic messages)
+  6. DynamoDB KMS encryption is documented with deployment examples
 **Plans**: TBD
 
 Plans:
-- [ ] 132-01: TBD (run /gsd:plan-phase 132 to break down)
+- [ ] 140-01: TBD (run /gsd:plan-phase 140 to break down)
 
-#### Phase 133: Rate Limit Hardening
+#### Phase 141: README & Examples Update
 
-**Goal**: Distributed rate limiting with DynamoDB to prevent bypass attacks
-**Depends on**: Phase 132
-**Research**: Unlikely (extends v1.16 rate limiting)
+**Goal**: Update README feature list and add examples for new features
+**Depends on**: Phase 140
+**Requirements**: README-01, README-02, README-03, README-04, EX-01, EX-02, EX-03, EX-04
+**Success Criteria** (what must be TRUE):
+  1. README mentions Lambda TVM, device posture, and policy signing in feature list
+  2. README feature list is complete through v1.18
+  3. Example policy demonstrates policy signing workflow
+  4. Example policy demonstrates device posture conditions
+  5. Terraform example shows KMS signing key creation
+  6. Lambda TVM deployment example includes signature verification configuration
 **Plans**: TBD
 
 Plans:
-- [ ] 133-01: TBD (run /gsd:plan-phase 133 to break down)
+- [ ] 141-01: TBD (run /gsd:plan-phase 141 to break down)
 
-#### Phase 134: Input Sanitization
+#### Phase 142: Deployment Guide Review
 
-**Goal**: Command injection prevention in MFA process and all user inputs
-**Depends on**: Phase 133
-**Research**: Unlikely (input validation patterns, shell escaping)
+**Goal**: Review and update deployment.md for accuracy with v1.18
+**Depends on**: Phase 141
+**Requirements**: DEPLOY-01, DEPLOY-02, DEPLOY-03
+**Success Criteria** (what must be TRUE):
+  1. Deployment.md examples are accurate for v1.18
+  2. DynamoDB encryption examples are verified (already added in Phase 126)
+  3. All Terraform examples use current syntax
+  4. No outdated commands or deprecated flags in examples
 **Plans**: TBD
 
 Plans:
-- [ ] 134-01: TBD (run /gsd:plan-phase 134 to break down)
-
-#### Phase 135: Security Validation
-
-**Goal**: Comprehensive security regression testing for all P0 and high-risk findings
-**Depends on**: Phase 134
-**Research**: Unlikely (extends existing test framework)
-**Plans**: TBD
-
-Plans:
-- [ ] 135-01: TBD (run /gsd:plan-phase 135 to break down)
+- [ ] 142-01: TBD (run /gsd:plan-phase 142 to break down)
 
 ## Domain Expertise
 
@@ -641,6 +657,7 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
-| v1.18 Critical Security Hardening | 126-135 | 0/? | 🚧 In Progress | - |
+| v1.18 Policy Integrity | 126 | 3/3 | ✅ Complete | 2026-01-26 |
 
-**Totals:** 21 milestones shipped (125 phases, 228 plans shipped), 1 milestone in progress (10 phases)
+| v1.19 Documentation & Completeness Audit | 136-142 | 0/? | 🚧 In Progress | - |
+**Totals:** 22 milestones shipped (126 phases, 231 plans shipped), 1 milestone in progress (7 phases)
