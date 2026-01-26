@@ -58,6 +58,8 @@ type SentinelExecCommandInput struct {
 	Lazy             bool              // Lazily fetch credentials in server mode
 	SessionTableName string            // DynamoDB table for session tracking (optional)
 	RemoteServer     string            // Remote TVM URL for credential vending (uses AWS_CONTAINER_CREDENTIALS_FULL_URI)
+	UseUnixSocket    bool              // Use Unix domain socket for credential server (more secure)
+	UnixSocketPath   string            // Path for Unix domain socket (optional)
 }
 
 // ConfigureSentinelExecCommand sets up the sentinel exec command with kingpin.
@@ -115,6 +117,14 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 
 	cmd.Flag("remote-server", "Remote TVM URL for credential vending (uses AWS_CONTAINER_CREDENTIALS_FULL_URI)").
 		StringVar(&input.RemoteServer)
+
+	cmd.Flag("unix-socket", "Use Unix domain socket for credential server (more secure, Linux/macOS only). "+
+		"Enables process-based authentication to prevent credential theft from other local processes.").
+		BoolVar(&input.UseUnixSocket)
+
+	cmd.Flag("unix-socket-path", "Path for Unix domain socket (default: /tmp/sentinel-<pid>.sock). "+
+		"Only used with --unix-socket.").
+		StringVar(&input.UnixSocketPath)
 
 	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses --profile if not specified)").
 		StringVar(&input.AWSProfile)
@@ -484,16 +494,48 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 			log.Printf("Session tracking enabled: table=%s", input.SessionTableName)
 		}
 
-		sentinelServer, err := sentinel.NewSentinelServer(ctx, serverConfig, "", input.ServerPort)
-		if err != nil {
-			return 0, fmt.Errorf("Failed to start credential server: %w", err)
-		}
+		var sentinelServer *sentinel.SentinelServer
+		var serverURL string
 
-		go func() {
-			if err := sentinelServer.Serve(); err != http.ErrServerClosed {
-				log.Fatalf("credential server: %s", err.Error())
+		if input.UseUnixSocket {
+			// Unix socket mode with process authentication
+			serverConfig.UseUnixSocket = true
+			serverConfig.UnixSocketPath = input.UnixSocketPath
+
+			sentinelServer, err = sentinel.NewSentinelServerUnix(ctx, serverConfig)
+			if err != nil {
+				return 0, fmt.Errorf("Failed to start Unix credential server: %w", err)
 			}
-		}()
+
+			// For Unix sockets, we pass the socket path instead of HTTP URL
+			serverURL = sentinelServer.UnixSocketPath()
+			log.Printf("Starting Sentinel Unix socket credential server at %s", serverURL)
+
+			go func() {
+				if err := sentinelServer.ServeUnix(); err != nil {
+					log.Fatalf("Unix credential server: %s", err.Error())
+				}
+			}()
+
+			defer sentinelServer.ShutdownUnix(ctx)
+		} else {
+			// TCP mode (existing behavior)
+			sentinelServer, err = sentinel.NewSentinelServer(ctx, serverConfig, "", input.ServerPort)
+			if err != nil {
+				return 0, fmt.Errorf("Failed to start credential server: %w", err)
+			}
+
+			serverURL = sentinelServer.BaseURL()
+			log.Printf("Starting Sentinel credential server at %s", serverURL)
+
+			go func() {
+				if err := sentinelServer.Serve(); err != http.ErrServerClosed {
+					log.Fatalf("credential server: %s", err.Error())
+				}
+			}()
+
+			defer sentinelServer.Shutdown(ctx)
+		}
 
 		// Default to shell if no command specified
 		command := input.Command
@@ -504,16 +546,23 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		// Prepare subprocess environment
 		cmdEnv := createEnv(input.ProfileName, input.Region, "")
 
-		// Set environment for subprocess - credentials come from server, not env vars
-		cmdEnv.Set("AWS_CONTAINER_CREDENTIALS_FULL_URI", sentinelServer.BaseURL())
-		cmdEnv.Set("AWS_CONTAINER_AUTHORIZATION_TOKEN", sentinelServer.AuthToken())
+		// Set environment for subprocess
+		if sentinelServer.IsUnixMode() {
+			// Unix socket mode uses different environment variable
+			// AWS SDKs don't directly support Unix sockets, so we use a wrapper
+			// For now, document that this mode requires SDK support
+			cmdEnv.Set("SENTINEL_UNIX_SOCKET", serverURL)
+			cmdEnv.Set("SENTINEL_AUTH_TOKEN", sentinelServer.AuthToken())
+		} else {
+			// TCP mode uses standard container credentials
+			cmdEnv.Set("AWS_CONTAINER_CREDENTIALS_FULL_URI", serverURL)
+			cmdEnv.Set("AWS_CONTAINER_AUTHORIZATION_TOKEN", sentinelServer.AuthToken())
+		}
 
 		// Prevent AWS SDK from reading config files - use container credentials only
 		// Without this, ~/.aws/config can override the container credentials URL
 		cmdEnv.Set("AWS_CONFIG_FILE", "/dev/null")
 		cmdEnv.Set("AWS_SHARED_CREDENTIALS_FILE", "/dev/null")
-
-		log.Printf("Starting Sentinel credential server at %s", sentinelServer.BaseURL())
 
 		// Remove AWS_SENTINEL since credentials come from server, not env
 		// (don't set it - subprocess won't have the "subshell" indicator)
