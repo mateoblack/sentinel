@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 
 ## Current Position
 
-Phase: 128-audit-log-integrity
-Plan: 03 of 03 (Log Verification CLI & Security Tests) - COMPLETE
-Status: Phase 128 complete, phases 129-135 pending
-Last activity: 2026-01-26 — Plan 128-03 completed (verify-logs CLI, security tests)
+Phase: 129-local-server-security
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-01-26 — Completed 129-01-PLAN.md (peer credential infrastructure)
 
-Progress: ████████████████████░░ 87% (228/263 estimated total plans)
+Progress: ████████████████████░░ 87% (229/263 estimated total plans)
 
 ## Milestone Summary
 
@@ -64,7 +64,7 @@ Last 5 milestones:
 - v1.15: 9 phases, 12 plans, ~41 min
 - v1.16: 8 phases, 9 plans, ~21 min
 - v1.17: 5 phases, 5 plans, ~25 min
-- v1.18: 3 phases complete (126-128), 7 phases remaining (129-135)
+- v1.18: 3 phases complete (126-128), phase 129 in progress (1/4 plans), 6 phases remaining (130-135)
 
 ## Accumulated Context
 
@@ -117,9 +117,15 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Device conditions affect rule matching (nil posture fails conditions)
 - Device audit commands with anomaly detection
 
+**Phase 129 Local Server Security (Plan 01):**
+- Use golang.org/x/sys/unix for SO_PEERCRED (already indirect dependency)
+- Separate syscall implementations per platform with build tags
+- Return typed errors (ErrNotUnixSocket, ErrPeerCredentialsUnavailable)
+- macOS requires two separate syscalls (LOCAL_PEERCRED + LOCAL_PEERPID)
+
 ### Pending Todos
 
-None — starting Phase 129.
+None — continuing Phase 129.
 
 ### Blockers/Concerns
 
@@ -128,6 +134,6 @@ None — phases 129-135 are security implementation work.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Phase 128-03 complete (verify-logs CLI, security tests)
+Stopped at: Phase 129-01 complete (peer credential infrastructure)
 Resume file: None
-Next: Plan Phase 129 (Local Server Security) - `/gsd:plan-phase 129`
+Next: Execute Plan 129-02 (credential server integration)

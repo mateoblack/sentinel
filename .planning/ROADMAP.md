@@ -161,10 +161,13 @@ Plans:
 **Goal**: Process-based authentication for credential servers to prevent local access
 **Depends on**: Phase 128
 **Research**: Unlikely (internal patterns, process auth established)
-**Plans**: TBD
+**Plans**: 4
 
 Plans:
-- [ ] 129-01: TBD (run /gsd:plan-phase 129 to break down)
+- [x] 129-01: Peer credential infrastructure (PeerCredentials types, GetPeerCredentials, Linux/macOS/fallback) — completed 2026-01-26
+- [ ] 129-02: Credential server integration (ECS/EC2/Sentinel server peer auth)
+- [ ] 129-03: TBD
+- [ ] 129-04: TBD
 
 #### Phase 130: Identity Hardening
 
