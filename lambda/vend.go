@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -180,79 +179,28 @@ func applyVendDefaults(input *VendInput) {
 	}
 }
 
-// extractUsername extracts a sanitized username from an AWS ARN.
-// Supported ARN formats:
-//   - IAM user: arn:aws:iam::123456789012:user/alice -> "alice"
-//   - Assumed role: arn:aws:sts::123456789012:assumed-role/RoleName/SessionName -> "SessionName"
-//   - SSO: arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_.../user@example.com -> sanitized email
-//   - Federated user: arn:aws:sts::123456789012:federated-user/fed-user -> "feduser"
+// extractUsername extracts a sanitized username from an AWS ARN using the
+// identity package for consistent validation across CLI and Lambda TVM.
 func extractUsername(userARN string) (string, error) {
 	if userARN == "" {
 		return "", ErrInvalidARN
 	}
-
-	// ARN format: arn:aws:SERVICE:REGION:ACCOUNT:RESOURCE
-	// Split by ':'
-	parts := strings.Split(userARN, ":")
-	if len(parts) < 6 {
-		return "", ErrInvalidARN
+	username, err := identity.ExtractUsername(userARN)
+	if err != nil {
+		// Wrap identity errors with lambda-specific error types for API consistency
+		if errors.Is(err, identity.ErrEmptyARN) {
+			return "", ErrInvalidARN
+		}
+		if errors.Is(err, identity.ErrInvalidARN) {
+			return "", ErrInvalidARN
+		}
+		if errors.Is(err, identity.ErrUnsupportedIdentityType) {
+			return "", ErrInvalidARN
+		}
+		return "", fmt.Errorf("failed to extract username: %w", err)
 	}
-
-	// Validate it looks like an ARN
-	if parts[0] != "arn" {
-		return "", ErrInvalidARN
-	}
-
-	resource := parts[5]
-	if resource == "" {
+	if username == "" {
 		return "", ErrEmptyUsername
 	}
-
-	var rawUsername string
-
-	// Handle different resource types
-	switch {
-	case strings.HasPrefix(resource, "user/"):
-		// IAM user: user/alice
-		rawUsername = strings.TrimPrefix(resource, "user/")
-		// Handle paths: user/path/to/alice -> alice
-		if lastSlash := strings.LastIndex(rawUsername, "/"); lastSlash != -1 {
-			rawUsername = rawUsername[lastSlash+1:]
-		}
-
-	case strings.HasPrefix(resource, "assumed-role/"):
-		// Assumed role: assumed-role/RoleName/SessionName
-		// Extract SessionName (last component)
-		trimmed := strings.TrimPrefix(resource, "assumed-role/")
-		slashIndex := strings.Index(trimmed, "/")
-		if slashIndex == -1 || slashIndex == len(trimmed)-1 {
-			// No session name found, use role name
-			if slashIndex == -1 {
-				rawUsername = trimmed
-			} else {
-				rawUsername = trimmed[:slashIndex]
-			}
-		} else {
-			rawUsername = trimmed[slashIndex+1:]
-		}
-
-	case strings.HasPrefix(resource, "federated-user/"):
-		// Federated user: federated-user/fed-user
-		rawUsername = strings.TrimPrefix(resource, "federated-user/")
-
-	default:
-		// Unknown format, try to extract last path component
-		if lastSlash := strings.LastIndex(resource, "/"); lastSlash != -1 {
-			rawUsername = resource[lastSlash+1:]
-		} else {
-			rawUsername = resource
-		}
-	}
-
-	if rawUsername == "" {
-		return "", ErrEmptyUsername
-	}
-
-	// Sanitize using identity package
-	return identity.SanitizeUser(rawUsername)
+	return username, nil
 }
