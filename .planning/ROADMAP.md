@@ -201,25 +201,27 @@ Plans:
 - [x] 132-01: Keyring security hardening (macOS Keychain ACLs, Linux keyctl permissions, iCloud sync prevention) — completed 2026-01-26
 - [x] 132-02: Security regression tests (TestSecurityRegression_* tests for keyring item properties) — completed 2026-01-26
 
-#### Phase 133: Rate Limit Hardening
+#### Phase 133: Rate Limit Hardening ✅
 
 **Goal**: Distributed rate limiting with DynamoDB to prevent bypass attacks
 **Depends on**: Phase 132
-**Research**: Unlikely (extends v1.16 rate limiting)
-**Plans**: TBD
+**Completed**: 2026-01-26
+**Plans**: 2/2
 
 Plans:
-- [ ] 133-01: TBD (run /gsd:plan-phase 133 to break down)
+- [x] 133-01: DynamoDB rate limiter implementation (atomic counters, fail-open, TTL) — completed 2026-01-26
+- [x] 133-02: Lambda TVM integration & security tests (config, handler tests, regression tests) — completed 2026-01-26
 
 #### Phase 134: Input Sanitization
 
 **Goal**: Command injection prevention in MFA process and all user inputs
 **Depends on**: Phase 133
 **Research**: Unlikely (input validation patterns, shell escaping)
-**Plans**: TBD
+**Plans**: 2/2
 
 Plans:
-- [ ] 134-01: TBD (run /gsd:plan-phase 134 to break down)
+- [ ] 134-01: Input validation utilities & Lambda handler hardening (validate package, profile validation) — planned 2026-01-26
+- [ ] 134-02: Shell escaping security regression tests (shellEscape, sanitizeFunctionName tests) — planned 2026-01-26
 
 #### Phase 135: Security Validation
 
