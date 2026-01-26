@@ -77,6 +77,78 @@ The output should show your AWS ARN and the extracted policy username based on y
 - 2026-01-19: Fix developed and tested
 - 2026-01-19: v1.7.1 released with fix
 
+## v1.16 Security Hardening
+
+Version 1.16 addresses findings from a comprehensive security audit with the following improvements:
+
+### Timing Attack Mitigation (Phase 113)
+
+Bearer token comparisons in credential servers now use `crypto/subtle.ConstantTimeCompare()` instead of direct string comparison, preventing timing-based oracle attacks.
+
+**Affected Components:**
+- Sentinel credential server (`sentinel/server.go`)
+- ECS credential server (`server/ecsserver.go`)
+
+### Secrets Management (Phase 114)
+
+MDM API tokens migrated from environment variables to AWS Secrets Manager with client-side caching:
+
+- **Cache TTL**: 1 hour (optimized for Lambda cold start patterns)
+- **Backward Compatible**: Environment variable fallback with deprecation warning
+- **Interface-based**: `SecretsLoader` interface enables testing and future extension
+
+### CI/CD Security Scanning (Phase 115)
+
+Automated security scanning integrated into CI/CD pipeline:
+
+| Tool | Coverage | Schedule |
+|------|----------|----------|
+| govulncheck | Go vulnerability database | PR, Push, Weekly |
+| gosec | Static application security testing | PR, Push, Weekly |
+| Trivy | Container/filesystem scanning | PR, Push, Weekly |
+
+### DynamoDB Encryption (Phase 116)
+
+All DynamoDB tables use AWS-managed KMS encryption:
+
+- Approval requests table
+- Break-glass events table
+- Server sessions table
+
+### API Rate Limiting (Phase 117)
+
+Rate limiting protects credential endpoints from abuse:
+
+| Endpoint | Default Limit | Key |
+|----------|---------------|-----|
+| Lambda TVM | 100 req/min | IAM User ARN |
+| Credential Server | 100 req/min | Remote Address |
+
+Rate limit responses include RFC 7231 compliant `Retry-After` header.
+
+### Error Sanitization (Phase 119)
+
+All credential endpoints sanitize error responses to prevent information leakage:
+
+- **Pattern**: Log detailed errors internally, return generic messages to clients
+- **Preserved**: Rate limit retry-after and policy deny reasons (intentional user-facing)
+- **Protected**: SSM paths, ARN parsing errors, MDM provider failures, credential retrieval errors
+
+### Security Regression Tests
+
+Comprehensive security regression tests validate:
+
+- Timing-safe token comparison (AST verification)
+- Rate limiter bypass resistance (concurrent access tests)
+- Error message sanitization (no internal details leaked)
+- Memory bounds on rate limiters
+
+Run security tests locally:
+
+```bash
+go test ./... -run Security
+```
+
 ## Security Best Practices
 
 ### Policy Configuration
@@ -152,7 +224,7 @@ All security scan results are uploaded to GitHub Security tab for centralized vu
 
 ### Last Audit
 
-**Date**: 2026-01-25
+**Date**: 2026-01-26
 **Result**: Clean - no vulnerabilities found
 **govulncheck**: All dependencies at patched versions
 
