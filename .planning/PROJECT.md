@@ -106,10 +106,17 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ Policy device conditions (require_mdm, require_encryption, require_mdm_compliant) — v1.15
 - ✓ Session device binding with DeviceID field and ListByDeviceID query — v1.15
 - ✓ Device audit commands (device-sessions, devices) with anomaly detection — v1.15
+- ✓ Timing-safe bearer token comparison via crypto/subtle.ConstantTimeCompare — v1.16
+- ✓ AWS Secrets Manager for MDM API token with client-side caching — v1.16
+- ✓ CI/CD security scanning with govulncheck, gosec, and Trivy — v1.16
+- ✓ DynamoDB KMS encryption by default for all Sentinel tables — v1.16
+- ✓ API rate limiting (100 req/min) for Lambda TVM and credential servers — v1.16
+- ✓ Error sanitization across all credential endpoints — v1.16
+- ✓ Security integration tests for hardening validation — v1.16
 
 ### Active
 
-None pending for v1.15 (milestone complete).
+None pending for v1.16 (milestone complete).
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -118,7 +125,7 @@ None pending for v1.15 (milestone complete).
 
 ### Future Milestones
 
-**v1.16 Policy Developer Experience**
+**v1.17 Policy Developer Experience**
 - `sentinel policy pull <profile>` — fetch policy from SSM to stdout/file for editing
 - `sentinel policy push <profile>` — validate and upload policy to SSM
 - `sentinel policy diff <profile>` — show pending changes before push
@@ -126,7 +133,7 @@ None pending for v1.15 (milestone complete).
 
 ## Context
 
-Shipped v1.15 with 129,040 LOC Go.
+Shipped v1.16 with 136,759 LOC Go (+7,719 from v1.15).
 Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy, aws-lambda-go, API Gateway v2.
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
@@ -266,6 +273,15 @@ v1.15 adds device posture verification:
 - Session device binding for forensic correlation and device-based revocation
 - Device audit commands (device-sessions, devices) with anomaly detection
 
+v1.16 adds comprehensive security hardening:
+- Timing attack mitigation via crypto/subtle.ConstantTimeCompare for bearer token validation
+- AWS Secrets Manager integration for MDM API token with 1-hour client-side caching
+- CI/CD security scanning with govulncheck, gosec, and Trivy in GitHub Actions
+- DynamoDB KMS encryption by default for all Sentinel tables
+- API rate limiting with sliding window algorithm (100 req/min)
+- Error sanitization across all credential endpoints (log details, return generic messages)
+- Security integration tests validating hardening patterns
+
 Target users: Platform engineers and security teams who need guardrails without slowing developers down.
 
 ## Constraints
@@ -365,6 +381,13 @@ Target users: Platform engineers and security teams who need guardrails without 
 | Device ID as query parameter | Simple API design (?device_id=...) for MDM lookup | ✓ Good |
 | Device-bound session logging | Log device_bound=true flag rather than actual ID for privacy | ✓ Good |
 | Anomaly detection thresholds | MULTI_USER at >1 user, HIGH_PROFILE_COUNT at >5 profiles | ✓ Good |
+| crypto/subtle.ConstantTimeCompare for bearer tokens | Prevent timing attacks on token comparison | ✓ Good |
+| AWS Secrets Manager with 1-hour cache TTL | Optimized for Lambda cold start patterns | ✓ Good |
+| Sliding window rate limiting | Simpler than token bucket for request-response | ✓ Good |
+| Rate limit by IAM ARN, not IP | IAM auth identifies caller, avoids NAT issues | ✓ Good |
+| Fail-open on rate limiter errors | Availability preferred over strict limiting | ✓ Good |
+| Error sanitization pattern | Log details internally, return generic messages | ✓ Good |
+| AWS managed KMS encryption | Simpler than customer CMK, no key management | ✓ Good |
 
 ---
-*Last updated: 2026-01-25 after v1.15 milestone*
+*Last updated: 2026-01-26 after v1.16 milestone*

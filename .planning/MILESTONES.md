@@ -1,5 +1,31 @@
 # Project Milestones: Sentinel
 
+## v1.16 Security Hardening (Shipped: 2026-01-26)
+
+**Delivered:** Comprehensive security hardening addressing audit findings with timing attack mitigation, secrets management, CI/CD security scanning, DynamoDB encryption, API rate limiting, error sanitization, and security validation tests.
+
+**Phases completed:** 113-120 (9 plans total)
+
+**Key accomplishments:**
+- Timing attack mitigation via crypto/subtle.ConstantTimeCompare for bearer token validation
+- AWS Secrets Manager integration for MDM API token with 1-hour client-side caching
+- CI/CD security scanning with govulncheck, gosec, and Trivy in GitHub Actions
+- DynamoDB KMS encryption by default for all Sentinel tables (approvals, breakglass, sessions)
+- API rate limiting with sliding window algorithm (100 req/min by IAM ARN or remote address)
+- Error sanitization across all credential endpoints (log details internally, return generic messages)
+
+**Stats:**
+- 51 files created/modified
+- +7,719 lines of Go
+- 8 phases, 9 plans
+- 2 days (2026-01-25 → 2026-01-26)
+
+**Git range:** `docs(113)` → `docs(120-01)`
+
+**What's next:** Security hardening complete. Consider policy developer experience (pull/push/diff commands), EDR integration, or hardware attestation for future milestones.
+
+---
+
 ## v1.15 Device Posture (Shipped: 2026-01-25)
 
 **Delivered:** Server-verified device posture via MDM APIs in Lambda TVM. CLI sends device identifier only - TVM queries Jamf for actual posture, preventing clients from faking compliance.

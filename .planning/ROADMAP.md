@@ -24,7 +24,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.13 Enforced Session Tracking** — [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) (Phases 94-96, shipped 2026-01-24)
 - ✅ **v1.14 Server-Side Credential Vending** — [milestones/v1.14-ROADMAP.md](milestones/v1.14-ROADMAP.md) (Phases 97-103, shipped 2026-01-25)
 - ✅ **v1.15 Device Posture** — [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) (Phases 104-112, shipped 2026-01-25)
-- 🚧 **v1.16 Security Hardening** — Phases 113-120 (in progress)
+- ✅ **v1.16 Security Hardening** — [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) (Phases 113-120, shipped 2026-01-26)
 
 ## Completed Milestones
 
@@ -84,92 +84,21 @@ See [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.16 Security Hardening (In Progress)
+<details>
+<summary>✅ v1.16 Security Hardening (Phases 113-120) — SHIPPED 2026-01-26</summary>
 
-**Milestone Goal:** Address security audit findings with timing attack fixes, secrets management, CI/CD security scanning, DynamoDB encryption, rate limiting, and comprehensive validation.
+- [x] Phase 113: Timing Attack Remediation (1/1 plans) — completed 2026-01-25
+- [x] Phase 114: Secrets Manager Migration (2/2 plans) — completed 2026-01-25
+- [x] Phase 115: CI/CD Security Scanning (1/1 plans) — completed 2026-01-25
+- [x] Phase 116: DynamoDB Encryption (1/1 plans) — completed 2026-01-25
+- [x] Phase 117: API Rate Limiting (2/2 plans) — completed 2026-01-25
+- [x] Phase 118: Dependency Security Audit (1/1 plans) — completed 2026-01-25
+- [x] Phase 119: Error Sanitization (1/1 plans) — completed 2026-01-26
+- [x] Phase 120: Security Validation (1/1 plans) — completed 2026-01-26
 
-#### Phase 113: Timing Attack Remediation
+See [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) for full details.
 
-**Goal**: Fix bearer token comparison vulnerability using crypto/subtle.ConstantTimeCompare()
-**Depends on**: v1.15 complete
-**Research**: Unlikely (standard Go crypto pattern)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 113-01: Fix timing attack in withAuthorizationCheck functions — completed 2026-01-25
-
-#### Phase 114: Secrets Manager Migration
-
-**Goal**: Move MDM API token from environment variable to AWS Secrets Manager
-**Depends on**: Phase 113
-**Research**: Complete (aws-secretsmanager-caching-go v2 library)
-**Plans**: 2/2 complete
-
-Plans:
-- [x] 114-01: Secrets Manager caching client and config integration — completed 2026-01-25
-- [x] 114-02: Terraform module and documentation updates — completed 2026-01-25
-
-#### Phase 115: CI/CD Security Scanning
-
-**Goal**: Add govulncheck, gosec, and Trivy to GitHub Actions for SAST and dependency scanning
-**Depends on**: Phase 113
-**Research**: Complete
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 115-01: Fix and enhance gosec and Trivy workflows — completed 2026-01-25
-
-#### Phase 116: DynamoDB Encryption
-
-**Goal**: Add explicit KMS encryption in Terraform for all DynamoDB tables
-**Depends on**: Phase 115
-**Research**: Likely (Terraform aws_dynamodb_table encryption, KMS key policies)
-**Research topics**: dynamodb server-side encryption, kms key rotation, terraform patterns
-**Plans**: TBD
-
-Plans:
-- [x] 116-01: Enable KMS encryption for all Sentinel DynamoDB tables — completed 2026-01-25
-
-#### Phase 117: API Rate Limiting
-
-**Goal**: Implement rate limiting for Lambda TVM and credential server endpoints
-**Depends on**: Phase 116
-**Research**: Unlikely (existing breakglass rate limiting patterns)
-**Plans**: 2/2 complete
-
-Plans:
-- [x] 117-01: Rate limiter types and Lambda TVM integration — completed 2026-01-25
-- [x] 117-02: Credential server rate limiting and security tests — completed 2026-01-25
-
-#### Phase 118: Dependency Security Audit
-
-**Goal**: Audit all Go dependencies, update vulnerable packages, document security posture
-**Depends on**: Phase 117
-**Research**: Unlikely (go mod tools, govulncheck output)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 118-01: Dependency audit and security documentation — completed 2026-01-25
-
-#### Phase 119: Error Sanitization
-
-**Goal**: Review and sanitize error messages to prevent information leakage
-**Depends on**: Phase 118
-**Research**: Unlikely (internal error handling patterns)
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 119-01: Sanitize error responses across Lambda TVM, Sentinel, EC2/ECS servers — completed 2026-01-26
-
-#### Phase 120: Security Validation
-
-**Goal**: Integration tests for all security fixes and updated security documentation
-**Depends on**: Phase 119
-**Research**: Unlikely (existing test patterns)
-**Plans**: TBD
-
-Plans:
-- [ ] 120-01: TBD
+</details>
 
 ## Domain Expertise
 
@@ -583,6 +512,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.13 Enforced Session Tracking | 94-96 | 10/10 | ✅ Complete | 2026-01-24 |
 | v1.14 Server-Side Credential Vending | 97-103 | 19/19 | ✅ Complete | 2026-01-25 |
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
-| v1.16 Security Hardening | 113-120 | 6/? | 🚧 In Progress | - |
+| v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 
-**Totals:** 19 milestones shipped (112 phases, 213 plans shipped)
+**Totals:** 20 milestones shipped (120 phases, 222 plans shipped)

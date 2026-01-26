@@ -2,17 +2,17 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-25)
+See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v1.16 Security Hardening - Address security audit findings
+**Current focus:** v1.16 Security Hardening shipped — Ready for next milestone
 
 ## Current Position
 
-Phase: 120 of 120 (Security Validation)
-Plan: 1 of 1 in current phase
-Status: Phase complete, milestone complete
-Last activity: 2026-01-26 — Completed 120-01-PLAN.md
+Phase: 120 of 120 (Security Validation) — v1.16 SHIPPED
+Plan: All plans complete
+Status: Milestone archived
+Last activity: 2026-01-26 — v1.16 Security Hardening shipped
 
 Progress: ██████████ 100%
 
@@ -51,13 +51,14 @@ Progress: ██████████ 100%
 - v1.13 Enforced Session Tracking: 3 phases, 10 plans (shipped 2026-01-24)
 - v1.14 Server-Side Credential Vending: 7 phases, 19 plans (shipped 2026-01-25)
 - v1.15 Device Posture: 9 phases, 12 plans (shipped 2026-01-25)
+- v1.16 Security Hardening: 8 phases, 9 plans (shipped 2026-01-26)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 216
+- Total plans completed: 222
 - Average duration: ~3.5 min
-- Total execution time: ~789 min
+- Total execution time: ~810 min
 
 **By Milestone:**
 
@@ -81,6 +82,7 @@ Progress: ██████████ 100%
 | v1.13 Enforced Session Tracking | 3 | 10 | ~35 min |
 | v1.14 Server-Side Credential Vending | 7 | 19 | ~49 min |
 | v1.15 Device Posture | 9 | 12 | ~41 min |
+| v1.16 Security Hardening | 8 | 9 | ~21 min |
 
 ## Accumulated Context
 
@@ -177,9 +179,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 120-01-PLAN.md (Phase 120 complete, v1.16 milestone complete)
+Stopped at: v1.16 Security Hardening milestone shipped
 Resume file: None
-Next: v1.17 milestone planning
+Next: v1.17 milestone planning (Policy Developer Experience)
 
 ## Roadmap Evolution
 
@@ -201,4 +203,4 @@ Next: v1.17 milestone planning
 - Milestone v1.13 shipped: 2026-01-24 — Enforced Session Tracking (Phases 94-96)
 - Milestone v1.14 shipped: 2026-01-25 — Server-Side Credential Vending (Phases 97-103)
 - Milestone v1.15 shipped: 2026-01-25 — Device Posture (Phases 104-112)
-- Milestone v1.16 created: 2026-01-25 — Security Hardening (Phases 113-120)
+- Milestone v1.16 shipped: 2026-01-26 — Security Hardening (Phases 113-120)
