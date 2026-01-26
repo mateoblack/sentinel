@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/byteness/aws-vault/v7/mfa"
 	"github.com/byteness/aws-vault/v7/policy"
 )
 
@@ -14,8 +15,19 @@ import (
 // It contains a version identifier and a list of rules that determine
 // who can invoke break-glass for which profiles.
 type BreakGlassPolicy struct {
-	Version string               `yaml:"version" json:"version"`
+	Version string                 `yaml:"version" json:"version"`
 	Rules   []BreakGlassPolicyRule `yaml:"rules" json:"rules"`
+}
+
+// MFARequirement specifies MFA enforcement for break-glass.
+type MFARequirement struct {
+	// Required enables MFA verification before break-glass access.
+	// If true, users must complete MFA challenge before invoking break-glass.
+	Required bool `yaml:"required" json:"required"`
+
+	// Methods lists allowed MFA methods (empty = all methods allowed).
+	// Valid values: "totp", "sms"
+	Methods []string `yaml:"methods,omitempty" json:"methods,omitempty"`
 }
 
 // BreakGlassPolicyRule defines who can invoke break-glass for matching profiles.
@@ -41,6 +53,10 @@ type BreakGlassPolicyRule struct {
 
 	// MaxDuration caps the duration for this rule (0 = use system default).
 	MaxDuration time.Duration `yaml:"max_duration,omitempty" json:"max_duration,omitempty"`
+
+	// MFA specifies multi-factor authentication requirements.
+	// If nil, MFA is not required for this rule.
+	MFA *MFARequirement `yaml:"mfa,omitempty" json:"mfa,omitempty"`
 }
 
 // Validate checks if the BreakGlassPolicy is semantically correct.
@@ -92,6 +108,15 @@ func (r *BreakGlassPolicyRule) validate(index int) error {
 
 	if r.MaxDuration > MaxDuration {
 		return fmt.Errorf("break-glass policy rule '%s' max_duration exceeds maximum of %v", r.Name, MaxDuration)
+	}
+
+	// Validate MFA requirements if specified
+	if r.MFA != nil && r.MFA.Required && len(r.MFA.Methods) > 0 {
+		for _, method := range r.MFA.Methods {
+			if !mfa.MFAMethod(method).IsValid() {
+				return fmt.Errorf("break-glass policy rule '%s' has invalid MFA method '%s'", r.Name, method)
+			}
+		}
 	}
 
 	return nil
@@ -298,4 +323,23 @@ func parseHourMinute(s string) (hour, minute int) {
 	hour = int(s[0]-'0')*10 + int(s[1]-'0')
 	minute = int(s[3]-'0')*10 + int(s[4]-'0')
 	return hour, minute
+}
+
+// RequiresMFA returns true if the rule requires MFA verification.
+func (r *BreakGlassPolicyRule) RequiresMFA() bool {
+	return r.MFA != nil && r.MFA.Required
+}
+
+// IsMethodAllowed returns true if the given MFA method is allowed by the rule.
+// Returns true if no method restrictions (empty Methods list).
+func (r *BreakGlassPolicyRule) IsMethodAllowed(method string) bool {
+	if r.MFA == nil || len(r.MFA.Methods) == 0 {
+		return true
+	}
+	for _, m := range r.MFA.Methods {
+		if m == method {
+			return true
+		}
+	}
+	return false
 }

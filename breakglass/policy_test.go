@@ -1017,10 +1017,10 @@ func TestParseHourMinute(t *testing.T) {
 		{"23:59", 23, 59},
 		{"12:05", 12, 5},
 		{"invalid", 0, 0},
-		{"9:00", 0, 0},   // wrong format
-		{"", 0, 0},       // empty
-		{"0900", 0, 0},   // no colon
-		{"09-00", 0, 0},  // wrong separator
+		{"9:00", 0, 0},  // wrong format
+		{"", 0, 0},      // empty
+		{"0900", 0, 0},  // no colon
+		{"09-00", 0, 0}, // wrong separator
 	}
 
 	for _, tc := range tests {
@@ -1041,4 +1041,354 @@ func mustLoadLocation(name string) *time.Location {
 		panic(err)
 	}
 	return loc
+}
+
+// ============================================================================
+// MFA Requirement Tests
+// ============================================================================
+
+// TestBreakGlassPolicyMFAValidation tests MFA requirement validation.
+func TestBreakGlassPolicyMFAValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		policy  BreakGlassPolicy
+		wantErr string
+	}{
+		{
+			name: "valid policy with MFA required",
+			policy: BreakGlassPolicy{
+				Version: "1",
+				Rules: []BreakGlassPolicyRule{
+					{
+						Name:  "mfa-required",
+						Users: []string{"admin"},
+						MFA: &MFARequirement{
+							Required: true,
+						},
+					},
+				},
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid policy with MFA required and totp method",
+			policy: BreakGlassPolicy{
+				Version: "1",
+				Rules: []BreakGlassPolicyRule{
+					{
+						Name:  "mfa-totp",
+						Users: []string{"admin"},
+						MFA: &MFARequirement{
+							Required: true,
+							Methods:  []string{"totp"},
+						},
+					},
+				},
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid policy with MFA required and sms method",
+			policy: BreakGlassPolicy{
+				Version: "1",
+				Rules: []BreakGlassPolicyRule{
+					{
+						Name:  "mfa-sms",
+						Users: []string{"admin"},
+						MFA: &MFARequirement{
+							Required: true,
+							Methods:  []string{"sms"},
+						},
+					},
+				},
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid policy with MFA required and both methods",
+			policy: BreakGlassPolicy{
+				Version: "1",
+				Rules: []BreakGlassPolicyRule{
+					{
+						Name:  "mfa-both",
+						Users: []string{"admin"},
+						MFA: &MFARequirement{
+							Required: true,
+							Methods:  []string{"totp", "sms"},
+						},
+					},
+				},
+			},
+			wantErr: "",
+		},
+		{
+			name: "valid policy with MFA not required (methods ignored)",
+			policy: BreakGlassPolicy{
+				Version: "1",
+				Rules: []BreakGlassPolicyRule{
+					{
+						Name:  "mfa-disabled",
+						Users: []string{"admin"},
+						MFA: &MFARequirement{
+							Required: false,
+							Methods:  []string{"invalid"},
+						},
+					},
+				},
+			},
+			wantErr: "", // Invalid methods ignored when Required=false
+		},
+		{
+			name: "valid policy with nil MFA",
+			policy: BreakGlassPolicy{
+				Version: "1",
+				Rules: []BreakGlassPolicyRule{
+					{
+						Name:  "no-mfa",
+						Users: []string{"admin"},
+						MFA:   nil,
+					},
+				},
+			},
+			wantErr: "",
+		},
+		{
+			name: "invalid MFA method",
+			policy: BreakGlassPolicy{
+				Version: "1",
+				Rules: []BreakGlassPolicyRule{
+					{
+						Name:  "invalid-method",
+						Users: []string{"admin"},
+						MFA: &MFARequirement{
+							Required: true,
+							Methods:  []string{"invalid"},
+						},
+					},
+				},
+			},
+			wantErr: "invalid MFA method",
+		},
+		{
+			name: "invalid MFA method among valid ones",
+			policy: BreakGlassPolicy{
+				Version: "1",
+				Rules: []BreakGlassPolicyRule{
+					{
+						Name:  "mixed-methods",
+						Users: []string{"admin"},
+						MFA: &MFARequirement{
+							Required: true,
+							Methods:  []string{"totp", "email"},
+						},
+					},
+				},
+			},
+			wantErr: "invalid MFA method",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.policy.Validate()
+
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Errorf("expected error containing %q, got nil", tc.wantErr)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Errorf("error %q does not contain %q", err.Error(), tc.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestRequiresMFA tests the RequiresMFA helper function.
+func TestRequiresMFA(t *testing.T) {
+	tests := []struct {
+		name string
+		rule *BreakGlassPolicyRule
+		want bool
+	}{
+		{
+			name: "nil MFA returns false",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA:   nil,
+			},
+			want: false,
+		},
+		{
+			name: "MFA not required returns false",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: false,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "MFA required returns true",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: true,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "MFA required with methods returns true",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: true,
+					Methods:  []string{"totp"},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.rule.RequiresMFA()
+			if got != tc.want {
+				t.Errorf("RequiresMFA() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestIsMethodAllowed tests the IsMethodAllowed helper function.
+func TestIsMethodAllowed(t *testing.T) {
+	tests := []struct {
+		name   string
+		rule   *BreakGlassPolicyRule
+		method string
+		want   bool
+	}{
+		{
+			name: "nil MFA allows any method",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA:   nil,
+			},
+			method: "totp",
+			want:   true,
+		},
+		{
+			name: "empty methods list allows any method",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: true,
+					Methods:  []string{},
+				},
+			},
+			method: "sms",
+			want:   true,
+		},
+		{
+			name: "nil methods list allows any method",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: true,
+					Methods:  nil,
+				},
+			},
+			method: "totp",
+			want:   true,
+		},
+		{
+			name: "method in list allowed",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: true,
+					Methods:  []string{"totp", "sms"},
+				},
+			},
+			method: "totp",
+			want:   true,
+		},
+		{
+			name: "method not in list denied",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: true,
+					Methods:  []string{"totp"},
+				},
+			},
+			method: "sms",
+			want:   false,
+		},
+		{
+			name: "first method in list",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: true,
+					Methods:  []string{"sms", "totp"},
+				},
+			},
+			method: "sms",
+			want:   true,
+		},
+		{
+			name: "last method in list",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: true,
+					Methods:  []string{"sms", "totp"},
+				},
+			},
+			method: "totp",
+			want:   true,
+		},
+		{
+			name: "case-sensitive method matching",
+			rule: &BreakGlassPolicyRule{
+				Name:  "test",
+				Users: []string{"admin"},
+				MFA: &MFARequirement{
+					Required: true,
+					Methods:  []string{"totp"},
+				},
+			},
+			method: "TOTP",
+			want:   false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.rule.IsMethodAllowed(tc.method)
+			if got != tc.want {
+				t.Errorf("IsMethodAllowed(%q) = %v, want %v", tc.method, got, tc.want)
+			}
+		})
+	}
 }
