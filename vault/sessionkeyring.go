@@ -171,6 +171,11 @@ func (sk *SessionKeyring) Set(key SessionMetadata, creds *ststypes.Credentials) 
 		Data:        valJSON,
 		Label:       fmt.Sprintf("aws-vault session for %s (expires %s)", key.ProfileName, creds.Expiration.Format(time.RFC3339)),
 		Description: "aws-vault session",
+
+		// macOS Keychain: prevent other applications from accessing this item
+		// without explicit user approval, and prevent iCloud sync
+		KeychainNotTrustApplication: true,
+		KeychainNotSynchronizable:   true,
 	})
 }
 

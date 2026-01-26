@@ -60,8 +60,10 @@ func (ck *CredentialKeyring) Set(credentialsName string, creds aws.Credentials) 
 		Label: fmt.Sprintf("aws-vault (%s)", credentialsName),
 		Data:  bytes,
 
-		// specific Keychain settings
+		// macOS Keychain: prevent other applications from accessing this item
+		// without explicit user approval, and prevent iCloud sync
 		KeychainNotTrustApplication: true,
+		KeychainNotSynchronizable:   true,
 	})
 }
 
