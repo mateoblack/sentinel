@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 ## Current Position
 
 Phase: 126 of 135 (Policy Integrity)
-Plan: 2 of 2 in current phase
+Plan: 3 of 3 in current phase
 Status: Complete
-Last activity: 2026-01-26 — Completed 126-02-PLAN.md
+Last activity: 2026-01-26 — Completed 126-03-PLAN.md
 
 Progress: ██░░░░░░░░ 20%
 
@@ -211,6 +211,13 @@ Key decisions logged in PROJECT.md Key Decisions table. Recent decisions:
 - Exit code 0 = valid, 1 = invalid for scripting (verify command)
 - Policy push signs AFTER uploading policy (not atomic but simpler)
 
+**v1.18 Critical Security Hardening decisions (Phase 126, Plan 03):**
+- Policy signing config read early in LoadConfigFromEnv for loader chain setup
+- SSM -> VerifyingLoader -> CachedLoader pipeline for verified caching
+- Single SSM client shared between policy and signature loaders
+- TestSecurity_ prefix for security tests (matches codebase conventions)
+- Fail-closed: KMS errors prevent policy loading (no silent bypass)
+
 **v1.14 Server-Side Credential Vending decisions:**
 - aws-lambda-go v1.47.0 for Lambda handler types
 - AWS container credentials format for SDK compatibility
@@ -234,7 +241,7 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 126-02-PLAN.md (Signed policy verification and CLI commands)
+Stopped at: Completed 126-03-PLAN.md (Lambda TVM signature verification integration)
 Resume file: None
 Next: Plan or execute Phase 127
 
