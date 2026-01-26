@@ -69,5 +69,8 @@ func main() {
 	// Shell integration commands
 	cli.ConfigureShellInitCommand(app, s)
 
+	// Policy commands
+	cli.ConfigurePolicyCommand(app, s)
+
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 }
