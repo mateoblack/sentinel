@@ -422,11 +422,13 @@ func TestSignedEntry_PreservesEntryData(t *testing.T) {
 		t.Fatalf("NewSignedEntry failed: %v", err)
 	}
 
-	// Entry should be preserved (as map due to json marshaling)
-	entryMap, ok := signed.Entry.(TestEntry)
-	if ok {
-		if entryMap.Action != "login" || entryMap.User != "alice" || entryMap.Count != 42 {
-			t.Error("Entry data was modified")
-		}
+	// Entry is stored as json.RawMessage, unmarshal to verify data
+	var decoded TestEntry
+	if err := signed.GetEntry(&decoded); err != nil {
+		t.Fatalf("GetEntry failed: %v", err)
+	}
+
+	if decoded.Action != "login" || decoded.User != "alice" || decoded.Count != 42 {
+		t.Error("Entry data was modified")
 	}
 }

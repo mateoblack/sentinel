@@ -34,11 +34,13 @@ func (c *SignatureConfig) Validate() error {
 }
 
 // SignedEntry wraps a log entry with its cryptographic signature.
+// The signature covers the JSON representation of entry + timestamp + key_id.
+// Entry is stored as json.RawMessage to preserve exact bytes for verification.
 type SignedEntry struct {
-	Entry     any    `json:"entry"`     // The original log entry (any type)
-	Signature string `json:"signature"` // Hex-encoded HMAC-SHA256 signature
-	KeyID     string `json:"key_id"`    // Key identifier for verification
-	Timestamp string `json:"timestamp"` // ISO8601 timestamp when signed
+	Entry     json.RawMessage `json:"entry"`     // The original log entry as raw JSON
+	Signature string          `json:"signature"` // Hex-encoded HMAC-SHA256 signature
+	KeyID     string          `json:"key_id"`    // Key identifier for verification
+	Timestamp string          `json:"timestamp"` // ISO8601 timestamp when signed
 }
 
 // ComputeSignature computes HMAC-SHA256 of the entry's JSON representation.
@@ -101,45 +103,78 @@ func NewSignedEntry(entry any, config *SignatureConfig) (*SignedEntry, error) {
 		return nil, err
 	}
 
-	timestamp := iso8601.Format(time.Now())
-
-	// Create wrapper to sign (includes timestamp for replay protection)
-	wrapper := struct {
-		Entry     any    `json:"entry"`
-		Timestamp string `json:"timestamp"`
-		KeyID     string `json:"key_id"`
-	}{
-		Entry:     entry,
-		Timestamp: timestamp,
-		KeyID:     config.KeyID,
-	}
-
-	signature, err := ComputeSignature(wrapper, config.SecretKey)
+	// Marshal entry to JSON first - this is the canonical form we'll sign
+	entryJSON, err := json.Marshal(entry)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SignedEntry{
-		Entry:     entry,
-		Signature: signature,
+	timestamp := iso8601.Format(time.Now())
+
+	// Create the signed entry with raw JSON
+	signed := &SignedEntry{
+		Entry:     entryJSON,
 		KeyID:     config.KeyID,
 		Timestamp: timestamp,
-	}, nil
+	}
+
+	// Compute signature over the signable content
+	signature, err := signed.computeSignature(config.SecretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	signed.Signature = signature
+	return signed, nil
 }
 
-// Verify checks the signature of a SignedEntry.
-// Returns (true, nil) if valid, (false, nil) if invalid, or (false, error) on error.
-func (s *SignedEntry) Verify(secretKey []byte) (bool, error) {
-	// Recreate the wrapper that was signed
+// computeSignature computes the HMAC-SHA256 signature for this entry.
+func (s *SignedEntry) computeSignature(secretKey []byte) (string, error) {
+	// Create wrapper with entry, timestamp, and key_id
 	wrapper := struct {
-		Entry     any    `json:"entry"`
-		Timestamp string `json:"timestamp"`
-		KeyID     string `json:"key_id"`
+		Entry     json.RawMessage `json:"entry"`
+		Timestamp string          `json:"timestamp"`
+		KeyID     string          `json:"key_id"`
 	}{
 		Entry:     s.Entry,
 		Timestamp: s.Timestamp,
 		KeyID:     s.KeyID,
 	}
 
-	return VerifySignature(wrapper, s.Signature, secretKey)
+	return ComputeSignature(wrapper, secretKey)
+}
+
+// Verify checks the signature of a SignedEntry.
+// Returns (true, nil) if valid, (false, nil) if invalid, or (false, error) on error.
+func (s *SignedEntry) Verify(secretKey []byte) (bool, error) {
+	// Compute expected signature
+	expected, err := s.computeSignature(secretKey)
+	if err != nil {
+		return false, err
+	}
+
+	// Decode provided signature from hex
+	providedBytes, err := hex.DecodeString(s.Signature)
+	if err != nil {
+		// Invalid hex is treated as invalid signature, not error
+		return false, nil
+	}
+
+	expectedBytes, err := hex.DecodeString(expected)
+	if err != nil {
+		// This should never happen since we just computed it
+		return false, err
+	}
+
+	// Use constant-time comparison to prevent timing attacks
+	if subtle.ConstantTimeCompare(providedBytes, expectedBytes) == 1 {
+		return true, nil
+	}
+	return false, nil
+}
+
+// GetEntry unmarshals the entry JSON into the provided destination.
+// This is useful when you need to access the original entry data.
+func (s *SignedEntry) GetEntry(dest any) error {
+	return json.Unmarshal(s.Entry, dest)
 }
