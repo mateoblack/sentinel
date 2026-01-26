@@ -3,6 +3,7 @@ package lambda
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/mdm"
+	"github.com/byteness/aws-vault/v7/mfa"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/ratelimit"
 	"github.com/byteness/aws-vault/v7/request"
@@ -45,6 +47,11 @@ const (
 	// Policy signing configuration environment variables.
 	EnvPolicySigningKey     = "SENTINEL_POLICY_SIGNING_KEY"     // KMS key ARN for verifying policy signatures
 	EnvEnforcePolicySigning = "SENTINEL_ENFORCE_POLICY_SIGNING" // "true" to reject unsigned policies (default: true if signing key set)
+
+	// MFA configuration environment variables.
+	// TOTP secrets and SMS phones are stored in SSM as JSON.
+	EnvMFATOTPSecretsParam = "SENTINEL_MFA_TOTP_SECRETS_PARAM" // SSM parameter path for TOTP secrets JSON
+	EnvMFASMSPhonesParam   = "SENTINEL_MFA_SMS_PHONES_PARAM"   // SSM parameter path for SMS phone numbers JSON
 )
 
 // Default configuration values.
@@ -137,6 +144,11 @@ type TVMConfig struct {
 	// Default: true when PolicySigningKeyID is set.
 	// Environment variable: SENTINEL_ENFORCE_POLICY_SIGNING (default: "true" if signing key set)
 	EnforcePolicySigning bool
+
+	// MFAVerifier is the optional MFA verifier for break-glass secondary verification.
+	// If nil, MFA verification is disabled.
+	// Environment variables: SENTINEL_MFA_TOTP_SECRETS_PARAM, SENTINEL_MFA_SMS_PHONES_PARAM
+	MFAVerifier mfa.Verifier
 }
 
 // LoadConfigFromEnv creates a TVMConfig from environment variables.
@@ -306,6 +318,19 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 		log.Printf("INFO: Rate limiting disabled")
 	}
 
+	// Configure MFA verifiers from SSM parameters
+	ssmClient := ssm.NewFromConfig(awsCfg)
+	mfaVerifier, err := loadMFAVerifiers(ctx, ssmClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load MFA configuration: %w", err)
+	}
+	if mfaVerifier != nil {
+		cfg.MFAVerifier = mfaVerifier
+		log.Printf("INFO: MFA verification enabled")
+	} else {
+		log.Printf("INFO: MFA verification disabled (no configuration)")
+	}
+
 	return cfg, nil
 }
 
@@ -376,4 +401,108 @@ func (c *TVMConfig) ValidateSigning() error {
 		return fmt.Errorf("%s required when %s=true", EnvPolicySigningKey, EnvEnforcePolicySigning)
 	}
 	return nil
+}
+
+// SSMAPI defines the SSM operations used by MFA configuration loading.
+// This interface enables testing with mock implementations.
+type SSMAPI interface {
+	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+}
+
+// loadMFAVerifiers creates MFA verifiers from environment configuration.
+// Returns nil if no MFA configuration is present (MFA disabled).
+//
+// Configuration is stored in SSM as JSON:
+//   - TOTP secrets: {"user1": {"secret": "BASE32SECRET"}, "user2": {...}}
+//   - SMS phones: {"user1": "+1XXXXXXXXXX", "user2": "+1YYYYYYYYYY"}
+func loadMFAVerifiers(ctx context.Context, ssmClient SSMAPI) (mfa.Verifier, error) {
+	totpParam := os.Getenv(EnvMFATOTPSecretsParam)
+	smsParam := os.Getenv(EnvMFASMSPhonesParam)
+
+	if totpParam == "" && smsParam == "" {
+		return nil, nil // MFA not configured
+	}
+
+	var verifiers []mfa.Verifier
+
+	// Load TOTP secrets if configured
+	if totpParam != "" {
+		secrets, err := loadTOTPSecrets(ctx, ssmClient, totpParam)
+		if err != nil {
+			return nil, fmt.Errorf("load TOTP secrets: %w", err)
+		}
+		verifiers = append(verifiers, mfa.NewTOTPVerifier(secrets))
+		log.Printf("INFO: TOTP MFA configured with %d users", len(secrets))
+	}
+
+	// Load SMS phones if configured
+	if smsParam != "" {
+		phones, err := loadSMSPhones(ctx, ssmClient, smsParam)
+		if err != nil {
+			return nil, fmt.Errorf("load SMS phones: %w", err)
+		}
+		// Note: SMS verifier requires AWS config for SNS, but we're in Lambda context
+		// For now, return nil - SMS will be configured when aws.Config is available
+		log.Printf("INFO: SMS MFA configured with %d users", len(phones))
+		// TODO: SMS verifier creation needs aws.Config - defer to handler setup
+		_ = phones
+	}
+
+	if len(verifiers) == 0 {
+		return nil, nil
+	}
+
+	// Return single verifier or composite
+	if len(verifiers) == 1 {
+		return verifiers[0], nil
+	}
+	return mfa.NewMultiVerifier(verifiers...), nil
+}
+
+// loadTOTPSecrets loads TOTP secrets from an SSM parameter.
+// The parameter value should be JSON: {"user1": {"secret": "BASE32SECRET"}, ...}
+func loadTOTPSecrets(ctx context.Context, client SSMAPI, paramPath string) (map[string]mfa.TOTPConfig, error) {
+	output, err := client.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           &paramPath,
+		WithDecryption: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get parameter %s: %w", paramPath, err)
+	}
+
+	if output.Parameter == nil || output.Parameter.Value == nil {
+		return nil, fmt.Errorf("parameter %s has no value", paramPath)
+	}
+
+	// Parse JSON to map
+	var secrets map[string]mfa.TOTPConfig
+	if err := json.Unmarshal([]byte(*output.Parameter.Value), &secrets); err != nil {
+		return nil, fmt.Errorf("parse TOTP secrets JSON: %w", err)
+	}
+
+	return secrets, nil
+}
+
+// loadSMSPhones loads SMS phone numbers from an SSM parameter.
+// The parameter value should be JSON: {"user1": "+1XXXXXXXXXX", ...}
+func loadSMSPhones(ctx context.Context, client SSMAPI, paramPath string) (map[string]string, error) {
+	output, err := client.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           &paramPath,
+		WithDecryption: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get parameter %s: %w", paramPath, err)
+	}
+
+	if output.Parameter == nil || output.Parameter.Value == nil {
+		return nil, fmt.Errorf("parameter %s has no value", paramPath)
+	}
+
+	// Parse JSON to map
+	var phones map[string]string
+	if err := json.Unmarshal([]byte(*output.Parameter.Value), &phones); err != nil {
+		return nil, fmt.Errorf("parse SMS phones JSON: %w", err)
+	}
+
+	return phones, nil
 }

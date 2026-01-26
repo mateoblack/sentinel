@@ -24,12 +24,6 @@ var (
 	ErrSignatureEnforced = errors.New("policy not signed (signature enforcement enabled)")
 )
 
-// PolicyLoader is the interface for loading policies.
-// This allows VerifyingLoader to wrap any policy loader implementation.
-type PolicyLoader interface {
-	Load(ctx context.Context, parameterName string) (*Policy, error)
-}
-
 // RawPolicyLoader is the interface for loading raw policy YAML content.
 // This is needed for signature verification which operates on raw bytes.
 type RawPolicyLoader interface {
