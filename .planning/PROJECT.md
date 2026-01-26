@@ -119,10 +119,25 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ `sentinel policy push <profile> <file>` validates and uploads to SSM with confirmation — v1.17
 - ✓ `sentinel policy diff <profile> <file>` shows unified diff with color output — v1.17
 - ✓ `sentinel policy validate <file>` validates locally without AWS credentials — v1.17
+- ✓ KMS-based policy signing with PolicySigner and RSASSA_PSS_SHA_256 algorithm — v1.18 Phase 126
+- ✓ VerifyingLoader for signature-validated policy loading with fail-closed security — v1.18 Phase 126
+- ✓ `sentinel policy sign <file>` creates detached KMS signatures — v1.18 Phase 126
+- ✓ `sentinel policy verify <file> <signature>` validates signatures locally — v1.18 Phase 126
+- ✓ `sentinel policy push --sign` uploads both policy and signature to SSM — v1.18 Phase 126
+- ✓ Lambda TVM signature verification integration with SSM → Verifying → Cached pipeline — v1.18 Phase 126
+- ✓ Security regression tests for policy tampering and cache poisoning prevention — v1.18 Phase 126
 
 ### Active
 
-None pending for v1.17 (milestone complete).
+**v1.19 Documentation & Completeness Audit** — Close documentation gaps for v1.13-v1.18 features
+
+Target work:
+- Update CHANGELOG with v1.13-v1.18 releases (currently showing "Unreleased")
+- Document policy commands in commands.md (pull, push, diff, validate, sign, verify)
+- Create policy signing guide (POLICY_SIGNING.md)
+- Create device posture guide (DEVICE_POSTURE.md)
+- Update README with Lambda TVM, device posture, and policy signing features
+- Review and update all examples and deployment guides
 
 ### Out of Scope
 - User management — AWS SSO handles identity
