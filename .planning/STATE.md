@@ -5,18 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Planning next milestone
+**Current focus:** v1.18 Critical Security Hardening
 
 ## Current Position
 
-Phase: 125 of 125 complete
-Plan: All plans complete
-Status: v1.17 milestone shipped
-Last activity: 2026-01-26 — v1.17 Policy Developer Experience milestone complete
+Phase: 126 of 135 (Policy Integrity)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-26 — Milestone v1.18 created
 
-Progress: ██████████ 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone Summary
+
+**v1.18 Critical Security Hardening (IN PROGRESS):**
+- 10 phases (126-135), TBD plans
+- P0: Policy cache poisoning, break-glass bypass, audit log tampering, credential exposure
+- High: Username spoofing, DynamoDB manipulation, keyring exposure, rate limit bypass, command injection
+- STRIDE threat model findings implementation
 
 **v1.17 Policy Developer Experience (SHIPPED 2026-01-26):**
 - 5 phases (121-125), 5 plans
@@ -215,9 +221,9 @@ None — fresh start for next milestone.
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: v1.17 milestone shipped
+Stopped at: Milestone v1.18 initialization
 Resume file: None
-Next: Plan next milestone
+Next: Plan Phase 126 (Policy Integrity)
 
 ## Roadmap Evolution
 
@@ -241,3 +247,4 @@ Next: Plan next milestone
 - Milestone v1.15 shipped: 2026-01-25 — Device Posture (Phases 104-112)
 - Milestone v1.16 shipped: 2026-01-26 — Security Hardening (Phases 113-120)
 - Milestone v1.17 shipped: 2026-01-26 — Policy Developer Experience (Phases 121-125)
+- Milestone v1.18 created: 2026-01-26 — Critical Security Hardening (Phases 126-135)

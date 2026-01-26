@@ -26,6 +26,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.15 Device Posture** — [milestones/v1.15-ROADMAP.md](milestones/v1.15-ROADMAP.md) (Phases 104-112, shipped 2026-01-25)
 - ✅ **v1.16 Security Hardening** — [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) (Phases 113-120, shipped 2026-01-26)
 - ✅ **v1.17 Policy Developer Experience** — [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) (Phases 121-125, shipped 2026-01-26)
+- 🚧 **v1.18 Critical Security Hardening** — Phases 126-135 (in progress)
 
 ## Completed Milestones
 
@@ -113,6 +114,115 @@ See [milestones/v1.16-ROADMAP.md](milestones/v1.16-ROADMAP.md) for full details.
 See [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) for full details.
 
 </details>
+
+### 🚧 v1.18 Critical Security Hardening (In Progress)
+
+**Milestone Goal:** Address P0 security threats and high-risk vulnerabilities identified in STRIDE threat model analysis, including policy cache poisoning, break-glass bypass, audit log tampering, and credential exposure.
+
+#### Phase 126: Policy Integrity
+
+**Goal**: KMS-signed policy validation to prevent cache poisoning attacks
+**Depends on**: v1.17 complete
+**Research**: Likely (KMS signing patterns, policy signature verification)
+**Research topics**: KMS asymmetric signing, policy signature format, verification caching
+**Plans**: TBD
+
+Plans:
+- [ ] 126-01: TBD (run /gsd:plan-phase 126 to break down)
+
+#### Phase 127: Break-Glass MFA
+
+**Goal**: Secondary verification (SMS/push) for emergency access to prevent abuse
+**Depends on**: Phase 126
+**Research**: Likely (SNS/push notification integration for MFA)
+**Research topics**: SNS SMS, push notification providers, TOTP integration
+**Plans**: TBD
+
+Plans:
+- [ ] 127-01: TBD (run /gsd:plan-phase 127 to break down)
+
+#### Phase 128: Audit Log Integrity
+
+**Goal**: CloudWatch forwarding with HMAC signatures for tamper-evident logging
+**Depends on**: Phase 127
+**Research**: Likely (CloudWatch Logs agent, HMAC patterns)
+**Research topics**: CloudWatch Logs API, HMAC-SHA256 signatures, log integrity verification
+**Plans**: TBD
+
+Plans:
+- [ ] 128-01: TBD (run /gsd:plan-phase 128 to break down)
+
+#### Phase 129: Local Server Security
+
+**Goal**: Process-based authentication for credential servers to prevent local access
+**Depends on**: Phase 128
+**Research**: Unlikely (internal patterns, process auth established)
+**Plans**: TBD
+
+Plans:
+- [ ] 129-01: TBD (run /gsd:plan-phase 129 to break down)
+
+#### Phase 130: Identity Hardening
+
+**Goal**: Strengthen AWS STS identity validation, remove OS username dependency
+**Depends on**: Phase 129
+**Research**: Unlikely (extends v1.7.1 STS identity work)
+**Plans**: TBD
+
+Plans:
+- [ ] 130-01: TBD (run /gsd:plan-phase 130 to break down)
+
+#### Phase 131: DynamoDB Security
+
+**Goal**: State integrity validation with conditional writes to prevent manipulation
+**Depends on**: Phase 130
+**Research**: Likely (DynamoDB conditional expressions, optimistic locking)
+**Research topics**: ConditionExpression patterns, version vectors, conflict detection
+**Plans**: TBD
+
+Plans:
+- [ ] 131-01: TBD (run /gsd:plan-phase 131 to break down)
+
+#### Phase 132: Keyring Protection
+
+**Goal**: Secure credential storage with access controls and encryption
+**Depends on**: Phase 131
+**Research**: Likely (keyring security, platform-specific patterns)
+**Research topics**: macOS Keychain ACLs, Linux secret service, Windows Credential Manager
+**Plans**: TBD
+
+Plans:
+- [ ] 132-01: TBD (run /gsd:plan-phase 132 to break down)
+
+#### Phase 133: Rate Limit Hardening
+
+**Goal**: Distributed rate limiting with DynamoDB to prevent bypass attacks
+**Depends on**: Phase 132
+**Research**: Unlikely (extends v1.16 rate limiting)
+**Plans**: TBD
+
+Plans:
+- [ ] 133-01: TBD (run /gsd:plan-phase 133 to break down)
+
+#### Phase 134: Input Sanitization
+
+**Goal**: Command injection prevention in MFA process and all user inputs
+**Depends on**: Phase 133
+**Research**: Unlikely (input validation patterns, shell escaping)
+**Plans**: TBD
+
+Plans:
+- [ ] 134-01: TBD (run /gsd:plan-phase 134 to break down)
+
+#### Phase 135: Security Validation
+
+**Goal**: Comprehensive security regression testing for all P0 and high-risk findings
+**Depends on**: Phase 134
+**Research**: Unlikely (extends existing test framework)
+**Plans**: TBD
+
+Plans:
+- [ ] 135-01: TBD (run /gsd:plan-phase 135 to break down)
 
 ## Domain Expertise
 
@@ -528,5 +638,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.15 Device Posture | 104-112 | 12/12 | ✅ Complete | 2026-01-25 |
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
+| v1.18 Critical Security Hardening | 126-135 | 0/? | 🚧 In Progress | - |
 
-**Totals:** 21 milestones shipped (125 phases, 228 plans shipped)
+**Totals:** 21 milestones shipped (125 phases, 228 plans shipped), 1 milestone in progress (10 phases)
