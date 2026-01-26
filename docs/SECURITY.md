@@ -151,6 +151,32 @@ go test ./... -run Security
 
 ## Security Best Practices
 
+### Trust Model
+
+**Sentinel Access = Full Command Execution Trust**
+
+Users with Sentinel access can execute any command with vended AWS credentials via `sentinel exec`. This is an intentional design - Sentinel controls **which credentials** users can obtain through policy evaluation, not **what commands** they run with those credentials.
+
+```bash
+# These are all permitted once policy grants credential access:
+sentinel exec --profile prod -- aws s3 ls
+sentinel exec --profile prod -- terraform apply
+sentinel exec --profile prod -- bash dangerous-script.sh
+sentinel exec --profile prod -- rm -rf /
+```
+
+**Security boundaries:**
+- ✅ **Policy engine controls**: Which profiles users can access, when, and under what conditions
+- ✅ **IAM permissions control**: What the vended credentials can do in AWS
+- ❌ **Sentinel does NOT control**: Which local commands/tools users run with credentials
+
+**Implication:** Grant Sentinel access only to users you trust with the full scope of the profile's IAM permissions. If you don't trust a user to run arbitrary commands, don't grant them Sentinel access to that profile.
+
+**Alternative approaches for restricted environments:**
+- Use IAM permission boundaries on the vended credentials themselves
+- Deploy separate Sentinel instances with different policy scopes
+- Use break-glass/approval workflows for sensitive profiles
+
 ### Policy Configuration
 
 1. **Principle of Least Privilege**: Configure policies to grant minimum necessary access

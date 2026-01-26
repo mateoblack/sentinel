@@ -78,6 +78,8 @@ sentinel credentials --profile prod --policy-parameter /sentinel/policies/prod -
 
 Execute a command with policy-gated AWS credentials.
 
+> **Security Note:** Users can run ANY command with vended credentials. Sentinel controls which credentials users can obtain (via policy evaluation), not which commands they execute. Grant Sentinel access only to users you trust with the full scope of the profile's IAM permissions. See [Trust Model](../SECURITY.md#trust-model) for details.
+
 **Usage:**
 ```bash
 sentinel exec --profile PROFILE --policy-parameter PATH [flags] [-- command args...]
