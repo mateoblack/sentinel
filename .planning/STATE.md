@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-26)
 
 ## Current Position
 
-Phase: 136 of 142 (CHANGELOG Completion)
+Phase: 137 of 142 (Command Documentation)
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-26 — Completed 136-01-PLAN.md
+Last activity: 2026-01-26 — Completed 137-01-PLAN.md
 
-Progress: ████████████████████░░ 95% (22 milestones shipped, v1.19 in progress)
+Progress: ████████████████████░░ 96% (22 milestones shipped, v1.19 in progress)
 
 ## Milestone Summary
 
@@ -22,6 +22,7 @@ Progress: ████████████████████░░ 95%
 - 7 phases (136-142), documentation milestone
 - Close documentation gaps for v1.13-v1.18 features
 - Phase 136 complete: CHANGELOG updated with v1.13-v1.18 releases
+- Phase 137 complete: Policy commands documented in commands.md
 
 **v1.18 Critical Security Hardening (SHIPPED 2026-01-26):**
 - 10 phases (126-135), 24 plans
@@ -74,6 +75,6 @@ None
 ## Session Continuity
 
 Last session: 2026-01-26
-Stopped at: Completed 136-01-PLAN.md
+Stopped at: Completed 137-01-PLAN.md
 Resume file: None
-Next: /gsd:plan-phase 137 for Command Documentation
+Next: /gsd:plan-phase 138 for Policy Signing Guide

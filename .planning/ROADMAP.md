@@ -154,20 +154,20 @@ See [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) for full details.
 Plans:
 - [x] 136-01: CHANGELOG completion (1/1 plans) - completed 2026-01-26
 
-#### Phase 137: Command Documentation
+#### Phase 137: Command Documentation - COMPLETE
 
 **Goal**: Document all policy commands in commands.md with syntax and examples
 **Depends on**: Phase 136
 **Requirements**: CMD-01, CMD-02, CMD-03, CMD-04, CMD-05, CMD-06
 **Success Criteria** (what must be TRUE):
-  1. User can find all 6 policy commands documented in commands.md
-  2. Each command shows syntax, flags, and practical examples
-  3. Policy workflow is clear (pull → edit → validate → diff → push)
-  4. Examples demonstrate both basic and advanced usage
-**Plans**: TBD
+  1. User can find all 6 policy commands documented in commands.md - DONE
+  2. Each command shows syntax, flags, and practical examples - DONE
+  3. Policy workflow is clear (pull → edit → validate → diff → push) - DONE
+  4. Examples demonstrate both basic and advanced usage - DONE
+**Plans**: 1 plan completed
 
 Plans:
-- [ ] 137-01: TBD (run /gsd:plan-phase 137 to break down)
+- [x] 137-01: Policy command documentation (1/1 plans) - completed 2026-01-26
 
 #### Phase 138: Policy Signing Guide
 
@@ -665,6 +665,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.16 Security Hardening | 113-120 | 9/9 | ✅ Complete | 2026-01-26 |
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
-| v1.19 Documentation & Completeness Audit | 136-142 | 0/? | 🚧 In Progress | - |
+| v1.19 Documentation & Completeness Audit | 136-142 | 2/? | 🚧 In Progress | - |
 
-**Totals:** 22 milestones shipped (135 phases, 254 plans shipped), 1 milestone in progress (7 phases)
+**Totals:** 22 milestones shipped (135 phases, 255 plans shipped), 1 milestone in progress (7 phases)
