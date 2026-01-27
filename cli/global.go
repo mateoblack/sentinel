@@ -71,7 +71,7 @@ var keyringConfigDefaults = keyring.Config{
 	//   User/Group/Other: no permissions
 	//   This prevents other processes (even same user) from accessing keys
 	KeyCtlScope: "user",
-	KeyCtlPerm:  keyring.KEYCTL_PERM_ALL << keyring.KEYCTL_PERM_PROCESS,
+	KeyCtlPerm:  0x3f000000, // KEYCTL_PERM_ALL << KEYCTL_PERM_PROCESS (possessor-only)
 }
 
 type AwsVault struct {
