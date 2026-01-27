@@ -2,7 +2,7 @@
 
 [![Build](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/go.yml?branch=main)](https://github.com/mateoblack/sentinel/actions/workflows/go.yml)
 
-> **Alpha Release** - APIs and features may change. Feedback welcome via issues.
+> **v2.0 Stable** - Production-ready with comprehensive security hardening.
 
 Policy-based credential gateway for AWS. Know not just *what* happened, but *why* it was allowed.
 
