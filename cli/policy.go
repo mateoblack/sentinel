@@ -310,8 +310,8 @@ func PolicyPullCommand(ctx context.Context, input PolicyPullCommandInput) (int, 
 
 	// Output policy
 	if input.OutputFile != "" {
-		// Write to file
-		if err := os.WriteFile(input.OutputFile, yamlData, 0644); err != nil {
+		// Use SensitiveFileMode (0600) for policy output - may contain user/profile mappings (SEC-03)
+		if err := os.WriteFile(input.OutputFile, yamlData, SensitiveFileMode); err != nil {
 			fmt.Fprintf(stderr, "Error: failed to write file: %v\n", err)
 			return 1, nil
 		}

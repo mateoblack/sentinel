@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -16,6 +17,32 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	isatty "github.com/mattn/go-isatty"
 	"golang.org/x/term"
+)
+
+// File permission constants for security hardening (SEC-03)
+// These constants ensure consistent and secure file permissions across all CLI commands.
+const (
+	// SensitiveFileMode is for files that may contain secrets or sensitive data
+	// (policy files, signatures, encrypted backups, etc.)
+	// Owner read/write only - no group or other access.
+	SensitiveFileMode fs.FileMode = 0600
+
+	// LogFileMode is for audit logs (readable by owner, group can read for log aggregation)
+	// Owner read/write, group read only - no other access.
+	LogFileMode fs.FileMode = 0640
+
+	// ConfigFileMode is for non-sensitive configuration files
+	// (AWS config files that don't contain credentials, profile names, etc.)
+	// This matches aws-cli default behavior for ~/.aws/config.
+	ConfigFileMode fs.FileMode = 0644
+
+	// SensitiveDirMode is for directories containing sensitive files
+	// Owner full access only - no group or other access.
+	SensitiveDirMode fs.FileMode = 0700
+
+	// ConfigDirMode is for general configuration directories
+	// This matches standard config directory permissions (e.g., ~/.aws/).
+	ConfigDirMode fs.FileMode = 0755
 )
 
 var keyringConfigDefaults = keyring.Config{

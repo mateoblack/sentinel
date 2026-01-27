@@ -264,7 +264,8 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 			writers = append(writers, os.Stderr)
 		}
 		if input.LogFile != "" {
-			f, err := os.OpenFile(input.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			// Use LogFileMode (0640) for decision logs - may contain access decisions (SEC-03)
+			f, err := os.OpenFile(input.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, LogFileMode)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Failed to open log file: %v\n", err)
 				return 1, err

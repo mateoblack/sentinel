@@ -207,7 +207,8 @@ func PolicySignCommand(ctx context.Context, input PolicySignCommandInput) (int, 
 
 	// Write to output
 	if input.OutputFile != "" {
-		if err := os.WriteFile(input.OutputFile, outputJSON, 0644); err != nil {
+		// Use SensitiveFileMode (0600) for signature output - security artifact (SEC-03)
+		if err := os.WriteFile(input.OutputFile, outputJSON, SensitiveFileMode); err != nil {
 			fmt.Fprintf(stderr, "Error: failed to write signature file: %v\n", err)
 			return 1, nil
 		}
