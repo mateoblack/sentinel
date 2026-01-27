@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/vault"
 )
+
+// ExampleWhoamiCommand demonstrates the sentinel whoami command.
+// This command shows your AWS identity and how Sentinel sees it for policy evaluation.
+func ExampleWhoamiCommand() {
+	// sentinel whoami
+	// Shows your AWS identity and how Sentinel sees it for policy evaluation
+	// Useful for debugging policy matching issues
+	fmt.Println("Identity: IAM ARN, Policy Username, Account ID")
+	// Output: Identity: IAM ARN, Policy Username, Account ID
+}
 
 // ============================================================================
 // Mock STS Client

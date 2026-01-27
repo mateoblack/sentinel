@@ -14,6 +14,17 @@ import (
 	"github.com/byteness/aws-vault/v7/shell"
 )
 
+// ExampleShellInitCommand demonstrates the sentinel shell init command.
+// This command outputs shell functions to source in ~/.bashrc or ~/.zshrc.
+func ExampleShellInitCommand() {
+	// sentinel shell init
+	// Outputs shell functions to source in ~/.bashrc or ~/.zshrc
+	// Generated functions: sentinel-{profile} for each profile found in SSM
+	// Usage: eval "$(sentinel shell init)"
+	fmt.Println("Shell integration provides sentinel-{profile} wrapper functions")
+	// Output: Shell integration provides sentinel-{profile} wrapper functions
+}
+
 // mockSSMShellClient implements shell.ssmShellAPI for testing.
 // We need to access via NewShellGeneratorWithClient which is unexported,
 // so we create a custom generator wrapper for testing.
