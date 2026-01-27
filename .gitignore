@@ -35,3 +35,5 @@ docs/VISION.md
 
 # Planning docs
 .planning/
+/sentinel-cli
+/sentinel/aws-vault
