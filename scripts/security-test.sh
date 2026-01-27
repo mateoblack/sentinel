@@ -119,6 +119,23 @@ go test $TEST_FLAGS -run "TestSecurityRegression" ./... 2>&1 | tee "$OUTPUT_FILE
 TEST_EXIT_CODE=${PIPESTATUS[0]}
 set -e
 
+# Check if tests actually ran
+if [ "$TEST_EXIT_CODE" -ne 0 ]; then
+    # Check if this is a build/dependency error (no test output at all)
+    if ! grep -qE "^(ok|FAIL|\?|---)" "$OUTPUT_FILE"; then
+        echo ""
+        echo "=============================================="
+        echo "BUILD/DEPENDENCY ERROR"
+        echo "=============================================="
+        echo ""
+        echo "Tests failed to run. Build or dependency error:"
+        echo ""
+        cat "$OUTPUT_FILE"
+        echo ""
+        exit 1
+    fi
+fi
+
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 
