@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
@@ -51,6 +53,46 @@ func (m *mockSSMHardenClient) PutParameter(ctx context.Context, params *ssm.PutP
 		return m.PutParameterFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("PutParameter not implemented")
+}
+
+// ============================================================================
+// Mock KMS Client for SEC-05 Encryption Tests
+// ============================================================================
+
+// mockKMSClient implements KMSEncryptAPI for testing backup encryption.
+type mockKMSClient struct {
+	EncryptFunc func(ctx context.Context, params *kms.EncryptInput, optFns ...func(*kms.Options)) (*kms.EncryptOutput, error)
+	DecryptFunc func(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error)
+}
+
+func (m *mockKMSClient) Encrypt(ctx context.Context, params *kms.EncryptInput, optFns ...func(*kms.Options)) (*kms.EncryptOutput, error) {
+	if m.EncryptFunc != nil {
+		return m.EncryptFunc(ctx, params, optFns...)
+	}
+	// Default: simple XOR-style "encryption" for testing (not real encryption!)
+	ciphertext := make([]byte, len(params.Plaintext))
+	for i, b := range params.Plaintext {
+		ciphertext[i] = b ^ 0x42 // Simple XOR for testing
+	}
+	return &kms.EncryptOutput{
+		CiphertextBlob: ciphertext,
+		KeyId:          params.KeyId,
+	}, nil
+}
+
+func (m *mockKMSClient) Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error) {
+	if m.DecryptFunc != nil {
+		return m.DecryptFunc(ctx, params, optFns...)
+	}
+	// Default: simple XOR-style "decryption" for testing (not real decryption!)
+	plaintext := make([]byte, len(params.CiphertextBlob))
+	for i, b := range params.CiphertextBlob {
+		plaintext[i] = b ^ 0x42 // Simple XOR for testing
+	}
+	return &kms.DecryptOutput{
+		Plaintext: plaintext,
+		KeyId:     params.KeyId,
+	}, nil
 }
 
 // ============================================================================
@@ -339,7 +381,7 @@ func TestSSMHardener_BackupParameters_CreatesFiles(t *testing.T) {
 
 	backupDir := filepath.Join(tmpDir, "test-backup")
 
-	client := &mockSSMHardenClient{
+	ssmClient := &mockSSMHardenClient{
 		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			name := *params.Name
 			values := map[string]string{
@@ -362,7 +404,10 @@ func TestSSMHardener_BackupParameters_CreatesFiles(t *testing.T) {
 		},
 	}
 
-	hardener := NewSSMHardenerWithClient(client)
+	kmsClient := &mockKMSClient{} // Uses default XOR "encryption"
+
+	// SEC-05: Create hardener with KMS key for encrypted backups
+	hardener := NewSSMHardenerWithKMS(ssmClient, kmsClient, "arn:aws:kms:us-east-1:123456789012:key/test-key")
 	result, err := hardener.BackupParameters(ctx, []string{
 		"/sentinel/policies/production",
 		"/sentinel/policies/staging",
@@ -390,7 +435,7 @@ func TestSSMHardener_BackupParameters_CreatesFiles(t *testing.T) {
 		t.Errorf("expected 2 backup files, got %d", len(entries))
 	}
 
-	// Verify file content
+	// Verify file content has encrypted_value, not plaintext value
 	prodFile := filepath.Join(backupDir, "sentinel-policies-production.json")
 	data, err := os.ReadFile(prodFile)
 	if err != nil {
@@ -399,6 +444,48 @@ func TestSSMHardener_BackupParameters_CreatesFiles(t *testing.T) {
 
 	if len(data) == 0 {
 		t.Error("backup file is empty")
+	}
+
+	// SEC-05: Verify encrypted_value is present and value is NOT present
+	content := string(data)
+	if !contains(content, "encrypted_value") {
+		t.Error("backup file should contain encrypted_value field (SEC-05)")
+	}
+	if contains(content, `"value":`) {
+		t.Error("backup file should NOT contain plaintext value field (SEC-05)")
+	}
+}
+
+// contains checks if substr is in s
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsAt(s, substr, 0))
+}
+
+func containsAt(s, substr string, start int) bool {
+	for i := start; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// TestSSMHardener_BackupParameters_RequiresKMS verifies that backup fails without KMS key (SEC-05).
+func TestSSMHardener_BackupParameters_RequiresKMS(t *testing.T) {
+	ctx := context.Background()
+
+	ssmClient := &mockSSMHardenClient{}
+
+	// Create hardener without KMS key
+	hardener := NewSSMHardenerWithClient(ssmClient)
+	_, err := hardener.BackupParameters(ctx, []string{"/sentinel/test"}, "/tmp/backup")
+
+	if err == nil {
+		t.Fatal("expected error when KMS key is not provided (SEC-05)")
+	}
+
+	if !contains(err.Error(), "KMS key required") {
+		t.Errorf("expected error about KMS key requirement, got: %v", err)
 	}
 }
 
@@ -417,7 +504,7 @@ func TestSSMHardener_BackupParameters_RestrictedPermissions(t *testing.T) {
 
 	backupDir := filepath.Join(tmpDir, "test-backup")
 
-	client := &mockSSMHardenClient{
+	ssmClient := &mockSSMHardenClient{
 		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -431,7 +518,10 @@ func TestSSMHardener_BackupParameters_RestrictedPermissions(t *testing.T) {
 		},
 	}
 
-	hardener := NewSSMHardenerWithClient(client)
+	kmsClient := &mockKMSClient{}
+
+	// SEC-05: Create hardener with KMS key
+	hardener := NewSSMHardenerWithKMS(ssmClient, kmsClient, "arn:aws:kms:us-east-1:123456789012:key/test-key")
 	_, err = hardener.BackupParameters(ctx, []string{"/sentinel/secrets/key"}, backupDir)
 
 	if err != nil {
@@ -480,7 +570,7 @@ func TestSSMHardener_BackupParameters_AutoGeneratesDir(t *testing.T) {
 	os.Chdir(tmpDir)
 	defer os.Chdir(oldDir)
 
-	client := &mockSSMHardenClient{
+	ssmClient := &mockSSMHardenClient{
 		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -494,7 +584,10 @@ func TestSSMHardener_BackupParameters_AutoGeneratesDir(t *testing.T) {
 		},
 	}
 
-	hardener := NewSSMHardenerWithClient(client)
+	kmsClient := &mockKMSClient{}
+
+	// SEC-05: Create hardener with KMS key
+	hardener := NewSSMHardenerWithKMS(ssmClient, kmsClient, "arn:aws:kms:us-east-1:123456789012:key/test-key")
 	result, err := hardener.BackupParameters(ctx, []string{"/sentinel/test"}, "")
 
 	if err != nil {
@@ -525,21 +618,21 @@ func TestSSMHardener_RestoreParameters_UpdatesExisting(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create backup file
-	backup := ParameterBackup{
-		Name:     "/sentinel/policies/production",
-		Type:     "String",
-		Value:    "restored-policy-value",
-		Version:  3,
-		BackupAt: lastMod,
+	// SEC-05: Create encrypted backup file using base64-encoded XOR "ciphertext"
+	plainValue := "restored-policy-value"
+	ciphertext := make([]byte, len(plainValue))
+	for i, b := range []byte(plainValue) {
+		ciphertext[i] = b ^ 0x42
 	}
-	backupData := `{"name":"/sentinel/policies/production","type":"String","value":"restored-policy-value","version":3,"backup_at":"2026-01-27T10:00:00Z"}`
+	encryptedValue := base64.StdEncoding.EncodeToString(ciphertext)
+
+	backupData := `{"name":"/sentinel/policies/production","type":"String","encrypted_value":"` + encryptedValue + `","version":3,"backup_at":"2026-01-27T10:00:00Z","kms_key_id":"arn:aws:kms:us-east-1:123456789012:key/test-key"}`
 	if err := os.WriteFile(filepath.Join(tmpDir, "sentinel-policies-production.json"), []byte(backupData), 0644); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 
 	putCalled := false
-	client := &mockSSMHardenClient{
+	ssmClient := &mockSSMHardenClient{
 		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			// Current version is 5, backup is version 3
 			return &ssm.GetParameterOutput{
@@ -553,11 +646,15 @@ func TestSSMHardener_RestoreParameters_UpdatesExisting(t *testing.T) {
 		},
 		PutParameterFunc: func(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
 			putCalled = true
-			if *params.Name != backup.Name {
-				t.Errorf("expected name %s, got %s", backup.Name, *params.Name)
+			if *params.Name != "/sentinel/policies/production" {
+				t.Errorf("expected name /sentinel/policies/production, got %s", *params.Name)
 			}
 			if !*params.Overwrite {
 				t.Error("expected Overwrite=true")
+			}
+			// SEC-05: Verify decrypted value is passed to SSM
+			if *params.Value != plainValue {
+				t.Errorf("expected decrypted value %q, got %q", plainValue, *params.Value)
 			}
 			return &ssm.PutParameterOutput{
 				Version: 6,
@@ -565,7 +662,9 @@ func TestSSMHardener_RestoreParameters_UpdatesExisting(t *testing.T) {
 		},
 	}
 
-	hardener := NewSSMHardenerWithClient(client)
+	kmsClient := &mockKMSClient{} // Uses default XOR "decryption"
+
+	hardener := NewSSMHardenerWithKMS(ssmClient, kmsClient, "arn:aws:kms:us-east-1:123456789012:key/test-key")
 	result, err := hardener.RestoreParameters(ctx, tmpDir, nil)
 
 	if err != nil {
@@ -596,14 +695,21 @@ func TestSSMHardener_RestoreParameters_SkipsMatchingVersion(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create backup file with version 3
-	backupData := `{"name":"/sentinel/policies/staging","type":"String","value":"staging-policy","version":3,"backup_at":"2026-01-27T10:00:00Z"}`
+	// SEC-05: Create encrypted backup file with version 3
+	plainValue := "staging-policy"
+	ciphertext := make([]byte, len(plainValue))
+	for i, b := range []byte(plainValue) {
+		ciphertext[i] = b ^ 0x42
+	}
+	encryptedValue := base64.StdEncoding.EncodeToString(ciphertext)
+
+	backupData := `{"name":"/sentinel/policies/staging","type":"String","encrypted_value":"` + encryptedValue + `","version":3,"backup_at":"2026-01-27T10:00:00Z","kms_key_id":"arn:aws:kms:us-east-1:123456789012:key/test-key"}`
 	if err := os.WriteFile(filepath.Join(tmpDir, "sentinel-policies-staging.json"), []byte(backupData), 0644); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 
 	putCalled := false
-	client := &mockSSMHardenClient{
+	ssmClient := &mockSSMHardenClient{
 		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			// Current version is same as backup (3)
 			return &ssm.GetParameterOutput{
@@ -621,7 +727,9 @@ func TestSSMHardener_RestoreParameters_SkipsMatchingVersion(t *testing.T) {
 		},
 	}
 
-	hardener := NewSSMHardenerWithClient(client)
+	kmsClient := &mockKMSClient{}
+
+	hardener := NewSSMHardenerWithKMS(ssmClient, kmsClient, "arn:aws:kms:us-east-1:123456789012:key/test-key")
 	result, err := hardener.RestoreParameters(ctx, tmpDir, nil)
 
 	if err != nil {
@@ -652,9 +760,17 @@ func TestSSMHardener_RestoreParameters_FiltersByName(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create multiple backup files
-	backupData1 := `{"name":"/sentinel/policies/production","type":"String","value":"prod","version":3,"backup_at":"2026-01-27T10:00:00Z"}`
-	backupData2 := `{"name":"/sentinel/policies/staging","type":"String","value":"staging","version":2,"backup_at":"2026-01-27T10:00:00Z"}`
+	// SEC-05: Create encrypted backup files
+	encryptValue := func(plain string) string {
+		cipher := make([]byte, len(plain))
+		for i, b := range []byte(plain) {
+			cipher[i] = b ^ 0x42
+		}
+		return base64.StdEncoding.EncodeToString(cipher)
+	}
+
+	backupData1 := `{"name":"/sentinel/policies/production","type":"String","encrypted_value":"` + encryptValue("prod") + `","version":3,"backup_at":"2026-01-27T10:00:00Z","kms_key_id":"test-key"}`
+	backupData2 := `{"name":"/sentinel/policies/staging","type":"String","encrypted_value":"` + encryptValue("staging") + `","version":2,"backup_at":"2026-01-27T10:00:00Z","kms_key_id":"test-key"}`
 	if err := os.WriteFile(filepath.Join(tmpDir, "sentinel-policies-production.json"), []byte(backupData1), 0644); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
@@ -663,7 +779,7 @@ func TestSSMHardener_RestoreParameters_FiltersByName(t *testing.T) {
 	}
 
 	restoredParams := []string{}
-	client := &mockSSMHardenClient{
+	ssmClient := &mockSSMHardenClient{
 		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -680,7 +796,9 @@ func TestSSMHardener_RestoreParameters_FiltersByName(t *testing.T) {
 		},
 	}
 
-	hardener := NewSSMHardenerWithClient(client)
+	kmsClient := &mockKMSClient{}
+
+	hardener := NewSSMHardenerWithKMS(ssmClient, kmsClient, "test-key")
 	// Only restore production, not staging
 	_, err = hardener.RestoreParameters(ctx, tmpDir, []string{"/sentinel/policies/production"})
 
@@ -708,12 +826,19 @@ func TestSSMHardener_RestoreParameters_HandlesErrors(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	backupData := `{"name":"/sentinel/policies/production","type":"String","value":"prod","version":3,"backup_at":"2026-01-27T10:00:00Z"}`
+	// SEC-05: Create encrypted backup file
+	cipher := make([]byte, 4)
+	for i, b := range []byte("prod") {
+		cipher[i] = b ^ 0x42
+	}
+	encryptedValue := base64.StdEncoding.EncodeToString(cipher)
+
+	backupData := `{"name":"/sentinel/policies/production","type":"String","encrypted_value":"` + encryptedValue + `","version":3,"backup_at":"2026-01-27T10:00:00Z","kms_key_id":"test-key"}`
 	if err := os.WriteFile(filepath.Join(tmpDir, "sentinel-policies-production.json"), []byte(backupData), 0644); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 
-	client := &mockSSMHardenClient{
+	ssmClient := &mockSSMHardenClient{
 		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
@@ -729,7 +854,9 @@ func TestSSMHardener_RestoreParameters_HandlesErrors(t *testing.T) {
 		},
 	}
 
-	hardener := NewSSMHardenerWithClient(client)
+	kmsClient := &mockKMSClient{}
+
+	hardener := NewSSMHardenerWithKMS(ssmClient, kmsClient, "test-key")
 	result, err := hardener.RestoreParameters(ctx, tmpDir, nil)
 
 	if err != nil {
@@ -757,9 +884,9 @@ func TestLoadBackup_ReadsDirectory(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create valid backup files
-	backupData1 := `{"name":"/sentinel/policies/production","type":"String","value":"prod","version":3,"backup_at":"2026-01-27T10:00:00Z"}`
-	backupData2 := `{"name":"/sentinel/policies/staging","type":"String","value":"staging","version":2,"backup_at":"2026-01-27T10:00:00Z"}`
+	// SEC-05: Create valid encrypted backup files
+	backupData1 := `{"name":"/sentinel/policies/production","type":"String","encrypted_value":"dGVzdC1lbmNyeXB0ZWQ=","version":3,"backup_at":"2026-01-27T10:00:00Z","kms_key_id":"test-key"}`
+	backupData2 := `{"name":"/sentinel/policies/staging","type":"String","encrypted_value":"c3RhZ2luZy1lbmNyeXB0ZWQ=","version":2,"backup_at":"2026-01-27T10:00:00Z","kms_key_id":"test-key"}`
 	if err := os.WriteFile(filepath.Join(tmpDir, "sentinel-policies-production.json"), []byte(backupData1), 0644); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
@@ -796,8 +923,8 @@ func TestLoadBackup_SkipsInvalidJSON(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create valid backup file
-	backupData := `{"name":"/sentinel/policies/production","type":"String","value":"prod","version":3,"backup_at":"2026-01-27T10:00:00Z"}`
+	// SEC-05: Create valid encrypted backup file
+	backupData := `{"name":"/sentinel/policies/production","type":"String","encrypted_value":"dGVzdC1lbmNyeXB0ZWQ=","version":3,"backup_at":"2026-01-27T10:00:00Z","kms_key_id":"test-key"}`
 	if err := os.WriteFile(filepath.Join(tmpDir, "valid.json"), []byte(backupData), 0644); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
@@ -814,5 +941,49 @@ func TestLoadBackup_SkipsInvalidJSON(t *testing.T) {
 	// Should only have the valid backup
 	if len(backups) != 1 {
 		t.Errorf("expected 1 backup (skipping invalid), got %d", len(backups))
+	}
+}
+
+// TestLoadBackup_RejectsLegacyFormat verifies that unencrypted legacy backups are rejected (SEC-05).
+func TestLoadBackup_RejectsLegacyFormat(t *testing.T) {
+	// Create temp directory with backup files
+	tmpDir, err := os.MkdirTemp("", "ssm-load-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create legacy unencrypted backup file (plaintext value)
+	legacyBackup := `{"name":"/sentinel/policies/production","type":"String","value":"plaintext-secret","version":3,"backup_at":"2026-01-27T10:00:00Z"}`
+	if err := os.WriteFile(filepath.Join(tmpDir, "legacy.json"), []byte(legacyBackup), 0644); err != nil {
+		t.Fatalf("failed to write backup file: %v", err)
+	}
+
+	_, err = LoadBackup(tmpDir)
+	if err == nil {
+		t.Fatal("expected error for legacy unencrypted backup (SEC-05)")
+	}
+
+	if !contains(err.Error(), "legacy unencrypted") {
+		t.Errorf("expected error about legacy format, got: %v", err)
+	}
+}
+
+// TestSSMHardener_RestoreParameters_RequiresKMS verifies restore fails without KMS (SEC-05).
+func TestSSMHardener_RestoreParameters_RequiresKMS(t *testing.T) {
+	ctx := context.Background()
+
+	ssmClient := &mockSSMHardenClient{}
+
+	// Create hardener without KMS
+	hardener := NewSSMHardenerWithClient(ssmClient)
+	_, err := hardener.RestoreParameters(ctx, "/tmp/backup", nil)
+
+	if err == nil {
+		t.Fatal("expected error when KMS client is not provided (SEC-05)")
+	}
+
+	if !contains(err.Error(), "KMS client required") {
+		t.Errorf("expected error about KMS requirement, got: %v", err)
 	}
 }

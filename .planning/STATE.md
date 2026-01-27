@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 152 of 155 (Security Hardening)
-Plan: 3 of 4 in current phase
-Status: In progress
-Last activity: 2026-01-27 — Completed 152-03-PLAN.md (file permission hardening)
+Plan: 2 of 4 in current phase
+Status: Complete
+Last activity: 2026-01-27 — Completed 152-02-PLAN.md (SCP template command)
 
 Progress: [████████████████████████░] 97% (151/155 phases complete)
 
@@ -67,6 +67,8 @@ Recent decisions affecting v2.0 work:
 - v2.0/152-03: ConfigFileMode (0644) matches aws-cli defaults for ~/.aws/config interoperability
 - v2.0/152-04: Security-focused fuzz test seed corpus with injection patterns
 - v2.0/152-04: Property-based verification in fuzz tests for security invariants
+- v2.0/152-02: SCP template command replaces direct deployment (SCP-T-01 mitigation)
+- v2.0/152-02: Deprecation pattern: hidden command with informative error
 
 ### Pending Todos
 
@@ -79,9 +81,9 @@ None yet (v2.0 milestone just started).
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 152-03-PLAN.md (file permission hardening)
+Stopped at: Completed 152-02-PLAN.md (SCP template command)
 Resume file: None
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-27 (Plan 152-03 complete)*
+*Last updated: 2026-01-27 (Plan 152-02 complete)*
