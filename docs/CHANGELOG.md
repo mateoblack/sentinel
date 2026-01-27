@@ -5,6 +5,44 @@ All notable changes to Sentinel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-01-27
+
+### BREAKING CHANGES
+
+- **Removed classic mode**: `sentinel exec` now requires `--remote-server <url>`
+- **Removed credentials command**: `sentinel credentials` no longer exists
+- **Removed --server flag**: Local metadata server mode removed
+
+### Why
+
+Client-side credential handling is fakeable. Server-side (TVM) is verified. We don't ship fakeable security.
+
+The Lambda isn't overhead - it's where the intelligence lives. No Lambda = no threat intel = just another fakeable CLI tool.
+
+### Migration
+
+See [docs/TVM_MIGRATION.md](TVM_MIGRATION.md) for complete upgrade guide from v2.0.
+
+### Security
+
+- All credential vending now happens server-side through Lambda TVM
+- Device posture verification is server-enforced
+- Policy evaluation cannot be bypassed by clients
+- SourceIdentity stamping ensures CloudTrail traceability
+
+### Added
+
+- TVM migration guide (docs/TVM_MIGRATION.md)
+- Updated README with TVM-only messaging and examples
+
+### Removed
+
+- `sentinel credentials` command (credentials to stdout are capturable)
+- `sentinel exec --server` flag (local server is client-controlled)
+- Classic exec mode without `--remote-server` (env var injection bypasses policy)
+
+**Milestone Summary:** v2.1 TVM Only removes all client-side credential paths to enforce server-verified security. Policy evaluation and device posture verification now happen exclusively in Lambda TVM where they cannot be bypassed.
+
 ## [1.21.0] - 2026-01-27
 
 ### Added
