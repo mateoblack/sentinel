@@ -187,35 +187,26 @@ Plans:
 - [x] 150-04: STRIDE threat coverage verification (100%)
 - [x] 150-05: CLI integration tests (60+ tests)
 
-### Phase 151: Intune MDM Provider
+### Phase 151: Intune MDM Provider ✅
 **Goal**: Microsoft Intune device posture verification support
 **Depends on**: Phase 150
 **Requirements**: INTUNE-01, INTUNE-02, INTUNE-03, INTUNE-04, INTUNE-05
-**Success Criteria** (what must be TRUE):
-  1. Intune MDM provider implements the MDM Provider interface
-  2. OAuth2 authentication with Azure AD succeeds for Microsoft Graph API access
-  3. Device compliance status from Intune maps to MDMDeviceInfo fields
-  4. Rate limiting and pagination work correctly for Graph API queries
-  5. Integration tests validate mock Graph API responses
-**Status**: In progress
+**Status**: Completed 2026-01-27
 
 Plans:
 - [x] 151-01: Intune provider implementation with OAuth2 and tests
 
-### Phase 152: Security Hardening
+### Phase 152: Security Hardening ✅
 **Goal**: Remove security risks and validate all security controls
 **Depends on**: Phase 151
 **Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05
-**Success Criteria** (what must be TRUE):
-  1. SSM backup feature is either deprecated or encrypts backups with KMS
-  2. SCP deployment command is removed and replaced with template output
-  3. File permissions are audited and enforced (0700 for directories, 0600 for files)
-  4. Fuzz tests validate input handling for all CLI inputs against injection attacks
-  5. No unencrypted secrets are written to disk during any Sentinel operation
-**Plans**: TBD
+**Status**: Completed 2026-01-27
 
 Plans:
-- [ ] 152-01: TBD during planning
+- [x] 152-01: SSM encrypted backup with KMS (SEC-01, SEC-05)
+- [x] 152-02: SCP template command replacing deploy (SEC-02)
+- [x] 152-03: File permission hardening (SEC-03)
+- [x] 152-04: Fuzz tests for CLI inputs (SEC-04)
 
 ### Phase 153: Documentation
 **Goal**: Complete, accurate, and maintainable documentation
@@ -288,9 +279,9 @@ Plans:
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
 | v1.20 CLI Security & Deployment Helpers | 143-149 | 7/7 | ✅ Complete | 2026-01-27 |
-| v2.0 Stable Release | 150-155 | 5/? | 🚧 In Progress | - |
+| v2.0 Stable Release | 150-155 | 10/? | 🚧 In Progress | - |
 
-**Totals:** 24 milestones (23 shipped, 1 in progress) - 150 phases complete, 5 phases planned
+**Totals:** 24 milestones (23 shipped, 1 in progress) - 152 phases complete, 3 phases planned
 
 ---
 *Roadmap created: 2026-01-14*
