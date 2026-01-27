@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 156 of 156 (Remove Classic Mode)
-Plan: 0 of ? in current phase
-Status: Not started
-Last activity: 2026-01-27 — v2.0 shipped, v2.1 milestone created
+Plan: 01 of ? in current phase (COMPLETE)
+Status: Plan 156-01 complete, ready for 156-02
+Last activity: 2026-01-27 — Plan 156-01 completed after checkpoint approval
 
-Progress: [█████████████████████████] 99% (155/156 phases complete)
+Progress: [█████████████████████████] 99% (155/156 phases complete, plan 01 done)
 
 ## Performance Metrics
 
@@ -73,10 +73,12 @@ Recent decisions affecting v2.0 work:
 - v2.0/152-01: KMSEncryptAPI interface pattern for testable KMS operations
 - v2.0/153-01: Consolidated SCP documentation into single reference (SCP_REFERENCE.md)
 - v2.0/153-01: Superseded LAMBDA_TVM_SCP.md with notice rather than removal
+- v2.1/156-01: ErrServerDeprecated pattern for deprecated functions with migration instructions
+- v2.1/156-01: t.Skip pattern for deprecated tests - preserves tests for gradual migration
 
 ### Pending Todos
 
-None yet (v2.0 milestone just started).
+None yet (v2.1 milestone in progress).
 
 ### Blockers/Concerns
 
@@ -85,9 +87,9 @@ None yet (v2.0 milestone just started).
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: v2.0 shipped, v2.1 TVM Only milestone created
+Stopped at: Plan 156-01 complete, ready for 156-02
 Resume file: None
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-27 (v2.0 shipped, v2.1 TVM Only milestone started)*
+*Last updated: 2026-01-27 (156-01 complete)*
