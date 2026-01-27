@@ -4,6 +4,7 @@ package lambda
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
@@ -162,8 +164,16 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 	loadedPolicy, err := h.Config.PolicyLoader.Load(ctx, h.Config.PolicyParameter)
 	if err != nil {
 		log.Printf("ERROR: Failed to load policy: %v", err)
-		return errorResponse(http.StatusInternalServerError, "POLICY_ERROR",
-			"Failed to load policy")
+		// Policy signature errors are POLICY_ERROR (document issues)
+		// Other errors are CONFIG_ERROR (infrastructure issues)
+		if errors.Is(err, policy.ErrSignatureInvalid) ||
+		   errors.Is(err, policy.ErrSignatureMissing) ||
+		   errors.Is(err, policy.ErrSignatureEnforced) {
+			return errorResponse(http.StatusInternalServerError, "POLICY_ERROR",
+				"Failed to load policy")
+		}
+		return errorResponse(http.StatusInternalServerError, "CONFIG_ERROR",
+			"Failed to load configuration")
 	}
 
 	// Evaluate policy
@@ -269,7 +279,7 @@ func (h *Handler) HandleRequest(ctx context.Context, req events.APIGatewayV2HTTP
 
 	// Include approval ID for SourceIdentity stamping (if via approved request)
 	if approvedReq != nil {
-		vendInput.ApprovalID = approvedReq.ID
+		vendInput.ApprovalID = identity.ApprovalIDFromRequestID(approvedReq.ID)
 	}
 
 	// Vend credentials

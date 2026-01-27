@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
 )
@@ -224,10 +225,12 @@ func TestSecurityRegression_SourceIdentityEnforcement(t *testing.T) {
 		}
 
 		// Format: sentinel:<user>:<approval-id>:<request-id>
-		expectedPrefix := "sentinel:testuser:approval-test-abc123:"
+		// Approval ID is 8-char hex hash of the request ID
+		expectedApprovalID := identity.ApprovalIDFromRequestID("approval-test-abc123")
+		expectedPrefix := "sentinel:testuser:" + expectedApprovalID + ":"
 		if len(capturedSourceIdentity) < len(expectedPrefix) ||
 			capturedSourceIdentity[:len(expectedPrefix)] != expectedPrefix {
-			t.Errorf("SourceIdentity = %s, should contain approval ID 'approval-test-abc123'", capturedSourceIdentity)
+			t.Errorf("SourceIdentity = %s, should contain approval ID '%s' (8-char hex hash)", capturedSourceIdentity, expectedApprovalID)
 		}
 	})
 }

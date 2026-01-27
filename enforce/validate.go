@@ -151,7 +151,7 @@ func ValidateTrustPolicy(policy *TrustPolicyDocument) *ValidationResult {
 	// Update risk summary and compliance status
 	for _, f := range result.Findings {
 		result.RiskSummary[f.RiskLevel]++
-		if f.RiskLevel == RiskLevelHigh || f.RiskLevel == RiskLevelMedium {
+		if f.RiskLevel == RiskLevelHigh || f.RiskLevel == RiskLevelMedium || f.RiskLevel == RiskLevelLow {
 			result.IsCompliant = false
 		}
 	}

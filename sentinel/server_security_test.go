@@ -23,7 +23,23 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/byteness/aws-vault/v7/policy"
+	"github.com/byteness/aws-vault/v7/testutil"
 )
+
+// testCredProvider is a mock credential provider for testing.
+type testCredProvider struct {
+	result *CredentialResult
+	err    error
+}
+
+func (p *testCredProvider) GetCredentialsWithSourceIdentity(ctx context.Context, req CredentialRequest) (*CredentialResult, error) {
+	if p.err != nil {
+		return nil, p.err
+	}
+	return p.result, nil
+}
 
 // =============================================================================
 // TIMING ATTACK MITIGATION TESTS
@@ -313,11 +329,29 @@ func TestSecurityRegression_SentinelServerAuthorizationIntegration(t *testing.T)
 	// since we're only testing the auth layer
 	ctx := context.Background()
 
+	mockLoader := testutil.NewMockPolicyLoader()
+	mockLoader.Policies["/sentinel/policies/test"] = &policy.Policy{
+		Rules: []policy.Rule{
+			{
+				Name:   "test-rule",
+				Effect: policy.EffectAllow,
+				Reason: "test reason",
+			},
+		},
+	}
+
+	// Mock credential provider that returns an error (for testing auth layer only)
+	mockProvider := &testCredProvider{
+		err: context.DeadlineExceeded, // Simulate credential fetch failure
+	}
+
 	config := SentinelServerConfig{
 		ProfileName:        "test-profile",
 		User:               "test-user",
 		LazyLoad:           true, // Skip credential prefetch
-		CredentialProvider: nil,  // Not needed for auth test
+		CredentialProvider: mockProvider,
+		PolicyLoader:       mockLoader,
+		PolicyParameter:    "/sentinel/policies/test",
 	}
 
 	server, err := NewSentinelServer(ctx, config, "test-auth-token", 0)

@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go-v2/service/sts/types"
 	"github.com/byteness/aws-vault/v7/breakglass"
+	"github.com/byteness/aws-vault/v7/identity"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/ratelimit"
@@ -664,8 +665,8 @@ func TestHandleRequest_PolicyLoadError(t *testing.T) {
 	if err := json.Unmarshal([]byte(resp.Body), &errResp); err != nil {
 		t.Fatalf("Failed to unmarshal error: %v", err)
 	}
-	if errResp.Code != "POLICY_ERROR" {
-		t.Errorf("Error code = %s, want POLICY_ERROR", errResp.Code)
+	if errResp.Code != "CONFIG_ERROR" {
+		t.Errorf("Error code = %s, want CONFIG_ERROR", errResp.Code)
 	}
 }
 
@@ -1368,9 +1369,11 @@ func TestHandleRequest_ApprovalIDInSourceIdentity(t *testing.T) {
 		t.Error("SourceIdentity should be set")
 	}
 	// When approval ID is present, format is sentinel:user:approval-id:request-id
-	expectedPrefix := "sentinel:testuser:approval-id-789:"
+	// Approval ID is 8-char hex hash of the request ID
+	expectedApprovalID := identity.ApprovalIDFromRequestID("approval-id-789")
+	expectedPrefix := "sentinel:testuser:" + expectedApprovalID + ":"
 	if len(capturedSourceIdentity) < len(expectedPrefix) || capturedSourceIdentity[:len(expectedPrefix)] != expectedPrefix {
-		t.Errorf("SourceIdentity = %s, should start with %s", capturedSourceIdentity, expectedPrefix)
+		t.Errorf("SourceIdentity = %s, should start with %s (8-char hex hash)", capturedSourceIdentity, expectedPrefix)
 	}
 }
 

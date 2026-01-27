@@ -400,7 +400,7 @@ func (s *SentinelServer) DefaultRoute(w http.ResponseWriter, r *http.Request) {
 	// in the SourceIdentity. This enables AWS SCPs to distinguish between approved
 	// and non-approved (direct) access.
 	if approvedReq != nil {
-		credReq.ApprovalID = approvedReq.ID
+		credReq.ApprovalID = identity.ApprovalIDFromRequestID(approvedReq.ID)
 	}
 
 	// Retrieve credentials with SourceIdentity stamping

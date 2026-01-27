@@ -43,6 +43,8 @@
 package identity
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -185,6 +187,17 @@ func (si *SourceIdentity) Validate() error {
 // Valid approval-ids are exactly 8 lowercase hex characters.
 func ValidateApprovalID(approvalID string) bool {
 	return approvalIDRegex.MatchString(approvalID)
+}
+
+// ApprovalIDFromRequestID converts a request ID to an 8-character hex approval ID.
+// This allows request IDs of any format to be used as approval markers in SourceIdentity.
+// Uses SHA-256 hash to ensure collision resistance and uniform distribution.
+func ApprovalIDFromRequestID(requestID string) string {
+	if requestID == "" {
+		return ""
+	}
+	h := sha256.Sum256([]byte(requestID))
+	return hex.EncodeToString(h[:4]) // 4 bytes = 8 hex chars
 }
 
 // IsValid returns true if the SourceIdentity passes all validation checks.

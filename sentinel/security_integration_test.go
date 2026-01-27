@@ -43,7 +43,7 @@ func TestSecurityIntegration_PolicyLoadErrorSanitized(t *testing.T) {
 		User:            "test-user",
 		LazyLoad:        true, // Skip credential prefetch
 		PolicyParameter: "/super/secret/ssm/path/that/should/not/be/exposed",
-		PolicyLoader: &mockPolicyLoader{
+		PolicyLoader: &securityTestPolicyLoader{
 			loadErr: errPolicyLoadFailed,
 		},
 	}
@@ -101,7 +101,7 @@ func TestSecurityIntegration_CredentialRetrievalErrorSanitized(t *testing.T) {
 		User:            "test-user",
 		LazyLoad:        true,
 		PolicyParameter: "/test/policy",
-		PolicyLoader: &mockPolicyLoader{
+		PolicyLoader: &securityTestPolicyLoader{
 			policy: allowAllPolicy(),
 		},
 		CredentialProvider: &mockCredentialProvider{
@@ -183,7 +183,7 @@ func TestSecurityIntegration_RateLimitConcurrent(t *testing.T) {
 		User:            "test-user",
 		LazyLoad:        true,
 		PolicyParameter: "/test/policy",
-		PolicyLoader: &mockPolicyLoader{
+		PolicyLoader: &securityTestPolicyLoader{
 			policy: allowAllPolicy(),
 		},
 		CredentialProvider: &mockCredentialProvider{
@@ -262,7 +262,7 @@ func TestSecurityIntegration_RateLimitRetryAfterHeader(t *testing.T) {
 		User:            "test-user",
 		LazyLoad:        true,
 		PolicyParameter: "/test/policy",
-		PolicyLoader: &mockPolicyLoader{
+		PolicyLoader: &securityTestPolicyLoader{
 			policy: allowAllPolicy(),
 		},
 		CredentialProvider: &mockCredentialProvider{
@@ -336,7 +336,7 @@ func TestSecurityIntegration_EndToEndSecurityChain(t *testing.T) {
 		name           string
 		authToken      string
 		requestToken   string
-		policyLoader   *mockPolicyLoader
+		policyLoader   *securityTestPolicyLoader
 		credProvider   *mockCredentialProvider
 		expectedStatus int
 		checkMessage   func(t *testing.T, msg string)
@@ -368,7 +368,7 @@ func TestSecurityIntegration_EndToEndSecurityChain(t *testing.T) {
 			name:         "policy_load_fails",
 			authToken:    "test-token",
 			requestToken: "test-token",
-			policyLoader: &mockPolicyLoader{
+			policyLoader: &securityTestPolicyLoader{
 				loadErr: errPolicyLoadFailed,
 			},
 			expectedStatus: http.StatusInternalServerError,
@@ -382,7 +382,7 @@ func TestSecurityIntegration_EndToEndSecurityChain(t *testing.T) {
 			name:         "policy_denies",
 			authToken:    "test-token",
 			requestToken: "test-token",
-			policyLoader: &mockPolicyLoader{
+			policyLoader: &securityTestPolicyLoader{
 				policy: denyAllPolicy(),
 			},
 			expectedStatus: http.StatusForbidden,
@@ -396,7 +396,7 @@ func TestSecurityIntegration_EndToEndSecurityChain(t *testing.T) {
 			name:         "credential_retrieval_fails",
 			authToken:    "test-token",
 			requestToken: "test-token",
-			policyLoader: &mockPolicyLoader{
+			policyLoader: &securityTestPolicyLoader{
 				policy: allowAllPolicy(),
 			},
 			credProvider: &mockCredentialProvider{
@@ -413,7 +413,7 @@ func TestSecurityIntegration_EndToEndSecurityChain(t *testing.T) {
 			name:         "full_chain_success",
 			authToken:    "test-token",
 			requestToken: "test-token",
-			policyLoader: &mockPolicyLoader{
+			policyLoader: &securityTestPolicyLoader{
 				policy: allowAllPolicy(),
 			},
 			credProvider: &mockCredentialProvider{
@@ -470,7 +470,17 @@ func TestSecurityIntegration_EndToEndSecurityChain(t *testing.T) {
 				return
 			}
 
-			tc.checkMessage(t, resp["Message"])
+			// For success case, check for credential fields instead of Message
+			if tc.expectedStatus == http.StatusOK {
+				// Check if credentials are present (AccessKeyId indicates success)
+				if accessKey, ok := resp["AccessKeyId"]; ok && accessKey != "" {
+					tc.checkMessage(t, accessKey) // Pass non-empty string to indicate success
+				} else {
+					tc.checkMessage(t, "") // Empty indicates missing credentials
+				}
+			} else {
+				tc.checkMessage(t, resp["Message"])
+			}
 		})
 	}
 }
@@ -479,12 +489,13 @@ func TestSecurityIntegration_EndToEndSecurityChain(t *testing.T) {
 // MOCK IMPLEMENTATIONS
 // ============================================================================
 
-type mockPolicyLoader struct {
+// securityTestPolicyLoader is a test mock for PolicyLoader used in security integration tests.
+type securityTestPolicyLoader struct {
 	policy  *policy.Policy
 	loadErr error
 }
 
-func (m *mockPolicyLoader) Load(ctx context.Context, parameter string) (*policy.Policy, error) {
+func (m *securityTestPolicyLoader) Load(ctx context.Context, parameter string) (*policy.Policy, error) {
 	if m.loadErr != nil {
 		return nil, m.loadErr
 	}

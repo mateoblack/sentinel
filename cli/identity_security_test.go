@@ -589,6 +589,7 @@ func TestSecurityRegression_FindApprovedRequestUsesAWSIdentity(t *testing.T) {
 		Requester: "alice",
 		Profile:   "production",
 		Status:    request.StatusApproved,
+		Duration:  2 * time.Hour,
 		CreatedAt: now.Add(-1 * time.Hour),
 		ExpiresAt: now.Add(23 * time.Hour),
 	}
@@ -684,17 +685,21 @@ func TestSecurityRegression_FindActiveBreakGlassUsesAWSIdentity(t *testing.T) {
 
 			// Create store with break-glass event for "oncall"
 			store := &mockBreakGlassStore{
-				findActiveByInvokerAndProfileFn: func(ctx context.Context, invoker, profile string) (*breakglass.BreakGlassEvent, error) {
-					if invoker == "oncall" && profile == "production" {
-						return &breakglass.BreakGlassEvent{
-							ID:        "bg001",
-							Invoker:   "oncall",
-							Profile:   "production",
-							Status:    breakglass.StatusActive,
-							ExpiresAt: now.Add(1 * time.Hour),
+				listByInvokerFn: func(ctx context.Context, invoker string, limit int) ([]*breakglass.BreakGlassEvent, error) {
+					if invoker == "oncall" {
+						return []*breakglass.BreakGlassEvent{
+							{
+								ID:        "bg001",
+								Invoker:   "oncall",
+								Profile:   "production",
+								Status:    breakglass.StatusActive,
+								CreatedAt: now,
+								ExpiresAt: now.Add(1 * time.Hour),
+								Duration:  1 * time.Hour,
+							},
 						}, nil
 					}
-					return nil, nil
+					return []*breakglass.BreakGlassEvent{}, nil
 				},
 			}
 
