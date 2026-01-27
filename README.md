@@ -4,9 +4,11 @@
 [![Gosec](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/goseccheck.yml?branch=main&label=gosec)](https://github.com/mateoblack/sentinel/actions/workflows/goseccheck.yml)
 [![Vulnerability Check](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/govulncheck.yml?branch=main&label=govulncheck)](https://github.com/mateoblack/sentinel/actions/workflows/govulncheck.yml)
 
-> **v1.21 Aplha** - Pre-release testing
+> **v2.1** - TVM-only mode. Server-verified security.
 
 Policy-based credential gateway for AWS. Know not just *what* happened, but *why* it was allowed.
+
+> **Sentinel v2.1+ requires Lambda TVM for verified security.** The Lambda isn't overhead - it's where the intelligence lives. Client-side credential handling is fakeable; server-side (TVM) is verified. We don't ship fakeable security. See [Migration Guide](docs/TVM_MIGRATION.md) for upgrading from v2.0.
 
 ## The Problem
 
@@ -48,10 +50,17 @@ Download from [Releases](https://github.com/mateoblack/sentinel/releases) and ad
 
 ## Quick Start
 
-**Prerequisites:** Install Sentinel (see [Installation](#installation) above)
+**Prerequisites:**
+1. Install Sentinel (see [Installation](#installation) above)
+2. Deploy Lambda TVM (see [Lambda TVM Deployment](docs/LAMBDA_TVM_DEPLOYMENT.md))
 
 ```bash
-# 1. Create a policy (see docs/examples/policy-getting-started.yaml)
+# 1. Deploy Lambda TVM (one-time setup)
+cd terraform/sentinel-tvm
+terraform init && terraform apply -var="region=us-east-1"
+export SENTINEL_TVM_URL=$(terraform output -raw api_gateway_url)
+
+# 2. Create a policy (see docs/examples/policy-getting-started.yaml)
 cat > my-policy.yaml <<EOF
 version: "1"
 rules:
@@ -62,18 +71,12 @@ rules:
     reason: Development access
 EOF
 
-# 2. Validate your policy
+# 3. Validate and push your policy
 sentinel policy validate my-policy.yaml
-
-# 3. Push policy to AWS SSM (minimal setup, no DynamoDB tables)
 sentinel init bootstrap --aws-profile my-admin --profile dev
 
-# 4. Verify what governs you
-sentinel policy pull dev --aws-profile my-admin
-
-# 5. Use it!
-sentinel exec --profile dev --policy-parameter /sentinel/policies/dev \
-  -- aws sts get-caller-identity
+# 4. Use it with TVM
+sentinel exec --remote-server "$SENTINEL_TVM_URL" dev -- aws sts get-caller-identity
 ```
 
 **Want more features?** Add them progressively:
@@ -87,16 +90,19 @@ See [docs/examples/](docs/examples/) for policy examples.
 ## How It Works
 
 ```
-Request access --> Sentinel evaluates policy --> Credentials issued (or denied)
-                                                        |
-                                                        v
-                                    SourceIdentity stamped: sentinel:alice:direct:a1b2c3d4
-                                                        |
-                                                        v
-                                           CloudTrail shows WHO + WHY
+Client request --> Lambda TVM --> Policy evaluation --> Credentials issued (or denied)
+                      |                  |
+                      v                  v
+            Device posture check    Server-verified policy
+                      |                  |
+                      v                  v
+            SourceIdentity stamped: sentinel:alice:direct:a1b2c3d4
+                                         |
+                                         v
+                              CloudTrail shows WHO + WHY
 ```
 
-Every credential issued through Sentinel is stamped with a `SourceIdentity` that appears in CloudTrail. Combined with Sentinel's decision logs, you get complete audit trails.
+Every credential issued through Sentinel's Lambda TVM is stamped with a `SourceIdentity` that appears in CloudTrail. Policy evaluation happens server-side where it cannot be bypassed. Combined with Sentinel's decision logs, you get complete audit trails.
 
 ## Features
 
@@ -121,21 +127,19 @@ Every credential issued through Sentinel is stamped with a `SourceIdentity` that
 | **Trust policy enforcement** | AWS rejects bypass attempts via IAM conditions |
 | **SCP enforcement** | Dangerous actions require Sentinel org-wide |
 
-### Real-time Revocation (Server Mode)
+### Lambda TVM (Server-Side Credential Vending)
 
 | Feature | Description |
 |---------|-------------|
-| **Server mode** | `--server` flag for per-request policy evaluation |
+| **Server-side policy** | Policy evaluation happens in Lambda, not on client |
 | **Instant revocation** | Change policy or revoke session, next request denied |
 | **Session tracking** | Track active sessions in DynamoDB |
-| **require_server effect** | Force server mode for sensitive profiles |
-| **Lambda TVM deployment** | Server-side credential vending with policy evaluation at the trust boundary |
+| **Device posture verification** | MDM checks enforced server-side |
+| **Trust boundary enforcement** | Clients cannot bypass policy |
 
 ```bash
-# Long-running process with revocation capability
-sentinel exec --server --session-table sentinel-sessions \
-  --profile prod --policy-parameter /sentinel/policies/prod \
-  -- terraform apply
+# Use Lambda TVM for credential vending
+sentinel exec --remote-server "$SENTINEL_TVM_URL" prod -- terraform apply
 
 # Revoke a session instantly
 sentinel server-revoke SESSION_ID --reason "Suspicious activity" \
@@ -156,6 +160,7 @@ sentinel server-revoke SESSION_ID --reason "Suspicious activity" \
 | **Audit verify** | `sentinel audit verify` checks CloudTrail for non-Sentinel sessions |
 | **Identity debugging** | `sentinel whoami` shows your AWS identity and policy username |
 | **Lambda TVM** | Terraform module and CDK example for Lambda TVM deployment |
+| **TVM Migration** | Migration guide from classic mode to TVM-only |
 
 ## Example Policy
 
@@ -212,6 +217,7 @@ rules:
 | [Policy Signing](docs/POLICY_SIGNING.md) | KMS-based policy integrity |
 | [Device Posture](docs/DEVICE_POSTURE.md) | MDM integration and device verification |
 | [Security Hardening](docs/SECURITY_HARDENING.md) | Timing attacks, rate limiting, encryption |
+| [TVM Migration](docs/TVM_MIGRATION.md) | Upgrading from v2.0 to TVM-only mode |
 | [Troubleshooting](docs/guide/troubleshooting.md) | Common issues and fixes |
 
 ## Built On
@@ -245,7 +251,7 @@ Supported credential stores:
 ## Limitations
 
 - **Console access** is not controlled by Sentinel. Use trust policies requiring SourceIdentity to block console from sensitive roles.
-- **Standard exec/credentials mode** issues credentials valid until expiry. Use server mode (`--server`) for instant revocation capability.
+- **Lambda TVM required** (v2.1+): Client-side credential handling was removed because it's fakeable. All credential vending now requires Lambda TVM deployment.
 
 ## License
 
