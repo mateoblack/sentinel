@@ -171,6 +171,41 @@ Server mode re-evaluates policy on every credential request, enabling instant re
 
 See [CLI Reference](guide/commands.md#shell-init) for full details.
 
+## v2.0 Features
+
+### Policy Signing (Optional)
+
+For production environments, enable KMS-based policy signing to ensure policy integrity:
+
+```bash
+# Sign a policy with KMS
+sentinel policy sign --kms-key-id alias/sentinel-policy-signing \
+  --input policy.yaml --output policy.yaml.sig
+
+# Verify signature before loading
+sentinel policy verify --kms-key-id alias/sentinel-policy-signing \
+  --input policy.yaml --signature policy.yaml.sig
+```
+
+See [Policy Signing Guide](POLICY_SIGNING.md) for KMS key setup and integration.
+
+### Device Posture (Optional)
+
+Require device security state verification before issuing credentials:
+
+```bash
+# Check device posture
+sentinel device check
+
+# Use with exec (automatically checked when policy requires device posture)
+sentinel exec --profile prod --policy-parameter /sentinel/policies/prod \
+  -- aws sts get-caller-identity
+```
+
+Supports Jamf Pro and Microsoft Intune MDM providers.
+
+See [Device Posture Guide](DEVICE_POSTURE.md) for MDM integration.
+
 ## What's Next
 
 - [Getting Started Guide](guide/getting-started.md) - Full setup walkthrough
