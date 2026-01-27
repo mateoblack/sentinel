@@ -15,7 +15,6 @@ func main() {
 	app.Version(Version)
 
 	s := cli.ConfigureSentinelGlobals(app)
-	cli.ConfigureCredentialsCommand(app, s)
 	cli.ConfigureSentinelExecCommand(app, s)
 	cli.ConfigureRequestCommand(app, s)
 	cli.ConfigureSentinelListCommand(app, s)
