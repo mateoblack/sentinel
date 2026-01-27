@@ -41,6 +41,17 @@ func ExampleCredentialsCommand() {
 	// Output: See docs/QUICKSTART.md for credential_process configuration
 }
 
+// ExampleCredentialsCommand_logging demonstrates decision logging options.
+// Decision logging is useful for auditing and debugging policy evaluation.
+func ExampleCredentialsCommand_logging() {
+	// sentinel credentials --profile prod --log-file /var/log/sentinel/decisions.log
+	// sentinel credentials --profile prod --log-stderr
+	// sentinel credentials --profile prod --log-file /var/log/sentinel/decisions.log --log-stderr
+	// Decision logs are JSON Lines format with user, profile, effect, and timestamp
+	fmt.Println("Decision logging: JSON Lines format to file or stderr")
+	// Output: Decision logging: JSON Lines format to file or stderr
+}
+
 func TestCredentialProcessOutputJSONMarshaling(t *testing.T) {
 	// Test that CredentialProcessOutput marshals with correct AWS field names
 	output := CredentialProcessOutput{
