@@ -1,4 +1,4 @@
-//go:build linux || darwin
+//go:build linux
 
 package sentinel
 
@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -18,10 +17,6 @@ import (
 // TestSecurityRegression_UnixSocket_ProcessAuthentication verifies that
 // only the process that received the token can use it.
 func TestSecurityRegression_UnixSocket_ProcessAuthentication(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("TODO: Unix socket peer credentials not fully implemented on macOS")
-	}
-
 	tmpDir, err := os.MkdirTemp("", "sentinel-unix-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)

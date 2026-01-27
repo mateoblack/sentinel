@@ -17,89 +17,6 @@ permissions:
 
 name: Build & Release
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            out: aws-vault-linux-amd64
-            cgo: "1"
-            cc: gcc
-            pkg: build-essential
-
-          - goos: linux
-            goarch: arm64
-            out: aws-vault-linux-arm64
-            cgo: "1"
-            cc: aarch64-linux-gnu-gcc
-            pkg: gcc-aarch64-linux-gnu
-
-          - goos: linux
-            goarch: ppc64le
-            out: aws-vault-linux-ppc64le
-            cgo: "1"
-            cc: powerpc64le-linux-gnu-gcc
-            pkg: gcc-powerpc64le-linux-gnu
-
-          - goos: freebsd
-            goarch: amd64
-            out: aws-vault-freebsd-amd64
-            cgo: "0"
-            cc: ""
-            pkg: ""
-
-          - goos: windows
-            goarch: amd64
-            out: aws-vault-windows-amd64.exe
-            cgo: "0"
-            cc: ""
-            pkg: ""
-
-          - goos: windows
-            goarch: arm64
-            out: aws-vault-windows-arm64.exe
-            cgo: "0"
-            cc: ""
-            pkg: ""
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # disable shallow clone - get all
-
-      #- name: Unshallow
-      #  run: git fetch --prune --unshallow
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 'stable'
-          #go-version-file: 'go.mod'
-          check-latest: true
-        id: go
-
-      - name: Install toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential ${{ matrix.pkg }}
-
-      - name: Build
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: ${{ matrix.cgo }}
-          CC: ${{ matrix.cc }}
-        run: |
-          make ${{ matrix.out }}
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.out }}
-          path: ${{ matrix.out }}
-
   # we can cross-compile on Linux
   #build-windows:
   #  if: startsWith(github.ref, 'refs/tags/x')
@@ -180,14 +97,11 @@ jobs:
 
   release:
     name: Release
-    needs: [build-linux, build-macos]
+    needs: [build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install UPX
-        run: sudo apt-get update && sudo apt-get install -y upx
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -195,13 +109,7 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # NOTE: Disabled for {windows-amd64} due Chocolately AV false positives
-      - name: Compress binaries with UPX
-        run: |
-          chmod +x dist/aws-vault-*
-          upx dist/aws-vault-linux*
-
-      - name: Generate SHA256 checksums
+      - name: Generate SHA256 checksums for macOS artifacts
         run: |
           cp dist/aws-vault-* .
           make aws-vault_sha256_checksums.txt

@@ -19,7 +19,7 @@ install: aws-vault
 	rm -f $(INSTALL_DIR)/aws-vault
 	cp -a ./aws-vault $(INSTALL_DIR)/aws-vault
 
-binaries: aws-vault-linux-amd64 aws-vault-linux-arm64 aws-vault-linux-ppc64le aws-vault-linux-arm7 aws-vault-darwin-amd64 aws-vault-darwin-arm64 aws-vault-windows-386.exe aws-vault-windows-arm64.exe aws-vault-freebsd-amd64
+binaries: aws-vault-darwin-amd64 aws-vault-darwin-arm64
 dmgs: aws-vault-darwin-amd64.dmg aws-vault-darwin-arm64.dmg
 
 clean:
@@ -69,18 +69,9 @@ release: binaries SHA256SUMS
 	@echo "\nTo create a new release run:\n\n    gh release create --title $(VERSION) $(VERSION) \
 	aws-vault-darwin-amd64.dmg \
 	aws-vault-darwin-arm64.dmg \
-	aws-vault-freebsd-amd64 \
-	aws-vault-linux-amd64 \
-	aws-vault-linux-arm64 \
-	aws-vault-linux-arm7 \
-	aws-vault-linux-ppc64le \
-	aws-vault-windows-386.exe \
-	aws-vault-windows-arm64.exe \
 	SHA256SUMS\n"
 
 	@echo "\nTo update homebrew-cask run:\n\n    brew bump-cask-pr --version $(shell echo $(VERSION) | sed 's/v\(.*\)/\1/') aws-vault\n"
-
-ubuntu-latest: aws-vault-linux-amd64 aws-vault-linux-arm64 aws-vault-linux-ppc64le aws-vault-windows-amd64.exe aws-vault-windows-arm64.exe aws-vault-freebsd-amd64
 
 macos-latest: aws-vault-darwin-amd64 aws-vault-darwin-arm64
 
@@ -89,34 +80,6 @@ aws-vault-darwin-amd64: $(SRC)
 
 aws-vault-darwin-arm64: $(SRC)
 	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 SDKROOT=$(shell xcrun --sdk macosx --show-sdk-path) go build $(BUILD_FLAGS) -o $@ .
-
-aws-vault-freebsd-amd64: $(SRC)
-	GOOS=freebsd GOARCH=amd64 go build $(BUILD_FLAGS) -o $@ .
-
-aws-vault-linux-amd64: $(SRC)
-	GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $@ .
-
-aws-vault-linux-arm64: $(SRC)
-	GOOS=linux GOARCH=arm64 go build $(BUILD_FLAGS) -o $@ .
-
-aws-vault-linux-ppc64le: $(SRC)
-	GOOS=linux GOARCH=ppc64le go build $(BUILD_FLAGS) -o $@ .
-
-aws-vault-linux-arm7: $(SRC)
-	GOOS=linux GOARCH=arm GOARM=7 go build $(BUILD_FLAGS) -o $@ .
-
-aws-vault-windows-386.exe: $(SRC)
-	GOOS=windows GOARCH=386 go build $(BUILD_FLAGS) -o $@ .
-
-aws-vault-windows-amd64.exe: $(SRC)
-	GOOS=windows GOARCH=amd64 go build $(BUILD_FLAGS) -o $@ .
-
-aws-vault-windows-arm64.exe: $(SRC)
-	GOOS=windows GOARCH=arm64 go build $(BUILD_FLAGS) -o $@ .
-
-# Lambda TVM binary (Linux amd64 for AWS Lambda)
-lambda-tvm-linux-amd64: $(SRC)
-	GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $@ ./cmd/lambda-tvm
 
 aws-vault-darwin-amd64.dmg: aws-vault-darwin-amd64
 	./bin/create-dmg aws-vault-darwin-amd64 $@
@@ -133,11 +96,4 @@ SHA256SUMS: binaries dmgs
 	shasum -a 256 \
 	  aws-vault-darwin-amd64.dmg \
 	  aws-vault-darwin-arm64.dmg \
-	  aws-vault-freebsd-amd64 \
-	  aws-vault-linux-amd64 \
-	  aws-vault-linux-arm64 \
-	  aws-vault-linux-arm7 \
-	  aws-vault-linux-ppc64le \
-	  aws-vault-windows-386.exe \
-	  aws-vault-windows-arm64.exe \
 	    > $@

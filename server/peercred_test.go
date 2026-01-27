@@ -1,4 +1,4 @@
-//go:build linux || darwin
+//go:build linux
 
 package server
 
@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
@@ -125,10 +124,6 @@ func TestPeerCredentials_String(t *testing.T) {
 }
 
 func TestGetPeerCredentials_VerifiesCurrentProcess(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("TODO: Unix socket peer credentials not fully implemented on macOS")
-	}
-
 	// This test verifies that we get our own process credentials when connecting
 	// to ourselves via Unix socket
 	tmpDir, err := os.MkdirTemp("", "peercred-self-test")
