@@ -3,136 +3,43 @@ package cli
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
-	"time"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/byteness/aws-vault/v7/breakglass"
 	"github.com/byteness/aws-vault/v7/device"
-	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
-	"github.com/byteness/aws-vault/v7/identity"
-	"github.com/byteness/aws-vault/v7/logging"
-	"github.com/byteness/aws-vault/v7/policy"
-	"github.com/byteness/aws-vault/v7/request"
-	"github.com/byteness/aws-vault/v7/sentinel"
-	"github.com/byteness/aws-vault/v7/session"
-	"github.com/byteness/aws-vault/v7/sso"
-	"github.com/byteness/aws-vault/v7/vault"
-)
-
-const (
-	// EnvSessionTable is the environment variable for default session table name.
-	EnvSessionTable = "SENTINEL_SESSION_TABLE"
 )
 
 // SentinelExecCommandInput contains the input for the sentinel exec command.
+// Note: Classic mode and CLI server mode have been removed in v2.1.
+// Only --remote-server (Lambda TVM) mode is supported.
 type SentinelExecCommandInput struct {
-	ProfileName      string
-	PolicyParameter  string // SSM parameter path, e.g., /sentinel/policies/default
-	Command          string
-	Args             []string
-	Region           string
-	AWSProfile       string // Optional AWS profile for credentials (SSO users)
-	NoSession        bool
-	SessionDuration  time.Duration
-	ServerDuration   time.Duration     // Duration for server mode sessions (0 = use default 15m)
-	RequestTable     string            // Optional: DynamoDB table for approved request checking
-	BreakGlassTable  string            // Optional: DynamoDB table for break-glass checking
-	LogFile          string            // Path to log file (empty = no file logging)
-	LogStderr        bool              // Log to stderr (default: false)
-	Store            request.Store     // Optional: for approved request checking (nil = no checking)
-	BreakGlassStore  breakglass.Store  // Optional: for break-glass checking (nil = no checking)
-	STSClient        identity.STSAPI   // Optional: for testing (nil = create from AWS config)
-	AutoLogin        bool              // Enable automatic SSO login on credential errors
-	UseStdout        bool              // Print SSO URL instead of opening browser (for --auto-login)
-	ConfigFile       *vault.ConfigFile // Optional: for auto-login SSO config lookup (nil = load from env)
-	StartServer      bool              // Run credential server instead of env var injection
-	ServerPort       int               // Port for server (0 = auto-assign)
-	Lazy             bool              // Lazily fetch credentials in server mode
-	SessionTableName string            // DynamoDB table for session tracking (optional)
-	RemoteServer     string            // Remote TVM URL for credential vending (uses AWS_CONTAINER_CREDENTIALS_FULL_URI)
-	UseUnixSocket    bool              // Use Unix domain socket for credential server (more secure)
-	UnixSocketPath   string            // Path for Unix domain socket (optional)
+	ProfileName  string   // AWS profile to request from TVM
+	Command      string   // Command to execute
+	Args         []string // Command arguments
+	Region       string   // AWS region (passed to subprocess environment)
+	RemoteServer string   // Remote TVM URL for credential vending (required)
 }
 
 // ConfigureSentinelExecCommand sets up the sentinel exec command with kingpin.
+// Note: Classic mode and CLI server mode have been removed in v2.1.
+// Only --remote-server (Lambda TVM) mode is supported.
 func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 	input := SentinelExecCommandInput{}
 
-	cmd := app.Command("exec", "Execute a command with policy-gated AWS credentials")
+	cmd := app.Command("exec", "Execute a command with policy-gated AWS credentials. Requires --remote-server (Lambda TVM).")
 
-	cmd.Flag("profile", "Name of the AWS profile").
+	cmd.Flag("profile", "Name of the AWS profile to request from TVM").
 		Required().
 		StringVar(&input.ProfileName)
 
-	cmd.Flag("policy-parameter", "SSM parameter path containing the policy (e.g., /sentinel/policies/default). Required unless --remote-server is set.").
-		StringVar(&input.PolicyParameter)
-
-	cmd.Flag("region", "The AWS region").
-		StringVar(&input.Region)
-
-	cmd.Flag("no-session", "Skip creating STS session with GetSessionToken").
-		Short('n').
-		BoolVar(&input.NoSession)
-
-	cmd.Flag("duration", "Duration of the temporary or assume-role session. Defaults to 1h").
-		Short('d').
-		DurationVar(&input.SessionDuration)
-
-	cmd.Flag("log-file", "Path to write decision logs (JSON Lines format)").
-		StringVar(&input.LogFile)
-
-	cmd.Flag("log-stderr", "Write decision logs to stderr").
-		BoolVar(&input.LogStderr)
-
-	cmd.Flag("auto-login", "Automatically trigger SSO login when credentials are expired or missing").
-		BoolVar(&input.AutoLogin)
-
-	cmd.Flag("stdout", "Print SSO URL instead of opening browser (used with --auto-login)").
-		BoolVar(&input.UseStdout)
-
-	cmd.Flag("server", "Run a credential server in the background for per-request policy evaluation (the SDK or app must support AWS_CONTAINER_CREDENTIALS_FULL_URI)").
-		Short('s').
-		BoolVar(&input.StartServer)
-
-	cmd.Flag("server-port", "Port for credential server (0 for auto-assign)").
-		Default("0").
-		IntVar(&input.ServerPort)
-
-	cmd.Flag("lazy", "When using --server, lazily fetch credentials").
-		BoolVar(&input.Lazy)
-
-	cmd.Flag("server-duration", "Session duration in server mode (default 15m for rapid revocation)").
-		DurationVar(&input.ServerDuration)
-
-	cmd.Flag("session-table", "DynamoDB table for session tracking (optional, server mode only)").
-		StringVar(&input.SessionTableName)
-
-	cmd.Flag("remote-server", "Remote TVM URL for credential vending (uses AWS_CONTAINER_CREDENTIALS_FULL_URI)").
+	cmd.Flag("remote-server", "Remote TVM URL for credential vending. Required for all credential operations.").
+		Required().
 		StringVar(&input.RemoteServer)
 
-	cmd.Flag("unix-socket", "Use Unix domain socket for credential server (more secure, Linux/macOS only). "+
-		"Enables process-based authentication to prevent credential theft from other local processes.").
-		BoolVar(&input.UseUnixSocket)
-
-	cmd.Flag("unix-socket-path", "Path for Unix domain socket (default: /tmp/sentinel-<pid>.sock). "+
-		"Only used with --unix-socket.").
-		StringVar(&input.UnixSocketPath)
-
-	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses --profile if not specified)").
-		StringVar(&input.AWSProfile)
-
-	cmd.Flag("request-table", "DynamoDB table for approved request checking (enables approval workflow)").
-		StringVar(&input.RequestTable)
-
-	cmd.Flag("breakglass-table", "DynamoDB table for break-glass checking (enables break-glass workflow)").
-		StringVar(&input.BreakGlassTable)
+	cmd.Flag("region", "The AWS region (passed to subprocess environment)").
+		StringVar(&input.Region)
 
 	cmd.Arg("cmd", "Command to execute, defaults to $SHELL").
 		StringVar(&input.Command)
@@ -141,10 +48,6 @@ func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 		StringsVar(&input.Args)
 
 	cmd.Action(func(c *kingpin.ParseContext) error {
-		// Validate --policy-parameter is required unless --remote-server is set
-		if input.PolicyParameter == "" && input.RemoteServer == "" {
-			return fmt.Errorf("--policy-parameter is required unless --remote-server is set")
-		}
 		exitcode, err := SentinelExecCommand(context.Background(), input, s)
 		app.FatalIfError(err, "exec")
 		if exitcode != 0 {
@@ -163,31 +66,25 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		return 0, fmt.Errorf("running in an existing sentinel subshell; 'exit' from the subshell or unset AWS_SENTINEL to force")
 	}
 
-	// 0.5. Validate profile exists in AWS config (skip for remote server mode - TVM has different profiles)
+	// 0.5. Require --remote-server - TVM is the only supported mode
 	if input.RemoteServer == "" {
-		if err := s.ValidateProfile(input.ProfileName); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			return 1, err
-		}
+		tvmErr := fmt.Errorf(`sentinel exec requires --remote-server <url>
+
+Classic mode has been removed in v2.1. Sentinel now requires server-side
+credential vending through Lambda TVM for verified security.
+
+To set up TVM:
+1. Deploy the Lambda TVM: sentinel tvm deploy --region us-east-1
+2. Configure your profile: sentinel config set tvm-url <url>
+3. Run: sentinel exec --remote-server <url> --profile %s -- <command>
+
+See: https://github.com/avishayil/sentinel/blob/main/docs/TVM_SETUP.md`, input.ProfileName)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", tvmErr)
+		return 1, tvmErr
 	}
 
-	// 0.7. Validate server mode flag combinations
-	if input.StartServer && input.NoSession {
-		return 0, fmt.Errorf("Can't use --server with --no-session")
-	}
-
-	// 0.7.1. Validate --remote-server flag combinations
-	if input.RemoteServer != "" {
-		if input.StartServer {
-			return 0, fmt.Errorf("Can't use --remote-server with --server (they are mutually exclusive modes)")
-		}
-		if input.PolicyParameter != "" {
-			return 0, fmt.Errorf("Can't use --remote-server with --policy-parameter (remote TVM has its own policy)")
-		}
-	}
-
-	// 0.7.2. Handle remote server mode - skip local policy evaluation and credential retrieval
-	if input.RemoteServer != "" {
+	// Handle remote TVM mode - the only supported credential vending path
+	{
 		// Remote TVM mode - credentials come from external TVM
 		// TVM handles policy evaluation, so skip local profile validation
 		// The profile parameter specifies which profile to request from TVM
@@ -235,399 +132,4 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 
 		return runSubProcess(command, input.Args, cmdEnv)
 	}
-
-	// 0.8. Apply SENTINEL_SESSION_TABLE env var if --session-table not provided and in server mode
-	if input.SessionTableName == "" && input.StartServer {
-		if envTable := os.Getenv(EnvSessionTable); envTable != "" {
-			input.SessionTableName = envTable
-			log.Printf("Using session table from %s: %s", EnvSessionTable, envTable)
-		}
-	}
-
-	// 0.6. Load AWS config file for auto-login SSO lookup (if needed)
-	configFile := input.ConfigFile
-	if input.AutoLogin && configFile == nil {
-		var loadErr error
-		configFile, loadErr = vault.LoadConfigFromEnv()
-		if loadErr != nil {
-			log.Printf("Warning: failed to load AWS config file for auto-login: %v", loadErr)
-			// Continue without auto-login capability
-		}
-	}
-
-	// 1. Create logger based on configuration
-	var logger logging.Logger
-	if input.LogFile != "" || input.LogStderr {
-		writers := []io.Writer{}
-		if input.LogStderr {
-			writers = append(writers, os.Stderr)
-		}
-		if input.LogFile != "" {
-			// Use LogFileMode (0640) for decision logs - may contain access decisions (SEC-03)
-			f, err := os.OpenFile(input.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, LogFileMode)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to open log file: %v\n", err)
-				return 1, err
-			}
-			defer f.Close()
-			writers = append(writers, f)
-		}
-		logger = logging.NewJSONLogger(io.MultiWriter(writers...))
-	}
-
-	// 2. Create AWS config for SSM and STS
-	// Use --aws-profile for credentials if specified, otherwise use --profile
-	credentialProfile := input.AWSProfile
-	if credentialProfile == "" {
-		credentialProfile = input.ProfileName
-	}
-	awsCfgOpts := []func(*config.LoadOptions) error{
-		config.WithSharedConfigProfile(credentialProfile),
-	}
-	if input.Region != "" {
-		awsCfgOpts = append(awsCfgOpts, config.WithRegion(input.Region))
-	}
-	awsCfg, err := config.LoadDefaultConfig(ctx, awsCfgOpts...)
-	if err != nil {
-		configErr := sentinelerrors.New(
-			sentinelerrors.ErrCodeConfigMissingCredentials,
-			fmt.Sprintf("Failed to load AWS config: %v", err),
-			sentinelerrors.GetSuggestion(sentinelerrors.ErrCodeConfigMissingCredentials),
-			err,
-		)
-		FormatErrorWithSuggestion(configErr)
-		return 1, configErr
-	}
-
-	// 3. Get AWS identity for policy evaluation (with optional auto-login retry)
-	stsClient := input.STSClient
-	if stsClient == nil {
-		stsClient = sts.NewFromConfig(awsCfg)
-	}
-
-	var username string
-	if input.AutoLogin && configFile != nil {
-		// Wrap identity retrieval with auto-login retry for SSO errors
-		autoConfig := sso.AutoLoginConfig{
-			ProfileName: input.ProfileName,
-			ConfigFile:  configFile,
-			Keyring:     nil, // Keyring managed by AWS SDK
-			UseStdout:   input.UseStdout,
-			Stderr:      os.Stderr,
-		}
-		username, err = sso.WithAutoLogin(ctx, autoConfig, func() (string, error) {
-			return identity.GetAWSUsername(ctx, stsClient)
-		})
-	} else {
-		username, err = identity.GetAWSUsername(ctx, stsClient)
-	}
-
-	if err != nil {
-		identityErr := sentinelerrors.New(
-			sentinelerrors.ErrCodeSTSError,
-			fmt.Sprintf("Failed to get AWS identity: %v", err),
-			"Ensure your AWS credentials are valid and have sts:GetCallerIdentity permission",
-			err,
-		)
-		FormatErrorWithSuggestion(identityErr)
-		return 1, identityErr
-	}
-
-	// 3.5. Create approval stores if configured (and not injected for testing)
-	if input.Store == nil && input.RequestTable != "" {
-		input.Store = request.NewDynamoDBStore(awsCfg, input.RequestTable)
-	}
-	if input.BreakGlassStore == nil && input.BreakGlassTable != "" {
-		input.BreakGlassStore = breakglass.NewDynamoDBStore(awsCfg, input.BreakGlassTable)
-	}
-
-	// 4. Create policy loader chain
-	loader := policy.NewLoader(awsCfg)
-	cachedLoader := policy.NewCachedLoader(loader, 5*time.Minute)
-
-	// 5. Load policy
-	loadedPolicy, err := cachedLoader.Load(ctx, input.PolicyParameter)
-	if err != nil {
-		FormatErrorWithSuggestion(err)
-		return 1, err
-	}
-
-	// 6. Build policy.Request
-	policyRequest := &policy.Request{
-		User:             username,
-		Profile:          input.ProfileName,
-		Time:             time.Now(),
-		Mode:             policy.ModeCLI, // CLI mode - one-time evaluation
-		SessionTableName: input.SessionTableName,
-	}
-
-	// 7. Evaluate policy
-	decision := policy.Evaluate(loadedPolicy, policyRequest)
-
-	// 7.5. Apply policy-specified session table if present (overrides CLI/env)
-	if decision.SessionTableName != "" && input.StartServer {
-		log.Printf("Using session table from policy: %s", decision.SessionTableName)
-		input.SessionTableName = decision.SessionTableName
-	}
-
-	// 8. Handle deny or require_approval decision - check for require_server mode first, then approved request or break-glass
-	var approvedReq *request.Request
-	var activeBreakGlass *breakglass.BreakGlassEvent
-	if decision.Effect == policy.EffectDeny || decision.Effect == policy.EffectRequireApproval {
-		// Check if denial is due to server mode or session tracking requirement - these cannot be bypassed
-		if decision.RequiresSessionTracking || decision.RequiresServerMode {
-			if logger != nil {
-				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
-				logger.LogDecision(entry)
-			}
-			var serverErr error
-			if decision.RequiresSessionTracking && decision.RequiresServerMode {
-				// Both server mode and session tracking required
-				serverErr = fmt.Errorf("policy requires server mode with session tracking for profile %q. Use: sentinel exec --server --session-table <table> --profile %s -- <cmd>", input.ProfileName, input.ProfileName)
-			} else if decision.RequiresSessionTracking {
-				// Only session tracking required (already in server mode)
-				serverErr = fmt.Errorf("policy requires session tracking for profile %q. Add --session-table <table> flag", input.ProfileName)
-			} else {
-				// Only server mode required
-				serverErr = fmt.Errorf("policy requires server mode for profile %q. Add --server flag", input.ProfileName)
-			}
-			FormatErrorWithSuggestion(serverErr)
-			return 1, serverErr
-		}
-
-		// Check for approved request before denying
-		if input.Store != nil {
-			var storeErr error
-			approvedReq, storeErr = request.FindApprovedRequest(ctx, input.Store, username, input.ProfileName)
-			if storeErr != nil {
-				// Log store error but don't fail - fall through to deny
-				log.Printf("Warning: failed to check approved requests: %v", storeErr)
-			}
-		}
-
-		// If no approved request, check for active break-glass
-		if approvedReq == nil && input.BreakGlassStore != nil {
-			var bgErr error
-			activeBreakGlass, bgErr = breakglass.FindActiveBreakGlass(ctx, input.BreakGlassStore, username, input.ProfileName)
-			if bgErr != nil {
-				log.Printf("Warning: failed to check break-glass: %v", bgErr)
-			}
-		}
-
-		if approvedReq == nil && activeBreakGlass == nil {
-			// No approved request and no active break-glass - proceed with deny
-			if logger != nil {
-				entry := logging.NewDecisionLogEntry(policyRequest, decision, input.PolicyParameter)
-				logger.LogDecision(entry)
-			}
-			// Create structured error with context
-			var matchedRule *sentinelerrors.PolicyRule
-			if decision.MatchedRule != "" {
-				matchedRule = &sentinelerrors.PolicyRule{
-					Name:        decision.MatchedRule,
-					Effect:      string(decision.Effect),
-					Description: decision.Reason,
-				}
-			}
-			policyErr := sentinelerrors.NewPolicyDeniedError(
-				username,
-				input.ProfileName,
-				matchedRule,
-				input.Store != nil,           // hasApprovalWorkflow
-				input.BreakGlassStore != nil, // hasBreakGlass
-			)
-			FormatErrorWithSuggestion(policyErr)
-			return 1, policyErr
-		}
-		// Approved request or active break-glass found - continue to credential issuance
-	}
-
-	// 8.5. Cap session duration to remaining break-glass time if applicable
-	sessionDuration := input.SessionDuration
-	if activeBreakGlass != nil {
-		remainingTime := breakglass.RemainingDuration(activeBreakGlass)
-		if sessionDuration == 0 || sessionDuration > remainingTime {
-			sessionDuration = remainingTime
-			log.Printf("Capping session duration to break-glass remaining time: %v", remainingTime)
-		}
-	}
-
-	// 8.6. Server mode: start SentinelServer for per-request policy evaluation
-	if input.StartServer {
-		// Determine server session duration: use explicit flag, or default to 15 minutes
-		serverSessionDuration := input.ServerDuration
-		if serverSessionDuration == 0 {
-			serverSessionDuration = sentinel.DefaultServerSessionDuration
-		}
-
-		// Create credential provider adapter that wraps Sentinel.GetCredentialsWithSourceIdentity
-		credProvider := &sentinelCredentialProviderAdapter{
-			sentinel:          s,
-			credentialProfile: credentialProfile, // Pass SSO credential profile
-		}
-
-		serverConfig := sentinel.SentinelServerConfig{
-			ProfileName:        input.ProfileName,
-			PolicyParameter:    input.PolicyParameter,
-			Region:             input.Region,
-			NoSession:          input.NoSession,
-			SessionDuration:    serverSessionDuration,
-			User:               username,
-			Logger:             logger,
-			Store:              input.Store,
-			BreakGlassStore:    input.BreakGlassStore,
-			PolicyLoader:       cachedLoader,
-			CredentialProvider: credProvider,
-			LazyLoad:           input.Lazy,
-		}
-
-		// Create session store if session table specified (optional, server mode only)
-		if input.SessionTableName != "" {
-			sessionStore := session.NewDynamoDBStore(awsCfg, input.SessionTableName)
-			serverConfig.SessionStore = sessionStore
-			log.Printf("Session tracking enabled: table=%s", input.SessionTableName)
-		}
-
-		var sentinelServer *sentinel.SentinelServer
-		var serverURL string
-
-		if input.UseUnixSocket {
-			// Unix socket mode with process authentication
-			serverConfig.UseUnixSocket = true
-			serverConfig.UnixSocketPath = input.UnixSocketPath
-
-			sentinelServer, err = sentinel.NewSentinelServerUnix(ctx, serverConfig)
-			if err != nil {
-				return 0, fmt.Errorf("Failed to start Unix credential server: %w", err)
-			}
-
-			// For Unix sockets, we pass the socket path instead of HTTP URL
-			serverURL = sentinelServer.UnixSocketPath()
-			log.Printf("Starting Sentinel Unix socket credential server at %s", serverURL)
-
-			go func() {
-				if err := sentinelServer.ServeUnix(); err != nil {
-					log.Fatalf("Unix credential server: %s", err.Error())
-				}
-			}()
-
-			defer sentinelServer.ShutdownUnix(ctx)
-		} else {
-			// TCP mode (existing behavior)
-			sentinelServer, err = sentinel.NewSentinelServer(ctx, serverConfig, "", input.ServerPort)
-			if err != nil {
-				return 0, fmt.Errorf("Failed to start credential server: %w", err)
-			}
-
-			serverURL = sentinelServer.BaseURL()
-			log.Printf("Starting Sentinel credential server at %s", serverURL)
-
-			go func() {
-				if err := sentinelServer.Serve(); err != http.ErrServerClosed {
-					log.Fatalf("credential server: %s", err.Error())
-				}
-			}()
-
-			defer sentinelServer.Shutdown(ctx)
-		}
-
-		// Default to shell if no command specified
-		command := input.Command
-		if command == "" {
-			command = getDefaultShell()
-		}
-
-		// Prepare subprocess environment
-		cmdEnv := createEnv(input.ProfileName, input.Region, "")
-
-		// Set environment for subprocess
-		if sentinelServer.IsUnixMode() {
-			// Unix socket mode uses different environment variable
-			// AWS SDKs don't directly support Unix sockets, so we use a wrapper
-			// For now, document that this mode requires SDK support
-			cmdEnv.Set("SENTINEL_UNIX_SOCKET", serverURL)
-			cmdEnv.Set("SENTINEL_AUTH_TOKEN", sentinelServer.AuthToken())
-		} else {
-			// TCP mode uses standard container credentials
-			cmdEnv.Set("AWS_CONTAINER_CREDENTIALS_FULL_URI", serverURL)
-			cmdEnv.Set("AWS_CONTAINER_AUTHORIZATION_TOKEN", sentinelServer.AuthToken())
-		}
-
-		// Prevent AWS SDK from reading config files - use container credentials only
-		// Without this, ~/.aws/config can override the container credentials URL
-		cmdEnv.Set("AWS_CONFIG_FILE", "/dev/null")
-		cmdEnv.Set("AWS_SHARED_CREDENTIALS_FILE", "/dev/null")
-
-		// Remove AWS_SENTINEL since credentials come from server, not env
-		// (don't set it - subprocess won't have the "subshell" indicator)
-
-		// Run subprocess (can't use exec syscall with server - need to keep server running)
-		return runSubProcess(command, input.Args, cmdEnv)
-	}
-
-	// 9. Classic mode has been removed - require --remote-server or --server
-	// If we reach here, neither --remote-server nor --server was specified
-	classicModeErr := fmt.Errorf(`sentinel exec requires --remote-server or --server
-
-Classic mode (direct credential injection) has been removed in v2.1.
-Sentinel now requires server-side credential vending for verified security.
-
-Options:
-1. Use Lambda TVM (recommended):
-   sentinel exec --remote-server <tvm-url> %s -- <command>
-
-2. Use local server mode:
-   sentinel exec --server %s -- <command>
-
-To deploy Lambda TVM:
-   sentinel tvm deploy --region us-east-1
-
-See: https://github.com/avishayil/sentinel/blob/main/docs/TVM_SETUP.md`, input.ProfileName, input.ProfileName)
-	fmt.Fprintf(os.Stderr, "Error: %v\n", classicModeErr)
-	return 1, classicModeErr
-}
-
-// sentinelCredentialProviderAdapter adapts Sentinel.GetCredentialsWithSourceIdentity
-// to the sentinel.CredentialProvider interface used by SentinelServer.
-type sentinelCredentialProviderAdapter struct {
-	sentinel          *Sentinel
-	credentialProfile string // SSO credential profile (from --aws-profile)
-}
-
-// GetCredentialsWithSourceIdentity implements sentinel.CredentialProvider.
-func (a *sentinelCredentialProviderAdapter) GetCredentialsWithSourceIdentity(ctx context.Context, req sentinel.CredentialRequest) (*sentinel.CredentialResult, error) {
-	// Use credentialProfile for credential retrieval if set, otherwise fall back to req.ProfileName.
-	// credentialProfile is the SSO source profile (--aws-profile), while req.ProfileName is the policy target.
-	profileForCredentials := a.credentialProfile
-	if profileForCredentials == "" {
-		profileForCredentials = req.ProfileName
-	}
-
-	// Convert sentinel.CredentialRequest to SentinelCredentialRequest
-	cliReq := SentinelCredentialRequest{
-		ProfileName:     profileForCredentials,
-		NoSession:       req.NoSession,
-		SessionDuration: req.SessionDuration,
-		Region:          req.Region,
-		User:            req.User,
-		RequestID:       req.RequestID,
-		ApprovalID:      req.ApprovalID,
-	}
-
-	// Call the CLI's credential retrieval
-	result, err := a.sentinel.GetCredentialsWithSourceIdentity(ctx, cliReq)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert SentinelCredentialResult to sentinel.CredentialResult
-	return &sentinel.CredentialResult{
-		AccessKeyID:     result.AccessKeyID,
-		SecretAccessKey: result.SecretAccessKey,
-		SessionToken:    result.SessionToken,
-		Expiration:      result.Expiration,
-		CanExpire:       result.CanExpire,
-		SourceIdentity:  result.SourceIdentity,
-		RoleARN:         result.RoleARN,
-	}, nil
 }

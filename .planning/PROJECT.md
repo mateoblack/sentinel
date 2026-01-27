@@ -170,6 +170,24 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - Authorization inside AWS resources — IAM/SCPs handle that
 - Daemon mode — CLI-first, no background process
 
+### Future Requirements
+
+**Long-term vision** — Features that align with Sentinel's mission but are deferred to later versions:
+
+**Observability & Analytics (v3.0+):**
+- Splunk-like querying interface for decision logs and audit trails
+- Pattern analysis dashboards to identify usage anomalies and access trends
+- Queryable audit trail with filtering by user, profile, time range, decision outcome
+- Visualization of credential usage patterns (who accessed what, when, why)
+
+**Threat Intelligence (v4.0+):**
+- IP reputation checking for credential requests
+- Geolocation anomaly detection (access from unexpected countries)
+- Blocklists for known compromised identities
+- Threat intel dashboard with security event correlation
+
+These features support "know not just what happened, but why" by enabling teams to analyze access patterns and detect anomalies. Deferred because core access control and enforcement must be solid first.
+
 ## Context
 
 Shipped v1.20 with complete CLI security tooling for policy validation, trust policy auditing, and self-service AWS account hardening. Added ~16,675 lines of Go with 7 new CLI commands for deployment validation, SCP deployment, DynamoDB hardening, SSM backup/restore, and CloudTrail monitoring.
@@ -459,4 +477,4 @@ v1.18 adds comprehensive security hardening:
 - 153 security regression tests across 13 packages with CI enforcement
 
 ---
-*Last updated: 2026-01-27 after v2.0 milestone initialization*
+*Last updated: 2026-01-27 after adding Future Requirements (observability and threat intel vision)*
