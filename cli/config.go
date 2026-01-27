@@ -452,9 +452,13 @@ func outputGenerateJSON(stdout *os.File, output *config.TemplateOutput) (int, er
 }
 
 // outputGenerateFiles writes templates to files in the specified directory.
+// Note: Config templates (policy.yaml, approval.yaml, etc.) use ConfigFileMode (0644) and
+// ConfigDirMode (0755) because they are configuration templates that may be shared with teams
+// and committed to version control. The actual secrets (credentials) are stored in the keyring,
+// not in these config files. This matches aws-cli behavior for ~/.aws/config.
 func outputGenerateFiles(stdout, stderr *os.File, dir string, output *config.TemplateOutput) (int, error) {
-	// Create directory if it doesn't exist
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// Create directory with standard config permissions (SEC-03)
+	if err := os.MkdirAll(dir, ConfigDirMode); err != nil {
 		fmt.Fprintf(stderr, "Error: failed to create directory %s: %v\n", dir, err)
 		return 1, err
 	}
@@ -475,7 +479,8 @@ func outputGenerateFiles(stdout, stderr *os.File, dir string, output *config.Tem
 			continue // Skip empty configs
 		}
 		path := dir + "/" + f.name
-		if err := os.WriteFile(path, []byte(f.content), 0644); err != nil {
+		// ConfigFileMode (0644) - config templates don't contain credentials (SEC-03)
+		if err := os.WriteFile(path, []byte(f.content), ConfigFileMode); err != nil {
 			fmt.Fprintf(stderr, "Error: failed to write %s: %v\n", path, err)
 			return 1, err
 		}
