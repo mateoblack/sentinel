@@ -197,7 +197,7 @@ func TestDynamoDBHardener_GetTableStatus_BothEnabled(t *testing.T) {
 				Table: &dbtypes.TableDescription{
 					TableName:                 aws.String("sentinel-requests"),
 					TableArn:                  aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/sentinel-requests"),
-					DeletionProtectionEnabled: true,
+					DeletionProtectionEnabled: aws.Bool(true),
 				},
 			}, nil
 		},
@@ -239,7 +239,7 @@ func TestDynamoDBHardener_GetTableStatus_BothDisabled(t *testing.T) {
 				Table: &dbtypes.TableDescription{
 					TableName:                 aws.String("sentinel-sessions"),
 					TableArn:                  aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/sentinel-sessions"),
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -278,7 +278,7 @@ func TestDynamoDBHardener_GetTableStatus_MixedState(t *testing.T) {
 				Table: &dbtypes.TableDescription{
 					TableName:                 aws.String("sentinel-breakglass"),
 					TableArn:                  aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/sentinel-breakglass"),
-					DeletionProtectionEnabled: true,
+					DeletionProtectionEnabled: aws.Bool(true),
 				},
 			}, nil
 		},
@@ -323,7 +323,7 @@ func TestDynamoDBHardener_HardenTable_BothProtections(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 aws.String("sentinel-requests"),
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -384,7 +384,7 @@ func TestDynamoDBHardener_HardenTable_AlreadyEnabled(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 aws.String("sentinel-requests"),
-					DeletionProtectionEnabled: true,
+					DeletionProtectionEnabled: aws.Bool(true),
 				},
 			}, nil
 		},
@@ -440,7 +440,7 @@ func TestDynamoDBHardener_HardenTable_PartialEnable(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 aws.String("sentinel-breakglass"),
-					DeletionProtectionEnabled: true, // Already enabled
+					DeletionProtectionEnabled: aws.Bool(true), // Already enabled
 				},
 			}, nil
 		},
@@ -496,7 +496,7 @@ func TestDynamoDBHardener_HardenTable_OnlyDeletionProtection(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 aws.String("sentinel-requests"),
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -558,10 +558,11 @@ func TestDynamoDBHardener_HardenTables_BatchOperation(t *testing.T) {
 	client := &mockDynamoDBHardenClient{
 		DescribeTableFunc: func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
 			tableName := *params.TableName
+			isEnabled := tableStatuses[tableName]
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: tableStatuses[tableName],
+					DeletionProtectionEnabled: &isEnabled,
 				},
 			}, nil
 		},
@@ -622,7 +623,7 @@ func TestDynamoDBHardener_HardenTables_PartialFailure(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -706,7 +707,7 @@ func TestDynamoDBHardener_HardenTable_UpdateTableError(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},

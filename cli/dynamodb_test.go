@@ -88,7 +88,7 @@ func TestDynamoDBHardenCommand_AutoDiscovery(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -161,7 +161,7 @@ func TestDynamoDBHardenCommand_ExplicitTables(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -229,7 +229,7 @@ func TestDynamoDBHardenCommand_ConfirmationPrompt(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -294,7 +294,7 @@ func TestDynamoDBHardenCommand_ForceBypassesConfirmation(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -355,7 +355,7 @@ func TestDynamoDBHardenCommand_NoPITR(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -416,7 +416,7 @@ func TestDynamoDBHardenCommand_JSONOutput(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -494,7 +494,7 @@ func TestDynamoDBHardenCommand_AllTablesAlreadyProtected(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: true, // Already enabled
+					DeletionProtectionEnabled: aws.Bool(true), // Already enabled
 				},
 			}, nil
 		},
@@ -553,7 +553,7 @@ func TestDynamoDBHardenCommand_PartialFailure(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},
@@ -707,7 +707,7 @@ func TestDynamoDBHardenCommand_CustomPrefix(t *testing.T) {
 				Table: &dbtypes.TableDescription{
 					TableName:                 params.TableName,
 					TableArn:                  aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/" + *params.TableName),
-					DeletionProtectionEnabled: false,
+					DeletionProtectionEnabled: aws.Bool(false),
 				},
 			}, nil
 		},

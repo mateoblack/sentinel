@@ -95,7 +95,7 @@ func TestAuditDynamoDBTables_DeletionProtectionEnabled(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: true,
+					DeletionProtectionEnabled: aws.Bool(true),
 				},
 			}, nil
 		},
@@ -129,7 +129,7 @@ func TestAuditDynamoDBTables_DeletionProtectionDisabled(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false, // Not protected
+					DeletionProtectionEnabled: aws.Bool(false), // Not protected
 				},
 			}, nil
 		},
@@ -171,7 +171,7 @@ func TestAuditDynamoDBTables_PITRDisabled(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: true,
+					DeletionProtectionEnabled: aws.Bool(true),
 				},
 			}, nil
 		},
@@ -232,7 +232,7 @@ func TestAuditDynamoDBTables_MultipleIssues(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false, // Issue 1
+					DeletionProtectionEnabled: aws.Bool(false), // Issue 1
 				},
 			}, nil
 		},

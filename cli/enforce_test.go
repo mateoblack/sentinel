@@ -20,7 +20,8 @@ import (
 
 // mockIAMClient implements iamAPI interface for testing.
 type mockIAMClient struct {
-	getRoleFunc func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error)
+	getRoleFunc   func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error)
+	listRolesFunc func(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error)
 }
 
 func (m *mockIAMClient) GetRole(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
@@ -28,6 +29,13 @@ func (m *mockIAMClient) GetRole(ctx context.Context, params *iam.GetRoleInput, o
 		return m.getRoleFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("GetRole not implemented")
+}
+
+func (m *mockIAMClient) ListRoles(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
+	if m.listRolesFunc != nil {
+		return m.listRolesFunc(ctx, params, optFns...)
+	}
+	return &iam.ListRolesOutput{Roles: []types.Role{}}, nil
 }
 
 // createEnforceTestFiles creates temp files for test I/O.

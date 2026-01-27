@@ -130,7 +130,7 @@ func TestDeployValidateCommand_HealthyDeployment(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: true,
+					DeletionProtectionEnabled: aws.Bool(true),
 				},
 			}, nil
 		},
@@ -205,7 +205,7 @@ func TestDeployValidateCommand_DynamoDBIssues(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: false, // Issue!
+					DeletionProtectionEnabled: aws.Bool(false), // Issue!
 				},
 			}, nil
 		},
@@ -270,7 +270,7 @@ func TestDeployValidateCommand_JSONOutput(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: true,
+					DeletionProtectionEnabled: aws.Bool(true),
 				},
 			}, nil
 		},
@@ -347,7 +347,7 @@ func TestDeployValidateCommand_MinRiskFilter(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: true,
+					DeletionProtectionEnabled: aws.Bool(true),
 				},
 			}, nil
 		},
@@ -439,7 +439,7 @@ func TestDeployValidateCommand_SCPMissing(t *testing.T) {
 			return &dynamodb.DescribeTableOutput{
 				Table: &ddbtypes.TableDescription{
 					TableName:                 params.TableName,
-					DeletionProtectionEnabled: true,
+					DeletionProtectionEnabled: aws.Bool(true),
 				},
 			}, nil
 		},

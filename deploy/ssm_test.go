@@ -682,7 +682,7 @@ func TestSSMHardener_RestoreParameters_FiltersByName(t *testing.T) {
 
 	hardener := NewSSMHardenerWithClient(client)
 	// Only restore production, not staging
-	result, err := hardener.RestoreParameters(ctx, tmpDir, []string{"/sentinel/policies/production"})
+	_, err = hardener.RestoreParameters(ctx, tmpDir, []string{"/sentinel/policies/production"})
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

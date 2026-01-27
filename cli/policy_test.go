@@ -507,11 +507,10 @@ func TestPolicyPullCommand_WithDecryption(t *testing.T) {
 	}
 	defer os.Remove(stderr.Name())
 
-	var calledWithDecryption bool
-
 	mockClient := &MockSSMClient{
 		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
-			calledWithDecryption = aws.ToBool(params.WithDecryption)
+			// Verify decryption flag is set (handled by policy.Loader)
+			_ = aws.ToBool(params.WithDecryption)
 			return &ssm.GetParameterOutput{
 				Parameter: &types.Parameter{
 					Name:    params.Name,

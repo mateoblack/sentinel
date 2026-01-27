@@ -111,7 +111,9 @@ func (h *DynamoDBHardener) GetTableStatus(ctx context.Context, tableName string)
 	}
 
 	if tableOutput.Table != nil {
-		status.DeletionProtection = tableOutput.Table.DeletionProtectionEnabled
+		if tableOutput.Table.DeletionProtectionEnabled != nil {
+			status.DeletionProtection = *tableOutput.Table.DeletionProtectionEnabled
+		}
 		if tableOutput.Table.TableArn != nil {
 			status.TableARN = *tableOutput.Table.TableArn
 		}

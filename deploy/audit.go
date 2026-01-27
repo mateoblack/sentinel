@@ -140,7 +140,7 @@ func (a *Auditor) AuditDynamoDBTables(ctx context.Context, tableNames []string) 
 		}
 
 		// DEPLOY-02: Check deletion protection
-		if tableOutput.Table != nil && !tableOutput.Table.DeletionProtectionEnabled {
+		if tableOutput.Table != nil && (tableOutput.Table.DeletionProtectionEnabled == nil || !*tableOutput.Table.DeletionProtectionEnabled) {
 			findings = append(findings, DeploymentFinding{
 				CheckID:     "DEPLOY-02",
 				Category:    "DynamoDB",
