@@ -256,7 +256,7 @@ Plans:
 **Plans:** TBD
 
 Plans:
-- [ ] 147-01: TBD
+- [x] 147-01: DynamoDB hardening implementation — completed 2026-01-27
 
 ### Phase 148: SSM Hardening
 
@@ -276,7 +276,7 @@ Plans:
 **Plans:** TBD
 
 Plans:
-- [ ] 148-01: SSM backup and restore commands — planned 2026-01-27
+- [x] 148-01: SSM backup and restore commands — completed 2026-01-27
 
 ### Phase 149: CloudTrail Monitoring
 
@@ -311,7 +311,7 @@ Phases execute in numeric order: 143 → 144 → 145 → 146 → 147 → 148 →
 | 145. Deployment Validation | 1/1 | Complete | 2026-01-27 |
 | 146. SCP Deployment | 1/1 | Complete | 2026-01-27 |
 | 147. DynamoDB Hardening | 1/1 | Complete | 2026-01-27 |
-| 148. SSM Hardening | 0/1 | Planned | - |
+| 148. SSM Hardening | 1/1 | Complete | 2026-01-27 |
 | 149. CloudTrail Monitoring | 0/TBD | Not started | - |
 
 ## Progress (All Milestones)
@@ -340,6 +340,6 @@ Phases execute in numeric order: 143 → 144 → 145 → 146 → 147 → 148 →
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
-| v1.20 CLI Security & Deployment Helpers | 143-149 | 4/TBD | 🚧 In progress | - |
+| v1.20 CLI Security & Deployment Helpers | 143-149 | 6/TBD | 🚧 In progress | - |
 
 **Totals:** 23 milestones (22 shipped, 1 in progress) - 145 phases shipped, 4 phases planned
