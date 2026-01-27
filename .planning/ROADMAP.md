@@ -276,7 +276,7 @@ Plans:
 **Plans:** TBD
 
 Plans:
-- [ ] 148-01: TBD
+- [ ] 148-01: SSM backup and restore commands — planned 2026-01-27
 
 ### Phase 149: CloudTrail Monitoring
 
@@ -310,8 +310,8 @@ Phases execute in numeric order: 143 → 144 → 145 → 146 → 147 → 148 →
 | 144. Trust Policy Validation | 1/1 | Complete | 2026-01-27 |
 | 145. Deployment Validation | 1/1 | Complete | 2026-01-27 |
 | 146. SCP Deployment | 1/1 | Complete | 2026-01-27 |
-| 147. DynamoDB Hardening | 0/TBD | Not started | - |
-| 148. SSM Hardening | 0/TBD | Not started | - |
+| 147. DynamoDB Hardening | 1/1 | Complete | 2026-01-27 |
+| 148. SSM Hardening | 0/1 | Planned | - |
 | 149. CloudTrail Monitoring | 0/TBD | Not started | - |
 
 ## Progress (All Milestones)
