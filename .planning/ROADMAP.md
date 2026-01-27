@@ -28,6 +28,8 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.17 Policy Developer Experience** — [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) (Phases 121-125, shipped 2026-01-26)
 - ✅ **v1.18 Critical Security Hardening** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phases 126-135, shipped 2026-01-26)
 - ✅ **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, shipped 2026-01-26)
+- 🚧 **v1.20 CLI Security & Deployment Helpers** (Phases 143-149, in progress)
+
 ## Completed Milestones
 
 <details>
@@ -152,391 +154,165 @@ See [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) for full details.
 
 None
 
+## 🚧 v1.20 CLI Security & Deployment Helpers (In Progress)
+
+**Milestone Goal:** Complete CLI feature set with policy validation, trust policy auditing, and self-service AWS account hardening helpers. Enable users to validate Sentinel configurations, detect security misconfigurations, and harden AWS infrastructure without manual processes.
+
+### Phase 143: Policy Linting
+
+**Goal:** Users can validate Sentinel policies for common errors before deployment
+
+**Depends on:** Phase 142 (v1.19 completion)
+
+**Requirements:** LINT-01, LINT-02, LINT-03, LINT-04, LINT-05
+
+**Success Criteria** (what must be TRUE):
+1. User can detect allow-before-deny conflicts where allow rules come before deny rules for same profile
+2. User can identify unreachable rules that cannot match due to earlier rules in evaluation order
+3. User can find overlapping time windows that create ambiguous policy behavior
+4. Linter outputs actionable warnings with rule line numbers and specific fix suggestions
+5. Linter exits with non-zero code when issues found for CI/CD integration
+
+**Plans:** TBD
+
+Plans:
+- [x] 143-01: Policy linting implementation — completed 2026-01-26
+
+### Phase 144: Trust Policy Validation
+
+**Goal:** Users can audit IAM role trust policies for Sentinel security violations
+
+**Depends on:** Phase 143
+
+**Requirements:** TRUST-01, TRUST-02, TRUST-03, TRUST-04, TRUST-05
+
+**Success Criteria** (what must be TRUE):
+1. User can check IAM role trust policies for overly broad principals like Principal root wildcard
+2. User can detect missing SourceIdentity conditions in trust policies for Sentinel-protected roles
+3. User can validate trust policies reference correct Sentinel patterns matching sentinel prefix
+4. Validator outputs security risk level per finding with HIGH MEDIUM LOW classification
+5. Validator supports batch checking multiple roles via glob patterns or prefix matching
+
+**Plans:** TBD
+
+Plans:
+- [x] 144-01: Trust policy validation — completed 2026-01-27
+
+### Phase 145: Deployment Validation
+
+**Goal:** Users can audit complete Sentinel deployment security posture
+
+**Depends on:** Phase 144
+
+**Requirements:** DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04, DEPLOY-05
+
+**Success Criteria** (what must be TRUE):
+1. User can audit SCP enforcement status across AWS organization for Sentinel policies
+2. User can check DynamoDB deletion protection status on all Sentinel tables
+3. User can check SSM parameter versioning status for all sentinel parameters
+4. User can check KMS key monitoring and alerting configuration for Sentinel keys
+5. Validator generates remediation report with specific sentinel commands to fix issues
+
+**Plans:** TBD
+
+Plans:
+- [ ] 145-01: TBD
+
+### Phase 146: SCP Deployment
+
+**Goal:** Users can deploy recommended SCPs to enforce Sentinel requirements
+
+**Depends on:** Phase 145
+
+**Requirements:** SCP-01, SCP-02, SCP-03, SCP-04, SCP-05
+
+**Success Criteria** (what must be TRUE):
+1. User can deploy recommended SCP to AWS management account with single command
+2. User can preview SCP policy document with dry-run flag before applying changes
+3. Deployed SCP enforces SourceIdentity requirement for AssumeRole on protected roles
+4. User can specify organizational unit scope for SCP application not just root
+5. SCP deployment validates IAM permissions before attempting changes to prevent partial failures
+
+**Plans:** TBD
+
+Plans:
+- [ ] 146-01: TBD
+
+### Phase 147: DynamoDB Hardening
+
+**Goal:** Users can enable deletion protection and PITR on Sentinel tables
+
+**Depends on:** Phase 146
+
+**Requirements:** DDB-01, DDB-02, DDB-03, DDB-04, DDB-05
+
+**Success Criteria** (what must be TRUE):
+1. User can enable deletion protection on all Sentinel tables with single command
+2. User can enable point-in-time recovery simultaneously with deletion protection
+3. User can list all Sentinel tables discovered automatically by prefix pattern
+4. Command reports current protection status before making changes for transparency
+5. User receives confirmation prompt before changes with force bypass option
+
+**Plans:** TBD
+
+Plans:
+- [ ] 147-01: TBD
+
+### Phase 148: SSM Hardening
+
+**Goal:** Users can enable versioning and create backups for Sentinel parameters
+
+**Depends on:** Phase 147
+
+**Requirements:** SSM-01, SSM-02, SSM-03, SSM-04, SSM-05
+
+**Success Criteria** (what must be TRUE):
+1. User can enable parameter versioning for all sentinel parameters with single command
+2. User can create backups of current parameter values to local directory
+3. User can restore parameters from backup when needed for disaster recovery
+4. Command discovers parameters automatically by sentinel prefix without manual input
+5. Command reports versioning status for each parameter before making changes
+
+**Plans:** TBD
+
+Plans:
+- [ ] 148-01: TBD
+
+### Phase 149: CloudTrail Monitoring
+
+**Goal:** Users can create CloudWatch alarms for Sentinel security events
+
+**Depends on:** Phase 148
+
+**Requirements:** MON-01, MON-02, MON-03, MON-04, MON-05, MON-06
+
+**Success Criteria** (what must be TRUE):
+1. User can create CloudWatch alarms for KMS key state changes like DisableKey or ScheduleKeyDeletion
+2. User can create alarms for DynamoDB DeleteTable events on Sentinel tables
+3. User can create alarms for SSM DeleteParameter events on sentinel parameters
+4. User can create alarms for unmanaged AssumeRole calls missing SourceIdentity
+5. User configures SNS topic for alarm notifications to security team
+6. Alarms include recommended threshold values with single occurrence triggering alert
+
+**Plans:** TBD
+
+Plans:
+- [ ] 149-01: TBD
+
 ## Progress
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1. Foundation | v1.0 | 2/2 | Complete | 2026-01-14 |
-| 2. Policy Schema | v1.0 | 2/2 | Complete | 2026-01-14 |
-| 3. Policy Loading | v1.0 | 2/2 | Complete | 2026-01-14 |
-| 4. Policy Evaluation | v1.0 | 2/2 | Complete | 2026-01-14 |
-| 5. Credential Process | v1.0 | 2/2 | Complete | 2026-01-14 |
-| 6. Decision Logging | v1.0 | 2/2 | Complete | 2026-01-14 |
-| 7. Exec Command | v1.0 | 2/2 | Complete | 2026-01-14 |
-| 8. Profile Compatibility | v1.0 | 2/2 | Complete | 2026-01-14 |
-
-<details>
-<summary>✅ v1.1 Sentinel Fingerprint (Phases 9-17) — SHIPPED 2026-01-15</summary>
-
-- [x] Phase 9: Source Identity Schema (1/1 plans) — completed 2026-01-14
-- [x] Phase 10: AssumeRole Provider (1/1 plans) — completed 2026-01-14
-- [x] Phase 11: Two-Hop Orchestration (1/1 plans) — completed 2026-01-14
-- [x] Phase 12: Credential Process Update (1/1 plans) — completed 2026-01-15
-- [x] Phase 13: Exec Command Update (1/1 plans) — completed 2026-01-15
-- [x] Phase 14: Enhanced Decision Logging (4/4 plans) — completed 2026-01-15
-- [x] Phase 15: CloudTrail Correlation (1/1 plans) — completed 2026-01-15
-- [x] Phase 16: Enforcement Patterns (1/1 plans) — completed 2026-01-15
-- [x] Phase 17: Integration Testing (1/1 plans) — completed 2026-01-15
-
-</details>
-
-<details>
-<summary>✅ v1.2 Approval Workflows (Phases 18-26) — SHIPPED 2026-01-15</summary>
-
-**Milestone Goal:** Add request/approve flow for sensitive access with DynamoDB state, notification hooks, and approval policies.
-
-#### Phase 18: Request Schema
-
-**Goal**: Define approval request data model, state machine, and validation
-**Depends on**: v1.1 complete
-**Research**: Unlikely (internal design, extends existing types)
-**Plans**: TBD
-
-Plans:
-- [x] 18-01: Request types with state machine and validation — completed 2026-01-15
-
-#### Phase 19: DynamoDB Backend
-
-**Goal**: Create request storage with TTL, indexes, and query patterns
-**Depends on**: Phase 18
-**Research**: Likely (new AWS service integration)
-**Research topics**: DynamoDB table design, GSI patterns, TTL, aws-sdk-go-v2 dynamodb
-**Plans**: 2
-
-Plans:
-- [x] 19-01: Store interface and DynamoDB CRUD operations — completed 2026-01-15
-- [x] 19-02: GSI query methods (ListByRequester, ListByStatus, ListByProfile) — completed 2026-01-15
-
-#### Phase 20: Request Command
-
-**Goal**: CLI command to submit access requests with profile/duration/justification
-**Depends on**: Phase 19
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 1
-
-Plans:
-- [x] 20-01: Request command with CLI configuration and tests — completed 2026-01-14
-
-#### Phase 21: List/Check Commands
-
-**Goal**: Commands to view pending requests and check own request status
-**Depends on**: Phase 20
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 2
-
-Plans:
-- [x] 21-01: List command with CLI configuration and tests — completed 2026-01-15
-- [x] 21-02: Check command with status lookup — completed 2026-01-15
-
-#### Phase 22: Approve/Deny Commands
-
-**Goal**: Approver actions with request validation and signature verification
-**Depends on**: Phase 21
-**Research**: Unlikely (extends existing CLI patterns)
-**Plans**: 1
-
-Plans:
-- [x] 22-01: Approve/deny commands with state transitions and tests — completed 2026-01-14
-
-#### Phase 23: Request Integration
-
-**Goal**: Wire approved requests into credential issuance flow
-**Depends on**: Phase 22
-**Research**: Unlikely (internal integration)
-**Plans**: 2
-
-Plans:
-- [x] 23-01: Request checker function with FindApprovedRequest — completed 2026-01-15
-- [x] 23-02: Credential issuance integration with Store field — completed 2026-01-15
-
-#### Phase 24: Notification Hooks
-
-**Goal**: Webhook/SNS integration for request lifecycle events
-**Depends on**: Phase 23
-**Research**: Likely (external service integration)
-**Research topics**: SNS publish API, webhook patterns, retry semantics
-**Plans**: 4
-
-Plans:
-- [x] 24-01: Notification types and Notifier interface — completed 2026-01-15
-- [x] 24-02: SNS notifier implementation — completed 2026-01-15
-- [x] 24-03: Webhook notifier implementation — completed 2026-01-15
-- [x] 24-04: NotifyStore wrapper and CLI integration — completed 2026-01-15
-
-#### Phase 25: Approval Policies
-
-**Goal**: Policy rules for auto-approve conditions and approval routing
-**Depends on**: Phase 24
-**Research**: Unlikely (extends existing policy schema)
-**Plans**: TBD
-
-Plans:
-- [x] 25-01: Approval policy schema — completed 2026-01-15
-- [x] 25-02: Approval policy validation — completed 2026-01-15
-- [x] 25-03: Approval policy matching — completed 2026-01-15
-
-#### Phase 26: Approval Audit Trail
-
-**Goal**: Enhanced logging for approval request lifecycle events
-**Depends on**: Phase 25
-**Research**: Unlikely (extends existing logging)
-**Plans**: 2
-
-Plans:
-- [x] 26-01: Approval audit trail logging infrastructure — completed 2026-01-15
-- [x] 26-02: CLI approval logging integration — completed 2026-01-15
-
-</details>
-
-<details>
-<summary>✅ v1.3 Break-Glass (Phases 27-34) — SHIPPED 2026-01-16</summary>
-
-- [x] Phase 27: Break-Glass Schema (1/1 plans) — completed 2026-01-15
-- [x] Phase 28: Break-Glass Command (2/2 plans) — completed 2026-01-15
-- [x] Phase 29: Elevated Audit (2/2 plans) — completed 2026-01-15
-- [x] Phase 30: Time-Bounded Sessions (2/2 plans) — completed 2026-01-15
-- [x] Phase 31: Notification Blast (2/2 plans) — completed 2026-01-15
-- [x] Phase 32: Post-Incident Review (2/2 plans) — completed 2026-01-15
-- [x] Phase 33: Rate Limiting (2/2 plans) — completed 2026-01-15
-- [x] Phase 34: Break-Glass Policies (2/2 plans) — completed 2026-01-16
-
-</details>
-
-<details>
-<summary>✅ v1.4 Sentinel Bootstrapping (Phases 35-42) — SHIPPED 2026-01-16</summary>
-
-- [x] Phase 35: Bootstrap Schema (1/1 plans) — completed 2026-01-16
-- [x] Phase 36: Bootstrap Planner (1/1 plans) — completed 2026-01-15
-- [x] Phase 37: SSM Parameter Creation (1/1 plans) — completed 2026-01-16
-- [x] Phase 38: Sample Policy Generation (1/1 plans) — completed 2026-01-16
-- [x] Phase 39: IAM Policy Generation (1/1 plans) — completed 2026-01-16
-- [x] Phase 40: Bootstrap Command (1/1 plans) — completed 2026-01-16
-- [x] Phase 41: Status Command (1/1 plans) — completed 2026-01-16
-- [x] Phase 42: Bootstrap Documentation (1/1 plans) — completed 2026-01-16
-
-</details>
-
-<details>
-<summary>✅ v1.5 Enforcement & Assurance (Phases 43-49) — SHIPPED 2026-01-16</summary>
-
-- [x] Phase 43: Enforcement Types (2/2 plans) — completed 2026-01-16
-- [x] Phase 44: Enforcement Advisor (1/1 plans) — completed 2026-01-16
-- [x] Phase 45: Trust Policy Templates (1/1 plans) — completed 2026-01-16
-- [x] Phase 46: CloudTrail Query Types (1/1 plans) — completed 2026-01-16
-- [x] Phase 47: Audit Verify Command (1/1 plans) — completed 2026-01-16
-- [x] Phase 48: Require Sentinel Mode (1/1 plans) — completed 2026-01-16
-- [x] Phase 49: Enforcement Documentation (1/1 plans) — completed 2026-01-16
-
-</details>
-
-<details>
-<summary>✅ v1.6 Testing & Hardening (Phases 50-59) — SHIPPED 2026-01-17</summary>
-
-**Milestone Goal:** Comprehensive test coverage and validation before production release (>80% coverage, security validation, performance benchmarks)
-
-#### Phase 50: Test Infrastructure Setup
-
-**Goal**: Set up coverage tooling and reusable test infrastructure
-**Depends on**: v1.5 complete
-**Research**: Unlikely (established Go testing patterns)
-**Plans**: 2 plans
-
-Plans:
-- [x] 50-01: Coverage tooling & baseline metrics — completed 2026-01-16
-- [x] 50-02: Mock framework & test helpers — completed 2026-01-16
-
-#### Phase 51: Policy Engine Testing
-
-**Goal**: Security-critical policy evaluation test coverage (>90%)
-**Depends on**: Phase 50
-**Research**: Unlikely (internal patterns)
-**Plans**: 3 plans
-
-Plans:
-- [x] 51-01: SSM loader tests — completed 2026-01-16
-- [x] 51-02: Policy authorization edge cases — completed 2026-01-17
-- [x] 51-03: Credential gating validation — completed 2026-01-17
-
-#### Phase 52: Break-Glass Security Testing
-
-**Goal**: Rate limiting, state machine, and audit trail security tests
-**Depends on**: Phase 51
-**Research**: Unlikely (internal patterns)
-**Plans**: 3 plans
-
-Plans:
-- [x] 52-01: Rate limiting logic tests — completed 2026-01-17
-- [x] 52-02: State machine security tests — completed 2026-01-17
-- [x] 52-03: Audit trail integrity tests — completed 2026-01-17
-
-#### Phase 53: Approval Workflow Testing
-
-**Goal**: Approval state machine and notification system tests
-**Depends on**: Phase 52
-**Research**: Unlikely (internal patterns)
-**Plans**: 2 plans
-
-Plans:
-- [x] 53-01: Approval state machine tests — completed 2026-01-17
-- [x] 53-02: Notification system tests — completed 2026-01-17
-
-#### Phase 54: SourceIdentity & Fingerprinting Tests
-
-**Goal**: Fingerprint generation and CloudTrail query tests (>90%)
-**Depends on**: Phase 53
-**Research**: Unlikely (internal patterns)
-**Plans**: 2 plans
-
-Plans:
-- [x] 54-01: Fingerprint generation tests — completed 2026-01-17
-- [x] 54-02: CloudTrail query tests — completed 2026-01-17
-
-#### Phase 55: Bootstrap & Deployment Testing
-
-**Goal**: Bootstrap planner and SSM integration tests
-**Depends on**: Phase 54
-**Research**: Unlikely (internal patterns)
-**Plans**: 2 plans
-
-Plans:
-- [x] 55-01: Bootstrap planner tests — completed 2026-01-17
-- [x] 55-02: SSM integration tests — completed 2026-01-17
-
-#### Phase 56: Integration Testing
-
-**Goal**: End-to-end credential flow and multi-service integration tests
-**Depends on**: Phase 55
-**Research**: Unlikely (internal patterns)
-**Plans**: 3 plans
-
-Plans:
-- [x] 56-01: End-to-end credential flow tests — completed 2026-01-17
-- [x] 56-02: Multi-service integration tests — completed 2026-01-17
-- [x] 56-03: CLI command integration tests — completed 2026-01-17
-
-#### Phase 57: Performance & Load Testing
-
-**Goal**: Performance benchmarks, concurrency testing, and load simulation
-**Depends on**: Phase 56
-**Research**: Unlikely (established patterns)
-**Plans**: 3 plans
-
-Plans:
-- [x] 57-01: Performance benchmarks — completed 2026-01-17
-- [x] 57-02: Concurrency testing — completed 2026-01-17
-- [x] 57-03: Load simulation — completed 2026-01-17
-
-#### Phase 58: Security Regression Suite
-
-**Goal**: Security test cases and threat model validation
-**Depends on**: Phase 57
-**Research**: Unlikely (internal patterns)
-**Plans**: 2 plans
-
-Plans:
-- [x] 58-01: Security test cases — completed 2026-01-17
-- [x] 58-02: Threat model validation — completed 2026-01-17
-
-#### Phase 59: Pre-Release Validation
-
-**Goal**: Coverage report, documentation validation, and release readiness
-**Depends on**: Phase 58
-**Research**: Unlikely (documentation review)
-**Plans**: 3 plans
-
-Plans:
-- [x] 59-01: Coverage report & gaps — completed 2026-01-17
-- [x] 59-02: Documentation validation — completed 2026-01-17
-- [x] 59-03: Pre-release checklist — completed 2026-01-17
-
-</details>
-
-<details>
-<summary>✅ v1.7 Permissions Discovery (Phases 60-68) — SHIPPED 2026-01-18</summary>
-
-- [x] Phase 60: Permissions Schema (1/1 plans) — completed 2026-01-18
-- [x] Phase 61: Permissions Command (1/1 plans) — completed 2026-01-18
-- [x] Phase 62: Feature Detection (1/1 plans) — completed 2026-01-18
-- [x] Phase 63: Permission Validation (1/1 plans) — completed 2026-01-18
-- [x] Phase 64: Guided Setup (1/1 plans) — completed 2026-01-18
-- [x] Phase 65: Error Enhancement (2/2 plans) — completed 2026-01-18
-- [x] Phase 66: Config Validation (1/1 plans) — completed 2026-01-18
-- [x] Phase 67: Quick Start Templates (1/1 plans) — completed 2026-01-18
-- [x] Phase 68: Onboarding Docs (1/1 plans) — completed 2026-01-18
-
-</details>
-
-<details>
-<summary>✅ v1.8 Credential Flow UX (Phases 73-75) — SHIPPED 2026-01-19</summary>
-
-**Milestone Goal:** Developer experience improvements for credential handling — automatic SSO profile resolution and login triggering.
-
-- [x] Phase 73: SSO Profile Resolution (1/1 plans) — completed 2026-01-19
-- [x] Phase 74: Auto SSO Login (2/2 plans) — completed 2026-01-19
-- [x] Phase 75: AWS Auth Error Enhancement (deferred to v1.9)
-
-</details>
-
-<details>
-<summary>✅ v1.9 SSO Profile Support (Phases 76-77) — SHIPPED 2026-01-19</summary>
-
-**Milestone Goal:** Fix systemic bug where --profile flag doesn't load SSO credentials, ensuring all Sentinel commands work seamlessly with SSO profiles like AWS CLI does.
-
-- [x] Phase 76: SSO Credential Loading (5/5 plans) — completed 2026-01-19
-- [x] Phase 77: Whoami Profile Flag (1/1 plan) — completed 2026-01-19
-
-</details>
-
-<details>
-<summary>✅ v1.10 Real-time Revocation (Phases 78-83) — SHIPPED 2026-01-20</summary>
-
-- [x] Phase 78: Server Infrastructure (2/2 plans) — completed 2026-01-19
-- [x] Phase 79: Server Policy Integration (2/2 plans) — completed 2026-01-20
-- [x] Phase 80: Short-Lived Sessions (1/1 plans) — completed 2026-01-20
-- [x] Phase 81: Session Management (4/4 plans) — completed 2026-01-20
-- [x] Phase 82: Server Mode Enforcement (3/3 plans) — completed 2026-01-20
-- [x] Phase 83: Server Mode Testing (3/3 plans) — completed 2026-01-20
-
-See [milestones/v1.10-ROADMAP.md](milestones/v1.10-ROADMAP.md) for full details.
-
-</details>
-
-<details>
-<summary>✅ v1.11 Shell Integration (Phases 84-87) — SHIPPED 2026-01-20</summary>
-
-- [x] Phase 84: Shell Init Command (1/1 plans) — completed 2026-01-20
-- [x] Phase 85: Server Mode Variants (1/1 plans) — completed 2026-01-20
-- [x] Phase 86: Shell Completions (1/1 plans) — completed 2026-01-20
-- [x] Phase 87: Documentation & Testing (1/1 plans) — completed 2026-01-20
-
-See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
-
-</details>
-
-<details>
-<summary>✅ v1.12 Infrastructure Provisioning (Phases 88-93) — SHIPPED 2026-01-22</summary>
-
-- [x] Phase 88: Approval Table Provisioning (3/3 plans + 1 fix plan) — completed 2026-01-22
-- [x] Phase 89: Breakglass Table Provisioning (2/2 plans) — completed 2026-01-22
-- [x] Phase 90: Session Table Provisioning (2/2 plans) — completed 2026-01-22
-- [x] Phase 91: Unified Bootstrap Extension (2/2 plans) — completed 2026-01-22
-- [x] Phase 92: Enhanced Init Status (2/2 plans) — completed 2026-01-22
-- [x] Phase 93: Documentation Validation (3/3 plans) — completed 2026-01-22
-
-See [milestones/v1.12-ROADMAP.md](milestones/v1.12-ROADMAP.md) for full details.
-
-</details>
-
-<details>
-<summary>✅ v1.13 Enforced Session Tracking (Phases 94-96) — SHIPPED 2026-01-24</summary>
-
-- [x] Phase 94: Policy Effect - require_server_session (3/3 plans) — completed 2026-01-24
-- [x] Phase 95: Default Session Table Configuration (4/4 plans) — completed 2026-01-24
-- [x] Phase 96: Session Tracking Audit & Compliance (3/3 plans) — completed 2026-01-24
-
-See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
-
-</details>
+**Execution Order:**
+Phases execute in numeric order: 143 → 144 → 145 → 146 → 147 → 148 → 149
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 143. Policy Linting | 1/1 | Complete | 2026-01-26 |
+| 144. Trust Policy Validation | 1/1 | Complete | 2026-01-27 |
+| 145. Deployment Validation | 0/TBD | Not started | - |
+| 146. SCP Deployment | 0/TBD | Not started | - |
+| 147. DynamoDB Hardening | 0/TBD | Not started | - |
+| 148. SSM Hardening | 0/TBD | Not started | - |
+| 149. CloudTrail Monitoring | 0/TBD | Not started | - |
 
 ## Progress (All Milestones)
 
@@ -564,5 +340,6 @@ See [milestones/v1.13-ROADMAP.md](milestones/v1.13-ROADMAP.md) for full details.
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
+| v1.20 CLI Security & Deployment Helpers | 143-149 | 2/TBD | 🚧 In progress | - |
 
-**Totals:** 23 milestones shipped (142 phases, 264 plans shipped)
+**Totals:** 23 milestones (22 shipped, 1 in progress) - 144 phases shipped, 5 phases planned
