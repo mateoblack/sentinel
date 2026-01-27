@@ -5,36 +5,36 @@
 See: .planning/PROJECT.md (updated 2026-01-26)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** Phase 148 - SSM Hardening COMPLETE
+**Current focus:** Phase 149 - CloudTrail Monitoring COMPLETE
 
 ## Current Position
 
-Phase: 148 of 149 (SSM Hardening)
-Plan: 1 of 1 in current phase
-Status: Phase 148 complete
-Last activity: 2026-01-27 — Completed 148-01-PLAN.md
+Phase: 149 of 149 (CloudTrail Monitoring)
+Plan: 1 of 1 (complete)
+Status: Milestone v1.20 complete
+Last activity: 2026-01-27 — Completed phase 149-01 CloudTrail monitoring
 
-Progress: [█████████████████████████████████████████████████████████████████████████████████████████████████████░░] 99.3%
+Progress: [████████████████████████████████████████████████████████████████████████████████████████████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 270 plans (through v1.20 phase 148)
-- Milestone v1.20: 6 plans completed, 7 phases planned
+- Total plans completed: 271 plans (through v1.20 phase 149)
+- Milestone v1.20: 7 plans completed, 7 phases complete
 - Recent milestones: v1.17 (5 plans), v1.18 (24 plans), v1.19 (7 plans)
 
 **By Recent Milestone:**
 
 | Milestone | Phases | Plans | Duration |
 |-----------|--------|-------|----------|
-| v1.20 | 143-149 (7) | 6 | In progress |
+| v1.20 | 143-149 (7) | 7 | Complete |
 | v1.19 | 136-142 (7) | 7 | 1 day |
 | v1.18 | 126-135 (10) | 24 | 1 day |
 | v1.17 | 121-125 (5) | 5 | 1 day |
 
 **Trend:** Stable — recent milestones completing in 1-2 days with high velocity
 
-*Updated after v1.20 phase 148 completion*
+*Updated after v1.20 phase 149 completion*
 
 ## Accumulated Context
 
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - v1.20: SSM backup creates local JSON files with version tracking
 - v1.20: SSM restore compares versions and skips unchanged parameters
 - v1.20: Exit codes for ssm backup/restore: 0=success, 1=failure, 2=user cancelled
+- v1.20: CloudTrail monitoring with single occurrence threshold for immediate alerting
+- v1.20: Metric filters for KMS, DynamoDB, SSM, and AssumeRole events
+- v1.20: Exit codes for monitoring setup: 0=success, 1=failure, 2=user cancelled
 
 ### Pending Todos
 
@@ -68,10 +71,10 @@ None.
 
 ### Blockers/Concerns
 
-None — Phase 149 ready to plan.
+None — Milestone v1.20 complete.
 
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed phase 148 SSM hardening - sentinel ssm backup/restore commands
-Resume file: .planning/phases/148-ssm-hardening/148-01-SUMMARY.md — ready for Phase 149 (CloudTrail Monitoring)
+Stopped at: Completed phase 149 CloudTrail monitoring
+Resume file: Milestone v1.20 complete — ready for /gsd:complete-milestone
