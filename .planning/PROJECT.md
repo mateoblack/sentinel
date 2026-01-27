@@ -154,7 +154,16 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ### Active
 
-No active requirements — v1.20 complete. Planning next milestone.
+**v2.0 Stable Release** — Production-ready release with comprehensive testing, security hardening, and documentation
+
+**Goal:** Stabilize Sentinel for production deployment by addressing security findings, achieving test coverage targets, and providing complete documentation.
+
+**Target capabilities:**
+- Fix all existing test failures and achieve coverage targets (security 80%, policy 90%, identity 85%)
+- Intune MDM provider implementation for device posture verification
+- Security hardening (encrypted backups, SCP templates instead of deployment, file permissions audit)
+- Comprehensive documentation (SECURITY.md, THREAT_MODEL.md, IAM/SCP templates, demo scripts)
+- Release preparation (CHANGELOG, version 2.0.0, release candidate)
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -450,4 +459,4 @@ v1.18 adds comprehensive security hardening:
 - 153 security regression tests across 13 packages with CI enforcement
 
 ---
-*Last updated: 2026-01-27 after v1.20 milestone*
+*Last updated: 2026-01-27 after v2.0 milestone initialization*

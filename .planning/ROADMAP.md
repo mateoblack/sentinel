@@ -29,6 +29,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.18 Critical Security Hardening** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phases 126-135, shipped 2026-01-26)
 - ✅ **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, shipped 2026-01-26)
 - ✅ **v1.20 CLI Security & Deployment Helpers** — [milestones/v1.20-ROADMAP.md](milestones/v1.20-ROADMAP.md) (Phases 143-149, shipped 2026-01-27)
+- 🚧 **v2.0 Stable Release** (Phases 150-155, in progress)
 
 ## Completed Milestones
 
@@ -150,10 +151,6 @@ See [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) for full details.
 
 </details>
 
-## Domain Expertise
-
-None
-
 <details>
 <summary>✅ v1.20 CLI Security & Deployment Helpers (Phases 143-149) — SHIPPED 2026-01-27</summary>
 
@@ -168,6 +165,103 @@ None
 See [milestones/v1.20-ROADMAP.md](milestones/v1.20-ROADMAP.md) for full details.
 
 </details>
+
+## Domain Expertise
+
+None
+
+## 🚧 v2.0 Stable Release (In Progress)
+
+**Milestone Goal:** Stabilize Sentinel for production deployment by addressing security findings, achieving test coverage targets, and providing complete documentation.
+
+### Phase 150: Test Stabilization
+**Goal**: All existing tests pass and coverage targets are met
+**Depends on**: Phase 149
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05
+**Success Criteria** (what must be TRUE):
+  1. All test failures in security, server, and request packages are resolved
+  2. Test coverage meets targets: security 80%, policy 90%, identity 85%
+  3. Race detector passes on full test suite with zero warnings
+  4. Security regression tests cover 100% of identified STRIDE findings
+  5. Integration tests exercise all CLI commands and verify expected behavior
+**Plans**: TBD
+
+Plans:
+- [ ] 150-01: TBD during planning
+
+### Phase 151: Intune MDM Provider
+**Goal**: Microsoft Intune device posture verification support
+**Depends on**: Phase 150
+**Requirements**: INTUNE-01, INTUNE-02, INTUNE-03, INTUNE-04, INTUNE-05
+**Success Criteria** (what must be TRUE):
+  1. Intune MDM provider implements the MDM Provider interface
+  2. OAuth2 authentication with Azure AD succeeds for Microsoft Graph API access
+  3. Device compliance status from Intune maps to MDMDeviceInfo fields
+  4. Rate limiting and pagination work correctly for Graph API queries
+  5. Integration tests validate mock Graph API responses
+**Plans**: TBD
+
+Plans:
+- [ ] 151-01: TBD during planning
+
+### Phase 152: Security Hardening
+**Goal**: Remove security risks and validate all security controls
+**Depends on**: Phase 151
+**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05
+**Success Criteria** (what must be TRUE):
+  1. SSM backup feature is either deprecated or encrypts backups with KMS
+  2. SCP deployment command is removed and replaced with template output
+  3. File permissions are audited and enforced (0700 for directories, 0600 for files)
+  4. Fuzz tests validate input handling for all CLI inputs against injection attacks
+  5. No unencrypted secrets are written to disk during any Sentinel operation
+**Plans**: TBD
+
+Plans:
+- [ ] 152-01: TBD during planning
+
+### Phase 153: Documentation
+**Goal**: Complete, accurate, and maintainable documentation
+**Depends on**: Phase 152
+**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, DOC-06, DOC-07
+**Success Criteria** (what must be TRUE):
+  1. Stale or outdated documentation is removed or updated
+  2. SECURITY.md contains v2.0 threat model and known risks
+  3. THREAT_MODEL.md references complete security analysis
+  4. README.md quick start guide accurately reflects v2.0 setup process
+  5. IAM policy templates are documented for all Sentinel features
+  6. SCP templates are provided as documentation (not CLI deployment)
+  7. All code examples in documentation have corresponding Example* tests
+**Plans**: TBD
+
+Plans:
+- [ ] 153-01: TBD during planning
+
+### Phase 154: Release Preparation
+**Goal**: v2.0.0 release candidate ready for production deployment
+**Depends on**: Phase 153
+**Requirements**: REL-01, REL-02, REL-03, REL-04
+**Success Criteria** (what must be TRUE):
+  1. CHANGELOG.md contains complete v2.0 release notes
+  2. Version constants are updated to 2.0.0 across all packages
+  3. Git history is clean with squashed fixup commits if needed
+  4. Release candidate tag v2.0.0-rc.1 is created and tested
+**Plans**: TBD
+
+Plans:
+- [ ] 154-01: TBD during planning
+
+### Phase 155: Internal Documentation
+**Goal**: Architecture documentation and demo materials for maintainers
+**Depends on**: Phase 154
+**Requirements**: INT-01, INT-02, INT-03
+**Success Criteria** (what must be TRUE):
+  1. Marshall document exists providing architecture overview
+  2. Demo script demonstrates common Sentinel workflows
+  3. Architecture diagram shows all components and their interactions
+**Plans**: TBD
+
+Plans:
+- [ ] 155-01: TBD during planning
 
 ## Progress (All Milestones)
 
@@ -196,5 +290,10 @@ See [milestones/v1.20-ROADMAP.md](milestones/v1.20-ROADMAP.md) for full details.
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
 | v1.20 CLI Security & Deployment Helpers | 143-149 | 7/7 | ✅ Complete | 2026-01-27 |
+| v2.0 Stable Release | 150-155 | 0/? | 🚧 In Progress | - |
 
-**Totals:** 23 milestones (23 shipped) - 149 phases complete
+**Totals:** 24 milestones (23 shipped, 1 in progress) - 149 phases complete, 6 phases planned
+
+---
+*Roadmap created: 2026-01-14*
+*Last updated: 2026-01-27 (v2.0 milestone added)*
