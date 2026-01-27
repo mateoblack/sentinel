@@ -5,7 +5,7 @@ All notable changes to Sentinel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2026-01-27
+## [1.21.0] - 2026-01-27
 
 ### Added
 
@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error wrapping pattern: fmt.Errorf %w for errors.Is() compatibility
 - Security sanitization strips control chars rather than rejecting
 
-**Milestone Summary:** v2.0 Stable Release stabilizes Sentinel for production deployment with comprehensive testing, Intune MDM support, security hardening, and complete documentation.
+**Milestone Summary:** v1.21.0 Stable Release stabilizes Sentinel for production deployment with comprehensive testing, Intune MDM support, security hardening, and complete documentation.
 
 ## [1.20.0] - 2026-01-27
 
