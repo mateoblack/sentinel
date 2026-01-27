@@ -220,10 +220,12 @@ Plans:
   5. IAM policy templates are documented for all Sentinel features
   6. SCP templates are provided as documentation (not CLI deployment)
   7. All code examples in documentation have corresponding Example* tests
-**Plans**: TBD
+**Status**: In progress
 
 Plans:
-- [ ] 153-01: TBD during planning
+- [ ] 153-01: Security and threat model documentation
+- [x] 153-02: README and Quick Start update (completed 2026-01-27)
+- [ ] 153-03: SCP reference documentation
 
 ### Phase 154: Release Preparation
 **Goal**: v2.0.0 release candidate ready for production deployment
