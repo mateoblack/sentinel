@@ -28,7 +28,7 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.17 Policy Developer Experience** — [milestones/v1.17-ROADMAP.md](milestones/v1.17-ROADMAP.md) (Phases 121-125, shipped 2026-01-26)
 - ✅ **v1.18 Critical Security Hardening** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phases 126-135, shipped 2026-01-26)
 - ✅ **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, shipped 2026-01-26)
-- 🚧 **v1.20 CLI Security & Deployment Helpers** (Phases 143-149, in progress)
+- ✅ **v1.20 CLI Security & Deployment Helpers** — [milestones/v1.20-ROADMAP.md](milestones/v1.20-ROADMAP.md) (Phases 143-149, shipped 2026-01-27)
 
 ## Completed Milestones
 
@@ -154,165 +154,20 @@ See [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) for full details.
 
 None
 
-## 🚧 v1.20 CLI Security & Deployment Helpers (In Progress)
+<details>
+<summary>✅ v1.20 CLI Security & Deployment Helpers (Phases 143-149) — SHIPPED 2026-01-27</summary>
 
-**Milestone Goal:** Complete CLI feature set with policy validation, trust policy auditing, and self-service AWS account hardening helpers. Enable users to validate Sentinel configurations, detect security misconfigurations, and harden AWS infrastructure without manual processes.
+- [x] Phase 143: Policy Linting (1/1 plans) — completed 2026-01-26
+- [x] Phase 144: Trust Policy Validation (1/1 plans) — completed 2026-01-27
+- [x] Phase 145: Deployment Validation (1/1 plans) — completed 2026-01-27
+- [x] Phase 146: SCP Deployment (1/1 plans) — completed 2026-01-27
+- [x] Phase 147: DynamoDB Hardening (1/1 plans) — completed 2026-01-27
+- [x] Phase 148: SSM Hardening (1/1 plans) — completed 2026-01-27
+- [x] Phase 149: CloudTrail Monitoring (1/1 plans) — completed 2026-01-27
 
-### Phase 143: Policy Linting
+See [milestones/v1.20-ROADMAP.md](milestones/v1.20-ROADMAP.md) for full details.
 
-**Goal:** Users can validate Sentinel policies for common errors before deployment
-
-**Depends on:** Phase 142 (v1.19 completion)
-
-**Requirements:** LINT-01, LINT-02, LINT-03, LINT-04, LINT-05
-
-**Success Criteria** (what must be TRUE):
-1. User can detect allow-before-deny conflicts where allow rules come before deny rules for same profile
-2. User can identify unreachable rules that cannot match due to earlier rules in evaluation order
-3. User can find overlapping time windows that create ambiguous policy behavior
-4. Linter outputs actionable warnings with rule line numbers and specific fix suggestions
-5. Linter exits with non-zero code when issues found for CI/CD integration
-
-**Plans:** TBD
-
-Plans:
-- [x] 143-01: Policy linting implementation — completed 2026-01-26
-
-### Phase 144: Trust Policy Validation
-
-**Goal:** Users can audit IAM role trust policies for Sentinel security violations
-
-**Depends on:** Phase 143
-
-**Requirements:** TRUST-01, TRUST-02, TRUST-03, TRUST-04, TRUST-05
-
-**Success Criteria** (what must be TRUE):
-1. User can check IAM role trust policies for overly broad principals like Principal root wildcard
-2. User can detect missing SourceIdentity conditions in trust policies for Sentinel-protected roles
-3. User can validate trust policies reference correct Sentinel patterns matching sentinel prefix
-4. Validator outputs security risk level per finding with HIGH MEDIUM LOW classification
-5. Validator supports batch checking multiple roles via glob patterns or prefix matching
-
-**Plans:** TBD
-
-Plans:
-- [x] 144-01: Trust policy validation — completed 2026-01-27
-
-### Phase 145: Deployment Validation
-
-**Goal:** Users can audit complete Sentinel deployment security posture
-
-**Depends on:** Phase 144
-
-**Requirements:** DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04, DEPLOY-05
-
-**Success Criteria** (what must be TRUE):
-1. User can audit SCP enforcement status across AWS organization for Sentinel policies
-2. User can check DynamoDB deletion protection status on all Sentinel tables
-3. User can check SSM parameter versioning status for all sentinel parameters
-4. User can check KMS key monitoring and alerting configuration for Sentinel keys
-5. Validator generates remediation report with specific sentinel commands to fix issues
-
-**Plans:** TBD
-
-Plans:
-- [x] 145-01: Deployment validation implementation — completed 2026-01-27
-
-### Phase 146: SCP Deployment
-
-**Goal:** Users can deploy recommended SCPs to enforce Sentinel requirements
-
-**Depends on:** Phase 145
-
-**Requirements:** SCP-01, SCP-02, SCP-03, SCP-04, SCP-05
-
-**Success Criteria** (what must be TRUE):
-1. User can deploy recommended SCP to AWS management account with single command
-2. User can preview SCP policy document with dry-run flag before applying changes
-3. Deployed SCP enforces SourceIdentity requirement for AssumeRole on protected roles
-4. User can specify organizational unit scope for SCP application not just root
-5. SCP deployment validates IAM permissions before attempting changes to prevent partial failures
-
-**Plans:** TBD
-
-Plans:
-- [x] 146-01: SCP deployment implementation — completed 2026-01-27
-
-### Phase 147: DynamoDB Hardening
-
-**Goal:** Users can enable deletion protection and PITR on Sentinel tables
-
-**Depends on:** Phase 146
-
-**Requirements:** DDB-01, DDB-02, DDB-03, DDB-04, DDB-05
-
-**Success Criteria** (what must be TRUE):
-1. User can enable deletion protection on all Sentinel tables with single command
-2. User can enable point-in-time recovery simultaneously with deletion protection
-3. User can list all Sentinel tables discovered automatically by prefix pattern
-4. Command reports current protection status before making changes for transparency
-5. User receives confirmation prompt before changes with force bypass option
-
-**Plans:** TBD
-
-Plans:
-- [x] 147-01: DynamoDB hardening implementation — completed 2026-01-27
-
-### Phase 148: SSM Hardening
-
-**Goal:** Users can enable versioning and create backups for Sentinel parameters
-
-**Depends on:** Phase 147
-
-**Requirements:** SSM-01, SSM-02, SSM-03, SSM-04, SSM-05
-
-**Success Criteria** (what must be TRUE):
-1. User can enable parameter versioning for all sentinel parameters with single command
-2. User can create backups of current parameter values to local directory
-3. User can restore parameters from backup when needed for disaster recovery
-4. Command discovers parameters automatically by sentinel prefix without manual input
-5. Command reports versioning status for each parameter before making changes
-
-**Plans:** TBD
-
-Plans:
-- [x] 148-01: SSM backup and restore commands — completed 2026-01-27
-
-### Phase 149: CloudTrail Monitoring
-
-**Goal:** Users can create CloudWatch alarms for Sentinel security events
-
-**Depends on:** Phase 148
-
-**Requirements:** MON-01, MON-02, MON-03, MON-04, MON-05, MON-06
-
-**Success Criteria** (what must be TRUE):
-1. User can create CloudWatch alarms for KMS key state changes like DisableKey or ScheduleKeyDeletion
-2. User can create alarms for DynamoDB DeleteTable events on Sentinel tables
-3. User can create alarms for SSM DeleteParameter events on sentinel parameters
-4. User can create alarms for unmanaged AssumeRole calls missing SourceIdentity
-5. User configures SNS topic for alarm notifications to security team
-6. Alarms include recommended threshold values with single occurrence triggering alert
-
-**Plans:** TBD
-
-Plans:
-- [ ] 149-01: TBD
-
-## Progress
-
-**Execution Order:**
-Phases execute in numeric order: 143 → 144 → 145 → 146 → 147 → 148 → 149
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 143. Policy Linting | 1/1 | Complete | 2026-01-26 |
-| 144. Trust Policy Validation | 1/1 | Complete | 2026-01-27 |
-| 145. Deployment Validation | 1/1 | Complete | 2026-01-27 |
-| 146. SCP Deployment | 1/1 | Complete | 2026-01-27 |
-| 147. DynamoDB Hardening | 1/1 | Complete | 2026-01-27 |
-| 148. SSM Hardening | 1/1 | Complete | 2026-01-27 |
-| 149. CloudTrail Monitoring | 0/TBD | Not started | - |
+</details>
 
 ## Progress (All Milestones)
 
@@ -340,6 +195,6 @@ Phases execute in numeric order: 143 → 144 → 145 → 146 → 147 → 148 →
 | v1.17 Policy Developer Experience | 121-125 | 5/5 | ✅ Complete | 2026-01-26 |
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
-| v1.20 CLI Security & Deployment Helpers | 143-149 | 6/TBD | 🚧 In progress | - |
+| v1.20 CLI Security & Deployment Helpers | 143-149 | 7/7 | ✅ Complete | 2026-01-27 |
 
-**Totals:** 23 milestones (22 shipped, 1 in progress) - 145 phases shipped, 4 phases planned
+**Totals:** 23 milestones (23 shipped) - 149 phases complete

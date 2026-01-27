@@ -144,21 +144,17 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 - ✓ Security hardening guide (SECURITY_HARDENING.md) for v1.16 features — v1.19 Phase 140
 - ✓ README feature tables updated through v1.18, example files for device posture and signing — v1.19 Phase 141
 - ✓ Deployment guide updated with KMS encryption and v1.17 policy commands — v1.19 Phase 142
+- ✓ Policy linting with allow-before-deny, unreachable-rules, overlapping-time-windows checks — v1.20 Phase 143
+- ✓ Trust policy validation with 5 security rules (TRUST-01 to TRUST-05) and risk classification — v1.20 Phase 144
+- ✓ Deployment validation auditing SCP, DynamoDB, SSM, KMS with remediation reports — v1.20 Phase 145
+- ✓ SCP deployment command with dry-run, OU targeting, and confirmation prompt — v1.20 Phase 146
+- ✓ DynamoDB hardening (deletion protection + PITR) with auto-discovery — v1.20 Phase 147
+- ✓ SSM backup and restore with version comparison and parameter discovery — v1.20 Phase 148
+- ✓ CloudTrail monitoring with CloudWatch alarms for 4 security event types — v1.20 Phase 149
 
 ### Active
 
-**v1.20 CLI Security & Deployment Helpers** — Complete CLI feature set before backend automation
-
-**Goal:** Provide policy validation, trust policy auditing, and self-service AWS account hardening helpers.
-
-**Target features:**
-- Policy linting (detect rule conflicts, unreachable rules, overlapping conditions)
-- Trust policy validation (overly broad principals, missing SourceIdentity)
-- Deployment validation (SCP/DynamoDB/SSM/KMS monitoring status audit)
-- SCP deployment helper (deploy recommended SCP to management account)
-- DynamoDB hardening (enable deletion protection + PITR)
-- SSM hardening (enable versioning, create backups)
-- CloudTrail monitoring (create alarms for security events)
+No active requirements — v1.20 complete. Planning next milestone.
 
 ### Out of Scope
 - User management — AWS SSO handles identity
@@ -167,8 +163,9 @@ Credentials are issued only when policy explicitly allows it — no credentials,
 
 ## Context
 
-Shipped v1.19 with complete documentation for all v1.13-v1.18 features. Added ~5,500 lines of documentation across 4 new guides (POLICY_SIGNING.md, DEVICE_POSTURE.md, SECURITY_HARDENING.md), updated commands.md, CHANGELOG.md, deployment.md, README.md, and Terraform modules.
-Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy, aws-lambda-go, API Gateway v2.
+Shipped v1.20 with complete CLI security tooling for policy validation, trust policy auditing, and self-service AWS account hardening. Added ~16,675 lines of Go with 7 new CLI commands for deployment validation, SCP deployment, DynamoDB hardening, SSM backup/restore, and CloudTrail monitoring.
+Tech stack: Go 1.25, aws-sdk-go-v2, aws-vault, kingpin CLI framework, DynamoDB, CloudTrail, IAM SimulatePrincipalPolicy, aws-lambda-go, API Gateway v2, CloudWatch, SNS.
+Total codebase: ~170,727 lines of Go across 23 shipped milestones (149 phases).
 
 Built on aws-vault, a battle-tested credential management CLI. The existing codebase provides:
 - Credential storage abstraction (keyring backends)
@@ -453,4 +450,4 @@ v1.18 adds comprehensive security hardening:
 - 153 security regression tests across 13 packages with CI enforcement
 
 ---
-*Last updated: 2026-01-26 after starting v1.20 milestone*
+*Last updated: 2026-01-27 after v1.20 milestone*

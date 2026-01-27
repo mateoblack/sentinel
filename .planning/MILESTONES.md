@@ -1,5 +1,32 @@
 # Project Milestones: Sentinel
 
+## v1.20 CLI Security & Deployment Helpers (Shipped: 2026-01-27)
+
+**Delivered:** Complete CLI feature set with policy validation, trust policy auditing, and self-service AWS account hardening helpers including policy linting, deployment validation, SCP deployment, DynamoDB/SSM hardening, and CloudTrail monitoring setup.
+
+**Phases completed:** 143-149 (7 plans total)
+
+**Key accomplishments:**
+- Policy linting with three checks (allow-before-deny, unreachable-rules, overlapping-time-windows) integrated into policy validate command
+- Trust policy validation with 5 security rules (TRUST-01 to TRUST-05) and risk classification (HIGH/MEDIUM/LOW)
+- Deployment validation auditing SCP, DynamoDB, SSM, and KMS with remediation report generation
+- SCP deployment command with dry-run preview, OU targeting, and confirmation prompt
+- DynamoDB hardening command enabling deletion protection and PITR on Sentinel tables
+- SSM backup and restore commands with parameter discovery and version comparison
+- CloudTrail monitoring setup creating CloudWatch alarms for 4 security event types
+
+**Stats:**
+- 7 plans completed across 7 phases
+- 49 files modified
+- +16,675 lines of Go
+- 1 day (2026-01-26 → 2026-01-27)
+
+**Git range:** `feat(143-01)` → `feat(149-01)`
+
+**What's next:** v1.20 completes the CLI security tooling roadmap. Consider v2.0 for web UI, multi-account federation, Kubernetes integration, or enhanced observability.
+
+---
+
 ## v1.19 Documentation & Completeness Audit (Shipped: 2026-01-26)
 
 **Delivered:** Complete documentation for v1.13-v1.18 features including policy signing, device posture, and security hardening guides. Closed all documentation gaps with CHANGELOG updates, command documentation, and deployment guide modernization.
