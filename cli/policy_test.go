@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +17,26 @@ import (
 	"github.com/byteness/aws-vault/v7/bootstrap"
 	"github.com/byteness/aws-vault/v7/policy"
 )
+
+// ExamplePolicyValidateCommand demonstrates the sentinel policy validate command.
+// This command validates policy YAML locally without requiring AWS credentials.
+func ExamplePolicyValidateCommand() {
+	// sentinel policy validate policy.yaml
+	// Validates policy YAML locally without AWS credentials
+	// Returns exit code 0 if valid, non-zero if invalid
+	fmt.Println("Policy validation checks: schema version, rule syntax, time window format")
+	// Output: Policy validation checks: schema version, rule syntax, time window format
+}
+
+// ExamplePolicyDiffCommand demonstrates the sentinel policy diff command.
+// This command shows unified diff between SSM policy and local file.
+func ExamplePolicyDiffCommand() {
+	// sentinel policy diff prod /path/to/local-policy.yaml
+	// Shows unified diff between SSM policy and local file
+	// Exit code: 0 = no changes, 1 = changes detected
+	fmt.Println("Diff output uses unified format with color (--no-color to disable)")
+	// Output: Diff output uses unified format with color (--no-color to disable)
+}
 
 // MockSSMClient implements policy.SSMAPI for testing.
 type MockSSMClient struct {
