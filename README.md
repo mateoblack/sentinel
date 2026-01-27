@@ -17,13 +17,41 @@ CloudTrail tells you Alice deleted the prod database at 2am. She's a senior dev 
 
 **[Read the full story &rarr;](docs/WHY.md)**
 
+## Installation
+
+### Via Go Install (Recommended)
+```bash
+go install github.com/byteness/aws-vault/v7/cmd/sentinel@latest
+```
+
+Make sure `~/go/bin` is in your PATH:
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+export PATH="$HOME/go/bin:$PATH"
+```
+
+### Via Homebrew (Coming Soon)
+```bash
+brew install byteness/tap/sentinel
+```
+
+### Manual Build
+```bash
+git clone https://github.com/mateoblack/sentinel
+cd sentinel
+go build -o sentinel .
+sudo mv sentinel /usr/local/bin/  # Or: cp sentinel ~/bin/
+```
+
+### Download Pre-built Binary
+Download from [Releases](https://github.com/mateoblack/sentinel/releases) and add to your PATH.
+
 ## Quick Start
 
-```bash
-# 1. Install
-go install github.com/byteness/aws-vault/v7/cmd/sentinel@latest
+**Prerequisites:** Install Sentinel (see [Installation](#installation) above)
 
-# 2. Create a policy (see docs/examples/policy-getting-started.yaml)
+```bash
+# 1. Create a policy (see docs/examples/policy-getting-started.yaml)
 cat > my-policy.yaml <<EOF
 version: "1"
 rules:
@@ -34,16 +62,16 @@ rules:
     reason: Development access
 EOF
 
-# 3. Validate your policy
+# 2. Validate your policy
 sentinel policy validate my-policy.yaml
 
-# 4. Push policy to AWS SSM (minimal setup, no DynamoDB tables)
+# 3. Push policy to AWS SSM (minimal setup, no DynamoDB tables)
 sentinel init bootstrap --aws-profile my-admin --profile dev
 
-# 5. Verify what governs you
+# 4. Verify what governs you
 sentinel policy pull dev --aws-profile my-admin
 
-# 6. Use it!
+# 5. Use it!
 sentinel exec --profile dev --policy-parameter /sentinel/policies/dev \
   -- aws sts get-caller-identity
 ```
