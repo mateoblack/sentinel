@@ -264,7 +264,8 @@ Plans:
   5. Clear error message when TVM endpoint not configured
 
 Plans:
-- [ ] 156-01: TBD during planning
+- [ ] 156-01: Remove classic mode and CLI server mode
+- [ ] 156-02: Documentation and migration guide
 
 ## Progress (All Milestones)
 
@@ -294,7 +295,7 @@ Plans:
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
 | v1.20 CLI Security & Deployment Helpers | 143-149 | 7/7 | ✅ Complete | 2026-01-27 |
 | v2.0 Stable Release | 150-155 | 14/14 | ✅ Complete | 2026-01-27 |
-| v2.1 TVM Only | 156 | 0/? | 🚧 In Progress | - |
+| v2.1 TVM Only | 156 | 0/2 | 🚧 In Progress | - |
 
 **Totals:** 25 milestones (24 shipped, 1 in progress) - 155 phases complete, 1 phase planned
 
