@@ -56,6 +56,7 @@ Recent decisions affecting v2.0 work:
 - v2.0/150-02: DynamoDB expression attribute names (#pk pattern) for reserved words
 - v2.0/150-02: Security sanitization strips control chars rather than rejecting
 - v2.0/150-02: 1password SDK requires CGO or vendor stub for builds
+- v2.0/150-03: Race detector requires CGO/gcc - use CI environment for race detection
 - v2.0/150-04: STRIDE coverage documentation pattern - meta-tests verify coverage mapping
 
 ### Pending Todos
