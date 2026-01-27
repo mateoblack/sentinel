@@ -497,8 +497,12 @@ func TestDynamoDBStore_ListByRequester_Success(t *testing.T) {
 	if *capturedInput.IndexName != GSIRequester {
 		t.Errorf("IndexName = %q, want %q", *capturedInput.IndexName, GSIRequester)
 	}
-	if *capturedInput.KeyConditionExpression != "requester = :v" {
-		t.Errorf("KeyConditionExpression = %q, want %q", *capturedInput.KeyConditionExpression, "requester = :v")
+	// Implementation uses expression attribute names to handle DynamoDB reserved words
+	if *capturedInput.KeyConditionExpression != "#pk = :v" {
+		t.Errorf("KeyConditionExpression = %q, want %q", *capturedInput.KeyConditionExpression, "#pk = :v")
+	}
+	if capturedInput.ExpressionAttributeNames["#pk"] != "requester" {
+		t.Errorf("ExpressionAttributeNames[#pk] = %q, want %q", capturedInput.ExpressionAttributeNames["#pk"], "requester")
 	}
 	if *capturedInput.ScanIndexForward != false {
 		t.Error("ScanIndexForward should be false for descending order")
@@ -575,8 +579,12 @@ func TestDynamoDBStore_ListByStatus_Pending(t *testing.T) {
 	if *capturedInput.IndexName != GSIStatus {
 		t.Errorf("IndexName = %q, want %q", *capturedInput.IndexName, GSIStatus)
 	}
-	if *capturedInput.KeyConditionExpression != "status = :v" {
-		t.Errorf("KeyConditionExpression = %q, want %q", *capturedInput.KeyConditionExpression, "status = :v")
+	// Implementation uses expression attribute names to handle DynamoDB reserved words like "status"
+	if *capturedInput.KeyConditionExpression != "#pk = :v" {
+		t.Errorf("KeyConditionExpression = %q, want %q", *capturedInput.KeyConditionExpression, "#pk = :v")
+	}
+	if capturedInput.ExpressionAttributeNames["#pk"] != "status" {
+		t.Errorf("ExpressionAttributeNames[#pk] = %q, want %q", capturedInput.ExpressionAttributeNames["#pk"], "status")
 	}
 	// Verify the status value in expression attributes
 	if v, ok := capturedInput.ExpressionAttributeValues[":v"].(*types.AttributeValueMemberS); !ok || v.Value != "pending" {
@@ -648,8 +656,12 @@ func TestDynamoDBStore_ListByProfile_Success(t *testing.T) {
 	if *capturedInput.IndexName != GSIProfile {
 		t.Errorf("IndexName = %q, want %q", *capturedInput.IndexName, GSIProfile)
 	}
-	if *capturedInput.KeyConditionExpression != "profile = :v" {
-		t.Errorf("KeyConditionExpression = %q, want %q", *capturedInput.KeyConditionExpression, "profile = :v")
+	// Implementation uses expression attribute names to handle DynamoDB reserved words
+	if *capturedInput.KeyConditionExpression != "#pk = :v" {
+		t.Errorf("KeyConditionExpression = %q, want %q", *capturedInput.KeyConditionExpression, "#pk = :v")
+	}
+	if capturedInput.ExpressionAttributeNames["#pk"] != "profile" {
+		t.Errorf("ExpressionAttributeNames[#pk] = %q, want %q", capturedInput.ExpressionAttributeNames["#pk"], "profile")
 	}
 
 	// Verify results
