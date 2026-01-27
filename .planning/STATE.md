@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 156 of 156 (Remove Classic Mode)
-Plan: 01 of ? in current phase (COMPLETE)
-Status: Plan 156-01 complete, ready for 156-02
-Last activity: 2026-01-27 — Plan 156-01 completed after checkpoint approval
+Plan: 2 of 2 in current phase (COMPLETE)
+Status: Phase 156 complete, v2.1 TVM Only milestone complete
+Last activity: 2026-01-27 — Plan 156-02 completed (documentation and migration guide)
 
-Progress: [█████████████████████████] 99% (155/156 phases complete, plan 01 done)
+Progress: [██████████████████████████] 100% (156/156 phases complete)
 
 ## Performance Metrics
 
@@ -75,10 +75,12 @@ Recent decisions affecting v2.0 work:
 - v2.0/153-01: Superseded LAMBDA_TVM_SCP.md with notice rather than removal
 - v2.1/156-01: ErrServerDeprecated pattern for deprecated functions with migration instructions
 - v2.1/156-01: t.Skip pattern for deprecated tests - preserves tests for gradual migration
+- v2.1/156-02: Migration guide format: Why Changed > What Changed > Migration Steps > FAQ
+- v2.1/156-02: SENTINEL_TVM_URL environment variable pattern for TVM URL configuration
 
 ### Pending Todos
 
-None yet (v2.1 milestone in progress).
+None (v2.1 milestone complete).
 
 ### Blockers/Concerns
 
@@ -87,9 +89,9 @@ None yet (v2.1 milestone in progress).
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Plan 156-01 complete, ready for 156-02
+Stopped at: Milestone v2.1 TVM Only complete
 Resume file: None
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-27 (156-01 complete)*
+*Last updated: 2026-01-27 (156-02 complete, v2.1 milestone complete)*

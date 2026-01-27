@@ -248,7 +248,7 @@ Plans:
 
 ---
 
-## 🚧 v2.1 TVM Only (In Progress)
+## v2.1 TVM Only (Shipped 2026-01-27)
 
 **Milestone Goal:** Remove classic mode entirely. Client-side device posture is fakeable. TVM/Lambda mode is server-verified. We don't ship fakeable security.
 
@@ -256,16 +256,11 @@ Plans:
 **Goal**: Eliminate all client-side-only credential paths
 **Depends on**: Phase 155
 **Requirements**: TVM-01
-**Success Criteria** (what must be TRUE):
-  1. Classic mode code paths removed from CLI
-  2. `exec` and `credentials` commands require TVM endpoint
-  3. Documentation updated to reflect TVM-only operation
-  4. Migration guide for users moving from classic to TVM mode
-  5. Clear error message when TVM endpoint not configured
+**Status**: Completed 2026-01-27
 
 Plans:
-- [ ] 156-01: Remove classic mode and CLI server mode
-- [ ] 156-02: Documentation and migration guide
+- [x] 156-01: Remove classic mode and CLI server mode
+- [x] 156-02: Documentation and migration guide
 
 ## Progress (All Milestones)
 
@@ -295,10 +290,10 @@ Plans:
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
 | v1.20 CLI Security & Deployment Helpers | 143-149 | 7/7 | ✅ Complete | 2026-01-27 |
 | v2.0 Stable Release | 150-155 | 14/14 | ✅ Complete | 2026-01-27 |
-| v2.1 TVM Only | 156 | 0/2 | 🚧 In Progress | - |
+| v2.1 TVM Only | 156 | 2/2 | ✅ Complete | 2026-01-27 |
 
-**Totals:** 25 milestones (24 shipped, 1 in progress) - 155 phases complete, 1 phase planned
+**Totals:** 25 milestones (25 shipped) - 156 phases complete
 
 ---
 *Roadmap created: 2026-01-14*
-*Last updated: 2026-01-27 (v2.0 shipped, v2.1 TVM Only started)*
+*Last updated: 2026-01-27 (v2.1 TVM Only shipped)*
