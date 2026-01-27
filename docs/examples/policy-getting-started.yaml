@@ -1,0 +1,35 @@
+# Getting Started - Simple Sentinel Policy
+# This is a minimal policy for your first setup
+version: "1"
+rules:
+  # Allow access to dev profile (no restrictions)
+  - name: dev-access
+    effect: allow
+    conditions:
+      profiles: [dev]
+    reason: Development environment access
+
+  # Staging requires approval from a manager
+  - name: staging-needs-approval
+    effect: require-approval
+    conditions:
+      profiles: [staging]
+      approvers: [manager@company.com]
+    reason: Staging access with manager approval
+
+  # Production access only during business hours
+  - name: prod-business-hours
+    effect: allow
+    conditions:
+      profiles: [production]
+      time:
+        - days: [Mon, Tue, Wed, Thu, Fri]
+          start: "09:00"
+          end: "17:00"
+    reason: Production access during business hours
+
+  # Default deny (explicit)
+  - name: default-deny
+    effect: deny
+    conditions: {}
+    reason: Access not explicitly allowed

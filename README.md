@@ -20,21 +20,41 @@ CloudTrail tells you Alice deleted the prod database at 2am. She's a senior dev 
 ## Quick Start
 
 ```bash
-# Install
+# 1. Install
 go install github.com/byteness/aws-vault/v7/cmd/sentinel@latest
 
-# Bootstrap policy in SSM
-sentinel init bootstrap --aws-profile dev --profile dev --plan
-sentinel init bootstrap --aws-profile dev --profile dev
+# 2. Create a policy (see docs/examples/policy-getting-started.yaml)
+cat > my-policy.yaml <<EOF
+version: "1"
+rules:
+  - name: dev-access
+    effect: allow
+    conditions:
+      profiles: [dev]
+    reason: Development access
+EOF
 
-# Use it
+# 3. Validate your policy
+sentinel policy validate my-policy.yaml
+
+# 4. Push policy to AWS SSM (minimal setup, no DynamoDB tables)
+sentinel init bootstrap --aws-profile my-admin --profile dev
+
+# 5. Verify what governs you
+sentinel policy pull dev --aws-profile my-admin
+
+# 6. Use it!
 sentinel exec --profile dev --policy-parameter /sentinel/policies/dev \
   -- aws sts get-caller-identity
-
-# Or with server mode (real-time revocation)
-sentinel exec --server --profile dev --policy-parameter /sentinel/policies/dev \
-  -- terraform apply
 ```
+
+**Want more features?** Add them progressively:
+- `--with-approvals` → Enable request/approval workflow
+- `--with-sessions` → Enable real-time session revocation
+- `--with-breakglass` → Enable emergency access tracking
+- `--with-all` → Enable all features
+
+See [docs/examples/](docs/examples/) for policy examples.
 
 ## How It Works
 
