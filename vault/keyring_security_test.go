@@ -48,6 +48,20 @@ func (m *mockKeyringCapture) Keys() ([]string, error) {
 	return m.keys, nil
 }
 
+func (m *mockKeyringCapture) GetMetadata(key string) (keyring.Metadata, error) {
+	if m.items != nil {
+		if item, ok := m.items[key]; ok {
+			// Metadata embeds *Item with empty Data, plus ModificationTime
+			itemCopy := item
+			itemCopy.Data = nil // Metadata should not include the secret data
+			return keyring.Metadata{
+				Item: &itemCopy,
+			}, nil
+		}
+	}
+	return keyring.Metadata{}, keyring.ErrKeyNotFound
+}
+
 // TestSecurityRegression_CredentialKeyring_NotTrustApplication verifies that
 // credential storage prevents other applications from being trusted.
 // THREAT: Malicious applications could be added to keychain ACL to steal credentials

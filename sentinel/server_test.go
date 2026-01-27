@@ -1377,6 +1377,10 @@ func (m *MockSessionStore) ListByProfile(ctx context.Context, profile string, li
 	return nil, nil
 }
 
+func (m *MockSessionStore) ListByDeviceID(ctx context.Context, deviceID string, limit int) ([]*session.ServerSession, error) {
+	return nil, nil
+}
+
 func (m *MockSessionStore) FindActiveByServerInstance(ctx context.Context, serverInstanceID string) (*session.ServerSession, error) {
 	return nil, nil
 }
