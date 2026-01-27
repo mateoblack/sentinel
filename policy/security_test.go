@@ -106,8 +106,10 @@ rules:
 // SECURITY: An attacker might try to replace a restrictive policy with a
 // permissive one from another environment. The signature check must prevent this.
 func TestSecurity_PolicySwapAttackRejected(t *testing.T) {
-	// Production policy (restrictive)
-	prodPolicy := []byte(`version: "1"
+	// Production policy (restrictive) - declared for documentation
+	// to show the contrast with devPolicy. Not used directly in test
+	// as the swap attack replaces prod with dev.
+	_ = []byte(`version: "1"
 rules:
   - name: prod-access
     effect: allow

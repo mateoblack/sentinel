@@ -11,8 +11,8 @@ import (
 	"github.com/byteness/aws-vault/v7/testutil"
 )
 
-// mockRawLoader is a mock implementation of RawPolicyLoader for testing.
-type mockRawLoader struct {
+// testRawLoader is a mock implementation of RawPolicyLoader for testing.
+type testRawLoader struct {
 	// Data maps parameter names to their content.
 	Data map[string][]byte
 	// Errors maps parameter names to errors to return.
@@ -22,7 +22,7 @@ type mockRawLoader struct {
 }
 
 // LoadRaw implements RawPolicyLoader.
-func (m *mockRawLoader) LoadRaw(ctx context.Context, parameterName string) ([]byte, error) {
+func (m *testRawLoader) LoadRaw(ctx context.Context, parameterName string) ([]byte, error) {
 	m.Calls = append(m.Calls, parameterName)
 
 	if m.Errors != nil {
@@ -64,13 +64,13 @@ rules:
 	}
 	sigJSON, _ := json.Marshal(sigEnvelope)
 
-	policyLoader := &mockRawLoader{
+	policyLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/policies/prod": policyYAML,
 		},
 	}
 
-	sigLoader := &mockRawLoader{
+	sigLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/signatures/prod": sigJSON,
 		},
@@ -129,13 +129,13 @@ rules:
 	}
 	sigJSON, _ := json.Marshal(sigEnvelope)
 
-	policyLoader := &mockRawLoader{
+	policyLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/policies/prod": policyYAML,
 		},
 	}
 
-	sigLoader := &mockRawLoader{
+	sigLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/signatures/prod": sigJSON,
 		},
@@ -171,14 +171,14 @@ rules:
         - "*"
 `)
 
-	policyLoader := &mockRawLoader{
+	policyLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/policies/prod": policyYAML,
 		},
 	}
 
 	// Signature loader returns not found
-	sigLoader := &mockRawLoader{
+	sigLoader := &testRawLoader{
 		Errors: map[string]error{
 			"/sentinel/signatures/prod": errors.New("/sentinel/signatures/prod: " + policy.ErrPolicyNotFound.Error()),
 		},
@@ -213,14 +213,14 @@ rules:
         - "*"
 `)
 
-	policyLoader := &mockRawLoader{
+	policyLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/policies/prod": policyYAML,
 		},
 	}
 
 	// Signature loader returns not found
-	sigLoader := &mockRawLoader{
+	sigLoader := &testRawLoader{
 		Errors: map[string]error{
 			"/sentinel/signatures/prod": errors.New("/sentinel/signatures/prod: " + policy.ErrPolicyNotFound.Error()),
 		},
@@ -244,13 +244,13 @@ rules:
 
 func TestVerifyingLoader_Load_PolicyNotFound(t *testing.T) {
 	// Policy loader returns not found
-	policyLoader := &mockRawLoader{
+	policyLoader := &testRawLoader{
 		Errors: map[string]error{
 			"/sentinel/policies/prod": errors.New("/sentinel/policies/prod: " + policy.ErrPolicyNotFound.Error()),
 		},
 	}
 
-	sigLoader := &mockRawLoader{}
+	sigLoader := &testRawLoader{}
 	mockKMS := &testutil.MockKMSClient{}
 	signer := policy.NewPolicySignerWithClient(mockKMS, "test-key-id")
 
@@ -287,13 +287,13 @@ rules:
 	}
 	sigJSON, _ := json.Marshal(sigEnvelope)
 
-	policyLoader := &mockRawLoader{
+	policyLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/policies/prod": policyYAML,
 		},
 	}
 
-	sigLoader := &mockRawLoader{
+	sigLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/signatures/prod": sigJSON,
 		},
@@ -331,14 +331,14 @@ rules:
         - "*"
 `)
 
-	policyLoader := &mockRawLoader{
+	policyLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/policies/prod": policyYAML,
 		},
 	}
 
 	// Invalid JSON in signature
-	sigLoader := &mockRawLoader{
+	sigLoader := &testRawLoader{
 		Data: map[string][]byte{
 			"/sentinel/signatures/prod": []byte("not valid json"),
 		},
@@ -412,13 +412,13 @@ rules:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			policyLoader := &mockRawLoader{
+			policyLoader := &testRawLoader{
 				Data: map[string][]byte{
 					"/sentinel/policies/test": policyYAML,
 				},
 			}
 
-			sigLoader := &mockRawLoader{}
+			sigLoader := &testRawLoader{}
 			if tt.hasSig {
 				sigLoader.Data = map[string][]byte{
 					"/sentinel/signatures/test": sigJSON,

@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/aws/smithy-go"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/testutil"
 )
@@ -83,7 +84,7 @@ func TestPolicySigner_Sign_KMSError(t *testing.T) {
 		},
 		{
 			name:    "access denied",
-			kmsErr:  &types.AccessDeniedException{Message: aws.String("access denied")},
+			kmsErr:  &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "access denied"},
 			wantErr: "access denied",
 		},
 		{
@@ -205,7 +206,7 @@ func TestPolicySigner_Verify_Invalid(t *testing.T) {
 			signer := policy.NewPolicySignerWithClient(mock, "test-key-id")
 			valid, err := signer.Verify(context.Background(), tt.policyYAML, tt.signature)
 			if err != nil {
-				t.Fatalf("unexpected error: %v (invalid signature should return false, nil)")
+				t.Fatalf("unexpected error: %v (invalid signature should return false, nil)", err)
 			}
 			if valid {
 				t.Error("expected valid=false, got true")
@@ -247,7 +248,7 @@ func TestPolicySigner_Verify_KMSError(t *testing.T) {
 		},
 		{
 			name:    "access denied",
-			kmsErr:  &types.AccessDeniedException{Message: aws.String("access denied")},
+			kmsErr:  &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "access denied"},
 			wantErr: "access denied",
 		},
 		{
