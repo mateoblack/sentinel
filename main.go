@@ -8,7 +8,7 @@ import (
 )
 
 // Version is provided at compile time
-var Version = "dev"
+var Version = "2.0.0"
 
 func main() {
 	app := kingpin.New("aws-vault", "A vault for securely storing and accessing AWS credentials in development environments.")
