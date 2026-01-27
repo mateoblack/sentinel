@@ -28,13 +28,13 @@ type SentinelExecCommandInput struct {
 func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 	input := SentinelExecCommandInput{}
 
-	cmd := app.Command("exec", "Execute a command with policy-gated AWS credentials. Requires --remote-server (Lambda TVM).")
+	cmd := app.Command("exec", "Execute a command with TVM-vended AWS credentials. Uses Lambda Token Vending Machine (TVM) for server-side credential vending.")
 
 	cmd.Flag("profile", "Name of the AWS profile to request from TVM").
 		Required().
 		StringVar(&input.ProfileName)
 
-	cmd.Flag("remote-server", "Remote TVM URL for credential vending. Required for all credential operations.").
+	cmd.Flag("remote-server", "TVM Lambda Function URL (e.g., https://xxx.lambda-url.region.on.aws). Deploy with: sentinel tvm deploy").
 		Required().
 		StringVar(&input.RemoteServer)
 
