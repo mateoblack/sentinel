@@ -1,5 +1,9 @@
 //go:build linux || darwin
 
+// DEPRECATED: Unix socket server mode is deprecated in Sentinel v2.1.
+// Use Lambda TVM (--remote-server) instead for verified server-side credential vending.
+// See package comment in server.go for migration details.
+
 package sentinel
 
 import (
@@ -21,7 +25,13 @@ import (
 
 // NewSentinelServerUnix creates a SentinelServer using Unix domain sockets
 // with process-based authentication.
+//
+// DEPRECATED: NewSentinelServerUnix is deprecated in v2.1. Use Lambda TVM instead.
+// This function now returns ErrServerDeprecated.
 func NewSentinelServerUnix(ctx context.Context, config SentinelServerConfig) (*SentinelServer, error) {
+	return nil, ErrServerDeprecated
+
+	// The following code is retained for reference but is no longer executed.
 	// Determine socket path
 	socketPath := config.UnixSocketPath
 	if socketPath == "" {

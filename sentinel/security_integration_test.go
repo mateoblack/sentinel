@@ -5,6 +5,9 @@
 // 3. Combined security chain - full request flow validation
 //
 // SECURITY: These tests are regression tests for security hardening phases 113, 117, 119.
+//
+// DEPRECATED (v2.1): Local server mode tests are skipped because SentinelServer
+// is deprecated in favor of Lambda TVM. See server.go for migration details.
 package sentinel
 
 import (
@@ -35,6 +38,7 @@ import (
 // SECURITY: Policy load errors may contain SSM parameter paths, AWS region info,
 // or IAM permission errors that should not be exposed to clients.
 func TestSecurityIntegration_PolicyLoadErrorSanitized(t *testing.T) {
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
 	ctx := context.Background()
 
 	// Create server with a policy loader that will fail
@@ -93,6 +97,7 @@ func TestSecurityIntegration_PolicyLoadErrorSanitized(t *testing.T) {
 // SECURITY: Credential errors may contain ARN details, STS error codes, or
 // internal provider information that should not be exposed to clients.
 func TestSecurityIntegration_CredentialRetrievalErrorSanitized(t *testing.T) {
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
 	ctx := context.Background()
 
 	// Create server with credential provider that fails
@@ -166,6 +171,7 @@ func TestSecurityIntegration_CredentialRetrievalErrorSanitized(t *testing.T) {
 // SECURITY: Rate limiting must work correctly under concurrent load to prevent
 // credential endpoint abuse and brute force attacks.
 func TestSecurityIntegration_RateLimitConcurrent(t *testing.T) {
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
 	ctx := context.Background()
 
 	// Create rate limiter with low limit for testing
@@ -245,6 +251,7 @@ func TestSecurityIntegration_RateLimitConcurrent(t *testing.T) {
 // SECURITY: Retry-After header helps clients implement proper backoff and
 // prevents tight retry loops that could amplify rate limiting issues.
 func TestSecurityIntegration_RateLimitRetryAfterHeader(t *testing.T) {
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
 	ctx := context.Background()
 
 	// Create rate limiter that allows only 1 request
@@ -321,6 +328,7 @@ func TestSecurityIntegration_RateLimitRetryAfterHeader(t *testing.T) {
 // SECURITY: This test validates that all security layers work together without
 // leaking information between layers or providing bypasses.
 func TestSecurityIntegration_EndToEndSecurityChain(t *testing.T) {
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
 	ctx := context.Background()
 
 	limiter, err := ratelimit.NewMemoryRateLimiter(ratelimit.Config{

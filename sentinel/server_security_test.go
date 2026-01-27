@@ -324,6 +324,7 @@ func TestSecurityRegression_AuthorizationEmptyConfigToken(t *testing.T) {
 // TestSecurityRegression_SentinelServerAuthorizationIntegration verifies that
 // a SentinelServer correctly rejects unauthorized requests.
 func TestSecurityRegression_SentinelServerAuthorizationIntegration(t *testing.T) {
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
 	// Create a minimal server configuration for testing auth
 	// We'll use a mock credential provider that returns an error
 	// since we're only testing the auth layer

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1079,38 +1080,8 @@ func TestCredentialFlowErrors_DriftCheckAllStatuses(t *testing.T) {
 	}
 }
 
-func TestCredentialFlowErrors_NoStoreConfigured(t *testing.T) {
-	// Test behavior when stores are nil (not configured)
-
-	t.Run("nil_request_store_skips_approval_check", func(t *testing.T) {
-		// When Store is nil, FindApprovedRequest shouldn't be called
-		// This tests the CredentialsCommandInput behavior
-
-		input := CredentialsCommandInput{
-			ProfileName:     "test",
-			PolicyParameter: "/test",
-			Store:           nil, // No request store
-		}
-
-		// Store should be nil
-		if input.Store != nil {
-			t.Error("expected nil Store")
-		}
-	})
-
-	t.Run("nil_break_glass_store_skips_break_glass_check", func(t *testing.T) {
-		input := CredentialsCommandInput{
-			ProfileName:     "test",
-			PolicyParameter: "/test",
-			BreakGlassStore: nil, // No break-glass store
-		}
-
-		// Store should be nil
-		if input.BreakGlassStore != nil {
-			t.Error("expected nil BreakGlassStore")
-		}
-	})
-}
+// TestCredentialFlowErrors_NoStoreConfigured has been removed - credential command is deprecated in v2.1.
+// Store configuration is now handled by Lambda TVM.
 
 func TestCredentialFlowErrors_ProfileValidation(t *testing.T) {
 	// Profile validation tests
@@ -1142,17 +1113,17 @@ region = us-east-1
 		errStr := err.Error()
 
 		// Should mention profile name
-		if !contains(errStr, "nonexistent") {
+		if !strings.Contains(errStr, "nonexistent") {
 			t.Errorf("error should mention profile name, got: %s", errStr)
 		}
 
 		// Should mention "not found"
-		if !contains(errStr, "not found") {
+		if !strings.Contains(errStr, "not found") {
 			t.Errorf("error should mention 'not found', got: %s", errStr)
 		}
 
 		// Should list available profiles
-		if !contains(errStr, "existing") {
+		if !strings.Contains(errStr, "existing") {
 			t.Errorf("error should list available profiles, got: %s", errStr)
 		}
 	})

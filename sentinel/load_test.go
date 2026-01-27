@@ -443,6 +443,7 @@ func (e *unexpectedAllowError) Error() string { return "unexpected allow from po
 //   - Policy evaluation + credential retrieval path performs well under load
 //   - No race conditions in concurrent access patterns
 func TestLoad_ServerCredentialRequests(t *testing.T) {
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
 	// Create server with allow policy
 	mockLoader := &mockPolicyLoader{
 		policy: &policy.Policy{
@@ -548,6 +549,7 @@ func (e *httpLoadTestError) Error() string {
 // The test runs requests at 50 req/sec, then revokes the session after 5 seconds,
 // and verifies the revocation takes effect immediately.
 func TestLoad_RevocationTiming(t *testing.T) {
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
 	mockStore := NewMockSessionStore()
 
 	// Create server with allow policy and session store
@@ -717,6 +719,7 @@ func TestLoad_RevocationTiming(t *testing.T) {
 // The test launches 50 concurrent goroutines, each making 100 credential requests,
 // while session state is being read/written concurrently.
 func TestLoad_ConcurrentRevocationCheck(t *testing.T) {
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
 	mockStore := NewMockSessionStore()
 
 	// Create server with allow policy and session store
