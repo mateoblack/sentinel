@@ -17,7 +17,6 @@ import (
 	"github.com/byteness/aws-vault/v7/device"
 	sentinelerrors "github.com/byteness/aws-vault/v7/errors"
 	"github.com/byteness/aws-vault/v7/identity"
-	"github.com/byteness/aws-vault/v7/iso8601"
 	"github.com/byteness/aws-vault/v7/logging"
 	"github.com/byteness/aws-vault/v7/policy"
 	"github.com/byteness/aws-vault/v7/request"
@@ -274,12 +273,6 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 			writers = append(writers, f)
 		}
 		logger = logging.NewJSONLogger(io.MultiWriter(writers...))
-	}
-
-	// 1.5. Collect device ID for forensic logging (fail-open: continue without on error)
-	deviceID, deviceErr := device.GetDeviceID()
-	if deviceErr != nil {
-		log.Printf("Warning: failed to collect device ID for logging: %v", deviceErr)
 	}
 
 	// 2. Create AWS config for SSM and STS
@@ -572,93 +565,26 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 		return runSubProcess(command, input.Args, cmdEnv)
 	}
 
-	// 9. EffectAllow (or approved request): generate request-id and retrieve credentials (env var mode)
-	requestID := identity.NewRequestID()
+	// 9. Classic mode has been removed - require --remote-server or --server
+	// If we reach here, neither --remote-server nor --server was specified
+	classicModeErr := fmt.Errorf(`sentinel exec requires --remote-server or --server
 
-	// Create credential request with User for SourceIdentity stamping
-	credReq := SentinelCredentialRequest{
-		ProfileName:     input.ProfileName,
-		Region:          input.Region,
-		NoSession:       input.NoSession,
-		SessionDuration: sessionDuration, // May be capped to break-glass remaining time
-		User:            username,        // For SourceIdentity stamping on role assumption
-		RequestID:       requestID,       // For CloudTrail correlation
-	}
+Classic mode (direct credential injection) has been removed in v2.1.
+Sentinel now requires server-side credential vending for verified security.
 
-	// If credentials are being issued via an approved request, include the approval ID
-	// in the SourceIdentity. This enables AWS SCPs to distinguish between approved
-	// and non-approved (direct) access.
-	if approvedReq != nil {
-		credReq.ApprovalID = approvedReq.ID
-	}
+Options:
+1. Use Lambda TVM (recommended):
+   sentinel exec --remote-server <tvm-url> %s -- <command>
 
-	// Retrieve credentials with SourceIdentity stamping (if profile has role_arn)
-	creds, err := s.GetCredentialsWithSourceIdentity(ctx, credReq)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to retrieve credentials: %v\n", err)
-		return 1, err
-	}
+2. Use local server mode:
+   sentinel exec --server %s -- <command>
 
-	// 10. Log allow decision with credential context
-	if logger != nil {
-		credFields := &logging.CredentialIssuanceFields{
-			RequestID:       requestID,
-			SourceIdentity:  creds.SourceIdentity,
-			RoleARN:         creds.RoleARN,
-			SessionDuration: sessionDuration, // May be capped to break-glass remaining time
-		}
-		// Include approved request ID if credentials were issued via approval override
-		if approvedReq != nil {
-			credFields.ApprovedRequestID = approvedReq.ID
-		}
-		// Include break-glass event ID if credentials were issued via break-glass override
-		if activeBreakGlass != nil {
-			credFields.BreakGlassEventID = activeBreakGlass.ID
-		}
-		// Include device ID in logs for forensic correlation
-		if deviceID != "" {
-			credFields.DevicePosture = &device.DevicePosture{
-				DeviceID: deviceID,
-			}
-		}
-		entry := logging.NewEnhancedDecisionLogEntry(policyRequest, decision, input.PolicyParameter, credFields)
-		logger.LogDecision(entry)
-	}
+To deploy Lambda TVM:
+   sentinel tvm deploy --region us-east-1
 
-	// 11. Default to shell if no command specified
-	command := input.Command
-	if command == "" {
-		command = getDefaultShell()
-	}
-
-	// 12. Prepare subprocess environment
-	cmdEnv := createEnv(input.ProfileName, input.Region, "")
-
-	// 13. Set AWS_SENTINEL to indicate running in sentinel subshell
-	cmdEnv.Set("AWS_SENTINEL", input.ProfileName)
-
-	// 14. Inject credentials into environment
-	log.Println("Setting subprocess env: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
-	cmdEnv.Set("AWS_ACCESS_KEY_ID", creds.AccessKeyID)
-	cmdEnv.Set("AWS_SECRET_ACCESS_KEY", creds.SecretAccessKey)
-	if creds.SessionToken != "" {
-		log.Println("Setting subprocess env: AWS_SESSION_TOKEN")
-		cmdEnv.Set("AWS_SESSION_TOKEN", creds.SessionToken)
-	}
-	if creds.CanExpire {
-		log.Println("Setting subprocess env: AWS_CREDENTIAL_EXPIRATION")
-		cmdEnv.Set("AWS_CREDENTIAL_EXPIRATION", iso8601.Format(creds.Expiration))
-	}
-
-	// 15. Try exec syscall first (replaces process, more efficient)
-	err = doExecSyscall(command, input.Args, cmdEnv)
-	if err != nil {
-		log.Println("Error doing execve syscall:", err.Error())
-		log.Println("Falling back to running a subprocess")
-	}
-
-	// 16. Fall back to subprocess execution
-	return runSubProcess(command, input.Args, cmdEnv)
+See: https://github.com/avishayil/sentinel/blob/main/docs/TVM_SETUP.md`, input.ProfileName, input.ProfileName)
+	fmt.Fprintf(os.Stderr, "Error: %v\n", classicModeErr)
+	return 1, classicModeErr
 }
 
 // sentinelCredentialProviderAdapter adapts Sentinel.GetCredentialsWithSourceIdentity
