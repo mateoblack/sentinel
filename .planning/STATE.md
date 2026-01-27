@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 151 of 155 (Intune MDM Provider)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-01-27 — Phase 150 complete (5/5 plans)
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-01-27 — Completed 151-01-PLAN.md
 
-Progress: [████████████████████████░] 97% (150/155 phases complete)
+Progress: [████████████████████████░] 97% (151/155 phases complete)
 
 ## Performance Metrics
 
@@ -59,6 +59,9 @@ Recent decisions affecting v2.0 work:
 - v2.0/150-03: Race detector requires CGO/gcc - use CI environment for race detection
 - v2.0/150-04: STRIDE coverage documentation pattern - meta-tests verify coverage mapping
 - v2.0/150-05: CLI integration test pattern - go run with help verification for all commands
+- v2.0/151-01: Token refresh buffer of 5 minutes before expiry for Azure AD tokens
+- v2.0/151-01: APIToken format client_id:client_secret for Intune OAuth2 credentials
+- v2.0/151-01: Device lookup fallback (azureADDeviceId then deviceName)
 
 ### Pending Todos
 
@@ -71,9 +74,9 @@ None yet (v2.0 milestone just started).
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Phase 150 complete - ready for Phase 151 planning
+Stopped at: Phase 151 complete - ready for Phase 152 planning
 Resume file: None
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-27 (Phase 150 complete)*
+*Last updated: 2026-01-27 (Phase 151 complete)*

@@ -197,10 +197,10 @@ Plans:
   3. Device compliance status from Intune maps to MDMDeviceInfo fields
   4. Rate limiting and pagination work correctly for Graph API queries
   5. Integration tests validate mock Graph API responses
-**Plans**: TBD
+**Status**: In progress
 
 Plans:
-- [ ] 151-01: TBD during planning
+- [x] 151-01: Intune provider implementation with OAuth2 and tests
 
 ### Phase 152: Security Hardening
 **Goal**: Remove security risks and validate all security controls
