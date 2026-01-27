@@ -425,6 +425,160 @@ func (m *MockKMSClient) Reset() {
 }
 
 // ============================================================================
+// MockDynamoDBAuditClient - DynamoDB audit operations
+// ============================================================================
+
+// MockDynamoDBAuditClient implements DynamoDB audit operations for testing.
+// Supports DescribeTable and DescribeContinuousBackups operations.
+type MockDynamoDBAuditClient struct {
+	mu sync.Mutex
+
+	// Configurable behavior functions
+	DescribeTableFunc             func(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+	DescribeContinuousBackupsFunc func(ctx context.Context, params *dynamodb.DescribeContinuousBackupsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error)
+
+	// Call tracking
+	DescribeTableCalls             []*dynamodb.DescribeTableInput
+	DescribeContinuousBackupsCalls []*dynamodb.DescribeContinuousBackupsInput
+}
+
+// DescribeTable implements DynamoDB DescribeTable operation.
+func (m *MockDynamoDBAuditClient) DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+	m.mu.Lock()
+	m.DescribeTableCalls = append(m.DescribeTableCalls, params)
+	m.mu.Unlock()
+
+	if m.DescribeTableFunc != nil {
+		return m.DescribeTableFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("DescribeTable not implemented")
+}
+
+// DescribeContinuousBackups implements DynamoDB DescribeContinuousBackups operation.
+func (m *MockDynamoDBAuditClient) DescribeContinuousBackups(ctx context.Context, params *dynamodb.DescribeContinuousBackupsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeContinuousBackupsOutput, error) {
+	m.mu.Lock()
+	m.DescribeContinuousBackupsCalls = append(m.DescribeContinuousBackupsCalls, params)
+	m.mu.Unlock()
+
+	if m.DescribeContinuousBackupsFunc != nil {
+		return m.DescribeContinuousBackupsFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("DescribeContinuousBackups not implemented")
+}
+
+// Reset clears all call tracking data.
+func (m *MockDynamoDBAuditClient) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.DescribeTableCalls = nil
+	m.DescribeContinuousBackupsCalls = nil
+}
+
+// ============================================================================
+// MockKMSAuditClient - KMS audit operations
+// ============================================================================
+
+// MockKMSAuditClient implements KMS audit operations for testing.
+// Supports DescribeKey operation.
+type MockKMSAuditClient struct {
+	mu sync.Mutex
+
+	// Configurable behavior functions
+	DescribeKeyFunc func(ctx context.Context, params *kms.DescribeKeyInput, optFns ...func(*kms.Options)) (*kms.DescribeKeyOutput, error)
+
+	// Call tracking
+	DescribeKeyCalls []*kms.DescribeKeyInput
+}
+
+// DescribeKey implements KMS DescribeKey operation.
+func (m *MockKMSAuditClient) DescribeKey(ctx context.Context, params *kms.DescribeKeyInput, optFns ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
+	m.mu.Lock()
+	m.DescribeKeyCalls = append(m.DescribeKeyCalls, params)
+	m.mu.Unlock()
+
+	if m.DescribeKeyFunc != nil {
+		return m.DescribeKeyFunc(ctx, params, optFns...)
+	}
+	return nil, errors.New("DescribeKey not implemented")
+}
+
+// Reset clears all call tracking data.
+func (m *MockKMSAuditClient) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.DescribeKeyCalls = nil
+}
+
+// ============================================================================
+// MockOrganizationsClient - Organizations operations
+// ============================================================================
+
+// MockOrganizationsClient implements Organizations operations for testing.
+// Supports ListPolicies, DescribePolicy, and ListTargetsForPolicy operations.
+type MockOrganizationsClient struct {
+	mu sync.Mutex
+
+	// Configurable behavior functions
+	ListPoliciesFunc         func(ctx context.Context, params *ListPoliciesInput, optFns ...func()) (*ListPoliciesOutput, error)
+	DescribePolicyFunc       func(ctx context.Context, params *DescribePolicyInput, optFns ...func()) (*DescribePolicyOutput, error)
+	ListTargetsForPolicyFunc func(ctx context.Context, params *ListTargetsForPolicyInput, optFns ...func()) (*ListTargetsForPolicyOutput, error)
+
+	// Call tracking
+	ListPoliciesCalls         []*ListPoliciesInput
+	DescribePolicyCalls       []*DescribePolicyInput
+	ListTargetsForPolicyCalls []*ListTargetsForPolicyInput
+}
+
+// ListPoliciesInput is a simplified input for mocking.
+type ListPoliciesInput struct {
+	Filter    string
+	NextToken *string
+}
+
+// ListPoliciesOutput is a simplified output for mocking.
+type ListPoliciesOutput struct {
+	Policies  []PolicySummary
+	NextToken *string
+}
+
+// PolicySummary is a simplified policy summary for mocking.
+type PolicySummary struct {
+	Id   *string
+	Name *string
+}
+
+// DescribePolicyInput is a simplified input for mocking.
+type DescribePolicyInput struct {
+	PolicyId *string
+}
+
+// DescribePolicyOutput is a simplified output for mocking.
+type DescribePolicyOutput struct {
+	Policy *Policy
+}
+
+// Policy is a simplified policy for mocking.
+type Policy struct {
+	Content *string
+}
+
+// ListTargetsForPolicyInput is a simplified input for mocking.
+type ListTargetsForPolicyInput struct {
+	PolicyId *string
+}
+
+// ListTargetsForPolicyOutput is a simplified output for mocking.
+type ListTargetsForPolicyOutput struct {
+	Targets []PolicyTargetSummary
+}
+
+// PolicyTargetSummary is a simplified policy target for mocking.
+type PolicyTargetSummary struct {
+	TargetId *string
+	Type     string
+}
+
+// ============================================================================
 // Helper functions
 // ============================================================================
 
