@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 150 of 155 (Test Stabilization)
-Plan: 1 of TBD in current phase
-Status: Plan 01 complete
-Last activity: 2026-01-27 — Plan 01 complete: Go toolchain fix, policy 93.5% coverage, identity 96.5% coverage
+Plan: 2 of TBD in current phase
+Status: Plan 02 complete
+Last activity: 2026-01-27 — Plan 02 complete: server, request, security tests stabilized (626 tests total)
 
 Progress: [████████████████████████░] 96% (149/155 phases complete)
 
@@ -52,6 +52,10 @@ Recent decisions affecting v2.0 work:
 - v2.0/150-01: Go toolchain directive (go1.24.1) for byteness/keyring compatibility
 - v2.0/150-01: Error wrapping pattern: fmt.Errorf %w for errors.Is() compatibility
 - v2.0/150-01: smithy.GenericAPIError for AWS SDK errors without specific types
+- v2.0/150-02: Go 1.25 socket cleanup - use regular file to simulate stale socket in tests
+- v2.0/150-02: DynamoDB expression attribute names (#pk pattern) for reserved words
+- v2.0/150-02: Security sanitization strips control chars rather than rejecting
+- v2.0/150-02: 1password SDK requires CGO or vendor stub for builds
 
 ### Pending Todos
 
@@ -59,14 +63,14 @@ None yet (v2.0 milestone just started).
 
 ### Blockers/Concerns
 
-None yet. v2.0 is stabilization work on existing codebase.
+- **1password SDK CGO requirement**: The SDK v0.4.0-beta.2 has a broken build constraint. Builds without CGO fail. Either need gcc in CI or vendor directory management strategy.
 
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Phase 150, Plan 01 complete - ready for Plan 02 or next phase
+Stopped at: Phase 150, Plan 02 complete - ready for Plan 03 or next phase
 Resume file: None
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-27 (Plan 150-01 complete)*
+*Last updated: 2026-01-27 (Plan 150-02 complete)*
