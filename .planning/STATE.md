@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-27)
 ## Current Position
 
 Phase: 153 of 155 (Documentation)
-Plan: 2 of 3 in current phase
+Plan: 1 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-27 — Completed 153-02-PLAN.md (README and Quick Start update)
+Last activity: 2026-01-27 — Completed 153-01-PLAN.md (Security documentation update)
 
 Progress: [████████████████████████░] 98% (152/155 phases complete, 153 in progress)
 
@@ -71,6 +71,8 @@ Recent decisions affecting v2.0 work:
 - v2.0/152-02: Deprecation pattern: hidden command with informative error
 - v2.0/152-01: KMS encryption required for SSM backup (SEC-05 mitigation)
 - v2.0/152-01: KMSEncryptAPI interface pattern for testable KMS operations
+- v2.0/153-01: Consolidated SCP documentation into single reference (SCP_REFERENCE.md)
+- v2.0/153-01: Superseded LAMBDA_TVM_SCP.md with notice rather than removal
 
 ### Pending Todos
 
@@ -83,9 +85,9 @@ None yet (v2.0 milestone just started).
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 153-02-PLAN.md (README and Quick Start update)
+Stopped at: Completed 153-01-PLAN.md (Security documentation update)
 Resume file: None
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-27 (Phase 153-02 complete - Documentation)*
+*Last updated: 2026-01-27 (Phase 153-01 complete - Security Documentation)*

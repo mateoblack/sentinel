@@ -223,7 +223,7 @@ Plans:
 **Status**: In progress
 
 Plans:
-- [ ] 153-01: Security and threat model documentation
+- [x] 153-01: Security and threat model documentation (completed 2026-01-27)
 - [x] 153-02: README and Quick Start update (completed 2026-01-27)
 - [ ] 153-03: SCP reference documentation
 

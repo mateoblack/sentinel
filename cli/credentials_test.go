@@ -24,6 +24,23 @@ import (
 	"github.com/byteness/aws-vault/v7/vault"
 )
 
+// ExampleCredentialsCommand demonstrates the sentinel credentials command usage.
+// This command is designed for use with AWS credential_process in ~/.aws/config.
+func ExampleCredentialsCommand() {
+	// sentinel credentials --profile dev --policy-parameter /sentinel/policies/dev
+	// Returns JSON credentials for use with credential_process in ~/.aws/config
+	// Output format:
+	// {
+	//   "Version": 1,
+	//   "AccessKeyId": "ASIA...",
+	//   "SecretAccessKey": "...",
+	//   "SessionToken": "...",
+	//   "Expiration": "2026-01-27T12:00:00Z"
+	// }
+	fmt.Println("See docs/QUICKSTART.md for credential_process configuration")
+	// Output: See docs/QUICKSTART.md for credential_process configuration
+}
+
 func TestCredentialProcessOutputJSONMarshaling(t *testing.T) {
 	// Test that CredentialProcessOutput marshals with correct AWS field names
 	output := CredentialProcessOutput{
