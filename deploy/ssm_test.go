@@ -402,6 +402,68 @@ func TestSSMHardener_BackupParameters_CreatesFiles(t *testing.T) {
 	}
 }
 
+// TestSSMHardener_BackupParameters_RestrictedPermissions verifies that backup directory
+// is created with 0700 permissions to prevent local privilege escalation (SSM-T-02).
+func TestSSMHardener_BackupParameters_RestrictedPermissions(t *testing.T) {
+	ctx := context.Background()
+	lastMod := time.Now()
+
+	// Create temp directory for test
+	tmpDir, err := os.MkdirTemp("", "ssm-backup-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	backupDir := filepath.Join(tmpDir, "test-backup")
+
+	client := &mockSSMHardenClient{
+		GetParameterFunc: func(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+			return &ssm.GetParameterOutput{
+				Parameter: &types.Parameter{
+					Name:             params.Name,
+					Type:             types.ParameterTypeSecureString,
+					Value:            aws.String("secret-value"),
+					Version:          1,
+					LastModifiedDate: &lastMod,
+				},
+			}, nil
+		},
+	}
+
+	hardener := NewSSMHardenerWithClient(client)
+	_, err = hardener.BackupParameters(ctx, []string{"/sentinel/secrets/key"}, backupDir)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify directory permissions are 0700 (owner-only)
+	info, err := os.Stat(backupDir)
+	if err != nil {
+		t.Fatalf("failed to stat backup dir: %v", err)
+	}
+
+	perm := info.Mode().Perm()
+	if perm != 0700 {
+		t.Errorf("expected directory permissions 0700, got %04o", perm)
+	}
+
+	// Verify file permissions are 0600 (owner read/write only)
+	files, _ := os.ReadDir(backupDir)
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		filePath := filepath.Join(backupDir, f.Name())
+		fileInfo, _ := os.Stat(filePath)
+		filePerm := fileInfo.Mode().Perm()
+		if filePerm != 0600 {
+			t.Errorf("expected file permissions 0600, got %04o for %s", filePerm, f.Name())
+		}
+	}
+}
+
 func TestSSMHardener_BackupParameters_AutoGeneratesDir(t *testing.T) {
 	ctx := context.Background()
 	lastMod := time.Now()

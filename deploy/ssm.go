@@ -189,8 +189,9 @@ func (h *SSMHardener) BackupParameters(ctx context.Context, paramNames []string,
 		backupDir = fmt.Sprintf("sentinel-backup-%s", time.Now().Format("20060102-150405"))
 	}
 
-	// Create backup directory
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	// Create backup directory with restricted permissions (owner-only)
+	// SSM-T-02: Backup files may contain decrypted secrets - prevent local privilege escalation
+	if err := os.MkdirAll(backupDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
