@@ -16,9 +16,10 @@ import (
 type SCPDeployCommandInput struct {
 	DryRun     bool   // Preview policy without deploying
 	TargetOU   string // OU ID to attach policy (empty = root)
-	Force      bool   // Skip confirmation prompt
 	AWSProfile string // AWS profile for credentials
 	Region     string // AWS region
+	// NOTE: Force flag removed - SCP-T-01 threat model requires mandatory confirmation
+	// to prevent organization-wide lockout from misconfigured SCPs
 
 	// For testing
 	Deployer *deploy.SCPDeployer
@@ -43,9 +44,9 @@ func ConfigureSCPDeployCommand(app *kingpin.Application, s *Sentinel) {
 	cmd.Flag("target-ou", "OU ID to attach SCP to (default: organization root)").
 		StringVar(&input.TargetOU)
 
-	cmd.Flag("force", "Skip confirmation prompt").
-		Short('f').
-		BoolVar(&input.Force)
+	// NOTE: --force flag intentionally removed due to SCP-T-01 threat model.
+	// SCP misconfiguration can lock out entire AWS organization including root.
+	// Mandatory confirmation required for all SCP deployments.
 
 	cmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
 		StringVar(&input.AWSProfile)
@@ -170,22 +171,25 @@ func SCPDeployCommand(ctx context.Context, input SCPDeployCommandInput) int {
 	fmt.Fprintln(stdout, deploy.SentinelSCPPolicy)
 	fmt.Fprintln(stdout)
 
-	// Prompt for confirmation unless --force
-	if !input.Force {
-		fmt.Fprintf(stdout, "Deploy SCP to %s? [y/N] ", targetLabel)
+	// Mandatory confirmation - SCP-T-01: No force bypass due to organization lockout risk
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintln(stdout, "⚠️  WARNING: SCP deployment affects the ENTIRE AWS Organization")
+	fmt.Fprintln(stdout, "   Misconfiguration can lock out all accounts including root.")
+	fmt.Fprintln(stdout, "   Review the policy content above carefully.")
+	fmt.Fprintln(stdout, "")
+	fmt.Fprintf(stdout, "Deploy SCP to %s? [y/N] ", targetLabel)
 
-		reader := bufio.NewReader(stdin)
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Fprintf(stderr, "Error reading input: %v\n", err)
-			return 1
-		}
+	reader := bufio.NewReader(stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Fprintf(stderr, "Error reading input: %v\n", err)
+		return 1
+	}
 
-		response = strings.TrimSpace(strings.ToLower(response))
-		if response != "y" && response != "yes" {
-			fmt.Fprintln(stdout, "Cancelled.")
-			return 2
-		}
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response != "y" && response != "yes" {
+		fmt.Fprintln(stdout, "Cancelled.")
+		return 2
 	}
 
 	// Deploy the SCP

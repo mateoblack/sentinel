@@ -258,7 +258,9 @@ func TestSCPDeployCommand_ConfirmationPrompt(t *testing.T) {
 	}
 }
 
-func TestSCPDeployCommand_ForceBypassesConfirmation(t *testing.T) {
+// TestSCPDeployCommand_MandatoryConfirmation verifies that SCP deployment always
+// requires confirmation (SCP-T-01 threat model - no force bypass due to lockout risk).
+func TestSCPDeployCommand_MandatoryConfirmation(t *testing.T) {
 	ctx := context.Background()
 
 	deployed := false
@@ -293,14 +295,20 @@ func TestSCPDeployCommand_ForceBypassesConfirmation(t *testing.T) {
 
 	stdout, _ := os.CreateTemp("", "stdout")
 	stderr, _ := os.CreateTemp("", "stderr")
+	stdin, _ := os.CreateTemp("", "stdin")
 	defer os.Remove(stdout.Name())
 	defer os.Remove(stderr.Name())
+	defer os.Remove(stdin.Name())
+
+	// User must confirm with "y" - no force bypass available
+	stdin.WriteString("y\n")
+	stdin.Seek(0, 0)
 
 	input := SCPDeployCommandInput{
-		Force:    true, // Skip confirmation
 		Deployer: deployer,
 		Stdout:   stdout,
 		Stderr:   stderr,
+		Stdin:    stdin,
 	}
 
 	exitCode := SCPDeployCommand(ctx, input)
@@ -314,7 +322,7 @@ func TestSCPDeployCommand_ForceBypassesConfirmation(t *testing.T) {
 	}
 
 	if !deployed {
-		t.Error("expected policy to be deployed with --force")
+		t.Error("expected policy to be deployed after confirmation")
 	}
 
 	stdout.Seek(0, 0)
@@ -322,6 +330,10 @@ func TestSCPDeployCommand_ForceBypassesConfirmation(t *testing.T) {
 	buf.ReadFrom(stdout)
 	output := buf.String()
 
+	// Verify warning about organization lockout risk is shown
+	if !strings.Contains(output, "WARNING") {
+		t.Error("expected warning about SCP deployment risks")
+	}
 	if !strings.Contains(output, "SCP deployed successfully") {
 		t.Error("expected success message")
 	}
@@ -365,14 +377,20 @@ func TestSCPDeployCommand_SuccessfulDeployToRoot(t *testing.T) {
 
 	stdout, _ := os.CreateTemp("", "stdout")
 	stderr, _ := os.CreateTemp("", "stderr")
+	stdin, _ := os.CreateTemp("", "stdin")
 	defer os.Remove(stdout.Name())
 	defer os.Remove(stderr.Name())
+	defer os.Remove(stdin.Name())
+
+	// Confirm deployment with "y"
+	stdin.WriteString("y\n")
+	stdin.Seek(0, 0)
 
 	input := SCPDeployCommandInput{
-		Force:    true,
 		Deployer: deployer,
 		Stdout:   stdout,
 		Stderr:   stderr,
+		Stdin:    stdin,
 	}
 
 	exitCode := SCPDeployCommand(ctx, input)
@@ -430,15 +448,21 @@ func TestSCPDeployCommand_SuccessfulDeployToOU(t *testing.T) {
 
 	stdout, _ := os.CreateTemp("", "stdout")
 	stderr, _ := os.CreateTemp("", "stderr")
+	stdin, _ := os.CreateTemp("", "stdin")
 	defer os.Remove(stdout.Name())
 	defer os.Remove(stderr.Name())
+	defer os.Remove(stdin.Name())
+
+	// Confirm deployment with "y"
+	stdin.WriteString("y\n")
+	stdin.Seek(0, 0)
 
 	input := SCPDeployCommandInput{
-		Force:    true,
 		TargetOU: "ou-production-123",
 		Deployer: deployer,
 		Stdout:   stdout,
 		Stderr:   stderr,
+		Stdin:    stdin,
 	}
 
 	exitCode := SCPDeployCommand(ctx, input)
@@ -477,8 +501,8 @@ func TestSCPDeployCommand_PermissionValidationFailure(t *testing.T) {
 	defer os.Remove(stdout.Name())
 	defer os.Remove(stderr.Name())
 
+	// No stdin needed - permission check fails before confirmation prompt
 	input := SCPDeployCommandInput{
-		Force:    true,
 		Deployer: deployer,
 		Stdout:   stdout,
 		Stderr:   stderr,
@@ -516,8 +540,8 @@ func TestSCPDeployCommand_NotInOrganization(t *testing.T) {
 	defer os.Remove(stdout.Name())
 	defer os.Remove(stderr.Name())
 
+	// No stdin needed - organization check fails before confirmation prompt
 	input := SCPDeployCommandInput{
-		Force:    true,
 		Deployer: deployer,
 		Stdout:   stdout,
 		Stderr:   stderr,
@@ -578,14 +602,20 @@ func TestSCPDeployCommand_UpdateExistingPolicy(t *testing.T) {
 
 	stdout, _ := os.CreateTemp("", "stdout")
 	stderr, _ := os.CreateTemp("", "stderr")
+	stdin, _ := os.CreateTemp("", "stdin")
 	defer os.Remove(stdout.Name())
 	defer os.Remove(stderr.Name())
+	defer os.Remove(stdin.Name())
+
+	// Confirm deployment with "y"
+	stdin.WriteString("y\n")
+	stdin.Seek(0, 0)
 
 	input := SCPDeployCommandInput{
-		Force:    true,
 		Deployer: deployer,
 		Stdout:   stdout,
 		Stderr:   stderr,
+		Stdin:    stdin,
 	}
 
 	exitCode := SCPDeployCommand(ctx, input)
