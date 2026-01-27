@@ -40,6 +40,7 @@ const (
 	EnvMDMBaseURL     = "SENTINEL_MDM_BASE_URL"      // MDM server URL (e.g., Jamf Pro URL)
 	EnvMDMAPISecretID = "SENTINEL_MDM_API_SECRET_ID" // Secrets Manager secret ID/ARN (preferred)
 	EnvMDMAPIToken    = "SENTINEL_MDM_API_TOKEN"     // Bearer token (deprecated - use Secrets Manager)
+	EnvMDMTenantID    = "SENTINEL_MDM_TENANT_ID"     // Azure AD tenant ID (required for Intune)
 	EnvRequireDevice  = "SENTINEL_REQUIRE_DEVICE"    // "true" to require device verification
 
 	// Rate limiting configuration environment variables.
@@ -309,9 +310,18 @@ func LoadConfigFromEnv(ctx context.Context) (*TVMConfig, error) {
 			}
 			cfg.MDMProvider = provider
 		case "intune":
-			// Intune provider not yet implemented
-			log.Printf("WARNING: MDM provider 'intune' is not yet implemented, using NoopProvider")
-			cfg.MDMProvider = &mdm.NoopProvider{}
+			// Intune requires TenantID for Azure AD authentication
+			tenantID := os.Getenv(EnvMDMTenantID)
+			if tenantID == "" {
+				return nil, fmt.Errorf("%s required for Intune provider", EnvMDMTenantID)
+			}
+			mdmConfig.TenantID = tenantID
+			provider, err := mdm.NewIntuneProvider(mdmConfig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create Intune MDM provider: %w", err)
+			}
+			cfg.MDMProvider = provider
+			log.Printf("INFO: Intune MDM provider initialized (tenant: %s)", tenantID)
 		case "kandji":
 			// Kandji provider not yet implemented
 			log.Printf("WARNING: MDM provider 'kandji' is not yet implemented, using NoopProvider")
