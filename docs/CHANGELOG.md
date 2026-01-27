@@ -5,6 +5,36 @@ All notable changes to Sentinel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-01-27
+
+### Added
+
+- Policy linting with 3 checks (allow-before-deny, unreachable-rules, overlapping-time-windows)
+- Trust policy validation with 5 security rules (TRUST-01 to TRUST-05) and risk classification
+- `sentinel trust validate` command for IAM role audit
+- Deployment validation with SCP, DynamoDB, SSM, KMS checks (DEPLOY-01 to DEPLOY-04)
+- `sentinel deploy validate` command with remediation reports
+- `sentinel scp template` command for SCP generation (replaces direct deployment)
+- `sentinel dynamodb harden` command for deletion protection and PITR
+- `sentinel ssm backup` and `sentinel ssm restore` commands with KMS encryption
+- `sentinel monitoring setup` command for CloudTrail CloudWatch alarms
+
+### Deprecated
+
+- `sentinel scp deploy` in favor of `sentinel scp template`
+
+## [1.19.0] - 2026-01-26
+
+### Added
+
+- CHANGELOG completion for v1.13-v1.18 releases
+- Policy command documentation in commands.md (pull, push, diff, validate, sign, verify)
+- POLICY_SIGNING.md guide with KMS setup and Lambda TVM integration
+- DEVICE_POSTURE.md guide with Jamf Pro MDM setup
+- SECURITY_HARDENING.md guide for v1.16 features
+- README feature tables updated through v1.18
+- Deployment guide updated with KMS encryption and policy commands
+
 ## [1.18.0] - 2026-01-26
 
 ### Added
