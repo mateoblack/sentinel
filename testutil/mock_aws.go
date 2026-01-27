@@ -294,15 +294,17 @@ func (m *MockSTSClient) Reset() {
 // ============================================================================
 
 // MockIAMClient implements IAM client operations for testing.
-// Supports GetRole operation.
+// Supports GetRole and ListRoles operations.
 type MockIAMClient struct {
 	mu sync.Mutex
 
 	// Configurable behavior functions
-	GetRoleFunc func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error)
+	GetRoleFunc   func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error)
+	ListRolesFunc func(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error)
 
 	// Call tracking
-	GetRoleCalls []*iam.GetRoleInput
+	GetRoleCalls   []*iam.GetRoleInput
+	ListRolesCalls []*iam.ListRolesInput
 }
 
 // GetRole implements IAM GetRole operation.
@@ -317,11 +319,24 @@ func (m *MockIAMClient) GetRole(ctx context.Context, params *iam.GetRoleInput, o
 	return nil, errors.New("GetRole not implemented")
 }
 
+// ListRoles implements IAM ListRoles operation.
+func (m *MockIAMClient) ListRoles(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
+	m.mu.Lock()
+	m.ListRolesCalls = append(m.ListRolesCalls, params)
+	m.mu.Unlock()
+
+	if m.ListRolesFunc != nil {
+		return m.ListRolesFunc(ctx, params, optFns...)
+	}
+	return &iam.ListRolesOutput{}, nil
+}
+
 // Reset clears all call tracking data.
 func (m *MockIAMClient) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.GetRoleCalls = nil
+	m.ListRolesCalls = nil
 }
 
 // ============================================================================

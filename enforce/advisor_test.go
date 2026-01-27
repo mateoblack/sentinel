@@ -13,7 +13,8 @@ import (
 
 // mockIAMClient implements iamAPI for testing.
 type mockIAMClient struct {
-	getRoleFunc func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error)
+	getRoleFunc   func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error)
+	listRolesFunc func(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error)
 }
 
 func (m *mockIAMClient) GetRole(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
@@ -21,6 +22,13 @@ func (m *mockIAMClient) GetRole(ctx context.Context, params *iam.GetRoleInput, o
 		return m.getRoleFunc(ctx, params, optFns...)
 	}
 	return nil, errors.New("GetRole not implemented")
+}
+
+func (m *mockIAMClient) ListRoles(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
+	if m.listRolesFunc != nil {
+		return m.listRolesFunc(ctx, params, optFns...)
+	}
+	return &iam.ListRolesOutput{}, nil
 }
 
 // ============================================================================
@@ -490,5 +498,370 @@ func TestAdvisor_AnalyzeRoles_Empty(t *testing.T) {
 	}
 	if len(results) != 0 {
 		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}
+
+// ============================================================================
+// ValidateRole Tests
+// ============================================================================
+
+func TestAdvisor_ValidateRole_Compliant(t *testing.T) {
+	// Compliant policy with sentinel:* pattern
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Sid": "AllowSentinelAccess",
+			"Effect": "Allow",
+			"Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+			"Action": "sts:AssumeRole",
+			"Condition": {
+				"StringLike": {
+					"sts:SourceIdentity": "sentinel:*"
+				}
+			}
+		}]
+	}`
+
+	client := &mockIAMClient{
+		getRoleFunc: func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+			return &iam.GetRoleOutput{
+				Role: &types.Role{
+					RoleName:                 params.RoleName,
+					Arn:                      aws.String("arn:aws:iam::123456789012:role/CompliantRole"),
+					AssumeRolePolicyDocument: aws.String(url.QueryEscape(trustPolicy)),
+				},
+			}, nil
+		},
+	}
+
+	advisor := NewAdvisorWithClient(client)
+	result, err := advisor.ValidateRole(context.Background(), "arn:aws:iam::123456789012:role/CompliantRole")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Error != "" {
+		t.Fatalf("unexpected result error: %v", result.Error)
+	}
+	if result.RoleName != "CompliantRole" {
+		t.Errorf("RoleName = %v, want CompliantRole", result.RoleName)
+	}
+	if result.Validation == nil {
+		t.Fatal("Validation is nil")
+	}
+	if !result.Validation.IsCompliant {
+		t.Error("expected compliant validation result")
+	}
+	if len(result.Validation.Findings) != 0 {
+		t.Errorf("expected 0 findings, got %d", len(result.Validation.Findings))
+	}
+}
+
+func TestAdvisor_ValidateRole_NonCompliant(t *testing.T) {
+	// Non-compliant policy without SourceIdentity
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+			"Action": "sts:AssumeRole"
+		}]
+	}`
+
+	client := &mockIAMClient{
+		getRoleFunc: func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+			return &iam.GetRoleOutput{
+				Role: &types.Role{
+					RoleName:                 params.RoleName,
+					Arn:                      aws.String("arn:aws:iam::123456789012:role/NonCompliantRole"),
+					AssumeRolePolicyDocument: aws.String(url.QueryEscape(trustPolicy)),
+				},
+			}, nil
+		},
+	}
+
+	advisor := NewAdvisorWithClient(client)
+	result, err := advisor.ValidateRole(context.Background(), "arn:aws:iam::123456789012:role/NonCompliantRole")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Error != "" {
+		t.Fatalf("unexpected result error: %v", result.Error)
+	}
+	if result.Validation == nil {
+		t.Fatal("Validation is nil")
+	}
+	if result.Validation.IsCompliant {
+		t.Error("expected non-compliant validation result")
+	}
+	if len(result.Validation.Findings) == 0 {
+		t.Error("expected findings for non-compliant policy")
+	}
+	// Should have at least TRUST-02 (missing SourceIdentity) and TRUST-04 (root without protection)
+	var hasTrust02, hasTrust04 bool
+	for _, f := range result.Validation.Findings {
+		if f.RuleID == "TRUST-02" {
+			hasTrust02 = true
+		}
+		if f.RuleID == "TRUST-04" {
+			hasTrust04 = true
+		}
+	}
+	if !hasTrust02 {
+		t.Error("expected TRUST-02 finding")
+	}
+	if !hasTrust04 {
+		t.Error("expected TRUST-04 finding")
+	}
+}
+
+func TestAdvisor_ValidateRole_Error(t *testing.T) {
+	client := &mockIAMClient{
+		getRoleFunc: func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+			return nil, errors.New("AccessDeniedException")
+		},
+	}
+
+	advisor := NewAdvisorWithClient(client)
+	result, err := advisor.ValidateRole(context.Background(), "arn:aws:iam::123456789012:role/TestRole")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Error == "" {
+		t.Error("expected error in result")
+	}
+	if result.Validation != nil {
+		t.Error("expected nil Validation when error occurs")
+	}
+}
+
+// ============================================================================
+// ValidateRoles (Batch) Tests
+// ============================================================================
+
+func TestAdvisor_ValidateRoles(t *testing.T) {
+	trustPolicyCompliant := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+			"Action": "sts:AssumeRole",
+			"Condition": {
+				"StringLike": {
+					"sts:SourceIdentity": "sentinel:*"
+				}
+			}
+		}]
+	}`
+
+	trustPolicyNonCompliant := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+			"Action": "sts:AssumeRole"
+		}]
+	}`
+
+	client := &mockIAMClient{
+		getRoleFunc: func(ctx context.Context, params *iam.GetRoleInput, optFns ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
+			switch *params.RoleName {
+			case "CompliantRole":
+				return &iam.GetRoleOutput{
+					Role: &types.Role{
+						RoleName:                 params.RoleName,
+						Arn:                      aws.String("arn:aws:iam::123456789012:role/CompliantRole"),
+						AssumeRolePolicyDocument: aws.String(url.QueryEscape(trustPolicyCompliant)),
+					},
+				}, nil
+			case "NonCompliantRole":
+				return &iam.GetRoleOutput{
+					Role: &types.Role{
+						RoleName:                 params.RoleName,
+						Arn:                      aws.String("arn:aws:iam::123456789012:role/NonCompliantRole"),
+						AssumeRolePolicyDocument: aws.String(url.QueryEscape(trustPolicyNonCompliant)),
+					},
+				}, nil
+			default:
+				return nil, errors.New("Role not found")
+			}
+		},
+	}
+
+	advisor := NewAdvisorWithClient(client)
+	results, err := advisor.ValidateRoles(context.Background(), []string{
+		"arn:aws:iam::123456789012:role/CompliantRole",
+		"arn:aws:iam::123456789012:role/NonCompliantRole",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+
+	// Check first result (Compliant)
+	if results[0].RoleName != "CompliantRole" {
+		t.Errorf("result[0].RoleName = %v, want CompliantRole", results[0].RoleName)
+	}
+	if results[0].Error != "" {
+		t.Errorf("result[0] unexpected error: %v", results[0].Error)
+	}
+	if results[0].Validation == nil || !results[0].Validation.IsCompliant {
+		t.Error("result[0] should be compliant")
+	}
+
+	// Check second result (NonCompliant)
+	if results[1].RoleName != "NonCompliantRole" {
+		t.Errorf("result[1].RoleName = %v, want NonCompliantRole", results[1].RoleName)
+	}
+	if results[1].Error != "" {
+		t.Errorf("result[1] unexpected error: %v", results[1].Error)
+	}
+	if results[1].Validation == nil || results[1].Validation.IsCompliant {
+		t.Error("result[1] should be non-compliant")
+	}
+}
+
+func TestAdvisor_ValidateRoles_Empty(t *testing.T) {
+	advisor := NewAdvisorWithClient(&mockIAMClient{})
+	results, err := advisor.ValidateRoles(context.Background(), []string{})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}
+
+// ============================================================================
+// ListRolesByPrefix Tests
+// ============================================================================
+
+func TestAdvisor_ListRolesByPrefix(t *testing.T) {
+	client := &mockIAMClient{
+		listRolesFunc: func(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
+			return &iam.ListRolesOutput{
+				Roles: []types.Role{
+					{
+						RoleName: aws.String("sentinel-admin"),
+						Arn:      aws.String("arn:aws:iam::123456789012:role/sentinel-admin"),
+					},
+					{
+						RoleName: aws.String("sentinel-user"),
+						Arn:      aws.String("arn:aws:iam::123456789012:role/sentinel-user"),
+					},
+					{
+						RoleName: aws.String("other-role"),
+						Arn:      aws.String("arn:aws:iam::123456789012:role/other-role"),
+					},
+				},
+				IsTruncated: false,
+			}, nil
+		},
+	}
+
+	advisor := NewAdvisorWithClient(client)
+	roles, err := advisor.ListRolesByPrefix(context.Background(), "sentinel-")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(roles) != 2 {
+		t.Fatalf("expected 2 roles, got %d", len(roles))
+	}
+	if roles[0] != "arn:aws:iam::123456789012:role/sentinel-admin" {
+		t.Errorf("roles[0] = %v, want sentinel-admin ARN", roles[0])
+	}
+	if roles[1] != "arn:aws:iam::123456789012:role/sentinel-user" {
+		t.Errorf("roles[1] = %v, want sentinel-user ARN", roles[1])
+	}
+}
+
+func TestAdvisor_ListRolesByPrefix_Pagination(t *testing.T) {
+	callCount := 0
+	client := &mockIAMClient{
+		listRolesFunc: func(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
+			callCount++
+			if callCount == 1 {
+				return &iam.ListRolesOutput{
+					Roles: []types.Role{
+						{
+							RoleName: aws.String("sentinel-role1"),
+							Arn:      aws.String("arn:aws:iam::123456789012:role/sentinel-role1"),
+						},
+					},
+					IsTruncated: true,
+					Marker:      aws.String("page2"),
+				}, nil
+			}
+			return &iam.ListRolesOutput{
+				Roles: []types.Role{
+					{
+						RoleName: aws.String("sentinel-role2"),
+						Arn:      aws.String("arn:aws:iam::123456789012:role/sentinel-role2"),
+					},
+				},
+				IsTruncated: false,
+			}, nil
+		},
+	}
+
+	advisor := NewAdvisorWithClient(client)
+	roles, err := advisor.ListRolesByPrefix(context.Background(), "sentinel-")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(roles) != 2 {
+		t.Fatalf("expected 2 roles across pages, got %d", len(roles))
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 API calls for pagination, got %d", callCount)
+	}
+}
+
+func TestAdvisor_ListRolesByPrefix_NoMatches(t *testing.T) {
+	client := &mockIAMClient{
+		listRolesFunc: func(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
+			return &iam.ListRolesOutput{
+				Roles: []types.Role{
+					{
+						RoleName: aws.String("other-role"),
+						Arn:      aws.String("arn:aws:iam::123456789012:role/other-role"),
+					},
+				},
+				IsTruncated: false,
+			}, nil
+		},
+	}
+
+	advisor := NewAdvisorWithClient(client)
+	roles, err := advisor.ListRolesByPrefix(context.Background(), "sentinel-")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(roles) != 0 {
+		t.Errorf("expected 0 roles, got %d", len(roles))
+	}
+}
+
+func TestAdvisor_ListRolesByPrefix_Error(t *testing.T) {
+	client := &mockIAMClient{
+		listRolesFunc: func(ctx context.Context, params *iam.ListRolesInput, optFns ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
+			return nil, errors.New("AccessDeniedException")
+		},
+	}
+
+	advisor := NewAdvisorWithClient(client)
+	_, err := advisor.ListRolesByPrefix(context.Background(), "sentinel-")
+
+	if err == nil {
+		t.Error("expected error for ListRoles failure")
 	}
 }
