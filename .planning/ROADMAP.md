@@ -208,7 +208,7 @@ Plans:
 - [x] 152-03: File permission hardening (SEC-03)
 - [x] 152-04: Fuzz tests for CLI inputs (SEC-04)
 
-### Phase 153: Documentation
+### Phase 153: Documentation ✅
 **Goal**: Complete, accurate, and maintainable documentation
 **Depends on**: Phase 152
 **Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, DOC-06, DOC-07
@@ -220,12 +220,12 @@ Plans:
   5. IAM policy templates are documented for all Sentinel features
   6. SCP templates are provided as documentation (not CLI deployment)
   7. All code examples in documentation have corresponding Example* tests
-**Status**: In progress
+**Status**: Completed 2026-01-27
 
 Plans:
 - [x] 153-01: Security and threat model documentation (completed 2026-01-27)
 - [x] 153-02: README and Quick Start update (completed 2026-01-27)
-- [ ] 153-03: SCP reference documentation
+- [x] 153-03: Example tests for CLI commands (completed 2026-01-27)
 
 ### Phase 154: Release Preparation
 **Goal**: v2.0.0 release candidate ready for production deployment
@@ -281,9 +281,9 @@ Plans:
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
 | v1.20 CLI Security & Deployment Helpers | 143-149 | 7/7 | ✅ Complete | 2026-01-27 |
-| v2.0 Stable Release | 150-155 | 10/? | 🚧 In Progress | - |
+| v2.0 Stable Release | 150-155 | 13/? | 🚧 In Progress | - |
 
-**Totals:** 24 milestones (23 shipped, 1 in progress) - 152 phases complete, 3 phases planned
+**Totals:** 24 milestones (23 shipped, 1 in progress) - 153 phases complete, 2 phases planned
 
 ---
 *Roadmap created: 2026-01-14*
