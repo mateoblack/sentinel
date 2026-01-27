@@ -123,52 +123,63 @@ func ConfigureSentinelGlobals(app *kingpin.Application) *Sentinel {
 		EnumVar(&s.KeyringBackend, backendsAvailable...)
 
 	app.Flag("keychain", "Name of macOS keychain to use, if it doesn't exist it will be created").
+		Hidden().
 		Default("aws-vault").
 		Envar("AWS_VAULT_KEYCHAIN_NAME").
 		StringVar(&s.KeyringConfig.KeychainName)
 
 	app.Flag("secret-service-collection", "Name of secret-service collection to use, if it doesn't exist it will be created").
+		Hidden().
 		Default("awsvault").
 		Envar("AWS_VAULT_SECRET_SERVICE_COLLECTION_NAME").
 		StringVar(&s.KeyringConfig.LibSecretCollectionName)
 
 	app.Flag("pass-dir", "Pass password store directory").
+		Hidden().
 		Envar("AWS_VAULT_PASS_PASSWORD_STORE_DIR").
 		StringVar(&s.KeyringConfig.PassDir)
 
 	app.Flag("pass-cmd", "Name of the pass executable").
+		Hidden().
 		Envar("AWS_VAULT_PASS_CMD").
 		StringVar(&s.KeyringConfig.PassCmd)
 
 	app.Flag("pass-prefix", "Prefix to prepend to the item path stored in pass").
+		Hidden().
 		Envar("AWS_VAULT_PASS_PREFIX").
 		StringVar(&s.KeyringConfig.PassPrefix)
 
 	app.Flag("file-dir", "Directory for the \"file\" password store").
+		Hidden().
 		Default("~/.awsvault/keys/").
 		Envar("AWS_VAULT_FILE_DIR").
 		StringVar(&s.KeyringConfig.FileDir)
 
 	app.Flag("op-timeout", "Timeout for 1Password API operations (1Password Service Accounts only)").
+		Hidden().
 		Default("15s").
 		Envar("AWS_VAULT_OP_TIMEOUT").
 		DurationVar(&s.KeyringConfig.OPTimeout)
 
 	app.Flag("op-vault-id", "UUID of the 1Password vault").
+		Hidden().
 		Envar("AWS_VAULT_OP_VAULT_ID").
 		StringVar(&s.KeyringConfig.OPVaultID)
 
 	app.Flag("op-item-title-prefix", "Prefix to prepend to 1Password item titles").
+		Hidden().
 		Default("aws-vault").
 		Envar("AWS_VAULT_OP_ITEM_TITLE_PREFIX").
 		StringVar(&s.KeyringConfig.OPItemTitlePrefix)
 
 	app.Flag("op-item-tag", "Tag to apply to 1Password items").
+		Hidden().
 		Default("aws-vault").
 		Envar("AWS_VAULT_OP_ITEM_TAG").
 		StringVar(&s.KeyringConfig.OPItemTag)
 
 	app.Flag("op-connect-host", "1Password Connect server HTTP(S) URI").
+		Hidden().
 		Envar("AWS_VAULT_OP_CONNECT_HOST").
 		StringVar(&s.KeyringConfig.OPConnectHost)
 
