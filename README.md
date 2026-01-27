@@ -1,6 +1,8 @@
 # Sentinel
 
-[![Build](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/go.yml?branch=main)](https://github.com/mateoblack/sentinel/actions/workflows/go.yml)
+[![Security Tests](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/test-security.yml?branch=main)](https://github.com/mateoblack/sentinel/actions/workflows/test-security.yml)
+[![Gosec](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/goseccheck.yml?branch=main&label=gosec)](https://github.com/mateoblack/sentinel/actions/workflows/goseccheck.yml)
+[![Vulnerability Check](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/govulncheck.yml?branch=main&label=govulncheck)](https://github.com/mateoblack/sentinel/actions/workflows/govulncheck.yml)
 
 > **v1.21 Aplha** - Pre-release testing
 
