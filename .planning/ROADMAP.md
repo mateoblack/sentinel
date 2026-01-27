@@ -29,7 +29,8 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.18 Critical Security Hardening** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phases 126-135, shipped 2026-01-26)
 - ✅ **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, shipped 2026-01-26)
 - ✅ **v1.20 CLI Security & Deployment Helpers** — [milestones/v1.20-ROADMAP.md](milestones/v1.20-ROADMAP.md) (Phases 143-149, shipped 2026-01-27)
-- 🚧 **v2.0 Stable Release** (Phases 150-155, in progress)
+- ✅ **v2.0 Stable Release** — [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) (Phases 150-155, shipped 2026-01-27)
+- 🚧 **v2.1 TVM Only** — [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) (Phase 156, in progress)
 
 ## Completed Milestones
 
@@ -170,7 +171,7 @@ See [milestones/v1.20-ROADMAP.md](milestones/v1.20-ROADMAP.md) for full details.
 
 None
 
-## 🚧 v2.0 Stable Release (In Progress)
+## ✅ v2.0 Stable Release (Shipped 2026-01-27)
 
 **Milestone Goal:** Stabilize Sentinel for production deployment by addressing security findings, achieving test coverage targets, and providing complete documentation.
 
@@ -227,32 +228,43 @@ Plans:
 - [x] 153-02: README and Quick Start update (completed 2026-01-27)
 - [x] 153-03: Example tests for CLI commands (completed 2026-01-27)
 
-### Phase 154: Release Preparation
+### Phase 154: Release Preparation ✅
 **Goal**: v2.0.0 release candidate ready for production deployment
 **Depends on**: Phase 153
 **Requirements**: REL-01, REL-02, REL-03, REL-04
-**Success Criteria** (what must be TRUE):
-  1. CHANGELOG.md contains complete v2.0 release notes
-  2. Version constants are updated to 2.0.0 across all packages
-  3. Git history is clean with squashed fixup commits if needed
-  4. Release candidate tag v2.0.0-rc.1 is created and tested
-**Plans**: TBD
+**Status**: Completed 2026-01-27
 
 Plans:
-- [ ] 154-01: TBD during planning
+- [x] 154-01: Release candidate preparation v1.21.0
 
-### Phase 155: Internal Documentation
+### Phase 155: Internal Documentation ✅
 **Goal**: Architecture documentation and demo materials for maintainers
 **Depends on**: Phase 154
 **Requirements**: INT-01, INT-02, INT-03
-**Success Criteria** (what must be TRUE):
-  1. Marshall document exists providing architecture overview
-  2. Demo script demonstrates common Sentinel workflows
-  3. Architecture diagram shows all components and their interactions
-**Plans**: TBD
+**Status**: Completed 2026-01-27
 
 Plans:
-- [ ] 155-01: TBD during planning
+- [x] 155-01: Internal documentation for maintainers
+
+---
+
+## 🚧 v2.1 TVM Only (In Progress)
+
+**Milestone Goal:** Remove classic mode entirely. Client-side device posture is fakeable. TVM/Lambda mode is server-verified. We don't ship fakeable security.
+
+### Phase 156: Remove Classic Mode
+**Goal**: Eliminate all client-side-only credential paths
+**Depends on**: Phase 155
+**Requirements**: TVM-01
+**Success Criteria** (what must be TRUE):
+  1. Classic mode code paths removed from CLI
+  2. `exec` and `credentials` commands require TVM endpoint
+  3. Documentation updated to reflect TVM-only operation
+  4. Migration guide for users moving from classic to TVM mode
+  5. Clear error message when TVM endpoint not configured
+
+Plans:
+- [ ] 156-01: TBD during planning
 
 ## Progress (All Milestones)
 
@@ -281,10 +293,11 @@ Plans:
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
 | v1.20 CLI Security & Deployment Helpers | 143-149 | 7/7 | ✅ Complete | 2026-01-27 |
-| v2.0 Stable Release | 150-155 | 13/? | 🚧 In Progress | - |
+| v2.0 Stable Release | 150-155 | 14/14 | ✅ Complete | 2026-01-27 |
+| v2.1 TVM Only | 156 | 0/? | 🚧 In Progress | - |
 
-**Totals:** 24 milestones (23 shipped, 1 in progress) - 153 phases complete, 2 phases planned
+**Totals:** 25 milestones (24 shipped, 1 in progress) - 155 phases complete, 1 phase planned
 
 ---
 *Roadmap created: 2026-01-14*
-*Last updated: 2026-01-27 (v2.0 milestone added)*
+*Last updated: 2026-01-27 (v2.0 shipped, v2.1 TVM Only started)*

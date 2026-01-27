@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Credentials are issued only when policy explicitly allows it — no credentials, no access, no exceptions.
-**Current focus:** v2.0 Stable Release - Production-ready release with comprehensive testing, security hardening, and documentation
+**Current focus:** v2.1 TVM Only - Remove classic mode entirely. We don't ship fakeable security.
 
 ## Current Position
 
-Phase: 154 of 155 (Release Preparation)
-Plan: 1 of 1 in current phase
-Status: Complete
-Last activity: 2026-01-27 — Completed 154-01-PLAN.md (Release candidate preparation v1.21.0)
+Phase: 156 of 156 (Remove Classic Mode)
+Plan: 0 of ? in current phase
+Status: Not started
+Last activity: 2026-01-27 — v2.0 shipped, v2.1 milestone created
 
-Progress: [████████████████████████░] 99% (154/155 phases complete)
+Progress: [█████████████████████████] 99% (155/156 phases complete)
 
 ## Performance Metrics
 
@@ -85,9 +85,9 @@ None yet (v2.0 milestone just started).
 ## Session Continuity
 
 Last session: 2026-01-27
-Stopped at: Completed 154-01-PLAN.md (Release candidate v1.21.0-rc.1)
+Stopped at: v2.0 shipped, v2.1 TVM Only milestone created
 Resume file: None
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-27 (Phase 154 plan 1 complete - Release Preparation)*
+*Last updated: 2026-01-27 (v2.0 shipped, v2.1 TVM Only milestone started)*
