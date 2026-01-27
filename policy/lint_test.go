@@ -176,7 +176,7 @@ func TestLintPolicy_UnreachableRules(t *testing.T) {
 						Conditions: Condition{
 							Users:    []string{},
 							Profiles: []string{},
-							Time:     &TimeWindow{Days: []Weekday{Monday}}, // Need at least one condition
+							// No time constraint = applies all times, shadows the specific rule below
 						},
 					},
 					{
@@ -200,7 +200,7 @@ func TestLintPolicy_UnreachableRules(t *testing.T) {
 						Effect: EffectDeny,
 						Conditions: Condition{
 							Profiles: []string{},
-							Time:     &TimeWindow{Days: []Weekday{Monday}}, // Need at least one condition
+							// No time constraint = applies all times, shadows the specific rule below
 						},
 					},
 					{

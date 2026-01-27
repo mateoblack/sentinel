@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -38,7 +39,7 @@ func (m *testRawLoader) LoadRaw(ctx context.Context, parameterName string) ([]by
 	}
 
 	// Default: not found
-	return nil, errors.New(parameterName + ": " + policy.ErrPolicyNotFound.Error())
+	return nil, fmt.Errorf("%s: %w", parameterName, policy.ErrPolicyNotFound)
 }
 
 func TestVerifyingLoader_Load_ValidSignature(t *testing.T) {
@@ -180,15 +181,15 @@ rules:
 	// Signature loader returns not found
 	sigLoader := &testRawLoader{
 		Errors: map[string]error{
-			"/sentinel/signatures/prod": errors.New("/sentinel/signatures/prod: " + policy.ErrPolicyNotFound.Error()),
+			"/sentinel/signatures/prod": fmt.Errorf("/sentinel/signatures/prod: %w", policy.ErrPolicyNotFound),
 		},
 	}
 
 	mockKMS := &testutil.MockKMSClient{}
 	signer := policy.NewPolicySignerWithClient(mockKMS, "test-key-id")
 
-	// Not enforced (default)
-	loader := policy.NewVerifyingLoader(policyLoader, sigLoader, signer)
+	// Explicitly disable enforcement to test warn-only mode
+	loader := policy.NewVerifyingLoader(policyLoader, sigLoader, signer, policy.WithEnforcement(false))
 
 	pol, err := loader.Load(context.Background(), "/sentinel/policies/prod")
 	if err != nil {
@@ -222,7 +223,7 @@ rules:
 	// Signature loader returns not found
 	sigLoader := &testRawLoader{
 		Errors: map[string]error{
-			"/sentinel/signatures/prod": errors.New("/sentinel/signatures/prod: " + policy.ErrPolicyNotFound.Error()),
+			"/sentinel/signatures/prod": fmt.Errorf("/sentinel/signatures/prod: %w", policy.ErrPolicyNotFound),
 		},
 	}
 
@@ -246,7 +247,7 @@ func TestVerifyingLoader_Load_PolicyNotFound(t *testing.T) {
 	// Policy loader returns not found
 	policyLoader := &testRawLoader{
 		Errors: map[string]error{
-			"/sentinel/policies/prod": errors.New("/sentinel/policies/prod: " + policy.ErrPolicyNotFound.Error()),
+			"/sentinel/policies/prod": fmt.Errorf("/sentinel/policies/prod: %w", policy.ErrPolicyNotFound),
 		},
 	}
 
@@ -425,7 +426,7 @@ rules:
 				}
 			} else {
 				sigLoader.Errors = map[string]error{
-					"/sentinel/signatures/test": errors.New("/sentinel/signatures/test: " + policy.ErrPolicyNotFound.Error()),
+					"/sentinel/signatures/test": fmt.Errorf("/sentinel/signatures/test: %w", policy.ErrPolicyNotFound),
 				}
 			}
 

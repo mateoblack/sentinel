@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -213,7 +214,7 @@ rules:
 	// No signature exists
 	sigLoader := &mockRawLoader{
 		Errors: map[string]error{
-			"/sentinel/signatures/prod": errors.New("/sentinel/signatures/prod: " + policy.ErrPolicyNotFound.Error()),
+			"/sentinel/signatures/prod": fmt.Errorf("/sentinel/signatures/prod: %w", policy.ErrPolicyNotFound),
 		},
 	}
 
@@ -259,7 +260,7 @@ rules:
 	// No signature exists
 	sigLoader := &mockRawLoader{
 		Errors: map[string]error{
-			"/sentinel/signatures/prod": errors.New("/sentinel/signatures/prod: " + policy.ErrPolicyNotFound.Error()),
+			"/sentinel/signatures/prod": fmt.Errorf("/sentinel/signatures/prod: %w", policy.ErrPolicyNotFound),
 		},
 	}
 
@@ -565,5 +566,5 @@ func (m *mockRawLoader) LoadRaw(ctx context.Context, parameterName string) ([]by
 			return data, nil
 		}
 	}
-	return nil, errors.New(parameterName + ": " + policy.ErrPolicyNotFound.Error())
+	return nil, fmt.Errorf("%s: %w", parameterName, policy.ErrPolicyNotFound)
 }
