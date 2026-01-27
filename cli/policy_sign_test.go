@@ -512,3 +512,59 @@ func TestPolicyVerifyCommand_Run_KMSError(t *testing.T) {
 		t.Errorf("stderr should contain 'failed to verify signature', got: %s", stderr.String())
 	}
 }
+
+// TestPolicySignCommand_OutputFilePermissions verifies that signature output files
+// have secure permissions (0600) as required by SEC-03 security hardening.
+func TestPolicySignCommand_OutputFilePermissions(t *testing.T) {
+	// Skip on Windows - file permissions work differently
+	if os.Getenv("GOOS") == "windows" {
+		t.Skip("File permissions test not applicable on Windows")
+	}
+
+	// Create temp directory
+	tmpDir := t.TempDir()
+	outputFile := tmpDir + "/signature-output.json"
+
+	// Create temp policy file
+	policyFile := createTempPolicyFile(t, validPolicyYAML())
+	defer os.Remove(policyFile)
+
+	var stderr bytes.Buffer
+
+	mockKMS := &testutil.MockKMSClient{
+		SignFunc: func(ctx context.Context, params *kms.SignInput, optFns ...func(*kms.Options)) (*kms.SignOutput, error) {
+			return &kms.SignOutput{
+				Signature: []byte("test-signature-for-perms-test"),
+			}, nil
+		},
+	}
+
+	input := PolicySignCommandInput{
+		PolicyFile: policyFile,
+		KeyID:      "alias/test-key",
+		OutputFile: outputFile,
+		Stderr:     &stderr,
+		KMSClient:  mockKMS,
+	}
+
+	exitCode, err := PolicySignCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0. stderr: %s", exitCode, stderr.String())
+	}
+
+	// Verify file was created
+	info, err := os.Stat(outputFile)
+	if err != nil {
+		t.Fatalf("failed to stat output file: %v", err)
+	}
+
+	// Verify file has 0600 permissions (SEC-03)
+	expectedPerm := os.FileMode(0600)
+	actualPerm := info.Mode().Perm()
+	if actualPerm != expectedPerm {
+		t.Errorf("Signature output file should have %o permissions (SEC-03), got %o", expectedPerm, actualPerm)
+	}
+}

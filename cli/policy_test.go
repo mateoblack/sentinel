@@ -2415,3 +2415,63 @@ func TestPolicyValidateCommand_LintOutput_Format(t *testing.T) {
 		t.Errorf("lint output should contain 'lint: allow-before-deny:', got: %s", errOutput)
 	}
 }
+
+// TestPolicyPullCommand_OutputFilePermissions verifies that policy output files
+// have secure permissions (0600) as required by SEC-03 security hardening.
+func TestPolicyPullCommand_OutputFilePermissions(t *testing.T) {
+	// Skip on Windows - file permissions work differently
+	if os.Getenv("GOOS") == "windows" {
+		t.Skip("File permissions test not applicable on Windows")
+	}
+
+	// Create temp directory
+	tmpDir := t.TempDir()
+	outputFile := filepath.Join(tmpDir, "policy-output.yaml")
+
+	// Create temp stdout/stderr
+	stdout, err := os.CreateTemp("", "stdout")
+	if err != nil {
+		t.Fatalf("failed to create stdout: %v", err)
+	}
+	defer os.Remove(stdout.Name())
+	stderr, err := os.CreateTemp("", "stderr")
+	if err != nil {
+		t.Fatalf("failed to create stderr: %v", err)
+	}
+	defer os.Remove(stderr.Name())
+
+	mockClient := &MockSSMClient{
+		Policies: map[string]string{
+			"/sentinel/policies/test-perms": validPolicyYAML(),
+		},
+	}
+
+	input := PolicyPullCommandInput{
+		Profile:    "test-perms",
+		OutputFile: outputFile,
+		Stdout:     stdout,
+		Stderr:     stderr,
+		SSMClient:  mockClient,
+	}
+
+	exitCode, err := PolicyPullCommand(context.Background(), input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exitCode != 0 {
+		t.Errorf("exitCode = %d, want 0", exitCode)
+	}
+
+	// Verify file was created
+	info, err := os.Stat(outputFile)
+	if err != nil {
+		t.Fatalf("failed to stat output file: %v", err)
+	}
+
+	// Verify file has 0600 permissions (SEC-03)
+	expectedPerm := os.FileMode(0600)
+	actualPerm := info.Mode().Perm()
+	if actualPerm != expectedPerm {
+		t.Errorf("Policy output file should have %o permissions (SEC-03), got %o", expectedPerm, actualPerm)
+	}
+}
