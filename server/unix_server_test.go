@@ -300,14 +300,14 @@ func TestUnixServer_RemoveExistingSocket(t *testing.T) {
 
 	socketPath := filepath.Join(tmpDir, "existing.sock")
 
-	// Create an existing socket file (simulating stale socket)
-	oldListener, err := net.Listen("unix", socketPath)
-	if err != nil {
-		t.Fatalf("failed to create old listener: %v", err)
+	// Create an existing regular file at socket path (simulating stale socket)
+	// Note: In Go 1.25+, closing a Unix listener removes the socket file,
+	// so we create a regular file to simulate a stale/orphaned socket path
+	if err := os.WriteFile(socketPath, []byte{}, 0600); err != nil {
+		t.Fatalf("failed to create stale socket file: %v", err)
 	}
-	oldListener.Close()
 
-	// Verify socket file exists
+	// Verify file exists at socket path
 	if _, err := os.Stat(socketPath); os.IsNotExist(err) {
 		t.Fatal("expected existing socket file")
 	}
