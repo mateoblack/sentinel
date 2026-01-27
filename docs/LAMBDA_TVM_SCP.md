@@ -1,5 +1,7 @@
 # Lambda TVM Service Control Policy (SCP) Patterns
 
+> **Note:** This document has been superseded by [SCP_REFERENCE.md](SCP_REFERENCE.md), which provides a comprehensive, consolidated reference for all SCP patterns, deployment guidance, and troubleshooting.
+
 This guide covers AWS Service Control Policies (SCPs) for enforcing TVM-only access to protected roles.
 
 ## Why SCPs Matter for TVM Security
