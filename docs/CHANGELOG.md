@@ -5,6 +5,43 @@ All notable changes to Sentinel will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-01-27
+
+### Added
+
+- Microsoft Intune MDM provider for device posture verification (OAuth2 + Graph API)
+- Intune device lookup by Azure AD device ID or device name
+- Token refresh with 5-minute buffer for Azure AD OAuth tokens
+- CLI integration tests for 60+ commands with help verification
+- STRIDE threat coverage verification (100% coverage documented)
+- Consolidated SCP reference documentation (SCP_REFERENCE.md)
+- Example tests for CLI commands (credentials, policy validate/diff, shell init, whoami)
+- Fuzz tests for policy YAML parsing, profile validation, identity validation, device validation
+
+### Changed
+
+- Go toolchain directive updated to go1.24.1 for byteness/keyring compatibility
+- File permission hardening: SensitiveFileMode (0600) for policy/signature files
+- SSM backup now uses KMS encryption by default (SEC-05 mitigation)
+- SCP deployment replaced with template generation command (SCP-T-01 mitigation)
+
+### Security
+
+- SEC-01: SSM encrypted backup with KMS
+- SEC-02: SCP template command replacing direct deployment
+- SEC-03: File permission hardening for sensitive outputs
+- SEC-04: Fuzz tests for CLI input validation
+- SEC-05: KMS encryption required for SSM backup files
+
+### Fixed
+
+- Race detector analysis complete (code review confirmed no data races)
+- DynamoDB expression attribute names (#pk pattern) for reserved words
+- Error wrapping pattern: fmt.Errorf %w for errors.Is() compatibility
+- Security sanitization strips control chars rather than rejecting
+
+**Milestone Summary:** v2.0 Stable Release stabilizes Sentinel for production deployment with comprehensive testing, Intune MDM support, security hardening, and complete documentation.
+
 ## [1.20.0] - 2026-01-27
 
 ### Added
