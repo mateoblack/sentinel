@@ -19,31 +19,35 @@ type SSMBackupCommandInput struct {
 	Parameters []string // Specific parameters to backup (empty = auto-discover)
 	Prefix     string   // Prefix for auto-discovery (default: "/sentinel/")
 	OutputDir  string   // Directory for backup files (default: "./sentinel-backup-{timestamp}")
+	KMSKeyID   string   // SEC-05: KMS key ID or ARN for encrypting backup (required)
 	JSONOutput bool     // Output in JSON format
 	AWSProfile string   // AWS profile for credentials
 	Region     string   // AWS region
 
 	// For testing
-	Hardener *deploy.SSMHardener
-	Stdout   *os.File
-	Stderr   *os.File
-	Stdin    *os.File // For confirmation prompt
+	Hardener  *deploy.SSMHardener
+	KMSClient deploy.KMSEncryptAPI // For testing KMS operations
+	Stdout    *os.File
+	Stderr    *os.File
+	Stdin     *os.File // For confirmation prompt
 }
 
 // SSMRestoreCommandInput contains the input for the ssm restore command.
 type SSMRestoreCommandInput struct {
 	BackupDir  string   // Directory containing backup files (required)
 	Parameters []string // Specific parameters to restore (empty = all in backup)
+	KMSKeyID   string   // SEC-05: KMS key ID for decryption (optional, uses key from backup if not specified)
 	Force      bool     // Skip confirmation prompt
 	JSONOutput bool     // Output in JSON format
 	AWSProfile string   // AWS profile for credentials
 	Region     string   // AWS region
 
 	// For testing
-	Hardener *deploy.SSMHardener
-	Stdout   *os.File
-	Stderr   *os.File
-	Stdin    *os.File // For confirmation prompt
+	Hardener  *deploy.SSMHardener
+	KMSClient deploy.KMSEncryptAPI // For testing KMS operations
+	Stdout    *os.File
+	Stderr    *os.File
+	Stdin     *os.File // For confirmation prompt
 }
 
 // ConfigureSSMCommands sets up the ssm backup and restore commands.
@@ -70,6 +74,11 @@ func ConfigureSSMCommands(app *kingpin.Application, s *Sentinel) {
 
 	backupCmd.Flag("json", "Output in JSON format").
 		BoolVar(&backupInput.JSONOutput)
+
+	// SEC-05: KMS key is required for backup encryption - no unencrypted backups allowed
+	backupCmd.Flag("kms-key", "KMS key ID or ARN for encrypting backup (required for SEC-05 compliance)").
+		Required().
+		StringVar(&backupInput.KMSKeyID)
 
 	backupCmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
 		StringVar(&backupInput.AWSProfile)
@@ -103,6 +112,10 @@ func ConfigureSSMCommands(app *kingpin.Application, s *Sentinel) {
 	restoreCmd.Flag("json", "Output in JSON format").
 		BoolVar(&restoreInput.JSONOutput)
 
+	// SEC-05: KMS key for decryption (optional, uses key from backup if not specified)
+	restoreCmd.Flag("kms-key", "KMS key ID for decryption (optional, uses key from backup if not specified)").
+		StringVar(&restoreInput.KMSKeyID)
+
 	restoreCmd.Flag("aws-profile", "AWS profile for credentials (optional, uses default chain if not specified)").
 		StringVar(&restoreInput.AWSProfile)
 
@@ -122,6 +135,7 @@ func ConfigureSSMCommands(app *kingpin.Application, s *Sentinel) {
 type SSMBackupOutput struct {
 	Parameters []SSMBackupParameterResult `json:"parameters"`
 	BackupDir  string                     `json:"backup_dir"`
+	KMSKeyID   string                     `json:"kms_key_id"` // SEC-05: KMS key used for encryption
 	Count      int                        `json:"count"`
 }
 
@@ -172,7 +186,8 @@ func SSMBackupCommand(ctx context.Context, input SSMBackupCommandInput) int {
 			fmt.Fprintf(stderr, "Failed to load AWS config: %v\n", err)
 			return 1
 		}
-		hardener = deploy.NewSSMHardener(awsCfg)
+		// SEC-05: Create hardener with KMS key for encrypted backups
+		hardener = deploy.NewSSMHardener(awsCfg, input.KMSKeyID)
 	}
 
 	// Determine parameters to backup
@@ -199,6 +214,7 @@ func SSMBackupCommand(ctx context.Context, input SSMBackupCommandInput) int {
 			output := SSMBackupOutput{
 				Parameters: []SSMBackupParameterResult{},
 				BackupDir:  "",
+				KMSKeyID:   input.KMSKeyID,
 				Count:      0,
 			}
 			jsonBytes, _ := json.MarshalIndent(output, "", "  ")
@@ -243,6 +259,7 @@ func SSMBackupCommand(ctx context.Context, input SSMBackupCommandInput) int {
 		}
 		fmt.Fprintln(stdout)
 		fmt.Fprintf(stdout, "Backup directory: %s/\n", backupDir)
+		fmt.Fprintf(stdout, "KMS key: %s\n", input.KMSKeyID)
 		fmt.Fprintln(stdout)
 	}
 
@@ -258,6 +275,7 @@ func SSMBackupCommand(ctx context.Context, input SSMBackupCommandInput) int {
 		output := SSMBackupOutput{
 			Parameters: make([]SSMBackupParameterResult, len(result.Parameters)),
 			BackupDir:  result.BackupDir,
+			KMSKeyID:   input.KMSKeyID,
 			Count:      result.Count,
 		}
 		for i, param := range result.Parameters {
@@ -319,7 +337,11 @@ func SSMRestoreCommand(ctx context.Context, input SSMRestoreCommandInput) int {
 			fmt.Fprintf(stderr, "Failed to load AWS config: %v\n", err)
 			return 1
 		}
-		hardener = deploy.NewSSMHardener(awsCfg)
+
+		// SEC-05: Determine KMS key for decryption
+		// If not provided via flag, will be inferred from backup files during restore
+		kmsKeyID := input.KMSKeyID
+		hardener = deploy.NewSSMHardener(awsCfg, kmsKeyID)
 	}
 
 	// Load backup files

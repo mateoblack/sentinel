@@ -30,9 +30,10 @@ type ssmHardenAPI interface {
 	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
 }
 
-// kmsEncryptAPI defines KMS operations for backup encryption.
+// KMSEncryptAPI defines KMS operations for backup encryption.
 // SEC-05: Backup files must be encrypted to prevent plaintext secrets on disk.
-type kmsEncryptAPI interface {
+// Exported for CLI testing injection.
+type KMSEncryptAPI interface {
 	Encrypt(ctx context.Context, params *kms.EncryptInput, optFns ...func(*kms.Options)) (*kms.EncryptOutput, error)
 	Decrypt(ctx context.Context, params *kms.DecryptInput, optFns ...func(*kms.Options)) (*kms.DecryptOutput, error)
 }
@@ -40,7 +41,7 @@ type kmsEncryptAPI interface {
 // SSMHardener provides backup and restore capabilities for SSM parameters.
 type SSMHardener struct {
 	client    ssmHardenAPI
-	kmsClient kmsEncryptAPI // KMS client for backup encryption (SEC-05)
+	kmsClient KMSEncryptAPI // KMS client for backup encryption (SEC-05)
 	kmsKeyID  string        // KMS key ID for backup encryption
 }
 
@@ -82,7 +83,7 @@ type RestoreResult struct {
 // NewSSMHardener creates a new SSMHardener using the provided AWS configuration.
 // SEC-05: kmsKeyID is required for backup encryption. If empty, backups will fail.
 func NewSSMHardener(cfg aws.Config, kmsKeyID string) *SSMHardener {
-	var kmsClient kmsEncryptAPI
+	var kmsClient KMSEncryptAPI
 	if kmsKeyID != "" {
 		kmsClient = kms.NewFromConfig(cfg)
 	}
@@ -102,7 +103,7 @@ func NewSSMHardenerWithClient(client ssmHardenAPI) *SSMHardener {
 
 // NewSSMHardenerWithKMS creates an SSMHardener with custom SSM and KMS clients for testing.
 // SEC-05: kmsKeyID is required for backup encryption operations.
-func NewSSMHardenerWithKMS(ssmClient ssmHardenAPI, kmsClient kmsEncryptAPI, kmsKeyID string) *SSMHardener {
+func NewSSMHardenerWithKMS(ssmClient ssmHardenAPI, kmsClient KMSEncryptAPI, kmsKeyID string) *SSMHardener {
 	return &SSMHardener{
 		client:    ssmClient,
 		kmsClient: kmsClient,
