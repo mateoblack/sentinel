@@ -171,7 +171,7 @@ Server mode re-evaluates policy on every credential request, enabling instant re
 
 See [CLI Reference](guide/commands.md#shell-init) for full details.
 
-## v2.0 Features
+## v1.21 Features
 
 ### Policy Signing (Optional)
 

@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/organizations"
 )
 
-// NOTE: SCP deployment functionality was removed in v2.0 (SEC-02/SCP-T-01).
+// NOTE: SCP deployment functionality was removed in v1.21 (SEC-02/SCP-T-01).
 // SCPs can lock out entire AWS Organizations. Users should deploy SCPs
 // through their organization's change management process.
 // Use sentinel scp template to generate the policy.

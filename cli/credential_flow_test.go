@@ -1080,7 +1080,7 @@ func TestCredentialFlowErrors_DriftCheckAllStatuses(t *testing.T) {
 	}
 }
 
-// TestCredentialFlowErrors_NoStoreConfigured has been removed - credential command is deprecated in v2.1.
+// TestCredentialFlowErrors_NoStoreConfigured has been removed - credential command is deprecated in v1.22.
 // Store configuration is now handled by Lambda TVM.
 
 func TestCredentialFlowErrors_ProfileValidation(t *testing.T) {

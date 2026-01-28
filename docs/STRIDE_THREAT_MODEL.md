@@ -1,9 +1,9 @@
 # STRIDE Threat Model: Sentinel AWS Credential Management System
 
-**Version:** 2.0
+**Version:** 1.21
 **Date:** 2026-01-27
-**Status:** v2.0 Release
-**Coverage:** Sentinel v2.0
+**Status:** v1.21 Release
+**Coverage:** Sentinel v1.21
 
 ## Executive Summary
 
@@ -613,7 +613,7 @@ This document presents a comprehensive STRIDE (Spoofing, Tampering, Repudiation,
   - ⚠️ Secrets Manager secrets readable by anyone with `secretsmanager:GetSecretValue`
   - ⚠️ Environment variable fallback still supported (deprecated)
 - **Recommendation:**
-  - Remove environment variable fallback in v2.0 (breaking change)
+  - Remove environment variable fallback in v1.22 (breaking change)
   - Restrict Secrets Manager access to Lambda execution role only
   - Rotate MDM tokens quarterly
 
@@ -1683,7 +1683,7 @@ This document presents a comprehensive STRIDE (Spoofing, Tampering, Repudiation,
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-26 | Claude Sonnet 4.5 | Initial comprehensive STRIDE threat model |
-| 2.0 | 2026-01-27 | Claude Opus 4.5 | Updated for v2.0 stable release, incorporated Phase 150-152 security hardening |
+| 1.21 | 2026-01-27 | Claude Opus 4.5 | Updated for v1.21 stable release, incorporated Phase 150-152 security hardening |
 
 **Review Schedule:** Quarterly or when significant architecture changes occur
 

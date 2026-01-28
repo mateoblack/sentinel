@@ -288,7 +288,7 @@ sentinel scp template \
 
 ### Deprecated: `sentinel scp deploy`
 
-**Warning:** The `sentinel scp deploy` command has been deprecated and removed in v2.0.
+**Warning:** The `sentinel scp deploy` command has been deprecated and removed in v1.21.
 
 **Reason:** Direct SCP deployment from CLI poses risks:
 - SCPs have immediate, organization-wide impact

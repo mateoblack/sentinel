@@ -1,5 +1,5 @@
 // Package cli tests for sentinel exec command.
-// Note: Classic mode and CLI server mode have been removed in v2.1.
+// Note: Classic mode and CLI server mode have been removed in v1.22.
 // These tests now focus on TVM-only behavior.
 package cli
 

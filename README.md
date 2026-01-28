@@ -4,11 +4,11 @@
 [![Gosec](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/goseccheck.yml?branch=main&label=gosec)](https://github.com/mateoblack/sentinel/actions/workflows/goseccheck.yml)
 [![Vulnerability Check](https://img.shields.io/github/actions/workflow/status/mateoblack/sentinel/govulncheck.yml?branch=main&label=govulncheck)](https://github.com/mateoblack/sentinel/actions/workflows/govulncheck.yml)
 
-> **v2.1** - TVM-only mode. Server-verified security.
+> **v1.22** - TVM-only mode. Server-verified security.
 
 Policy-based credential gateway for AWS. Know not just *what* happened, but *why* it was allowed.
 
-> **Sentinel v2.1+ requires Lambda TVM for verified security.** The Lambda isn't overhead - it's where the intelligence lives. Client-side credential handling is fakeable; server-side (TVM) is verified. We don't ship fakeable security. See [Migration Guide](docs/TVM_MIGRATION.md) for upgrading from v2.0.
+> **Sentinel v1.22+ requires Lambda TVM for verified security.** The Lambda isn't overhead - it's where the intelligence lives. Client-side credential handling is fakeable; server-side (TVM) is verified. We don't ship fakeable security. See [Migration Guide](docs/TVM_MIGRATION.md) for upgrading from v1.21.
 
 ## The Problem
 
@@ -217,7 +217,7 @@ rules:
 | [Policy Signing](docs/POLICY_SIGNING.md) | KMS-based policy integrity |
 | [Device Posture](docs/DEVICE_POSTURE.md) | MDM integration and device verification |
 | [Security Hardening](docs/SECURITY_HARDENING.md) | Timing attacks, rate limiting, encryption |
-| [TVM Migration](docs/TVM_MIGRATION.md) | Upgrading from v2.0 to TVM-only mode |
+| [TVM Migration](docs/TVM_MIGRATION.md) | Upgrading from v1.21 to TVM-only mode |
 | [Troubleshooting](docs/guide/troubleshooting.md) | Common issues and fixes |
 
 ## Built On
@@ -251,7 +251,7 @@ Supported credential stores:
 ## Limitations
 
 - **Console access** is not controlled by Sentinel. Use trust policies requiring SourceIdentity to block console from sensitive roles.
-- **Lambda TVM required** (v2.1+): Client-side credential handling was removed because it's fakeable. All credential vending now requires Lambda TVM deployment.
+- **Lambda TVM required** (v1.22+): Client-side credential handling was removed because it's fakeable. All credential vending now requires Lambda TVM deployment.
 
 ## License
 

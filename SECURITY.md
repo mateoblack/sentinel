@@ -13,9 +13,9 @@ For detailed security analysis of Sentinel, see the [STRIDE Threat Model](docs/S
 
 For security advisory history and detailed documentation, see [docs/SECURITY.md](docs/SECURITY.md).
 
-## v2.0 Security Hardening Features
+## v1.21 Security Hardening Features
 
-Version 2.0 incorporates comprehensive security hardening from v1.15-v1.18:
+Version 1.21 incorporates comprehensive security hardening from v1.15-v1.18:
 
 ### Policy Integrity (v1.18)
 - **KMS Policy Signing**: RSASSA_PSS_SHA_256 signatures prevent cache poisoning

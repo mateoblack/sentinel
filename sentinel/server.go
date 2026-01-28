@@ -1,7 +1,7 @@
 // Package sentinel provides Sentinel's server mode for real-time credential revocation.
 // This file implements the SentinelServer which evaluates policy on every credential request.
 //
-// DEPRECATED: SentinelServer (local CLI server mode) is deprecated in v2.1.
+// DEPRECATED: SentinelServer (local CLI server mode) is deprecated in v1.22.
 // Use Lambda TVM (--remote-server) instead for verified server-side credential vending.
 // Local server mode runs on the client machine, meaning the user controls the credential
 // vending process. Lambda TVM places the trust boundary in AWS infrastructure.
@@ -48,7 +48,7 @@ const (
 
 // ErrServerDeprecated is returned when NewSentinelServer or NewSentinelServerUnix
 // is called. Local server mode has been deprecated in favor of Lambda TVM.
-var ErrServerDeprecated = fmt.Errorf(`local CLI server mode is deprecated in Sentinel v2.1
+var ErrServerDeprecated = fmt.Errorf(`local CLI server mode is deprecated in Sentinel v1.22
 
 Use Lambda TVM (--remote-server) instead for verified server-side credential vending.
 Local server mode runs on the client machine, meaning the user controls the credential
@@ -195,7 +195,7 @@ type SentinelServer struct {
 // If port is 0, an available port is automatically assigned.
 // If authToken is empty, a random token is generated.
 //
-// DEPRECATED: NewSentinelServer is deprecated in v2.1. Use Lambda TVM instead.
+// DEPRECATED: NewSentinelServer is deprecated in v1.22. Use Lambda TVM instead.
 // This function now returns ErrServerDeprecated.
 func NewSentinelServer(ctx context.Context, config SentinelServerConfig, authToken string, port int) (*SentinelServer, error) {
 	return nil, ErrServerDeprecated

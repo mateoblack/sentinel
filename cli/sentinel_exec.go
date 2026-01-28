@@ -12,7 +12,7 @@ import (
 )
 
 // SentinelExecCommandInput contains the input for the sentinel exec command.
-// Note: Classic mode and CLI server mode have been removed in v2.1.
+// Note: Classic mode and CLI server mode have been removed in v1.22.
 // Only --remote-server (Lambda TVM) mode is supported.
 type SentinelExecCommandInput struct {
 	ProfileName  string   // AWS profile to request from TVM
@@ -23,7 +23,7 @@ type SentinelExecCommandInput struct {
 }
 
 // ConfigureSentinelExecCommand sets up the sentinel exec command with kingpin.
-// Note: Classic mode and CLI server mode have been removed in v2.1.
+// Note: Classic mode and CLI server mode have been removed in v1.22.
 // Only --remote-server (Lambda TVM) mode is supported.
 func ConfigureSentinelExecCommand(app *kingpin.Application, s *Sentinel) {
 	input := SentinelExecCommandInput{}
@@ -70,7 +70,7 @@ func SentinelExecCommand(ctx context.Context, input SentinelExecCommandInput, s 
 	if input.RemoteServer == "" {
 		tvmErr := fmt.Errorf(`sentinel exec requires --remote-server <url>
 
-Classic mode has been removed in v2.1. Sentinel now requires server-side
+Classic mode has been removed in v1.22. Sentinel now requires server-side
 credential vending through Lambda TVM for verified security.
 
 To set up TVM:

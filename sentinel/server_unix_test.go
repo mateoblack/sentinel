@@ -17,7 +17,7 @@ import (
 // TestSecurityRegression_UnixSocket_ProcessAuthentication verifies that
 // only the process that received the token can use it.
 func TestSecurityRegression_UnixSocket_ProcessAuthentication(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	tmpDir, err := os.MkdirTemp("", "sentinel-unix-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
@@ -100,7 +100,7 @@ func TestSecurityRegression_UnixSocket_ProcessAuthentication(t *testing.T) {
 // TestSecurityRegression_UnixSocket_SocketCleanup verifies that the socket
 // is cleaned up on shutdown.
 func TestSecurityRegression_UnixSocket_SocketCleanup(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	tmpDir, err := os.MkdirTemp("", "sentinel-unix-cleanup-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
@@ -141,7 +141,7 @@ func TestSecurityRegression_UnixSocket_SocketCleanup(t *testing.T) {
 // TestSecurityRegression_UnixSocket_TCPFallbackDisabledByDefault verifies
 // that TCP fallback is disabled by default.
 func TestSecurityRegression_UnixSocket_TCPFallbackDisabledByDefault(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	config := SentinelServerConfig{
 		ProfileName:   "test-profile",
 		User:          "test-user",

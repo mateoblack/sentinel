@@ -1,10 +1,10 @@
-# Migrating to TVM-Only Mode (v2.1)
+# Migrating to TVM-Only Mode (v1.22)
 
-> **v2.1 Breaking Change:** Sentinel v2.1 removes "classic mode" (direct credential injection). All credential vending now requires Lambda TVM for server-verified security.
+> **v1.22 Breaking Change:** Sentinel v1.22 removes "classic mode" (direct credential injection). All credential vending now requires Lambda TVM for server-verified security.
 
 ## Why Classic Mode Was Removed
 
-Sentinel v2.1 removes "classic mode" (direct credential injection) because:
+Sentinel v1.22 removes "classic mode" (direct credential injection) because:
 
 1. **Client-side is fakeable**: Device posture checks on the client can be bypassed by a malicious client
 2. **Credentials escape**: Once injected via `credential_process` or environment variables, credentials can be captured, cached, and reused
@@ -17,7 +17,7 @@ No Lambda = no threat intel = just another fakeable CLI tool.
 
 ## What Changed
 
-| Before (v2.0) | After (v2.1) | Why |
+| Before (v1.21) | After (v1.22) | Why |
 |---------------|--------------|-----|
 | `sentinel exec profile -- cmd` | `sentinel exec --remote-server <url> profile -- cmd` | Policy evaluation moved server-side |
 | `sentinel credentials --profile profile` | **Removed** | Credentials to stdout are capturable |
@@ -53,10 +53,10 @@ Note the API Gateway URL from the deployment output (e.g., `https://abc123.execu
 Replace direct exec with remote-server:
 
 ```bash
-# Before (v2.0) - no longer works
+# Before (v1.21) - no longer works
 sentinel exec production -- aws s3 ls
 
-# After (v2.1) - requires TVM
+# After (v1.22) - requires TVM
 sentinel exec --remote-server https://abc123.execute-api.us-east-1.amazonaws.com production -- aws s3 ls
 ```
 
@@ -75,7 +75,7 @@ sentinel exec --remote-server "$SENTINEL_TVM_URL" production -- aws s3 ls
 If you used `sentinel credentials` in `~/.aws/config`, this no longer works:
 
 ```ini
-# Before (no longer works in v2.1)
+# Before (no longer works in v1.22)
 [profile production]
 credential_process = sentinel credentials --profile production
 ```
@@ -114,7 +114,7 @@ Replace direct credential injection with TVM calls:
     eval $(sentinel credentials --profile production --stdout)
     aws s3 ls
 
-# After (v2.1)
+# After (v1.22)
 - name: Get AWS Credentials via TVM
   env:
     AWS_CONTAINER_CREDENTIALS_FULL_URI: "https://abc123.execute-api.us-east-1.amazonaws.com/credentials?profile=production"
@@ -191,7 +191,7 @@ By moving to TVM-only, you gain:
 
 ### "Error: --remote-server is required"
 
-You're running v2.1+ without specifying the TVM URL. Either:
+You're running v1.22+ without specifying the TVM URL. Either:
 - Set `SENTINEL_TVM_URL` environment variable
 - Pass `--remote-server <url>` explicitly
 
@@ -222,4 +222,4 @@ TVM endpoint is unreachable. Verify:
 
 ---
 
-*Migration guide for Sentinel v2.1 TVM-Only mode*
+*Migration guide for Sentinel v1.22 TVM-Only mode*

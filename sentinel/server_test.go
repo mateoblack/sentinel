@@ -75,12 +75,12 @@ func createTestPolicy(effect policy.Effect) *policy.Policy {
 }
 
 // createTestServer creates a SentinelServer for testing with the given config overrides.
-// NOTE: This helper will skip the test because local server mode is deprecated in v2.1.
+// NOTE: This helper will skip the test because local server mode is deprecated in v1.22.
 func createTestServer(t *testing.T, policyEffect policy.Effect, opts ...func(*SentinelServerConfig)) (*SentinelServer, string) {
 	t.Helper()
 
 	// Skip test since local server mode is deprecated
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 
 	mockLoader := testutil.NewMockPolicyLoader()
 	mockLoader.Policies["/sentinel/policies/test"] = createTestPolicy(policyEffect)
@@ -537,7 +537,7 @@ func TestSentinelServer_AuthToken(t *testing.T) {
 }
 
 func TestSentinelServer_GenerateRandomAuthToken(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	mockLoader := testutil.NewMockPolicyLoader()
 	mockLoader.Policies["/sentinel/policies/test"] = createTestPolicy(policy.EffectAllow)
 
@@ -730,7 +730,7 @@ func createModeConditionalPolicy(effect policy.Effect, allowedMode policy.Creden
 }
 
 func TestSentinelServer_ModeCondition_ServerAllowed(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	// Policy allows only server mode
 	mockLoader := testutil.NewMockPolicyLoader()
 	mockLoader.Policies["/sentinel/policies/test"] = createModeConditionalPolicy(policy.EffectAllow, policy.ModeServer)
@@ -793,7 +793,7 @@ func TestSentinelServer_PassesModeServer(t *testing.T) {
 }
 
 func TestSentinelServer_ModeCondition_CLIOnlyDeniesServer(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	// Policy allows only CLI mode - should deny server requests
 	mockLoader := testutil.NewMockPolicyLoader()
 	mockLoader.Policies["/sentinel/policies/test"] = createModeConditionalPolicy(policy.EffectAllow, policy.ModeCLI)
@@ -828,7 +828,7 @@ func TestSentinelServer_ModeCondition_CLIOnlyDeniesServer(t *testing.T) {
 }
 
 func TestSentinelServer_ModeCondition_CredentialProcessOnlyDeniesServer(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	// Policy allows only credential_process mode - should deny server requests
 	mockLoader := testutil.NewMockPolicyLoader()
 	mockLoader.Policies["/sentinel/policies/test"] = createModeConditionalPolicy(policy.EffectAllow, policy.ModeCredentialProcess)
@@ -887,7 +887,7 @@ func createPolicyWithMaxDuration(effect policy.Effect, maxDuration time.Duration
 }
 
 func TestSentinelServer_PolicyDurationCapping(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	mockProvider := &MockCredentialProvider{}
 	mockLoader := testutil.NewMockPolicyLoader()
 
@@ -934,7 +934,7 @@ func TestSentinelServer_PolicyDurationCapping(t *testing.T) {
 }
 
 func TestSentinelServer_PolicyDurationCap_NoCapWhenZero(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	mockProvider := &MockCredentialProvider{}
 	mockLoader := testutil.NewMockPolicyLoader()
 
@@ -979,7 +979,7 @@ func TestSentinelServer_PolicyDurationCap_NoCapWhenZero(t *testing.T) {
 }
 
 func TestSentinelServer_PolicyAndBreakGlassCapInteraction(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	// Test that the smallest cap wins: policy cap vs break-glass remaining time
 	mockProvider := &MockCredentialProvider{}
 	mockLoader := testutil.NewMockPolicyLoader()
@@ -1044,7 +1044,7 @@ func TestSentinelServer_PolicyAndBreakGlassCapInteraction(t *testing.T) {
 }
 
 func TestSentinelServer_PolicyCapSmallerThanBreakGlass(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	// Test when policy cap is smaller than break-glass remaining time
 	mockProvider := &MockCredentialProvider{}
 	mockLoader := testutil.NewMockPolicyLoader()
@@ -1109,7 +1109,7 @@ func TestSentinelServer_PolicyCapSmallerThanBreakGlass(t *testing.T) {
 }
 
 func TestSentinelServer_ModeCondition_EmptyModeAllowsServer(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	// Policy with no mode condition (empty) should allow any mode including server
 	mockLoader := testutil.NewMockPolicyLoader()
 	mockLoader.Policies["/sentinel/policies/test"] = &policy.Policy{
@@ -1156,7 +1156,7 @@ func TestSentinelServer_ModeCondition_EmptyModeAllowsServer(t *testing.T) {
 // ============================================================================
 
 func TestSentinelServer_RequireServerEffect_Allowed(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	// Create policy with require_server effect
 	requireServerPolicy := &policy.Policy{
 		Version: "1",
@@ -1225,7 +1225,7 @@ func TestSentinelServer_RequireServerEffect_Allowed(t *testing.T) {
 }
 
 func TestSentinelServer_RequireServerEffect_Logging(t *testing.T) {
-	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v2.1)")
+	t.Skip("DEPRECATED: Local server mode tests skipped - use Lambda TVM instead (v1.22)")
 	// Create policy with require_server effect
 	requireServerPolicy := &policy.Policy{
 		Version: "1",

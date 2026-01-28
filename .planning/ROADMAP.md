@@ -29,8 +29,8 @@ Sentinel adds intent-aware access control to aws-vault, evaluating policy rules 
 - ✅ **v1.18 Critical Security Hardening** — [milestones/v1.18-ROADMAP.md](milestones/v1.18-ROADMAP.md) (Phases 126-135, shipped 2026-01-26)
 - ✅ **v1.19 Documentation & Completeness Audit** — [milestones/v1.19-ROADMAP.md](milestones/v1.19-ROADMAP.md) (Phases 136-142, shipped 2026-01-26)
 - ✅ **v1.20 CLI Security & Deployment Helpers** — [milestones/v1.20-ROADMAP.md](milestones/v1.20-ROADMAP.md) (Phases 143-149, shipped 2026-01-27)
-- ✅ **v2.0 Stable Release** — [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) (Phases 150-155, shipped 2026-01-27)
-- 🚧 **v2.1 TVM Only** — [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) (Phase 156, in progress)
+- ✅ **v1.21 Stable Release** — [milestones/v1.21-ROADMAP.md](milestones/v1.21-ROADMAP.md) (Phases 150-155, shipped 2026-01-27)
+- ✅ **v1.22 TVM Only** — [milestones/v1.22-ROADMAP.md](milestones/v1.22-ROADMAP.md) (Phase 156, shipped 2026-01-28)
 
 ## Completed Milestones
 
@@ -171,7 +171,7 @@ See [milestones/v1.20-ROADMAP.md](milestones/v1.20-ROADMAP.md) for full details.
 
 None
 
-## ✅ v2.0 Stable Release (Shipped 2026-01-27)
+## ✅ v1.21 Stable Release (Shipped 2026-01-27)
 
 **Milestone Goal:** Stabilize Sentinel for production deployment by addressing security findings, achieving test coverage targets, and providing complete documentation.
 
@@ -215,9 +215,9 @@ Plans:
 **Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, DOC-06, DOC-07
 **Success Criteria** (what must be TRUE):
   1. Stale or outdated documentation is removed or updated
-  2. SECURITY.md contains v2.0 threat model and known risks
+  2. SECURITY.md contains v1.21 threat model and known risks
   3. THREAT_MODEL.md references complete security analysis
-  4. README.md quick start guide accurately reflects v2.0 setup process
+  4. README.md quick start guide accurately reflects v1.21 setup process
   5. IAM policy templates are documented for all Sentinel features
   6. SCP templates are provided as documentation (not CLI deployment)
   7. All code examples in documentation have corresponding Example* tests
@@ -229,7 +229,7 @@ Plans:
 - [x] 153-03: Example tests for CLI commands (completed 2026-01-27)
 
 ### Phase 154: Release Preparation ✅
-**Goal**: v2.0.0 release candidate ready for production deployment
+**Goal**: v1.21.0 release candidate ready for production deployment
 **Depends on**: Phase 153
 **Requirements**: REL-01, REL-02, REL-03, REL-04
 **Status**: Completed 2026-01-27
@@ -248,7 +248,7 @@ Plans:
 
 ---
 
-## v2.1 TVM Only (Shipped 2026-01-27)
+## v1.22 TVM Only (Shipped 2026-01-28)
 
 **Milestone Goal:** Remove classic mode entirely. Client-side device posture is fakeable. TVM/Lambda mode is server-verified. We don't ship fakeable security.
 
@@ -289,11 +289,11 @@ Plans:
 | v1.18 Critical Security Hardening | 126-135 | 24/24 | ✅ Complete | 2026-01-26 |
 | v1.19 Documentation & Completeness Audit | 136-142 | 7/7 | ✅ Complete | 2026-01-26 |
 | v1.20 CLI Security & Deployment Helpers | 143-149 | 7/7 | ✅ Complete | 2026-01-27 |
-| v2.0 Stable Release | 150-155 | 14/14 | ✅ Complete | 2026-01-27 |
-| v2.1 TVM Only | 156 | 2/2 | ✅ Complete | 2026-01-27 |
+| v1.21 Stable Release | 150-155 | 14/14 | ✅ Complete | 2026-01-27 |
+| v1.22 TVM Only | 156 | 2/2 | ✅ Complete | 2026-01-28 |
 
 **Totals:** 25 milestones (25 shipped) - 156 phases complete
 
 ---
 *Roadmap created: 2026-01-14*
-*Last updated: 2026-01-27 (v2.1 TVM Only shipped)*
+*Last updated: 2026-01-28 (v1.22 TVM Only shipped)*
